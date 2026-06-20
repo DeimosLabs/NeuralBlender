@@ -9,7 +9,7 @@ Supports nam A1, A2, aidax, and json model files. Can load up to 4 models simult
 Doesn't have a custom UI yet, but generic LV2 controls seem to be working fine.
 
 Compiles and installs with cmake.
-Required libraries: eigen3, lv2, and (for JACK support) libjack
+Required libraries: eigen3, lv2, and (for JACK support) libjack.
 See CMakeLists.txt for more details.
 
 To build and install, from an empty build directory run something like:
