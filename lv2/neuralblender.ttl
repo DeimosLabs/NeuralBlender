@@ -77,7 +77,7 @@ nb:ModelD
           lv2:ControlPort ;
         lv2:index 2 ;
         lv2:symbol "bypass" ;
-        lv2:name "Bypass" ;
+        lv2:name "ENABLE" ;
         lv2:designation lv2:enabled ;
         lv2:portProperty lv2:toggled ;
         lv2:default 1 ;
