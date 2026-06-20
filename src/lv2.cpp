@@ -37,7 +37,7 @@
 
 #define NB_URI "http://deimos.ca/neuralblender"
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #define CMDLINE_DEBUG

@@ -22,7 +22,7 @@
 #include <filesystem>
 #include "neuralblender.h"
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #define CMDLINE_IMPLEMENTATION // This should only be in ONE implementation file!!
