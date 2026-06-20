@@ -4,7 +4,7 @@ A simple amp modeling plugin based on RTNeural and NeuralAmpModeler (NAM)
 
 Supports nam A1, A2, aidax, and json model files. Can load up to 4 models simultaneously and either blend or switch between them. Each lane has input gain, output gain, and pre-delay for phasing correction/effects.
 
-Doesn't have a custom UI yet, but generic LV2 controls seem to be working fine at least in Ardour and jalv. Carla doesn't expose LV2 filename parameters except for the first one, this will be fixed / worked around soon.
+Doesn't have a custom UI yet, but generic LV2 controls seem to be working fine at least in Ardour and jalv.
 
 ![NeuralBlender in Ardour](screenshot-ardour.png)
 
