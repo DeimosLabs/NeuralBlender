@@ -8,7 +8,7 @@ Compiles and installs with cmake.
 Required libraries: eigen3, lv2, and (for JACK support) libjack
 See CMakeLists.txt for more details.
 
-To build and install:
+To build and install, from an empty build directory:
 ```
 cmake wherver/is/src/neuralblender
 make -j `nproc`
@@ -20,7 +20,7 @@ For standalone version, see --help text for more info/options
 
 Should compile and work fine on any POSIX compliant OS including Linux, MacOS, FreeBSD, etc.
 
-Tested on: As of now, only Linux Mint and Void Linux.
+Tested on: As of now, only Void Linux and Linux Mint.
 
 Compiling/running this on w**dows: Short answer, don't do microsuck malware. It's bad for you (and for everyone else)
 
