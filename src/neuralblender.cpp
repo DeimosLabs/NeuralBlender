@@ -253,10 +253,10 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes)
   std::lock_guard<std::mutex> lock (model_mutex, std::adopt_lock);
   
   // output gain at minimum (-40dB) -> silence
-  if (gain_out <= 0.01) {
+  /*if (gain_out <= 0.01) {
     memset (out, 0, nframes * sizeof (float));
     return;
-  }
+  }*/
   
   if (warmup > 0) {
     debug ("skipping block, warmup=%d", warmup);
@@ -445,17 +445,25 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
   }
 
   bool any_loaded = false;
+  bool any_active = false;
   for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
-    if (!amps [lane].filename.empty () &&
-        !amps [lane].mute.load (std::memory_order_relaxed) &&
-        !m_lane_mute [lane].load (std::memory_order_relaxed)) {
-      any_loaded = true;
-      break;
-    }
+    if (amps [lane].filename.empty ())
+      continue;
+
+    any_loaded = true;
+
+    if (!amps [lane].mute.load (std::memory_order_relaxed) &&
+        !m_lane_mute [lane].load (std::memory_order_relaxed))
+      any_active = true;
   }
 
   if (!any_loaded) {
     delays [0].process_block (process_in, out, nframes);
+    return;
+  }
+
+  if (!any_active) {
+    std::fill (out, out + nframes, 0.0f);
     return;
   }
 
