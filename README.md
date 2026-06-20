@@ -12,7 +12,7 @@ Compiles and installs with cmake.
 Required libraries: eigen3, lv2, and (for JACK support) libjack
 See CMakeLists.txt for more details.
 
-To build and install, from an empty build directory:
+To build and install, from an empty build directory run something like:
 ```
 cmake wherver/is/src/neuralblender
 make -j `nproc`
