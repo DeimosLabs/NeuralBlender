@@ -26,16 +26,28 @@ endif()
 set(TIMESTAMP_FILE ${CMAKE_CURRENT_BINARY_DIR}/timestamp.h)
 set_source_files_properties(${TIMESTAMP_FILE} PROPERTIES GENERATED TRUE)
 
-add_custom_target(timestamp ALL
+add_custom_target(generate_timestamp ALL
   COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/timestamp.sh" "${TIMESTAMP_FILE}"
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
   COMMENT "Updating build timestamp"
 )
 
+add_custom_target(generate_inline_data ALL
+  COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh"
+  WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+  COMMENT "Generating inline data"
+)
+
+execute_process (COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+execute_process (COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/timestamp.sh
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
 add_library(neuralblender_core OBJECT
   src/neuralblender.cpp
-  src/timestamp.cpp
-
+  ${CMAKE_CURRENT_BINARY_DIR}/data/data.cpp
+  
   external/NAM/get_dsp.cpp
   external/NAM/dsp.cpp
   external/NAM/container.cpp
@@ -55,7 +67,8 @@ set_target_properties(neuralblender_core PROPERTIES
   POSITION_INDEPENDENT_CODE ON
 )
 
-add_dependencies(neuralblender_core timestamp)
+add_dependencies(neuralblender_core generate_timestamp)
+add_dependencies(neuralblender_core generate_inline_data)
 
 target_include_directories(neuralblender_core PUBLIC
   ${CMAKE_CURRENT_BINARY_DIR}

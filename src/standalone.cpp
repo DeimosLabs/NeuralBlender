@@ -23,6 +23,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include "neuralblender.h"
+#include "timestamp.h"
 
 #ifdef DEBUG
 #define CMDLINE_DEBUG
@@ -33,6 +34,8 @@
 #define CP
 #define BP
 #endif
+
+const char *g_build_timestamp = BUILD_TIMESTAMP;
 
 /******************************************************************************
  * JACK stuff
