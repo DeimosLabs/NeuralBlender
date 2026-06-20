@@ -4,6 +4,7 @@
 @prefix atom:  <http://lv2plug.in/ns/ext/atom#> .
 @prefix patch: <http://lv2plug.in/ns/ext/patch#> .
 @prefix urid:  <http://lv2plug.in/ns/ext/urid#> .
+@prefix foaf:  <http://xmlns.com/foaf/0.1/> .
 @prefix mod:   <http://moddevices.com/ns/mod#> .
 @prefix nb:    <http://deimos.ca/neuralblender#> .
 @prefix state: <http://lv2plug.in/ns/ext/state#> .
@@ -50,6 +51,14 @@ nb:ModelD
                    nb:ModelD ;
     
     doap:name "NeuralBlender" ;
+    doap:developer [
+        a foaf:Organization ;
+        foaf:name "DeimosLabs"
+    ] ;
+    doap:maintainer [
+        a foaf:Organization ;
+        foaf:name "DeimosLabs"
+    ] ;
 
     lv2:port [
         a lv2:InputPort ,

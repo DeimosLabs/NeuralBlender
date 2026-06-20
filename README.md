@@ -4,6 +4,8 @@ A simple amp modeling plugin based on RTNeural and NeuralAmpModeler (NAM)
 
 Supports nam A1, A2, aidax, and json model files. Can load up to 4 models simultaneously and either blend or switch between them. Each lane has input gain, output gain, and pre-delay for phasing correction/effects.
 
+![NeuralBlender in Ardour](screenshot-ardour.png)
+
 Doesn't have a custom UI yet, but generic LV2 controls seem to be working fine.
 
 Compiles and installs with cmake.
