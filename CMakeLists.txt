@@ -68,20 +68,20 @@ add_library(neuralblender_core OBJECT
   external/NAM/wavenet/slimmable.cpp
 )
 
-add_library(xputty STATIC
-  external/libxputty/xputty/xwidget.c
-  external/libxputty/xputty/xputty.c
-)
-
-target_include_directories(xputty PUBLIC
-  ${PROJECT_SOURCE_DIR}/external/libxputty
-  ${PROJECT_SOURCE_DIR}/external/libxputty/xputty
-)
-
-target_link_libraries(xputty PUBLIC
-  ${X11_LIBRARIES}
-  cairo
-)
+#add_library(xputty STATIC
+#  external/libxputty/xputty/xwidget.c
+#  external/libxputty/xputty/xputty.c
+#)
+#
+#target_include_directories(xputty PUBLIC
+#  ${PROJECT_SOURCE_DIR}/external/libxputty
+#  ${PROJECT_SOURCE_DIR}/external/libxputty/xputty
+#)
+#
+#target_link_libraries(xputty PUBLIC
+#  ${X11_LIBRARIES}
+#  cairo
+#)
 
 
 set_target_properties(neuralblender_core PROPERTIES
@@ -198,7 +198,7 @@ if (LV2)
       OUTPUT_NAME "neuralblender_ui"
     )
 
-    target_link_libraries(neuralblender_ui PRIVATE xputty)
+    #target_link_libraries(neuralblender_ui PRIVATE xputty)
     target_compile_definitions(neuralblender_ui PRIVATE LV2_UI)
     target_include_directories(neuralblender_ui PRIVATE ${X11_INCLUDE_DIRS})
     target_link_libraries(neuralblender_ui PRIVATE ${X11_LIBRARIES})
