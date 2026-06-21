@@ -1,4 +1,7 @@
 #!/bin/bash
+# generates lv2/*.ttl from lv2/*.ttl.in in source dir. Lines starting 
+# with @@UI in the .ttl.in files are included only if LV2 UI
+# is enabled (without the "@@UI" token) and stripped otherwise.
 
 lv2dir="`dirname $0`"
 lv2dir="`readlink -f "$lv2dir"`"
