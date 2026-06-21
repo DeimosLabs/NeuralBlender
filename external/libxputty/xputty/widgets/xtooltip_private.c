@@ -1,0 +1,57 @@
+/*
+ *                           0BSD 
+ * 
+ *                    BSD Zero Clause License
+ * 
+ *  Copyright (c) 2019 Hermann Meyer
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted.
+
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+ * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ *
+ */
+
+
+#include "xtooltip_private.h"
+
+
+void _get_width(Widget_t *w) {
+    cairo_text_extents_t extents;
+    cairo_set_font_size (w->crb, w->app->normal_font * w->app->hdpi);
+    cairo_text_extents(w->crb,w->label , &extents);
+    os_resize_window (w->app->dpy, w, max(1, (int)extents.width+40), 25 * w->app->hdpi);    
+}
+
+void _draw_tooltip(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    int width = metrics.width;
+    int height = metrics.height;
+    if (!metrics.visible) return;
+    cairo_set_line_width(w->crb, 1.0 * w->app->hdpi);
+    use_bg_color_scheme(w, get_color_state(w));
+    cairo_rectangle(w->crb,0, 0, width, height);
+    cairo_fill_preserve(w->crb);
+    use_frame_color_scheme(w, NORMAL_);
+    cairo_stroke (w->crb);
+    cairo_text_extents_t extents;
+    cairo_set_font_size (w->crb, w->app->normal_font * w->app->hdpi);
+    cairo_text_extents(w->crb,"ApqO" , &extents);
+    int eh = extents.height;
+    /** show label **/
+    use_text_color_scheme(w, get_color_state(w));
+    cairo_text_extents(w->crb,w->label , &extents);
+    cairo_move_to (w->crb, (width-extents.width)/2., height+5 - eh );
+    cairo_text_path (w->crb, w->label);
+    cairo_fill (w->crb);
+    
+}

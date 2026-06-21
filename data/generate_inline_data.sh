@@ -220,10 +220,10 @@ done >> "$listfile"
 if [ "$make_new_data_c" != "yes" ]; then
   debug "checking if we need to regenerate $cname and $hname..."
   if ! [ -f "$data_c" ]; then
-    echo "$cname not found in output dir, creating new"
+    echo "$cname doesn't exit in output dir, creating new"
     make_new_data_c="yes"
   elif ! [ -f "$data_h" ]; then
-    echo "$hname not found in output dir, creating new"
+    echo "$hname doesn't exist in output dir, creating new"
     make_new_data_c="yes"
   elif [ "$data_h" -ot "$data_c" ] || [ "$data_c" -ot "$data_h" ]; then
     # both files SHOULD have the same timestamp, see 'touch' command below
@@ -236,12 +236,13 @@ if [ "$make_new_data_c" != "yes" ]; then
         exit 1
       fi
       
+      #echo "data_c='$data_c', file='$file'"
       if [ "$data_c" -ot "$file" ]; then
         echo "$file is newer than $data_c, re-generating"
         make_new_data_c="yes"
         break
       #else
-        #echo "$checkfile is older than $data_c"
+      #  echo "$file is older than $data_c"
       fi
     done
   fi

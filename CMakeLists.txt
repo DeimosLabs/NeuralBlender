@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(neuralblender
   VERSION 0.1.0
   DESCRIPTION "Amp modeling plugin based on RTNeural and NAM"
-  LANGUAGES CXX)
+  LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -37,21 +37,11 @@ add_custom_target(generate_timestamp ALL
   COMMENT "Updating build timestamp"
 )
 
-add_custom_target(generate_inline_data ALL
-  COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh"
-  WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-  COMMENT "Generating inline data"
-)
-
-execute_process (COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh
-                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-
 execute_process (COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/timestamp.sh
                  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
 add_library(neuralblender_core OBJECT
   src/neuralblender.cpp
-  ${CMAKE_CURRENT_BINARY_DIR}/data/data.cpp
   
   external/NAM/get_dsp.cpp
   external/NAM/dsp.cpp
@@ -68,28 +58,11 @@ add_library(neuralblender_core OBJECT
   external/NAM/wavenet/slimmable.cpp
 )
 
-#add_library(xputty STATIC
-#  external/libxputty/xputty/xwidget.c
-#  external/libxputty/xputty/xputty.c
-#)
-#
-#target_include_directories(xputty PUBLIC
-#  ${PROJECT_SOURCE_DIR}/external/libxputty
-#  ${PROJECT_SOURCE_DIR}/external/libxputty/xputty
-#)
-#
-#target_link_libraries(xputty PUBLIC
-#  ${X11_LIBRARIES}
-#  cairo
-#)
-
-
 set_target_properties(neuralblender_core PROPERTIES
   POSITION_INDEPENDENT_CODE ON
 )
 
 add_dependencies(neuralblender_core generate_timestamp)
-add_dependencies(neuralblender_core generate_inline_data)
 
 target_include_directories(neuralblender_core PUBLIC
   ${CMAKE_CURRENT_BINARY_DIR}
@@ -151,6 +124,62 @@ if (STANDALONE)
   endif()
 endif()
 
+if (GUI)
+  pkg_check_modules(X11 REQUIRED x11)
+  pkg_check_modules(CAIRO REQUIRED cairo)
+  message(STATUS "X11: found")
+  message(STATUS "Cairo: found")
+
+  add_custom_target(generate_inline_data ALL
+    COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMENT "Generating inline data"
+  )
+
+  execute_process (COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh
+                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+  add_library(neuralblender_data OBJECT
+    ${CMAKE_CURRENT_BINARY_DIR}/data/data.cpp
+  )
+
+  add_dependencies(neuralblender_data generate_inline_data)
+
+  set_target_properties(neuralblender_data PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+  )
+
+  target_include_directories(neuralblender_data PUBLIC
+    ${CMAKE_CURRENT_BINARY_DIR}
+  )
+
+  add_library(xputty STATIC
+    external/libxputty/xputty/xwidget.c
+    external/libxputty/xputty/xputty.c
+  )
+
+  set_target_properties(xputty PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+  )
+
+  target_include_directories(xputty PUBLIC
+    ${PROJECT_SOURCE_DIR}/external/libxputty
+    ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/header
+    ${X11_INCLUDE_DIRS}
+    ${CAIRO_INCLUDE_DIRS}
+  )
+
+  target_compile_options(xputty PUBLIC
+    ${X11_CFLAGS_OTHER}
+    ${CAIRO_CFLAGS_OTHER}
+  )
+
+  target_link_libraries(xputty PUBLIC
+    ${X11_LIBRARIES}
+    ${CAIRO_LIBRARIES}
+  )
+endif()
+  
 if (LV2)
   add_custom_target(generate_ttl ALL
     COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/lv2/generate_ttl.sh" "$<BOOL:${GUI}>"
@@ -185,23 +214,19 @@ if (LV2)
     DESTINATION lib/lv2/neuralblender.lv2
   )
 
-  if (GUI)
-    pkg_check_modules(X11 REQUIRED x11)
-    message(STATUS "X11: found")
-
+  if(GUI)    
     add_library(neuralblender_ui MODULE
-      src/ui.cpp
+      src/lv2_ui.cpp
+      $<TARGET_OBJECTS:neuralblender_data>
     )
-    
+
     set_target_properties(neuralblender_ui PROPERTIES
       PREFIX ""
       OUTPUT_NAME "neuralblender_ui"
     )
-
-    #target_link_libraries(neuralblender_ui PRIVATE xputty)
+    
+    target_link_libraries(neuralblender_ui PRIVATE xputty)
     target_compile_definitions(neuralblender_ui PRIVATE LV2_UI)
-    target_include_directories(neuralblender_ui PRIVATE ${X11_INCLUDE_DIRS})
-    target_link_libraries(neuralblender_ui PRIVATE ${X11_LIBRARIES})
 
     install(TARGETS neuralblender_ui
       LIBRARY DESTINATION lib/lv2/neuralblender.lv2
