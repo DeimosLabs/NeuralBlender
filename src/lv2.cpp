@@ -41,7 +41,7 @@
 
 #ifdef CMDLINE_DEBUG
 #include "cmdline/cmdline.h"
-#define debug(...) cmdline_debug(stderr,ANSI_BLUE,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
+#define debug(...) cmdline_debug(stderr,ANSI_DARK_GREEN,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
 #else
 #define debug(...)
 #define CP

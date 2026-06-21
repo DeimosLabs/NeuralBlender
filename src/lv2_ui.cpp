@@ -11,24 +11,25 @@
 #include <lv2/ui/ui.h>
 #include <X11/Xlib.h>
 
+#include "ui.h"
+
 #define NB_UI_URI "http://deimos.ca/neuralblender#ui"
 
 #ifdef CMDLINE_DEBUG
-#define CMDLINE_IMPLEMENTATION // separate .so file for UI
+#define CMDLINE_IMPLEMENTATION // separate .so file for UI, so we need this here
 #include "cmdline/cmdline.h"
-#define debug(...) cmdline_debug(stderr,ANSI_MAGENTA,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
+#define debug(...) cmdline_debug(stderr,ANSI_DARK_MAGENTA,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
 #else
 #define debug(...)
 #define CP
 #define BP
 #endif
 
-typedef struct {
+class c_ui : public c_neuralblender_ui {
+public:
   LV2UI_Write_Function write;
   LV2UI_Controller controller;
-  Display *display;
-  Window window;
-} NeuralBlenderUI;
+};
 
 static LV2UI_Handle instantiate (
   const LV2UI_Descriptor *descriptor,
@@ -38,14 +39,13 @@ static LV2UI_Handle instantiate (
   LV2UI_Controller controller,
   LV2UI_Widget *widget,
   const LV2_Feature *const *features) { CP
-    
+  
   (void) descriptor;
   (void) plugin_uri;
   (void) bundle_path;
-  NeuralBlenderUI *ui = (NeuralBlenderUI *) calloc (1, sizeof (NeuralBlenderUI));
+  c_ui *ui = new c_ui;
   if (!ui)
     return NULL;
-
   ui->write = write_function;
   ui->controller = controller;
 
@@ -57,47 +57,25 @@ static LV2UI_Handle instantiate (
     }
   }
 
-  ui->display = XOpenDisplay (NULL);
-  if (!ui->display) {
-    free (ui);
+  if (!ui->create (parent)) {
+    delete ui;
     return NULL;
   }
 
-  if (!parent)
-    parent = DefaultRootWindow (ui->display);
-
-  const int screen = DefaultScreen (ui->display);
-  ui->window = XCreateSimpleWindow (
-    ui->display,
-    parent,
-    0, 0,
-    640, 480,
-    0,
-    BlackPixel (ui->display, screen),
-    0x202020);
-
-  XStoreName (ui->display, ui->window, "NeuralBlender");
-  XMapWindow (ui->display, ui->window);
-  XFlush (ui->display);
-
   if (widget)
     *widget = (LV2UI_Widget) (uintptr_t) ui->window;
-
+  
   return (LV2UI_Handle) ui;
 }
 
 static void cleanup (LV2UI_Handle handle) { CP
-  NeuralBlenderUI *ui = (NeuralBlenderUI *) handle;
+  c_ui *ui = (c_ui *) handle;
   if (!ui)
     return;
-
-  if (ui->display) {
-    if (ui->window)
-      XDestroyWindow (ui->display, ui->window);
-    XCloseDisplay (ui->display);
-  }
-
-  free (ui);
+  
+  CP
+  delete ui;
+  CP
 }
 
 static void port_event (

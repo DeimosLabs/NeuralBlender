@@ -178,6 +178,28 @@ if (GUI)
     ${X11_LIBRARIES}
     ${CAIRO_LIBRARIES}
   )
+
+  add_library(neuralblender_gui STATIC
+    src/ui.cpp
+    $<TARGET_OBJECTS:neuralblender_data>
+  )
+
+  set_target_properties(neuralblender_gui PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+  )
+
+  target_include_directories(neuralblender_gui PUBLIC
+    ${PROJECT_SOURCE_DIR}/src
+  )
+
+  target_link_libraries(neuralblender_gui PUBLIC
+    xputty
+  )
+endif()
+
+if (TARGET neuralblender AND GUI)
+  target_link_libraries(neuralblender PRIVATE neuralblender_gui)
+  target_compile_definitions(neuralblender PRIVATE GUI)
 endif()
   
 if (LV2)
@@ -217,7 +239,6 @@ if (LV2)
   if(GUI)    
     add_library(neuralblender_ui MODULE
       src/lv2_ui.cpp
-      $<TARGET_OBJECTS:neuralblender_data>
     )
 
     set_target_properties(neuralblender_ui PROPERTIES
@@ -225,7 +246,7 @@ if (LV2)
       OUTPUT_NAME "neuralblender_ui"
     )
     
-    target_link_libraries(neuralblender_ui PRIVATE xputty)
+    target_link_libraries(neuralblender_ui PRIVATE neuralblender_gui)
     target_compile_definitions(neuralblender_ui PRIVATE LV2_UI)
 
     install(TARGETS neuralblender_ui
