@@ -9,7 +9,13 @@ Doesn't have a custom UI yet, but generic LV2 controls seem to be working fine a
 ![NeuralBlender in Ardour](screenshot-ardour.png)
 
 Compiles and installs with cmake.
-Required libraries: eigen3, lv2, and (for JACK support) libjack.
+
+Required libraries:
+  - eigen3
+  - lv2 (for LV2 plugin)
+  - jack (for standalone)
+  - cairo/x11 (for GUI)
+  
 See CMakeLists.txt for more details.
 
 To build and install, from an empty build directory run something like:
