@@ -14,6 +14,7 @@
 #define NB_UI_URI "http://deimos.ca/neuralblender#ui"
 
 #ifdef CMDLINE_DEBUG
+#define CMDLINE_IMPLEMENTATION
 #include "cmdline/cmdline.h"
 #define debug(...) cmdline_debug(stderr,ANSI_MAGENTA,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
 #else
