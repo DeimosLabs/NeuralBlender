@@ -13,6 +13,15 @@
 
 #define NB_UI_URI "http://deimos.ca/neuralblender#ui"
 
+#ifdef CMDLINE_DEBUG
+#include "cmdline/cmdline.h"
+#define debug(...) cmdline_debug(stderr,ANSI_MAGENTA,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
+#else
+#define debug(...)
+#define CP
+#define BP
+#endif
+
 typedef struct {
   LV2UI_Write_Function write;
   LV2UI_Controller controller;
@@ -27,8 +36,8 @@ static LV2UI_Handle instantiate (
   LV2UI_Write_Function write_function,
   LV2UI_Controller controller,
   LV2UI_Widget *widget,
-  const LV2_Feature *const *features)
-{
+  const LV2_Feature *const *features) { CP
+    
   (void) descriptor;
   (void) plugin_uri;
   (void) bundle_path;
@@ -61,7 +70,7 @@ static LV2UI_Handle instantiate (
     ui->display,
     parent,
     0, 0,
-    640, 360,
+    640, 480,
     0,
     BlackPixel (ui->display, screen),
     0x202020);
@@ -76,7 +85,7 @@ static LV2UI_Handle instantiate (
   return (LV2UI_Handle) ui;
 }
 
-static void cleanup (LV2UI_Handle handle) {
+static void cleanup (LV2UI_Handle handle) { CP
   NeuralBlenderUI *ui = (NeuralBlenderUI *) handle;
   if (!ui)
     return;
@@ -95,8 +104,8 @@ static void port_event (
   uint32_t port_index,
   uint32_t buffer_size,
   uint32_t format,
-  const void *buffer)
-{
+  const void *buffer) { CP
+  
   (void) handle;
   (void) port_index;
   (void) buffer_size;

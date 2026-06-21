@@ -24,9 +24,8 @@
 
 //#define DEBUG
 
-#ifdef DEBUG
+#ifdef CMDLINE_DEBUG
 #define CMDLINE_IMPLEMENTATION // This should only be in ONE implementation file!!
-#define CMDLINE_DEBUG
 #include "cmdline/cmdline.h"
 #define debug(...) cmdline_debug(stderr,ANSI_GREEN,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
 #else

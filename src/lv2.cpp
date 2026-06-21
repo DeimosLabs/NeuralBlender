@@ -39,8 +39,7 @@
 
 //#define DEBUG
 
-#ifdef DEBUG
-#define CMDLINE_DEBUG
+#ifdef CMDLINE_DEBUG
 #include "cmdline/cmdline.h"
 #define debug(...) cmdline_debug(stderr,ANSI_BLUE,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
 #else
