@@ -5,6 +5,7 @@
 @prefix patch: <http://lv2plug.in/ns/ext/patch#> .
 @prefix urid:  <http://lv2plug.in/ns/ext/urid#> .
 @prefix foaf:  <http://xmlns.com/foaf/0.1/> .
+@prefix ui:    <http://lv2plug.in/ns/extensions/ui#> .
 @prefix mod:   <http://moddevices.com/ns/mod#> .
 @prefix nb:    <http://deimos.ca/neuralblender#> .
 @prefix state: <http://lv2plug.in/ns/ext/state#> .
@@ -40,6 +41,7 @@ nb:ModelD
 
     lv2:requiredFeature urid:map ;
     lv2:extensionData state:interface ;
+    ui:ui <http://deimos.ca/neuralblender#ui> ;
 
     patch:readable nb:ModelA ,
                    nb:ModelB ,
