@@ -206,16 +206,20 @@ static LV2_State_Status save (
     LV2_State_Handle handle,
     uint32_t flags,
     const LV2_Feature *const *features) {
-    Plugin *self = (Plugin *) instance;
-    
-    for (int i = 0; i < NB_MAX_MODELS; i++) {
-      store (handle,
-             self->urid_model [i],
-             self->blender.amps [i].filename.c_str (),
-             self->blender.amps [i].filename.size () + 1,
-             self->urid_atom_Path,
-             LV2_STATE_IS_POD);
-    }
+	    Plugin *self = (Plugin *) instance;
+	    
+	    for (int i = 0; i < NB_MAX_MODELS; i++) {
+	      const std::string &filename = self->blender.amps [i].filename;
+	      if (filename.empty ())
+	        continue;
+
+	      store (handle,
+	             self->urid_model [i],
+	             filename.c_str (),
+	             filename.size () + 1,
+	             self->urid_atom_Path,
+	             LV2_STATE_IS_POD);
+	    }
   
     return LV2_STATE_SUCCESS;
 }
@@ -241,16 +245,14 @@ static LV2_State_Status restore (
                     &type,
                     &valflags);
 
-      fprintf (stderr, "RESTORE [%d]: type=%u size=%zu value='%s'\n",
-               i, type, size, p ? (const char*) p : "(null)");
-      
-      if (p) {
-        request_load (self, i, (const char *) p);
-        self->current_model [i] = (const char *) p;
-        self->notify_path [i] = true;
-      } else
-        { debug ("!p"); }
-    }
+	      self->current_model [i].clear ();
+	      self->notify_path [i] = false;
+
+	      if (p && type == self->urid_atom_Path && size > 1) {
+	        const char *path = (const char *) p;
+	        request_load (self, i, path);
+	      }
+	    }
 
     return LV2_STATE_SUCCESS;
 }
