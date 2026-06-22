@@ -25,7 +25,7 @@
 #define BP
 #endif
 
-class c_ui : public c_neuralblender_ui {
+class c_lv2_ui : public c_neuralblender_ui {
 public:
   LV2UI_Write_Function write;
   LV2UI_Controller controller;
@@ -49,7 +49,7 @@ static LV2UI_Handle instantiate (
   (void) descriptor;
   (void) plugin_uri;
   (void) bundle_path;
-  c_ui *ui = new c_ui;
+  c_lv2_ui *ui = new c_lv2_ui;
   if (!ui)
     return NULL;
   ui->write = write_function;
@@ -75,7 +75,7 @@ static LV2UI_Handle instantiate (
 }
 
 static void cleanup (LV2UI_Handle handle) { CP
-  c_ui *ui = (c_ui *) handle;
+  c_lv2_ui *ui = (c_lv2_ui *) handle;
   if (!ui)
     return;
   
@@ -99,7 +99,7 @@ static void port_event (
 }
 
 static int idle (LV2UI_Handle handle) {
-  c_ui *ui = (c_ui *) handle;
+  c_lv2_ui *ui = (c_lv2_ui *) handle;
   if (!ui)
     return 0;
   
@@ -108,8 +108,8 @@ static int idle (LV2UI_Handle handle) {
 
 static const LV2UI_Idle_Interface idle_iface = { idle };
 
-static const void *extension_data(const char *uri) {
-  if (!strcmp(uri, LV2_UI__idleInterface))
+static const void *extension_data (const char *uri) {
+  if (!strcmp (uri, LV2_UI__idleInterface))
     return &idle_iface;
   return NULL;
 }

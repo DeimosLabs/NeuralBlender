@@ -25,6 +25,12 @@
 #include "neuralblender.h"
 #include "timestamp.h"
 
+#ifdef HAVE_GUI
+#include <thread>
+#include "ui.h"
+#include "xputty.h"
+#endif
+
 #ifdef CMDLINE_DEBUG
 #include "cmdline/cmdline.h"
 #define debug(...) cmdline_debug(stderr,ANSI_RED,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
@@ -43,7 +49,7 @@ const char *g_build_timestamp = BUILD_TIMESTAMP;
 static jack_client_t *jack_client = nullptr;
 static jack_port_t *jack_in = nullptr;
 static jack_port_t *jack_out = nullptr;
-static volatile bool running = true;
+static volatile bool g_running = true;
 
 static c_neuralblender g_blender;
 
@@ -56,13 +62,52 @@ static int jack_process (jack_nframes_t nframes, void *) {
 }
 
 static void jack_shutdown (void *) {
-  running = false;
+  g_running = false;
 }
 
 static void signal_handler (int) {
-  running = false;
+  g_running = false;
 }
 
+/******************************************************************************
+ * UI
+ */
+
+#ifdef HAVE_GUI
+
+class c_standalone_ui : public c_neuralblender_ui {
+public:
+  void on_gain_in (void *data, float f);
+  void on_gain_out (void *data, float f);
+  void on_fileselect (void *data);
+  void on_fileclear (void *data);
+  void on_mute (void *data, bool b);
+};
+
+void c_standalone_ui::on_gain_in (void *data, float f) { CP }
+void c_standalone_ui::on_gain_out (void *data, float f) { CP }
+void c_standalone_ui::on_fileselect (void *data) { CP }
+void c_standalone_ui::on_fileclear (void *data) { CP }
+void c_standalone_ui::on_mute (void *data, bool b) { CP }
+
+static std::thread ui_thread;
+static c_standalone_ui ui;
+
+static void ui_main () {
+  fprintf (stderr, "Creating UI...\n");
+  c_standalone_ui ui;
+  ui.create (0);        // no LV2 parent, so root/toplevel
+  fprintf (stderr, "UI running...\n");
+  
+  CP
+  main_run (&ui.app);   // blocking xputty loop
+  CP
+  g_running = false;
+  //exit (0);
+}
+
+#endif
+ 
 /******************************************************************************
  * args, main etc
  */
@@ -108,8 +153,10 @@ bool parse_args (int argc, char **argv, c_neuralblender *blender) {
 }
 
 int main (int argc, char **argv) {
+#ifndef HAVE_GUI
   signal (SIGINT, signal_handler);
   signal (SIGTERM, signal_handler);
+#endif
   
   if (!parse_args (argc, argv, &g_blender)) {
     printf ("Error parsing command line\n");
@@ -168,11 +215,19 @@ int main (int argc, char **argv) {
     return 1;
   }
   
-  fprintf(stderr, "NeuralBlender running. Connect ports manually. Ctrl+C to quit.\n");
-
-  while (running)
-    sleep (1);
-
+#ifdef HAVE_GUI
+  auto ui_thead = std::thread (ui_main);
+  CP
+#else
+  fprintf(stderr, "NeuralBlender running. Connect ports manually. Press ctrl+C to quit.\n");
+#endif
+  while (g_running)
+    usleep (1000);
+  CP
+  //ui_thread.join ();
+  CP
   jack_client_close (jack_client);
-  return 0;
+  CP
+  exit (0);
+  //return 0;
 }

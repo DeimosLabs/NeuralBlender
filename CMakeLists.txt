@@ -109,7 +109,7 @@ if (STANDALONE)
     add_executable(neuralblender
       src/standalone.cpp
     )
-
+    
     target_include_directories(neuralblender PRIVATE ${JACK_INCLUDE_DIRS})
     target_link_libraries(neuralblender PRIVATE
       neuralblender_core
@@ -222,7 +222,7 @@ endif()
 
 if (TARGET neuralblender AND GUI)
   target_link_libraries(neuralblender PRIVATE neuralblender_gui)
-  target_compile_definitions(neuralblender PRIVATE GUI)
+  target_compile_definitions(neuralblender PRIVATE GUI HAVE_GUI=1)
 endif()
   
 if (LV2)
