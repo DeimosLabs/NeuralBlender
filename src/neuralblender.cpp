@@ -230,6 +230,7 @@ void c_neuralamp::unload_model () {
   m_rtneural_model.reset ();
   m_nam_model.reset ();
   m_engine_mode = ENGINE_NONE;
+  filename = "";
 }
 
 static void copy_with_gain (float *in, float *out, uint32_t nframes, float gain) {
@@ -409,6 +410,15 @@ bool c_neuralblender::load_model (size_t which, const std::string &fn) { CP
   debug ("mute bitfield 0x%02x", bf);
   update_mutes ();
   return ret;
+}
+
+bool c_neuralblender::unload_model (size_t which) { CP
+  if (which >= NB_MAX_MODELS)
+    return false;
+
+  amps [which].unload_model ();
+  update_mutes ();
+  return true;
 }
 
 bool c_neuralblender::set_delay_ms (size_t which, float ms) {

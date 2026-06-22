@@ -109,6 +109,7 @@ typedef struct {
   LV2_URID urid_patch_property = 0;
   LV2_URID urid_patch_value    = 0;
   LV2_URID urid_atom_Path      = 0;
+  LV2_URID urid_atom_String    = 0;
   LV2_URID urid_atom_Blank     = 0;
 
   LV2_URID urid_model [NB_MAX_MODELS] = { 0 };
@@ -171,13 +172,15 @@ static void loader_main (Plugin *self) { CP
     fprintf (stderr, "NeuralBlender: loading model %zu: %s\n",
              which, path.c_str ());
 
-    if (self->blender.load_model (which, path)) {
-      self->current_model [which] = path;
-      self->notify_path [which] = true;
-      
-    }
-  }
-}
+	    if (self->blender.load_model (which, path)) {
+	      self->current_model [which] = path;
+	      self->notify_path [which] = true;
+	    } else {
+	      self->current_model [which].clear ();
+	      self->notify_path [which] = true;
+	    }
+	  }
+	}
 
 // THIS RUNS IN DSP THREAD
 static void request_load (Plugin *self, size_t which, const char *path) {
@@ -197,7 +200,22 @@ static void request_load (Plugin *self, size_t which, const char *path) {
   self->pending_load [which] = true;
   self->pending_path [which] = path;
 
-  self->loader_cv.notify_one();
+	  self->loader_cv.notify_one();
+	}
+
+static void clear_model_slot (Plugin *self, size_t which, bool notify) {
+  if (!self || which >= NB_MAX_MODELS)
+    return;
+
+  {
+    std::lock_guard<std::mutex> lock (self->loader_mutex);
+    self->pending_load [which] = false;
+    self->pending_path [which].clear ();
+  }
+
+  self->blender.unload_model (which);
+  self->current_model [which].clear ();
+  self->notify_path [which] = notify;
 }
 
 static LV2_State_Status save (
@@ -208,18 +226,16 @@ static LV2_State_Status save (
     const LV2_Feature *const *features) {
 	    Plugin *self = (Plugin *) instance;
 	    
-	    for (int i = 0; i < NB_MAX_MODELS; i++) {
-	      const std::string &filename = self->blender.amps [i].filename;
-	      if (filename.empty ())
-	        continue;
-
+		    for (int i = 0; i < NB_MAX_MODELS; i++) {
+		      const std::string &filename = self->blender.amps [i].filename;
+		      const bool empty = filename.empty ();
 	      store (handle,
 	             self->urid_model [i],
 	             filename.c_str (),
 	             filename.size () + 1,
-	             self->urid_atom_Path,
+	             empty ? self->urid_atom_String : self->urid_atom_Path,
 	             LV2_STATE_IS_POD);
-	    }
+		    }
   
     return LV2_STATE_SUCCESS;
 }
@@ -245,14 +261,14 @@ static LV2_State_Status restore (
                     &type,
                     &valflags);
 
-	      self->current_model [i].clear ();
-	      self->notify_path [i] = false;
-
-	      if (p && type == self->urid_atom_Path && size > 1) {
-	        const char *path = (const char *) p;
-	        request_load (self, i, path);
-	      }
-	    }
+		      if (p && type == self->urid_atom_Path && size > 1) {
+		        clear_model_slot (self, i, false);
+		        const char *path = (const char *) p;
+		        request_load (self, i, path);
+		      } else {
+		        clear_model_slot (self, i, true);
+		      }
+		    }
 
     return LV2_STATE_SUCCESS;
 }
@@ -317,6 +333,7 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   self->urid_patch_property = self->map->map (self->map->handle, LV2_PATCH__property);
   self->urid_patch_value    = self->map->map (self->map->handle, LV2_PATCH__value);
   self->urid_atom_Path      = self->map->map (self->map->handle, LV2_ATOM__Path);
+  self->urid_atom_String    = self->map->map (self->map->handle, LV2_ATOM__String);
   self->urid_atom_URID      = self->map->map (self->map->handle, LV2_ATOM__URID);
   self->urid_atom_Blank     = self->map->map (self->map->handle, LV2_ATOM__Blank);
   
