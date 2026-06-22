@@ -29,6 +29,12 @@ class c_ui : public c_neuralblender_ui {
 public:
   LV2UI_Write_Function write;
   LV2UI_Controller controller;
+
+  void on_gain_in (void *data, float f)  { CP }
+  void on_gain_out (void *data, float f) { CP }
+  void on_fileselect (void *data)        { CP }
+  void on_fileclear (void *data)         { CP }
+  void on_mute (void *data, bool b)      { CP }
 };
 
 static LV2UI_Handle instantiate (
@@ -92,12 +98,28 @@ static void port_event (
   (void) buffer;
 }
 
+static int idle (LV2UI_Handle handle) {
+  c_ui *ui = (c_ui *) handle;
+  if (!ui)
+    return 0;
+  
+  return ui->idle ();
+}
+
+static const LV2UI_Idle_Interface idle_iface = { idle };
+
+static const void *extension_data(const char *uri) {
+  if (!strcmp(uri, LV2_UI__idleInterface))
+    return &idle_iface;
+  return NULL;
+}
+
 static const LV2UI_Descriptor descriptor = {
   NB_UI_URI,
   instantiate,
   cleanup,
   port_event,
-  NULL
+  extension_data
 };
 
 extern "C" const LV2UI_Descriptor *lv2ui_descriptor (uint32_t index) {

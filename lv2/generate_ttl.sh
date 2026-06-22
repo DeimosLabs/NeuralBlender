@@ -22,6 +22,7 @@ cd "$srcdir/lv2" || {
 mkdir -p "$destdir/lv2"
 echo -n "$0 cwd:"; pwd -P
 for file in *.ttl.in; do
+  echo "$file -> $destdir/lv2/${file%.in}"
   if [ "$include_ui" = 1 ]; then
     cat "$file" | sed 's,^@@UI,,' > "$destdir/lv2/${file%.in}"
   else

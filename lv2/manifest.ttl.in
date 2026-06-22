@@ -9,5 +9,7 @@
 
 @@UI<http://deimos.ca/neuralblender#ui>
 @@UI    a ui:X11UI ;
+@@UI    lv2:extensionData ui:idleInterface ;
+@@UI    lv2:optionalFeature ui:idleInterface ;
 @@UI    ui:binary <neuralblender_ui.so> ;
 @@UI    rdfs:seeAlso <neuralblender.ttl> .

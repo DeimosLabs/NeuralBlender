@@ -154,8 +154,30 @@ if (GUI)
   )
 
   add_library(xputty STATIC
-    external/libxputty/xputty/xwidget.c
     external/libxputty/xputty/xputty.c
+    external/libxputty/xputty/xwidget.c
+    external/libxputty/xputty/xwidget_private.c
+    external/libxputty/xputty/xwidget-linux.c
+    external/libxputty/xputty/xadjustment.c
+    external/libxputty/xputty/xadjustment_private.c
+    external/libxputty/xputty/xchildlist.c
+    external/libxputty/xputty/xchildlist_private.c
+    external/libxputty/xputty/xcolor.c
+    external/libxputty/xputty/xpngloader.c
+    external/libxputty/xputty/widgets/xframe.c
+    external/libxputty/xputty/widgets/xframe_private.c
+    external/libxputty/xputty/widgets/xlabel.c
+    external/libxputty/xputty/widgets/xlabel_private.c
+    external/libxputty/xputty/widgets/xbutton.c
+    external/libxputty/xputty/widgets/xbutton_private.c
+    external/libxputty/xputty/widgets/xknob.c
+    external/libxputty/xputty/widgets/xknob_private.c
+    external/libxputty/xputty/widgets/xcombobox.c
+    external/libxputty/xputty/widgets/xcombobox_private.c
+    external/libxputty/xputty/widgets/xtooltip.c
+    external/libxputty/xputty/widgets/xtooltip_private.c
+    external/libxputty/xputty/widgets/xslider.c
+    external/libxputty/xputty/widgets/xslider_private.c
   )
 
   set_target_properties(xputty PROPERTIES
@@ -165,6 +187,7 @@ if (GUI)
   target_include_directories(xputty PUBLIC
     ${PROJECT_SOURCE_DIR}/external/libxputty
     ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/header
+    ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/header/widgets
     ${X11_INCLUDE_DIRS}
     ${CAIRO_INCLUDE_DIRS}
   )

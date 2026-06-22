@@ -41,7 +41,7 @@
 
 #ifdef CMDLINE_DEBUG
 #include "cmdline/cmdline.h"
-#define debug(...) cmdline_debug(stderr,ANSI_DARK_GREEN,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
+#define debug(...) cmdline_debug(stderr,ANSI_DARK_BLUE,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
 #else
 #define debug(...)
 #define CP
@@ -124,7 +124,7 @@ typedef struct {
   std::atomic<bool> loader_running { true };
   std::atomic<bool> load_requested { false };
 
-  bool pending_load [NB_MAX_MODELS]        = { false };
+  bool pending_load [NB_MAX_MODELS] = { false };
   //size_t pending_which         = 0;
   std::string pending_path [NB_MAX_MODELS];
   std::string current_model [NB_MAX_MODELS];
