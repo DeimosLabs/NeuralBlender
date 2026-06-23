@@ -306,7 +306,7 @@ if [ "$make_new_data_c" = "yes" ]; then
   touch "$data_c" "$data_h"
   
 else
-  echo "$data_c is up to date, no need to recreate"
+  echo "$baseme: inline data up to date, no need to regenerate"
 fi
 
 cd "$startwd"

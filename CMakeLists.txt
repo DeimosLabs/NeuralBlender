@@ -118,7 +118,7 @@ if (STANDALONE)
 
     install(TARGETS neuralblender RUNTIME DESTINATION bin)
   else()
-    message(WARNING "JACK development files not found; standalone target disabled")
+    message(WARNING "JACK development files not found, standalone target disabled")
   endif()
 endif()
 
@@ -185,7 +185,6 @@ if (GUI)
     external/libxputty/xputty/widgets/xlistview_private.c
     external/libxputty/xputty/widgets/xmultilistview.c
     external/libxputty/xputty/widgets/xmultilistview_private.c
-    external/libxputty/xputty/dialogs/xfile-dialog.c
     external/libxputty/xputty/dialogs/xmessage-dialog.c
     external/libxputty/xputty/b64_encode.c
     external/libxputty/xputty/xdgmime/xdgmime.c
@@ -221,6 +220,10 @@ if (GUI)
     ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/header/widgets
     ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/header/dialogs
     ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/xdgmime
+    ${PROJECT_SOURCE_DIR}/external
+    ${PROJECT_SOURCE_DIR}/external/RTNeural
+    ${PROJECT_SOURCE_DIR}/external/NAM
+    ${PROJECT_SOURCE_DIR}/external/nlohmann
     ${X11_INCLUDE_DIRS}
     ${CAIRO_INCLUDE_DIRS}
   )
@@ -241,6 +244,8 @@ if (GUI)
     $<TARGET_OBJECTS:neuralblender_data>
   )
 
+  add_dependencies(neuralblender_gui generate_inline_data)
+
   set_target_properties(neuralblender_gui PROPERTIES
     POSITION_INDEPENDENT_CODE ON
   )
@@ -251,6 +256,7 @@ if (GUI)
   )
 
   target_link_libraries(neuralblender_gui PUBLIC
+    Eigen3::Eigen
     xputty
   )
 endif()

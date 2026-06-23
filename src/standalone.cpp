@@ -80,15 +80,22 @@ public:
   : c_neuralblender_ui () {
     blender = b;
   }
+  bool load_model (size_t which, const char *filename);
   void on_gain_in (c_widget *w, float f);
   void on_gain_out (c_widget *w, float f);
   void on_delay (c_widget *w, float f);
-  void on_fileselect (c_widget *w);
+  void on_filebrowse (c_widget *w);
+  void on_fileselected (c_widget *w, const char *path);
   void on_fileclear (c_widget *w);
   void on_mute (c_widget *w, bool b);
   void on_bypass (c_widget *w, bool b);
   void on_about (c_widget *w);
 };
+
+bool c_standalone_ui::load_model (size_t which, const char *filename) {
+  debug ("which=%d, filename='%s'", (int) which, filename);
+  return blender->load_model (which, filename);
+}
 
 void c_standalone_ui::on_gain_in (c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
@@ -105,8 +112,12 @@ void c_standalone_ui::on_delay (c_widget *w, float f) {
   g_blender.set_gain_out (w->lane, f);
 }
 
-void c_standalone_ui::on_fileselect (c_widget *w) {
+void c_standalone_ui::on_filebrowse (c_widget *w) {
   debug ("lane %d", w->lane);
+}
+
+void c_standalone_ui::on_fileselected (c_widget *w, const char *path) {
+  debug ("lane %d, path='%s'", w->lane, path);
 }
 
 void c_standalone_ui::on_fileclear (c_widget *w) {
@@ -203,9 +214,9 @@ int main (int argc, char **argv) {
   }
   
   if (g_blender.amps [0].filename != "")
-    g_blender.load_model (0);
+    g_blender.load_model (0, g_blender.amps [0].filename.c_str ());
   if (g_blender.amps [1].filename != "")
-    g_blender.load_model (1);
+    g_blender.load_model (1, g_blender.amps [1].filename.c_str ());
 
   jack_client = jack_client_open ("NeuralBlender", JackNullOption, nullptr);
   if (!jack_client) {

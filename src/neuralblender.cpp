@@ -391,7 +391,7 @@ void c_neuralblender::update_mutes () {
     amps [0].mute = false;
 }
 
-bool c_neuralblender::load_model (size_t which, const std::string &fn) { CP
+bool c_neuralblender::load_model (size_t which, const char *fn) { CP
   if (which >= NB_MAX_MODELS)
     return false;
 

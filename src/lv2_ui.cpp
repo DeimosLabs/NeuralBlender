@@ -29,15 +29,17 @@ class c_lv2_ui : public c_neuralblender_ui {
 public:
   LV2UI_Write_Function write;
   LV2UI_Controller controller;
-
-  void on_gain_in (c_widget *w, float f)  { CP }
-  void on_gain_out (c_widget *w, float f) { CP }
-  void on_delay (c_widget *w, float f)    { CP }
-  void on_fileselect (c_widget *w)        { CP }
-  void on_fileclear (c_widget *w)         { CP }
-  void on_mute (c_widget *w, bool b)      { CP }
-  void on_bypass (c_widget *w, bool b)    { CP }
-  void on_about (c_widget *w)             { CP }
+  
+  bool load_model (size_t which, const char *filename) { CP; return false; }
+  void on_gain_in (c_widget *w, float f)               { CP }
+  void on_gain_out (c_widget *w, float f)              { CP }
+  void on_delay (c_widget *w, float f)                 { CP }
+  void on_filebrowse (c_widget *w)                     { CP }
+  void on_fileselected (c_widget *w, const char *path) { CP }
+  void on_fileclear (c_widget *w)                      { CP }
+  void on_mute (c_widget *w, bool b)                   { CP }
+  void on_bypass (c_widget *w, bool b)                 { CP }
+  void on_about (c_widget *w)                          { CP }
 };
 
 static LV2UI_Handle instantiate (
@@ -57,7 +59,7 @@ static LV2UI_Handle instantiate (
     return NULL;
   ui->write = write_function;
   ui->controller = controller;
-
+  
   Window parent = 0;
   for (int i = 0; features && features [i]; ++i) {
     if (!strcmp (features [i]->URI, LV2_UI__parent)) {

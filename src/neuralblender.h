@@ -109,7 +109,7 @@ public:
   void set_samplerate (uint32_t sr);
   void set_blocksize (uint32_t bs);
   void process_block (float *in, float *out, uint32_t count);
-  bool load_model (size_t which, const std::string &filename = "");
+  bool load_model (size_t which, const char *filename);
   bool unload_model (size_t which);
   bool set_delay_frames (size_t which, uint32_t frames);
   bool set_delay_ms (size_t which, float ms);

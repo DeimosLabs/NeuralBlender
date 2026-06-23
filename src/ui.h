@@ -54,6 +54,7 @@ enum _widget_role {
   ROLE_UNKNOWN,
   ROLE_MUTE,
   ROLE_BROWSE,
+  ROLE_LOADFILE,
   ROLE_CLEAR,
   ROLE_GAIN_IN,
   ROLE_GAIN_OUT,
@@ -62,18 +63,22 @@ enum _widget_role {
   ROLE_MASTER
 };
 
+class c_filepicker;
+
 class c_widget {
 public:
   virtual void create (
       c_neuralblender_ui *ui,
       Widget_t *parent,
       const char *label,
-      int x, int y, int w, int h) = 0;
+      int x, int y, int w, int h);
       
   // backpointers to parent objects
   Widget_t *widget         = NULL;
-  Widget_t *parent_struct  = NULL;
+  Widget_t *parent         = NULL;
+  c_widget *parent_struct  = NULL;
   c_neuralblender_ui *ui   = NULL;
+  c_filepicker *filepicker = NULL;
   std::string label;
   _widget_role role        = ROLE_UNKNOWN;
   uint64_t id              = -1;
@@ -168,7 +173,7 @@ public:
       int x, int y, int w, int h);
 };
 
-class c_filepicker {
+class c_filepicker : c_widget {
 public:
   void create (c_neuralblender_ui *ui, Widget_t *parent, size_t lane, const char *title);
 
@@ -176,10 +181,7 @@ public:
   void hide ();
   bool is_visible () const;
 
-  virtual void on_file_select (
-      size_t lane,
-      const std::string &filename,
-      const std::vector<std::string> &visible_files) {}
+  void on_file_select (c_widget *w, const std::string &filename);
 
   c_neuralblender_ui *ui = nullptr;
   Widget_t *parent = nullptr;
@@ -198,7 +200,6 @@ public:
   void show ();
   void hide ();
   
-  Widget_t *parent = NULL;
   Widget_t *w = NULL;
   c_button btn_ok;
   c_label labels [16];
@@ -239,15 +240,17 @@ public:
   void destroy ();
   int idle ();
   void draw ();
+  virtual bool load_model (size_t which, const char *filename) = 0;
   
-  virtual void on_gain_in (c_widget *w, float f)  = 0;
-  virtual void on_gain_out (c_widget *w, float f) = 0;
-  virtual void on_delay (c_widget *w, float f)    = 0;
-  virtual void on_fileselect (c_widget *w)        = 0;
-  virtual void on_fileclear (c_widget *w)         = 0;
-  virtual void on_mute (c_widget *w, bool b)      = 0;
-  virtual void on_bypass (c_widget *w, bool b)    = 0;
-  virtual void on_about (c_widget *w)             = 0;
+  virtual void on_gain_in (c_widget *w, float f)               = 0;
+  virtual void on_gain_out (c_widget *w, float f)              = 0;
+  virtual void on_delay (c_widget *w, float f)                 = 0;
+  virtual void on_filebrowse (c_widget *w)                     = 0;
+  virtual void on_fileselected (c_widget *w, const char *path) = 0;
+  virtual void on_fileclear (c_widget *w)                      = 0;
+  virtual void on_mute (c_widget *w, bool b)                   = 0;
+  virtual void on_bypass (c_widget *w, bool b)                 = 0;
+  virtual void on_about (c_widget *w)                          = 0;
   
   Display *display = NULL;
   Window window;

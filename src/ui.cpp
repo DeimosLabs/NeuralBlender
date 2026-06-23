@@ -6,6 +6,7 @@
  
 #include <string.h>
 
+#include "neuralblender.h"
 #include "ui.h"
 
 #include "xdrawing_area.h"
@@ -135,8 +136,11 @@ void c_button::on_mouseup () {
     break;
     
     case ROLE_BROWSE: CP
-      ui->filepickers [0].show ();
-      ui->on_fileselect (this);
+      ui->on_filebrowse (this);
+      if (filepicker)
+        filepicker->show ();
+      else
+        debug ("!filepicker");
     break;
     
     case ROLE_CLEAR: CP
@@ -377,16 +381,49 @@ static void knob_value_changed (void *w_, void *value_) {
   }
 }
 
-static void file_response (void *w_, void *user_data) {
-  if (!user_data)
-    return; // cancelled
-
-  const char *path = *(const char **)user_data;
-  if (!path)
+static void filepicker_response (void *w_, void *user_data) { CP
+  Widget_t *w = (Widget_t *) w_;
+  if (!w || !w->parent_struct) {
+    debug ("!w || !w->parent_struct");
     return;
+  }
 
-  // copy path now
+  c_widget *cw = (c_widget *) w->parent_struct;
+  c_filepicker *fp = cw->filepicker;
+  if (!fp) {
+    debug ("!fp");
+    return;
+  }
+
+  if (!user_data) {
+    fp->dialog = NULL;
+    debug ("!user_data");
+    return;
+  }
+
+  const char *filename = *(const char **) user_data;
+  if (!filename) {
+    fp->dialog = NULL;
+    return;
+  }
+
+  if (fp->dialog && fp->dialog->parent_struct) {
+    FileDialog *fd = (FileDialog *) fp->dialog->parent_struct;
+    if (fd->fp && fd->fp->path) {
+      fp->current_dir = fd->fp->path;
+      fp->filelist.clear ();
+      for (unsigned int i = 0; i < fd->fp->file_counter; i++) {
+        if (fd->fp->file_names [i])
+          fp->filelist.push_back (fd->fp->file_names [i]);
+      }
+    }
+  }
+
+  std::string selected = filename;
+  fp->on_file_select (cw, selected);
+  fp->dialog = NULL; // we recreate this each time the dialog is shown
 }
+
 
 void c_filepicker::create (
     c_neuralblender_ui *ui_,
@@ -402,10 +439,31 @@ void c_filepicker::create (
 }
 
 void c_filepicker::show () { CP
-  open_file_dialog (parent, "/tmp", "*");
+  if (!parent) {
+    debug ("!parent");
+    return;
+  }
+  parent->func.dialog_callback = filepicker_response;
+  const char *path = current_dir.empty () ? "/tmp" : current_dir.c_str ();
+  dialog = open_file_dialog (parent, path, "");
 }
 
 void c_filepicker::hide () { CP
+}
+
+void c_filepicker::on_file_select (c_widget *cw, const std::string &filename) { CP
+  if (!ui) {
+    debug ("!ui");
+    return;
+  }
+
+  if (!cw) {
+    debug ("!cw");
+    return;
+  }
+  
+  ui->load_model (cw->lane, filename.c_str ());
+  ui->on_fileselected (cw, filename.c_str ());
 }
 
 void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
@@ -437,7 +495,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   
   int i;
   for (i = 0; text [i]; i++) {
-    int h = (i == 0 ? 32 : (180 + i * 24));
+    int h = (i == 0 ? 20 : (180 + i * 24));
     labels [i].create (ui, w, text [i], 0, h, 400, 24);
   }
   
@@ -484,10 +542,10 @@ void c_lane_widgets::create (
   
   menu_list.create (ui, wp, label, 104, 24, 330, 32);
   
-  for (int i = 0; i < 50; i++) {
+  /*for (int i = 0; i < 50; i++) {
     snprintf (label, 31, "Item %d", i + 1);
     combobox_add_entry (menu_list.widget, label);
-  }
+  }*/
   int knobs_left = w - 180;
   gain_in.create (ui, wp, "Input", knobs_left + 32, 36, 64, 64);
   gain_out.create (ui, wp, "Output", knobs_left + 90, 36, 64, 64);
@@ -519,6 +577,11 @@ void c_lane_widgets::create (
   btn_browse.role = ROLE_BROWSE;
   btn_clear.role = ROLE_CLEAR;
   btn_mute.role = ROLE_MUTE;
+
+  if (ui && which < NB_UI_MAX_LANES) {
+    ui->filepickers [which].create (ui, btn_browse.widget, which, "Select file");
+    btn_browse.filepicker = &ui->filepickers [which];
+  }
 }
 
 c_neuralblender_ui::c_neuralblender_ui () { CP
@@ -535,8 +598,7 @@ c_neuralblender_ui::~c_neuralblender_ui () { CP
 
 bool c_neuralblender_ui::create (Window parent_) { CP
   destroy ();
-
-  CP
+  
   main_init (&app);
   ui_ready = true;
   app.small_font = 12 * app.hdpi;
@@ -564,7 +626,6 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   aboutwindow.create (this);
   for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
     lanes [i].create (this, main_widget, i, 20, 64 + i * 140, 600, 130);
-    filepickers [i].create (this, main_widget, i, "Select file");
   }
   widget_show_all (main_widget);
   expose_widget (main_widget);
@@ -585,6 +646,11 @@ void c_neuralblender_ui::destroy () { CP
   window = 0;
   main_widget = NULL;
   ui_ready = false;
+}
+
+bool c_neuralblender_ui::load_model (size_t which, const char *filename) {
+  debug ("which=%d, filename='%s'", (int) which, filename);
+  return false;//blender->load_model (which, filename);
 }
 
 int c_neuralblender_ui::idle () {

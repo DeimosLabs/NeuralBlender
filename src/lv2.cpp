@@ -172,7 +172,7 @@ static void loader_main (Plugin *self) { CP
     fprintf (stderr, "NeuralBlender: loading model %zu: %s\n",
              which, path.c_str ());
 
-	    if (self->blender.load_model (which, path)) {
+	    if (self->blender.load_model (which, path.c_str ())) {
 	      self->current_model [which] = path;
 	      self->notify_path [which] = true;
 	    } else {
@@ -200,14 +200,14 @@ static void request_load (Plugin *self, size_t which, const char *path) {
   self->pending_load [which] = true;
   self->pending_path [which] = path;
 
-	  self->loader_cv.notify_one();
-	}
+	self->loader_cv.notify_one();
+}
 
 static void clear_model_slot (Plugin *self, size_t which, bool notify) {
   if (!self || which >= NB_MAX_MODELS)
     return;
 
-  {
+  { // scope
     std::lock_guard<std::mutex> lock (self->loader_mutex);
     self->pending_load [which] = false;
     self->pending_path [which].clear ();
