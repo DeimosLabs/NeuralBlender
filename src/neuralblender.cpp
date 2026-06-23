@@ -392,8 +392,10 @@ void c_neuralblender::update_mutes () {
 }
 
 bool c_neuralblender::load_model (size_t which, const char *fn) { CP
-  if (which >= NB_MAX_MODELS)
+  if (which >= NB_MAX_MODELS) {
+    debug ("which >= %d", NB_MAX_MODELS);
     return false;
+  }
 
   for (size_t i = 0; i < NB_MAX_MODELS; ++i)
     amps [i].mute = true;

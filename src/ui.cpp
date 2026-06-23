@@ -11,6 +11,7 @@
 
 #include "xdrawing_area.h"
 #include "xpngloader.h"
+#include "widgets/xcombobox_private.h"
 
 #include "data/data.h"
 
@@ -148,8 +149,8 @@ void c_button::on_mouseup () {
     break;
     
     case ROLE_ABOUT: CP
-      //ui->on_about (this);
       ui->aboutwindow.show ();
+      ui->on_about (this);
     break;
 
     case ROLE_ABOUTOK: CP
@@ -247,7 +248,89 @@ void c_combobox::create (
     
   label = label_;
   widget = add_combobox (parent, label.c_str (), x, y, w, h);
+  c_widget::create (ui_, parent, label_, x, y, w, h);
   combobox_set_menu_size (widget, 16);
+  
+  update_widget ();
+}
+
+void c_combobox::clear () { CP
+  items.clear ();
+  update_widget ();
+}
+
+void c_combobox::add (const std::string &str) {
+  debug ("str=%s", str.c_str ());
+  items.push_back (str);
+  update_widget ();
+}
+
+void c_combobox::on_change (int x) {
+  debug ("x=%d", x);
+  set_selection (x);
+  
+  if (x < 0 && x >= items.size ()) {
+    debug ("item out of range: %d", x);
+    return;
+  }
+  std::string fullpath;
+  if (strip_directories) // yay spaghetti
+    fullpath = ui->filepickers [lane].current_dir + "/" + items [x];
+  else
+    fullpath = items [x];
+  
+  ui->load_model (lane, fullpath.c_str ());
+}
+
+void c_combobox::set_selection (int n) {
+  if (n >= 0 && n < (int) items.size())
+    selected = n;
+  else
+    selected = -1;
+
+  update_widget();
+}
+
+int c_combobox::get_selection () {
+  return selected;
+}
+
+void c_combobox::update_widget () {
+  int i, n = items.size ();
+  debug ("%d items", n);
+  
+  updating_widget = true;
+  combobox_delete_entrys (widget);
+  for (i = 0; i < n; i++) {
+    combobox_add_entry (widget, items [i].c_str ());
+  }
+  
+  // more xputty internals... thanks to codex for the help on this!
+  if (selected >= 0 && selected < i) {
+    combobox_set_active_entry (widget, selected);
+    
+    Widget_t *menu = widget->childlist->childs [1];
+    Widget_t *view_port = menu->childlist->childs [0];
+    ComboBox_t *list = (ComboBox_t *) view_port->parent_struct;
+    int show_items = list->show_items > 0 ? list->show_items : 16;
+    int top = selected - (show_items / 2);
+    int max_top = n - show_items;
+
+    if (max_top < 0)
+      max_top = 0;
+    if (top < 0)
+      top = 0;
+    if (top > max_top)
+      top = max_top;
+
+    combobox_set_menu_size (widget, show_items);
+    adj_set_value (view_port->adj, top);
+    adj_set_state (list->slider->adj, adj_get_state (view_port->adj));
+    expose_widget (view_port);
+  }
+  updating_widget = false;
+  
+  expose_widget (widget);
 }
 
 void c_label::draw (void *w_, void *ptr) {
@@ -381,49 +464,118 @@ static void knob_value_changed (void *w_, void *value_) {
   }
 }
 
-static void filepicker_response (void *w_, void *user_data) { CP
+static void filepicker_response(void *w_, void *user_data) { CP
   Widget_t *w = (Widget_t *) w_;
   if (!w || !w->parent_struct) {
-    debug ("!w || !w->parent_struct");
+    debug("!w || !w->parent_struct");
     return;
   }
 
   c_widget *cw = (c_widget *) w->parent_struct;
-  c_filepicker *fp = cw->filepicker;
+  c_filepicker *fp = cw ? cw->filepicker : NULL;
   if (!fp) {
-    debug ("!fp");
-    return;
-  }
-
-  if (!user_data) {
-    fp->dialog = NULL;
-    debug ("!user_data");
-    return;
-  }
-
-  const char *filename = *(const char **) user_data;
-  if (!filename) {
-    fp->dialog = NULL;
+    debug("!fp");
     return;
   }
 
   if (fp->dialog && fp->dialog->parent_struct) {
     FileDialog *fd = (FileDialog *) fp->dialog->parent_struct;
-    if (fd->fp && fd->fp->path) {
-      fp->current_dir = fd->fp->path;
-      fp->filelist.clear ();
+    if (fd->fp) {
+      if (fd->fp->path)
+        fp->current_dir = fd->fp->path;
+
+      fp->filelist.clear();
       for (unsigned int i = 0; i < fd->fp->file_counter; i++) {
         if (fd->fp->file_names [i])
-          fp->filelist.push_back (fd->fp->file_names [i]);
+          fp->filelist.push_back (fd->fp->file_names[i]);
       }
     }
   }
 
-  std::string selected = filename;
-  fp->on_file_select (cw, selected);
-  fp->dialog = NULL; // we recreate this each time the dialog is shown
+  fp->dialog = NULL;
+
+  if (!user_data) {
+    debug("!user_data");
+    return;
+  }
+
+  const char *filename = *(const char **) user_data;
+  if (!filename) {
+    debug ("!filename");
+    return;
+  }
+  
+  c_neuralblender_ui *ui = fp->ui;
+  size_t lane = fp->lane;
+
+  //std::string selected (filename);
+  //fp->on_file_select(cw, selected);
+  debug ("lane %d", (int) lane);
+  if (!ui) {
+    debug ("!ui");
+    return;
+  }
+
+  if (!cw) {
+    debug ("!cw");
+    return;
+  }
+  
+  debug ("current_dir: '%s'", fp->current_dir.c_str ());
+  for (int i = 0; i < fp->filelist.size (); i++) {
+    debug ("filelist [%d]: '%s'", i, fp->filelist [i].c_str ());
+  }
+  
+  fp->selected_file = std::string (filename);
+  ui->load_model (cw->lane, filename);
+  
+  c_combobox *cb = &ui->lanes [lane].menu_list;
+  cb->clear ();
+  //cb->add (filename);
+  fp->add_files_from_dir (cb);
+  ui->on_fileselected (cw, filename);
 }
 
+static void combobox_selected_callback (void *w_, void *user_data) { CP
+  Widget_t *w = (Widget_t *) w_;
+  
+  int index = (int) adj_get_value (w->adj);
+
+  Widget_t *menu = w->childlist->childs[1];
+  Widget_t *view_port = menu->childlist->childs[0];
+  ComboBox_t *list = (ComboBox_t *) view_port->parent_struct;
+
+  const char *label = NULL;
+  if (index >= 0 && index < (int) list->list_size)
+    label = list->list_names [index];
+
+  // index + label are selected item
+  c_combobox *cb = (c_combobox *) w->parent_struct;
+  if (!cb) {
+    debug ("!cb");
+    return;
+  }
+  cb->selected = index;
+  if (cb->updating_widget)
+    return;
+
+  cb->on_change (index);
+}
+
+static void combobox_changed (void *w_, void *user_data) {
+  Widget_t *w = (Widget_t *) w_;
+  if (!w)
+    return;
+
+  _set_entry(w, user_data);
+
+  c_combobox *combo = (c_combobox *) w->parent_struct;
+  if (!combo)
+    return;
+
+  int index = (int) adj_get_value(w->adj);
+  combo->on_change (index);
+}
 
 void c_filepicker::create (
     c_neuralblender_ui *ui_,
@@ -435,6 +587,8 @@ void c_filepicker::create (
   ui = ui_;
   parent = parent_;
   lane = lane_;
+  c_widget::create (ui, parent, title_, 0, 0, 220, 220);
+  //os_set_transient_for_hint (ui->main_widget, widget);
   title = std::string (title_);
 }
 
@@ -443,27 +597,59 @@ void c_filepicker::show () { CP
     debug ("!parent");
     return;
   }
+  if (dialog) {
+    destroy_widget (dialog, dialog->app);
+    dialog = NULL;
+  }
   parent->func.dialog_callback = filepicker_response;
-  const char *path = current_dir.empty () ? "/tmp" : current_dir.c_str ();
-  dialog = open_file_dialog (parent, path, "");
+  const char *path = current_dir.empty () ? "/usr/nam" : current_dir.c_str ();
+  dialog = open_file_dialog (parent, path, ".nam|.json|.aidax");
 }
 
 void c_filepicker::hide () { CP
 }
 
 void c_filepicker::on_file_select (c_widget *cw, const std::string &filename) { CP
-  if (!ui) {
-    debug ("!ui");
+}
+
+/*void c_filepicker::add_files_from_dir (c_combobox *cb) {
+  CP
+  int i, sel = -1;
+  
+  for (i = 0; i < filelist.size (); i++) {
+    cb->add (filelist [i]);
+    if (filelist [i] == selected_file) {
+      sel = i;
+      debug ("found selected: %d", i);
+    }
+  }
+  cb->set_selection (sel);
+}*/
+
+void c_filepicker::add_files_from_dir(c_combobox *cb) {
+  if (!cb)
     return;
+
+  cb->items.clear();
+
+  int sel = -1;
+
+  for (size_t i = 0; i < filelist.size(); i++) {
+    cb->items.push_back(filelist[i]);
+
+    std::string full = current_dir;
+    if (!full.empty() && full.back() != '/')
+      full += '/';
+    full += filelist[i];
+
+    if (full == selected_file || filelist[i] == selected_file) {
+      sel = (int) i;
+      debug("found selected: %d", sel);
+    }
   }
 
-  if (!cw) {
-    debug ("!cw");
-    return;
-  }
-  
-  ui->load_model (cw->lane, filename.c_str ());
-  ui->on_fileselected (cw, filename.c_str ());
+  cb->selected = sel;
+  cb->update_widget();
 }
 
 void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
@@ -475,7 +661,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   if (!w)
     return;
   
-  os_set_transient_for_hint(ui->main_widget, w);
+  os_set_transient_for_hint (ui->main_widget, w);
   
   w->func.expose_callback = draw_main_window;
   widget_set_title (w, "About NeuralBlender");
@@ -541,11 +727,14 @@ void c_lane_widgets::create (
   Widget_t *wp = lane_widget.widget;
   
   menu_list.create (ui, wp, label, 104, 24, 330, 32);
+  menu_list.widget->func.value_changed_callback = combobox_selected_callback;
+  menu_list.lane = which;
   
-  /*for (int i = 0; i < 50; i++) {
+  /*for (int i = 0; i < 5; i++) {
     snprintf (label, 31, "Item %d", i + 1);
     combobox_add_entry (menu_list.widget, label);
   }*/
+  
   int knobs_left = w - 180;
   gain_in.create (ui, wp, "Input", knobs_left + 32, 36, 64, 64);
   gain_out.create (ui, wp, "Output", knobs_left + 90, 36, 64, 64);
@@ -581,6 +770,8 @@ void c_lane_widgets::create (
   if (ui && which < NB_UI_MAX_LANES) {
     ui->filepickers [which].create (ui, btn_browse.widget, which, "Select file");
     btn_browse.filepicker = &ui->filepickers [which];
+    btn_browse.lane = which;
+    ui->filepickers [which].lane = which;
   }
 }
 
@@ -646,11 +837,6 @@ void c_neuralblender_ui::destroy () { CP
   window = 0;
   main_widget = NULL;
   ui_ready = false;
-}
-
-bool c_neuralblender_ui::load_model (size_t which, const char *filename) {
-  debug ("which=%d, filename='%s'", (int) which, filename);
-  return false;//blender->load_model (which, filename);
 }
 
 int c_neuralblender_ui::idle () {

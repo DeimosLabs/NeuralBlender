@@ -18,7 +18,7 @@
 #ifdef CMDLINE_DEBUG
 #define CMDLINE_IMPLEMENTATION // separate .so file for UI, so we need this here
 #include "cmdline/cmdline.h"
-#define debug(...) cmdline_debug(stderr,ANSI_DARK_MAGENTA,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
+#define debug(...) cmdline_debug(stderr,ANSI_DARK_RED,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
 #else
 #define debug(...)
 #define CP

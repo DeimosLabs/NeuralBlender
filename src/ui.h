@@ -171,6 +171,20 @@ public:
       Widget_t *parent,
       const char *label,
       int x, int y, int w, int h);
+  
+  void clear ();
+  void add (const std::string &str);
+  void set_selection (int n);
+  int get_selection ();
+  
+  virtual void on_change (int x);
+  
+  void update_widget ();
+  
+  std::vector<std::string> items;
+  int selected = -1;
+  bool strip_directories = true;
+  bool updating_widget = false;
 };
 
 class c_filepicker : c_widget {
@@ -179,6 +193,7 @@ public:
 
   void show ();
   void hide ();
+  void add_files_from_dir (c_combobox *cb);
   bool is_visible () const;
 
   void on_file_select (c_widget *w, const std::string &filename);
@@ -189,6 +204,7 @@ public:
   size_t lane = -1;
 
   std::string title;
+  std::string selected_file;
   std::string current_dir;
   std::vector<std::string> filelist;
 };
