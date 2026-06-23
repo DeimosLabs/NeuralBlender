@@ -22,6 +22,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "xputty.h"
 #include "xwidgets.h"
@@ -100,6 +101,17 @@ public:
   _textalign align = TEXT_CENTER;
 };
 
+class c_image : public c_widget {
+public:
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label,
+      int x, int y, int w, int h) override;
+
+  void set_png (const unsigned char *png);
+};
+
 class c_button : public c_widget {
 public:
   void create (
@@ -155,6 +167,23 @@ public:
       int x, int y, int w, int h);
 };
 
+class c_filepicker : public c_widget {
+public:
+  void create (
+      c_neuralblender_ui *ui,
+      size_t which /* lane */,
+      Widget_t *parent,
+      const char *title);
+  
+  void show ();
+  void hide ();
+  bool is_visible ();
+  void on_file_select (c_widget *w, std::string &filename);
+  
+  std::string current_dir;
+  std::vector <std::string> filelist;
+};
+
 class c_lane_widgets {
 public:
   //c_lane_widgets ();
@@ -191,6 +220,7 @@ public:
   Widget_t *w = NULL;
   c_button btn_ok;
   c_label labels [16];
+  c_image img_logo;
   c_neuralblender_ui *ui = NULL;
 };
 

@@ -5,7 +5,13 @@
  */
  
 #include <string.h>
+
 #include "ui.h"
+
+#include "xdrawing_area.h"
+#include "xpngloader.h"
+
+#include "data/data.h"
 
 #ifdef CMDLINE_DEBUG
 #include "cmdline/cmdline.h"
@@ -66,6 +72,23 @@ void c_label::create (
   widget = add_label (parent, label.c_str (), x, y, w, h);
   widget->func.expose_callback = c_label::draw;
   c_widget::create (ui_, parent, label_, x, y, w, h);
+}
+
+void c_image::create (
+    c_neuralblender_ui *ui,
+    Widget_t *parent,
+    const char *label,
+    int x, int y, int w, int h) {
+  widget = add_image (parent, label, x, y, w, h);
+  c_widget::create (ui, parent, label, x, y, w, h);
+}
+
+void c_image::set_png (const unsigned char *png) {
+  if (!widget || !png)
+    return;
+
+  widget_get_png(widget, png);
+  expose_widget(widget);
 }
 
 void c_button::create (
@@ -358,13 +381,15 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   if (!ui || !ui->ui_ready || w)
     return;
 
-  w = create_window (&ui->app, os_get_root_window (&ui->app, IS_WINDOW), 0, 0, 400, 400);
+  w = create_window (&ui->app, os_get_root_window (&ui->app, IS_WINDOW), 0, 0, 400, 450);
   if (!w)
     return;
   
+  os_set_transient_for_hint(ui->main_widget, w);
+  
   w->func.expose_callback = draw_main_window;
   widget_set_title (w, "About NeuralBlender");
-  btn_ok.create (ui, w, "OK", 160, 350, 80, 40);
+  btn_ok.create (ui, w, "OK", 160, 400, 80, 40);
   btn_ok.role = ROLE_ABOUTOK;
   
   const char *text [] = {
@@ -378,16 +403,21 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
     NULL
   };
   
-  char buf [64];
-  snprintf (buf, 63, "Build timestamp: %s", g_build_timestamp);
-  
   int i;
   for (i = 0; text [i]; i++) {
-    labels [i].create (ui, w, text [i], 0, 64 + i * 24, 400, 24);
+    int h = (i == 0 ? 32 : (180 + i * 24));
+    labels [i].create (ui, w, text [i], 0, h, 400, 24);
   }
+  
+  char buf [64];
+  snprintf (buf, 63, "Build timestamp: %s", g_build_timestamp);
+
   labels [0].textsize = 1.5;
-  labels [i].create (ui, w, buf, 0, 320, 400, 20);
+  labels [i].create (ui, w, buf, 0, 360, 400, 20);
   labels [i].textsize = 0.75;
+  
+  img_logo.create (ui, w, "", (400-160)/2, 64, 160, 160);
+  img_logo.set_png (data_neuralblender_logo_160_png);
 }
 
 void c_aboutwindow::show () { CP

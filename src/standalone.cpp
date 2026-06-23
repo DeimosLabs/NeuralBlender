@@ -41,7 +41,7 @@
 #endif
 
 static c_neuralblender g_blender;
-const char *g_build_timestamp = BUILD_TIMESTAMP;
+//const char *g_build_timestamp = BUILD_TIMESTAMP;
 
 /******************************************************************************
  * JACK stuff

@@ -108,6 +108,7 @@ if (STANDALONE)
 
     add_executable(neuralblender
       src/standalone.cpp
+      src/timestamp.cpp
     )
     
     target_include_directories(neuralblender PRIVATE ${JACK_INCLUDE_DIRS})
@@ -178,6 +179,8 @@ if (GUI)
     external/libxputty/xputty/widgets/xtooltip_private.c
     external/libxputty/xputty/widgets/xslider.c
     external/libxputty/xputty/widgets/xslider_private.c
+    external/libxputty/xputty/widgets/xdrawing_area.c
+    external/libxputty/xputty/widgets/xdrawing_area_private.c
   )
 
   set_target_properties(xputty PROPERTIES
@@ -204,6 +207,7 @@ if (GUI)
 
   add_library(neuralblender_gui STATIC
     src/ui.cpp
+    src/timestamp.cpp
     $<TARGET_OBJECTS:neuralblender_data>
   )
 
@@ -213,6 +217,7 @@ if (GUI)
 
   target_include_directories(neuralblender_gui PUBLIC
     ${PROJECT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_BINARY_DIR}
   )
 
   target_link_libraries(neuralblender_gui PUBLIC
@@ -234,6 +239,7 @@ if (LV2)
 
   add_library(neuralblender_lv2 MODULE
     src/lv2.cpp
+    src/timestamp.cpp
   )
 
   target_compile_options(neuralblender_lv2 PRIVATE
