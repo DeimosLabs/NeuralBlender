@@ -41,6 +41,10 @@
 #include <pwd.h>
 #endif
 
+#ifdef BUILD_NEURALBLENDER
+#include "xputty_res.h"
+#endif
+
 static void combo_response(void *w_, void* user_data);
 static void set_selected_file(FileDialog *file_dialog);
 

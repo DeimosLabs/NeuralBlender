@@ -402,6 +402,7 @@ void c_filepicker::create (
 }
 
 void c_filepicker::show () { CP
+  open_file_dialog (parent, "/tmp", "*");
 }
 
 void c_filepicker::hide () { CP

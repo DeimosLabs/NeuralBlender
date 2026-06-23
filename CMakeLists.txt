@@ -178,16 +178,48 @@ if (GUI)
     external/libxputty/xputty/widgets/xslider_private.c
     external/libxputty/xputty/widgets/xdrawing_area.c
     external/libxputty/xputty/widgets/xdrawing_area_private.c
+    external/libxputty/xputty/dialogs/xfile-dialog.c
+    external/libxputty/xputty/xfilepicker.c
+    external/libxputty/xputty/xsvgloader.c
+    external/libxputty/xputty/widgets/xlistview.c
+    external/libxputty/xputty/widgets/xlistview_private.c
+    external/libxputty/xputty/widgets/xmultilistview.c
+    external/libxputty/xputty/widgets/xmultilistview_private.c
+    external/libxputty/xputty/dialogs/xfile-dialog.c
+    external/libxputty/xputty/dialogs/xmessage-dialog.c
+    external/libxputty/xputty/b64_encode.c
+    external/libxputty/xputty/xdgmime/xdgmime.c
+    external/libxputty/xputty/xdgmime/xdgmimealias.c
+    external/libxputty/xputty/xdgmime/xdgmimecache.c
+    external/libxputty/xputty/xdgmime/xdgmimeglob.c
+    external/libxputty/xputty/xdgmime/xdgmimeicon.c
+    external/libxputty/xputty/xdgmime/xdgmimeint.c
+    external/libxputty/xputty/xdgmime/xdgmimemagic.c
+    external/libxputty/xputty/xdgmime/xdgmimeparent.c
+
   )
 
   set_target_properties(xputty PROPERTIES
     POSITION_INDEPENDENT_CODE ON
   )
 
+  add_dependencies(xputty generate_inline_data)
+
+  target_compile_definitions(xputty PRIVATE
+    BUILD_NEURALBLENDER
+  )
+
   target_include_directories(xputty PUBLIC
+    ${PROJECT_SOURCE_DIR}/
+    ${PROJECT_SOURCE_DIR}/data
+    ${PROJECT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}/data
+    ${CMAKE_CURRENT_BINARY_DIR}/src
     ${PROJECT_SOURCE_DIR}/external/libxputty
     ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/header
     ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/header/widgets
+    ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/header/dialogs
     ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/xdgmime
     ${X11_INCLUDE_DIRS}
     ${CAIRO_INCLUDE_DIRS}
