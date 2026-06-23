@@ -37,6 +37,7 @@
 #define MAX_DELAY_FRAMES (MAX_DELAY_MS * 192)
 #define MAX_BLOCK_SIZE 8192
 #define NB_MAX_MODELS 4
+#define DB_SILENCE -120
 
 enum _engine_mode {
   ENGINE_NONE,
@@ -48,6 +49,13 @@ extern const char *g_build_timestamp;
 
 static inline float db_to_gain (float db) {
   return powf (10.0f, db / 20.0f);
+}
+
+static inline float gain_to_db (float gain) {
+  if (gain <= 0.0f)
+    return DB_SILENCE;
+
+  return 20.0f * log10f(gain);
 }
 
 class c_delayline {

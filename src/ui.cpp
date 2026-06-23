@@ -232,7 +232,28 @@ void c_knob::set_step (float x) {
 }
 
 void c_knob::on_change () {
-  debug ("value=%f", value);
+  //debug ("value=%f", value);
+  float g = db_to_gain (value);
+  switch (role) {
+    case ROLE_GAIN_IN:
+      debug ("lane %d gain in %f", lane, g);
+      ui->on_gain_in (this, g);
+    break;
+    
+    case ROLE_GAIN_OUT:
+      debug ("lane %d gain out %f", lane, g);
+      ui->on_gain_out (this, g);
+    break;
+
+    case ROLE_DELAY:
+      debug ("lane %d delay %f", lane, g);
+      ui->on_delay (this, g);
+    break;
+    
+    default:
+      debug ("unknown knob set to %f", g);
+    break;
+  }
 }
 
 void c_knob::on_doubleclick () { CP
@@ -739,6 +760,10 @@ void c_lane_widgets::create (
   gain_in.create (ui, wp, "Input", knobs_left + 32, 36, 64, 64);
   gain_out.create (ui, wp, "Output", knobs_left + 90, 36, 64, 64);
   delay.create (ui, wp, "Delay", 32, 36, 64, 64);
+  gain_in.role = ROLE_GAIN_IN;
+  gain_out.role = ROLE_GAIN_IN;
+  delay.role = ROLE_DELAY;
+  gain_in.lane = gain_out.lane = delay.lane = which;
   gain_in.set_min (-40);
   gain_in.set_max (40);
   gain_in.set_defaultvalue (0);

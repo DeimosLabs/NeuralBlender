@@ -122,7 +122,7 @@ void c_standalone_ui::on_fileselected (c_widget *w, const char *path) {
 
 void c_standalone_ui::on_fileclear (c_widget *w) {
   debug ("lane %d", w->lane);
-  g_blender.load_model (w->lane, "");
+  g_blender.unload_model (w->lane);
 }
 
 void c_standalone_ui::on_mute (c_widget *w, bool b) {
