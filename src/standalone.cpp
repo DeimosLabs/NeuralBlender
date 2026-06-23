@@ -109,7 +109,7 @@ void c_standalone_ui::on_gain_out (c_widget *w, float f) {
 
 void c_standalone_ui::on_delay (c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
-  g_blender.set_gain_out (w->lane, f);
+  g_blender.set_delay_ms (w->lane, f);
 }
 
 void c_standalone_ui::on_filebrowse (c_widget *w) {
@@ -251,12 +251,12 @@ int main (int argc, char **argv) {
   
   g_blender.set_samplerate (jack_get_sample_rate (jack_client));
   g_blender.set_blocksize (jack_get_buffer_size (jack_client));
-  g_blender.delays [0].set_frames (0);
+  /*g_blender.delays [0].set_frames (0);
   g_blender.delays [1].set_frames (24000);
   g_blender.amps [0].gain_in = 1.0;
   g_blender.amps [0].gain_out = 1.0;
   g_blender.amps [1].gain_in = 1.0;
-  g_blender.amps [1].gain_out = 0.5;
+  g_blender.amps [1].gain_out = 0.5;*/
 
   if (jack_activate (jack_client)) {
     fprintf (stderr, "could not activate JACK client\n");

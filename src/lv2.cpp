@@ -521,7 +521,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       LV2_URID prop =
         ((const LV2_Atom_URID *) property)->body;
 
-      if (value->type != self->urid_atom_Path)
+      if (value->type != self->urid_atom_Path &&
+          value->type != self->urid_atom_String)
         continue;
 
       const char *path =
@@ -529,7 +530,10 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       
       for (i = 0; i < NB_MAX_MODELS; i++) {
         if (prop == self->urid_model [i]) {
-          request_load (self, i, path);
+          if (path && path [0])
+            request_load (self, i, path);
+          else
+            clear_model_slot (self, i, true);
           break;
         }
       }

@@ -246,8 +246,8 @@ void c_knob::on_change () {
     break;
 
     case ROLE_DELAY:
-      debug ("lane %d delay %f", lane, g);
-      ui->on_delay (this, g);
+      debug ("lane %d delay %f", lane, value);
+      ui->on_delay (this, value);
     break;
     
     default:
