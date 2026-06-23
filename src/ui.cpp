@@ -135,6 +135,7 @@ void c_button::on_mouseup () {
     break;
     
     case ROLE_BROWSE: CP
+      ui->filepickers [0].show ();
       ui->on_fileselect (this);
     break;
     
@@ -376,6 +377,36 @@ static void knob_value_changed (void *w_, void *value_) {
   }
 }
 
+static void file_response (void *w_, void *user_data) {
+  if (!user_data)
+    return; // cancelled
+
+  const char *path = *(const char **)user_data;
+  if (!path)
+    return;
+
+  // copy path now
+}
+
+void c_filepicker::create (
+    c_neuralblender_ui *ui_,
+    Widget_t *parent_,
+    size_t lane_,
+    const char *title_) {
+    
+  CP
+  ui = ui_;
+  parent = parent_;
+  lane = lane_;
+  title = std::string (title_);
+}
+
+void c_filepicker::show () { CP
+}
+
+void c_filepicker::hide () { CP
+}
+
 void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   ui = ui_;
   if (!ui || !ui->ui_ready || w)
@@ -532,6 +563,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   aboutwindow.create (this);
   for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
     lanes [i].create (this, main_widget, i, 20, 64 + i * 140, 600, 130);
+    filepickers [i].create (this, main_widget, i, "Select file");
   }
   widget_show_all (main_widget);
   expose_widget (main_widget);

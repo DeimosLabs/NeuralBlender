@@ -112,10 +112,7 @@ if (STANDALONE)
     )
     
     target_include_directories(neuralblender PRIVATE ${JACK_INCLUDE_DIRS})
-    target_link_libraries(neuralblender PRIVATE
-      neuralblender_core
-      ${JACK_LIBRARIES}
-    )
+    target_link_libraries(neuralblender PRIVATE neuralblender_core ${JACK_LIBRARIES})
 
     target_compile_definitions(neuralblender PRIVATE STANDALONE)
 
@@ -191,6 +188,7 @@ if (GUI)
     ${PROJECT_SOURCE_DIR}/external/libxputty
     ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/header
     ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/header/widgets
+    ${PROJECT_SOURCE_DIR}/external/libxputty/xputty/xdgmime
     ${X11_INCLUDE_DIRS}
     ${CAIRO_INCLUDE_DIRS}
   )

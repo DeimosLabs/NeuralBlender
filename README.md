@@ -6,7 +6,7 @@ Supports nam A1, nam A2, aidax, and json model files. Can load up to 4 models si
 
 Doesn't have a custom UI yet, but generic LV2 controls seem to be working fine at least in Ardour and jalv. Carla doesn't expose LV2 filename parameters except for the first one, this will be fixed / worked around soon.
 
-![NeuralBlender in Ardour](screenshot-ardour.png)
+![NeuralBlender in Ardour](data/screenshot-ardour.png)
 
 Compiles and installs with cmake.
 

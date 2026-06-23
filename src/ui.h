@@ -26,6 +26,7 @@
 
 #include "xputty.h"
 #include "xwidgets.h"
+#include "dialogs/xfile-dialog.h"
 
 // why does xputty define this?
 #ifdef min
@@ -167,21 +168,42 @@ public:
       int x, int y, int w, int h);
 };
 
-class c_filepicker : public c_widget {
+class c_filepicker {
 public:
-  void create (
-      c_neuralblender_ui *ui,
-      size_t which /* lane */,
-      Widget_t *parent,
-      const char *title);
+  void create (c_neuralblender_ui *ui, Widget_t *parent, size_t lane, const char *title);
+
+  void show ();
+  void hide ();
+  bool is_visible () const;
+
+  virtual void on_file_select (
+      size_t lane,
+      const std::string &filename,
+      const std::vector<std::string> &visible_files) {}
+
+  c_neuralblender_ui *ui = nullptr;
+  Widget_t *parent = nullptr;
+  Widget_t *dialog = nullptr;
+  size_t lane = -1;
+
+  std::string title;
+  std::string current_dir;
+  std::vector<std::string> filelist;
+};
+
+class c_aboutwindow {
+public:
+  void create (c_neuralblender_ui *ui);
   
   void show ();
   void hide ();
-  bool is_visible ();
-  void on_file_select (c_widget *w, std::string &filename);
   
-  std::string current_dir;
-  std::vector <std::string> filelist;
+  Widget_t *parent = NULL;
+  Widget_t *w = NULL;
+  c_button btn_ok;
+  c_label labels [16];
+  c_image img_logo;
+  c_neuralblender_ui *ui = NULL;
 };
 
 class c_lane_widgets {
@@ -209,21 +231,6 @@ public:
   c_combobox menu_list;
 };
 
-class c_aboutwindow {
-public:
-  void create (c_neuralblender_ui *ui);
-  
-  void show ();
-  void hide ();
-  
-  Widget_t *parent = NULL;
-  Widget_t *w = NULL;
-  c_button btn_ok;
-  c_label labels [16];
-  c_image img_logo;
-  c_neuralblender_ui *ui = NULL;
-};
-
 class c_neuralblender_ui {
 public:
   c_neuralblender_ui ();
@@ -241,7 +248,7 @@ public:
   virtual void on_mute (c_widget *w, bool b)      = 0;
   virtual void on_bypass (c_widget *w, bool b)    = 0;
   virtual void on_about (c_widget *w)             = 0;
-//private:
+  
   Display *display = NULL;
   Window window;
   c_neuralblender *blender = NULL;
@@ -252,6 +259,7 @@ public:
   c_button btn_enable;
   c_button btn_about;
   c_lane_widgets lanes [NB_UI_MAX_LANES];
+  c_filepicker filepickers [NB_UI_MAX_LANES];
   c_aboutwindow aboutwindow;
   bool ui_ready;
 };
