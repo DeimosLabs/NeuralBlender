@@ -46,37 +46,55 @@ enum _textalign {
   TEXT_RIGHT
 };
 
-enum _button_role {
-  BTN_UNKNOWN,
-  BTN_ENABLE,
-  BTN_MUTE,
-  BTN_BROWSE,
-  BTN_CLEAR,
-  BTN_ABOUT
+enum _widget_role {
+  ROLE_ABOUT,
+  ROLE_ABOUTOK,
+  ROLE_UNKNOWN,
+  ROLE_MUTE,
+  ROLE_BROWSE,
+  ROLE_CLEAR,
+  ROLE_GAIN_IN,
+  ROLE_GAIN_OUT,
+  ROLE_DELAY,
+  ROLE_BYPASS,
+  ROLE_MASTER
 };
-
 
 class c_widget {
 public:
-  virtual void create (Widget_t *parent, const char *label,
-                       int x, int y, int w, int h) = 0;
+  virtual void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label,
+      int x, int y, int w, int h) = 0;
+      
   // backpointers to parent objects
   Widget_t *widget         = NULL;
   Widget_t *parent_struct  = NULL;
   c_neuralblender_ui *ui   = NULL;
   std::string label;
-  _button_role role        = BTN_UNKNOWN;
+  _widget_role role        = ROLE_UNKNOWN;
   uint64_t id              = -1;
+  uint64_t lane            = -1;
 };
 
 class c_frame : public c_widget {
 public:
-  void create (Widget_t *parent, const char *label, int x, int y, int w, int h);
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label,
+      int x, int y, int w, int h);
 };
 
 class c_label : public c_widget {
 public:
-  void create (Widget_t *parent, const char *label, int x, int y, int w, int h);
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label,
+      int x, int y, int w, int h);
+      
   static void draw (void *w, void *userdata);
   float textsize = 1.0;
   _textalign align = TEXT_CENTER;
@@ -84,27 +102,40 @@ public:
 
 class c_button : public c_widget {
 public:
-  void create (Widget_t *parent, const char *label, int x, int y, int w, int h);
-  void create (Widget_t *parent, const char *label, 
-               int x, int y, int w, int h, bool is_toggle);
-  bool value ();
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label,
+      int x, int y, int w, int h);
+      
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label, 
+      int x, int y, int w, int h, bool is_toggle);
+      
   bool set_value (bool value);
   bool set_label (const char *label);
   virtual void on_mouseup ();
   
   bool is_toggle = false;
-  bool toggle_value = false;
+  bool value = false;
   
 };
 
 class c_knob : public c_widget {
 public:
-  void create (Widget_t *parent, const char *label, int x, int y, int w, int h);
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label,
+      int x, int y, int w, int h);
   
   void set_value (float v);
-  void set_min   (float min);
-  void set_max   (float max);
-  void set_step  (float max);
+  void set_defaultvalue (float v);
+  void set_min (float min);
+  void set_max (float max);
+  void set_step (float max);
   virtual void on_change ();
   virtual void on_doubleclick ();
   float min = 0;
@@ -117,7 +148,11 @@ public:
 
 class c_combobox : public c_widget {
 public:
-  void create (Widget_t *parent, const char *label, int x, int y, int w, int h);
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label,
+      int x, int y, int w, int h);
 };
 
 class c_lane_widgets {
@@ -125,19 +160,38 @@ public:
   //c_lane_widgets ();
   //~c_lane_widgets ();
   
-  void create (Widget_t *parent, size_t which, int x, int y, int w, int h);
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      size_t which,
+      int x, int y, int w, int h);
   
   size_t lane_id = -1;
-  c_neuralblender *blender = NULL;
+  c_neuralblender_ui *ui = NULL;
   size_t which_lane = 0;
   Widget_t *main_widget;
   c_frame lane_widget;
   c_knob gain_in;
   c_knob gain_out;
+  c_knob delay;
   c_button btn_mute;
   c_button btn_browse;
   c_button btn_clear;
   c_combobox menu_list;
+};
+
+class c_aboutwindow {
+public:
+  void create (c_neuralblender_ui *ui);
+  
+  void show ();
+  void hide ();
+  
+  Widget_t *parent = NULL;
+  Widget_t *w = NULL;
+  c_button btn_ok;
+  c_label labels [16];
+  c_neuralblender_ui *ui = NULL;
 };
 
 class c_neuralblender_ui {
@@ -149,20 +203,25 @@ public:
   int idle ();
   void draw ();
   
-  virtual void on_gain_in (void *data, float f)  = 0;
-  virtual void on_gain_out (void *data, float f) = 0;
-  virtual void on_fileselect (void *data)        = 0;
-  virtual void on_fileclear (void *data)         = 0;
-  virtual void on_mute (void *data, bool b)      = 0;
-
+  virtual void on_gain_in (c_widget *w, float f)  = 0;
+  virtual void on_gain_out (c_widget *w, float f) = 0;
+  virtual void on_delay (c_widget *w, float f)    = 0;
+  virtual void on_fileselect (c_widget *w)        = 0;
+  virtual void on_fileclear (c_widget *w)         = 0;
+  virtual void on_mute (c_widget *w, bool b)      = 0;
+  virtual void on_bypass (c_widget *w, bool b)    = 0;
+  virtual void on_about (c_widget *w)             = 0;
 //private:
   Display *display = NULL;
   Window window;
+  c_neuralblender *blender = NULL;
   Xputty app;
   Widget_t *main_widget = NULL;
+  Window parent;
   c_label  label_big;
   c_button btn_enable;
   c_button btn_about;
   c_lane_widgets lanes [NB_UI_MAX_LANES];
+  c_aboutwindow aboutwindow;
   bool ui_ready;
 };

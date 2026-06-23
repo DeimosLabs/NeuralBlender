@@ -30,11 +30,14 @@ public:
   LV2UI_Write_Function write;
   LV2UI_Controller controller;
 
-  void on_gain_in (void *data, float f)  { CP }
-  void on_gain_out (void *data, float f) { CP }
-  void on_fileselect (void *data)        { CP }
-  void on_fileclear (void *data)         { CP }
-  void on_mute (void *data, bool b)      { CP }
+  void on_gain_in (c_widget *w, float f)  { CP }
+  void on_gain_out (c_widget *w, float f) { CP }
+  void on_delay (c_widget *w, float f)    { CP }
+  void on_fileselect (c_widget *w)        { CP }
+  void on_fileclear (c_widget *w)         { CP }
+  void on_mute (c_widget *w, bool b)      { CP }
+  void on_bypass (c_widget *w, bool b)    { CP }
+  void on_about (c_widget *w)             { CP }
 };
 
 static LV2UI_Handle instantiate (

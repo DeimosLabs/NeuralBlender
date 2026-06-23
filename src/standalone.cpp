@@ -40,6 +40,7 @@
 #define BP
 #endif
 
+static c_neuralblender g_blender;
 const char *g_build_timestamp = BUILD_TIMESTAMP;
 
 /******************************************************************************
@@ -50,8 +51,6 @@ static jack_client_t *jack_client = nullptr;
 static jack_port_t *jack_in = nullptr;
 static jack_port_t *jack_out = nullptr;
 static volatile bool g_running = true;
-
-static c_neuralblender g_blender;
 
 static int jack_process (jack_nframes_t nframes, void *) {
   float *in = (float *) jack_port_get_buffer (jack_in, nframes);
@@ -77,30 +76,69 @@ static void signal_handler (int) {
 
 class c_standalone_ui : public c_neuralblender_ui {
 public:
-  void on_gain_in (void *data, float f);
-  void on_gain_out (void *data, float f);
-  void on_fileselect (void *data);
-  void on_fileclear (void *data);
-  void on_mute (void *data, bool b);
+  c_standalone_ui (c_neuralblender *b) 
+  : c_neuralblender_ui () {
+    blender = b;
+  }
+  void on_gain_in (c_widget *w, float f);
+  void on_gain_out (c_widget *w, float f);
+  void on_delay (c_widget *w, float f);
+  void on_fileselect (c_widget *w);
+  void on_fileclear (c_widget *w);
+  void on_mute (c_widget *w, bool b);
+  void on_bypass (c_widget *w, bool b);
+  void on_about (c_widget *w);
 };
 
-void c_standalone_ui::on_gain_in (void *data, float f) { CP }
-void c_standalone_ui::on_gain_out (void *data, float f) { CP }
-void c_standalone_ui::on_fileselect (void *data) { CP }
-void c_standalone_ui::on_fileclear (void *data) { CP }
-void c_standalone_ui::on_mute (void *data, bool b) { CP }
+void c_standalone_ui::on_gain_in (c_widget *w, float f) {
+  debug ("lane %d, f=%f", w->lane, f);
+  g_blender.set_gain_in (w->lane, f);
+}
+
+void c_standalone_ui::on_gain_out (c_widget *w, float f) {
+  debug ("lane %d, f=%f", w->lane, f);
+  g_blender.set_gain_out (w->lane, f);
+}
+
+void c_standalone_ui::on_delay (c_widget *w, float f) {
+  debug ("lane %d, f=%f", w->lane, f);
+  g_blender.set_gain_out (w->lane, f);
+}
+
+void c_standalone_ui::on_fileselect (c_widget *w) {
+  debug ("lane %d", w->lane);
+}
+
+void c_standalone_ui::on_fileclear (c_widget *w) {
+  debug ("lane %d", w->lane);
+  g_blender.load_model (w->lane, "");
+}
+
+void c_standalone_ui::on_mute (c_widget *w, bool b) {
+  debug ("lane %d, b=%d", w->lane, (int) b);
+  g_blender.set_lane_mute (w->lane, b);
+}
+
+void c_standalone_ui::on_bypass (c_widget *w, bool b) {
+  debug ("lane %d, b=%d", w->lane, (int) b);
+  g_blender.set_bypass (!b);
+}
+
+void c_standalone_ui::on_about (c_widget *w) {
+  debug ("lane %d", w->lane);
+}
 
 static std::thread ui_thread;
-static c_standalone_ui ui;
+
+static c_standalone_ui g_ui (&g_blender);
 
 static void ui_main () {
   fprintf (stderr, "Creating UI...\n");
-  c_standalone_ui ui;
-  ui.create (0);        // no LV2 parent, so root/toplevel
+  g_ui.create (0);        // no LV2 parent, so root/toplevel
   fprintf (stderr, "UI running...\n");
   
   CP
-  main_run (&ui.app);   // blocking xputty loop
+  main_run (&g_ui.app);   // blocking xputty loop
   CP
   g_running = false;
   //exit (0);
