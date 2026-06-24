@@ -70,10 +70,15 @@ public:
   LV2_URID_Map *map = NULL;
   LV2_Atom_Forge forge;
   LV2_URID urid_atom_eventTransfer = 0;
+  LV2_URID urid_atom_Path = 0;
+  LV2_URID urid_atom_String = 0;
+  LV2_URID urid_atom_URID = 0;
   LV2_URID urid_patch_Set = 0;
+  LV2_URID urid_patch_Get = 0;
   LV2_URID urid_patch_property = 0;
   LV2_URID urid_patch_value = 0;
   LV2_URID urid_model [NB_UI_MAX_LANES] = { 0 };
+  LV2UI_Port_Subscribe *subscribe = NULL;
   bool updating_from_host = false;
   
   void write_control (uint32_t port, float value) {
@@ -114,6 +119,25 @@ public:
     return path [0] != '\0';
   }
 
+  void request_current_state () {
+    if (!write || !map)
+      return;
+
+    uint8_t buf [256];
+    LV2_Atom_Forge_Frame frame;
+
+    lv2_atom_forge_set_buffer (&forge, buf, sizeof (buf));
+    lv2_atom_forge_object (&forge, &frame, 0, urid_patch_Get);
+    lv2_atom_forge_pop (&forge, &frame);
+
+    const LV2_Atom *atom = (const LV2_Atom *) buf;
+    write (controller,
+           PORT_CONTROL,
+           lv2_atom_total_size (atom),
+           urid_atom_eventTransfer,
+           atom);
+  }
+
   bool load_model (size_t which, const char *filename) { CP; return write_model_path (which, filename); }
   void on_gain_in (c_widget *w, float f)               { CP; write_control (lane_port (w->lane, PORT_A_GAIN_IN), gain_to_db (f)); }
   void on_gain_out (c_widget *w, float f)              { CP; write_control (lane_port (w->lane, PORT_A_GAIN_OUT), gain_to_db (f)); }
@@ -127,11 +151,13 @@ public:
 
   void set_port_value (uint32_t port, float value) {
     updating_from_host = true;
+    updating_from_state = true;
 
     if (port == PORT_BYPASS) {
-      btn_enable.value = value >= 0.5f;
-      btn_enable.set_value (btn_enable.value);
-      btn_enable.set_label (btn_enable.value ? "Enabled" : "Bypass");
+      const bool enabled = value >= 0.5f;
+      btn_enable.set_value (enabled);
+      btn_enable.set_label (enabled ? "Enabled" : "Bypass");
+      updating_from_state = false;
       updating_from_host = false;
       return;
     }
@@ -148,13 +174,79 @@ public:
         lanes [lane].delay.set_value (value);
         break;
       } else if (port == base + 3) {
-        lanes [lane].btn_mute.value = value >= 0.5f;
-        lanes [lane].btn_mute.set_value (lanes [lane].btn_mute.value);
+        lanes [lane].btn_mute.set_value (value >= 0.5f);
         break;
       }
     }
 
+    updating_from_state = false;
     updating_from_host = false;
+  }
+
+  void set_model_path (size_t which, const char *path) {
+    if (which >= NB_UI_MAX_LANES)
+      return;
+
+    const char *p = path ? path : "";
+    c_neuralblender_state state;
+    state.bypass = !btn_enable.value;
+    for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+      state.lanes [i].filename = filepickers [i].selected_file;
+      state.lanes [i].gain_in = db_to_gain (lanes [i].gain_in.value);
+      state.lanes [i].gain_out = db_to_gain (lanes [i].gain_out.value);
+      state.lanes [i].delay_ms = lanes [i].delay.value;
+      state.lanes [i].lane_mute = lanes [i].btn_mute.value;
+      state.lanes [i].loaded = !state.lanes [i].filename.empty ();
+    }
+    state.lanes [which].filename = p;
+    state.lanes [which].loaded = p [0] != '\0';
+
+    apply_state (state);
+  }
+
+  void set_model_property (LV2_URID property, const char *path) {
+    for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+      if (property == urid_model [i]) {
+        set_model_path (i, path);
+        return;
+      }
+    }
+  }
+
+  void handle_atom_event (const LV2_Atom *atom) {
+    if (!atom)
+      return;
+
+    const LV2_Atom_Object *obj = (const LV2_Atom_Object *) atom;
+    if (obj->body.otype != urid_patch_Set)
+      return;
+
+    const LV2_Atom *property = NULL;
+    const LV2_Atom *value = NULL;
+    lv2_atom_object_get (
+      obj,
+      urid_patch_property, &property,
+      urid_patch_value, &value,
+      0);
+
+    if (!property || !value || property->type != urid_atom_URID)
+      return;
+
+    if (value->type != urid_atom_Path &&
+        value->type != urid_atom_String)
+      return;
+
+    const LV2_URID prop = ((const LV2_Atom_URID *) property)->body;
+    const char *path = (const char *) LV2_ATOM_BODY_CONST (value);
+    set_model_property (prop, path);
+  }
+
+  void subscribe_ports () {
+    if (!subscribe)
+      return;
+
+    for (uint32_t port = PORT_BYPASS; port <= PORT_D_MUTE; ++port)
+      subscribe->subscribe (subscribe->handle, port, 0, NULL);
   }
 };
 
@@ -182,13 +274,19 @@ static LV2UI_Handle instantiate (
       parent = (Window) (uintptr_t) features [i]->data;
     } else if (!strcmp (features [i]->URI, LV2_URID__map)) {
       ui->map = (LV2_URID_Map *) features [i]->data;
+    } else if (!strcmp (features [i]->URI, LV2_UI__portSubscribe)) {
+      ui->subscribe = (LV2UI_Port_Subscribe *) features [i]->data;
     }
   }
 
   if (ui->map) {
     lv2_atom_forge_init (&ui->forge, ui->map);
     ui->urid_atom_eventTransfer = ui->map->map (ui->map->handle, LV2_ATOM__eventTransfer);
+    ui->urid_atom_Path = ui->map->map (ui->map->handle, LV2_ATOM__Path);
+    ui->urid_atom_String = ui->map->map (ui->map->handle, LV2_ATOM__String);
+    ui->urid_atom_URID = ui->map->map (ui->map->handle, LV2_ATOM__URID);
     ui->urid_patch_Set = ui->map->map (ui->map->handle, LV2_PATCH__Set);
+    ui->urid_patch_Get = ui->map->map (ui->map->handle, LV2_PATCH__Get);
     ui->urid_patch_property = ui->map->map (ui->map->handle, LV2_PATCH__property);
     ui->urid_patch_value = ui->map->map (ui->map->handle, LV2_PATCH__value);
     ui->urid_model [0] = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#ModelA");
@@ -201,6 +299,9 @@ static LV2UI_Handle instantiate (
     delete ui;
     return NULL;
   }
+
+  ui->subscribe_ports ();
+  ui->request_current_state ();
 
   if (widget)
     *widget = (LV2UI_Widget) (uintptr_t) ui->window;
@@ -232,6 +333,11 @@ static void port_event (
   if (format == 0 && buffer_size == sizeof (float)) {
     const float value = *(const float *) buffer;
     ui->set_port_value (port_index, value);
+    return;
+  }
+
+  if (format == ui->urid_atom_eventTransfer && buffer_size >= sizeof (LV2_Atom_Object)) {
+    ui->handle_atom_event ((const LV2_Atom *) buffer);
     return;
   }
 }

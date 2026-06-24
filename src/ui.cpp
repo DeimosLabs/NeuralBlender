@@ -5,6 +5,9 @@
  */
  
 #include <string.h>
+#include <algorithm>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #include "neuralblender.h"
 #include "ui.h"
@@ -30,6 +33,8 @@ static void button_double_click (void *w_, void *event, void *user_data);
 static void button_value_changed (void *w_, void *value);
 static void knob_value_changed (void *w_, void *value);
 static void knob_double_click (void *w_, void *event, void *user_data);
+static std::string path_dirname (const std::string &path);
+static std::string path_basename (const std::string &path);
 
 extern const char *g_build_timestamp;
 
@@ -125,6 +130,9 @@ void c_button::on_mouseup () {
     debug ("!ui");
     return;
   }
+
+  if (ui->updating_from_state)
+    return;
   
   switch (role) {
     case ROLE_BYPASS: CP
@@ -173,8 +181,9 @@ bool c_button::set_value (bool value) {
   if (!widget || !widget->adj)
     return false;
 
-  adj_set_value (widget->adj, value ? 1.0f : 0.0f);
-  widget->state = value ? 3 : 0;
+  this->value = value;
+  adj_set_value (widget->adj, this->value ? 1.0f : 0.0f);
+  widget->state = this->value ? 3 : 0;
   expose_widget (widget);
   return true;
 }
@@ -233,6 +242,9 @@ void c_knob::set_step (float x) {
 
 void c_knob::on_change () {
   //debug ("value=%f", value);
+  if (ui && ui->updating_from_state)
+    return;
+
   float g = db_to_gain (value);
   switch (role) {
     case ROLE_GAIN_IN:
@@ -288,9 +300,12 @@ void c_combobox::add (const std::string &str) {
 
 void c_combobox::on_change (int x) {
   debug ("x=%d", x);
+  if (ui && ui->updating_from_state)
+    return;
+
   set_selection (x);
   
-  if (x < 0 && x >= items.size ()) {
+  if (x < 0 || x >= (int) items.size ()) {
     debug ("item out of range: %d", x);
     return;
   }
@@ -543,11 +558,13 @@ static void filepicker_response(void *w_, void *user_data) { CP
   }
   
   debug ("current_dir: '%s'", fp->current_dir.c_str ());
+  
+  fp->selected_file = std::string (filename);
+  fp->current_dir = path_dirname (fp->selected_file);
+  fp->scan_current_dir ();
   for (int i = 0; i < fp->filelist.size (); i++) {
     debug ("filelist [%d]: '%s'", i, fp->filelist [i].c_str ());
   }
-  
-  fp->selected_file = std::string (filename);
   ui->load_model (cw->lane, filename);
   
   c_combobox *cb = &ui->lanes [lane].menu_list;
@@ -633,6 +650,54 @@ void c_filepicker::hide () { CP
 void c_filepicker::on_file_select (c_widget *cw, const std::string &filename) { CP
 }
 
+static bool is_supported_model_filename (const std::string &path) {
+  std::string lower = path;
+  std::transform (lower.begin (), lower.end (), lower.begin (),
+                  [] (unsigned char c) { return (char) std::tolower (c); });
+
+  return (lower.size () >= 4 && lower.rfind (".nam") == lower.size () - 4) ||
+         (lower.size () >= 5 && lower.rfind (".json") == lower.size () - 5) ||
+         (lower.size () >= 6 && lower.rfind (".aidax") == lower.size () - 6);
+}
+
+void c_filepicker::scan_current_dir () {
+  filelist.clear ();
+
+  if (current_dir.empty ())
+    return;
+
+  DIR *dir = opendir (current_dir.c_str ());
+  if (!dir) {
+    debug ("failed to scan '%s'", current_dir.c_str ());
+    return;
+  }
+
+  struct dirent *entry = NULL;
+  while ((entry = readdir (dir))) {
+    const char *name = entry->d_name;
+    if (!name || !strcmp (name, ".") || !strcmp (name, ".."))
+      continue;
+
+    if (!is_supported_model_filename (name))
+      continue;
+
+    std::string full = current_dir;
+    if (!full.empty () && full.back () != '/')
+      full += '/';
+    full += name;
+
+    struct stat st;
+    if (stat (full.c_str (), &st) || !S_ISREG (st.st_mode))
+      continue;
+
+    filelist.push_back (name);
+  }
+  closedir (dir);
+
+  std::sort (filelist.begin (), filelist.end ());
+  debug ("scan '%s': %zu model files", current_dir.c_str (), filelist.size ());
+}
+
 /*void c_filepicker::add_files_from_dir (c_combobox *cb) {
   CP
   int i, sel = -1;
@@ -670,6 +735,8 @@ void c_filepicker::add_files_from_dir(c_combobox *cb) {
   }
 
   cb->selected = sel;
+  debug ("add_files_from_dir: dir='%s' selected='%s' files=%zu sel=%d",
+         current_dir.c_str (), selected_file.c_str (), filelist.size (), sel);
   cb->update_widget();
 }
 
@@ -879,4 +946,54 @@ void c_neuralblender_ui::draw () {
     return;
 
   widget_draw (main_widget, NULL);
+}
+
+static std::string path_dirname (const std::string &path) {
+  const size_t pos = path.find_last_of ('/');
+  if (pos == std::string::npos)
+    return "";
+
+  if (pos == 0)
+    return "/";
+
+  return path.substr (0, pos);
+}
+
+static std::string path_basename (const std::string &path) {
+  const size_t pos = path.find_last_of ('/');
+  if (pos == std::string::npos)
+    return path;
+
+  return path.substr (pos + 1);
+}
+
+void c_neuralblender_ui::apply_state (const c_neuralblender_state &state) {
+  if (!ui_ready)
+    return;
+
+  updating_from_state = true;
+
+  const bool enabled = !state.bypass;
+  btn_enable.value = enabled;
+  btn_enable.set_value (enabled);
+  btn_enable.set_label (enabled ? "Enabled" : "Bypass");
+
+  const size_t nlanes = NB_UI_MAX_LANES < NB_MAX_MODELS ? NB_UI_MAX_LANES : NB_MAX_MODELS;
+  for (size_t i = 0; i < nlanes; ++i) {
+    const c_neuralblender_lane_state &lane = state.lanes [i];
+
+    lanes [i].gain_in.set_value (gain_to_db (lane.gain_in));
+    lanes [i].gain_out.set_value (gain_to_db (lane.gain_out));
+    lanes [i].delay.set_value (lane.delay_ms);
+
+    lanes [i].btn_mute.value = lane.lane_mute;
+    lanes [i].btn_mute.set_value (lane.lane_mute);
+
+    filepickers [i].selected_file = lane.filename;
+    filepickers [i].current_dir = path_dirname (lane.filename);
+    filepickers [i].scan_current_dir ();
+    filepickers [i].add_files_from_dir (&lanes [i].menu_list);
+  }
+
+  updating_from_state = false;
 }

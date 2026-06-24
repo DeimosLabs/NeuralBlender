@@ -146,6 +146,9 @@ static c_standalone_ui g_ui (&g_blender);
 static void ui_main () {
   fprintf (stderr, "Creating UI...\n");
   g_ui.create (0);        // no LV2 parent, so root/toplevel
+  c_neuralblender_state state;
+  g_blender.get_state (state);
+  g_ui.apply_state (state);
   fprintf (stderr, "UI running...\n");
   
   CP

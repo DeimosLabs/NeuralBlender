@@ -40,6 +40,7 @@
 #define NB_UI_MAX_LANES 4
 
 class c_neuralblender;
+struct c_neuralblender_state;
 class c_neuralblender_ui;
 
 enum _textalign {
@@ -193,6 +194,7 @@ public:
 
   void show ();
   void hide ();
+  void scan_current_dir ();
   void add_files_from_dir (c_combobox *cb);
   bool is_visible () const;
 
@@ -256,6 +258,7 @@ public:
   void destroy ();
   int idle ();
   void draw ();
+  void apply_state (const c_neuralblender_state &state);
   virtual bool load_model (size_t which, const char *filename) = 0;
   
   virtual void on_gain_in (c_widget *w, float f)               = 0;
@@ -281,4 +284,5 @@ public:
   c_filepicker filepickers [NB_UI_MAX_LANES];
   c_aboutwindow aboutwindow;
   bool ui_ready;
+  bool updating_from_state = false;
 };

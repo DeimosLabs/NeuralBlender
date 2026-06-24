@@ -11,7 +11,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(STANDALONE     "Build standalone JACK client" ON)
 option(LV2            "Build LV2 plugin" ON)
-option(GUI            "Enable GUI" OFF)
+option(GUI            "Enable GUI" ON)
 option(DEBUG          "Debug build" OFF)
 option(TRACE          "Debug (mostly) UI code" OFF)
 option(NOASAN         "Disable asan on debug build" ON)

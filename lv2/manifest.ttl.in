@@ -1,6 +1,7 @@
 @prefix lv2:  <http://lv2plug.in/ns/lv2core#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix ui:   <http://lv2plug.in/ns/extensions/ui#> .
+@prefix atom: <http://lv2plug.in/ns/ext/atom#> .
 
 <http://deimos.ca/neuralblender>
     a lv2:Plugin ;
@@ -11,5 +12,61 @@
 @@UI    a ui:X11UI ;
 @@UI    lv2:extensionData ui:idleInterface ;
 @@UI    lv2:optionalFeature ui:idleInterface ;
+@@UI    ui:portNotification [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 2
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 3
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 4
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 5
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 6
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 7
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 8
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 9
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 10
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 11
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 12
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 13
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 14
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 15
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 16
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 17
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 18
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        lv2:symbol "NOTIFY" ;
+@@UI        ui:notifyType atom:Blank
+@@UI    ] ;
 @@UI    ui:binary <neuralblender_ui.so> ;
 @@UI    rdfs:seeAlso <neuralblender.ttl> .

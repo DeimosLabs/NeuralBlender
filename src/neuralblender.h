@@ -65,12 +65,27 @@ public:
   //float process_sample (float x);
   void process_block (float *in, float *out, uint32_t nframes);
   bool set_frames (uint32_t f);
+  uint32_t frames () const;
   void clear ();
   
 private:
   uint32_t m_delay_frames = 0;
   std::vector<float> m_buffer;
   uint32_t m_writepos = 0;
+};
+
+struct c_neuralblender_lane_state {
+  std::string filename;
+  float gain_in = 1.0f;
+  float gain_out = 1.0f;
+  float delay_ms = 0.0f;
+  bool lane_mute = false;
+  bool loaded = false;
+};
+
+struct c_neuralblender_state {
+  bool bypass = false;
+  c_neuralblender_lane_state lanes [NB_MAX_MODELS];
 };
 
 
@@ -89,6 +104,7 @@ public:
   void process_block (float *in, float *out, uint32_t nframes);
 
   bool loaded () const;
+  std::string model_filename () const;
   
   std::string filename = "";
   float       gain_in  = 1.0f;
@@ -99,12 +115,14 @@ public:
   int warmup = 5;
   
 private:
+  void reset_unlocked ();
   bool load_json ( const std::string &filename);
   bool load_nam ( const std::string &filename);
   // model impl.
   std::unique_ptr<nam::DSP> m_nam_model;
   std::unique_ptr<RTNeural::Model<float>> m_rtneural_model;
-  std::mutex model_mutex;
+  mutable std::mutex model_mutex;
+  std::atomic<bool> m_loaded { false };
   
   _engine_mode m_engine_mode = ENGINE_NONE;
 };
@@ -125,6 +143,10 @@ public:
   bool set_gain_out (size_t which, float g);
   bool set_lane_mute (size_t which, bool muted);
   void set_bypass (bool bypass);
+  bool lane_mute (size_t which) const;
+  bool bypass () const;
+  float delay_ms (size_t which) const;
+  void get_state (c_neuralblender_state &state) const;
 
   c_neuralamp amps [NB_MAX_MODELS];
   c_delayline delays [NB_MAX_MODELS];

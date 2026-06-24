@@ -65,6 +65,12 @@ static bool ends_with (const std::string &a, const std::string &b, bool casesens
   return ret;
 }
 
+static bool is_supported_model_path (const std::string &path) {
+  return ends_with (path, ".nam") ||
+         ends_with (path, ".json") ||
+         ends_with (path, ".aidax");
+}
+
 /******************************************************************************
  * c_delayline
  */
@@ -82,6 +88,10 @@ bool c_delayline::set_frames (uint32_t frames) { CP
 
   m_delay_frames = frames;
   return true;
+}
+
+uint32_t c_delayline::frames () const {
+  return m_delay_frames;
 }
 
 void c_delayline::clear () { CP
@@ -126,7 +136,14 @@ void c_neuralamp::set_samplerate (uint32_t sr) { CP
   reset ();
 }
 
-bool c_neuralamp::loaded () const { return m_engine_mode != ENGINE_NONE; }
+bool c_neuralamp::loaded () const {
+  return m_loaded.load (std::memory_order_relaxed);
+}
+
+std::string c_neuralamp::model_filename () const {
+  std::lock_guard<std::mutex> lock (model_mutex);
+  return filename;
+}
 
 bool c_neuralamp::load_nam (const std::string &fn) { CP
   try
@@ -196,37 +213,57 @@ bool c_neuralamp::load_json (const std::string &fn) { CP
 }
 
 bool c_neuralamp::load_model (const std::string &fn) { CP
-  const std::string load_fn = fn.empty() ? filename : fn;
+  const std::string load_fn = fn.empty() ? model_filename () : fn;
 
   if (load_fn.empty ()) {
     fprintf (stderr, "No model filename specified\n");
     return false;
   }
+
+  if (!is_supported_model_path (load_fn)) {
+    fprintf (stderr, "Unsupported model file type: %s\n", load_fn.c_str ());
+    unload_model ();
+    return false;
+  }
   
-  reset ();
+  std::lock_guard<std::mutex> lock (model_mutex);
+  m_loaded.store (false, std::memory_order_release);
+  reset_unlocked ();
   
   const bool ret = ends_with (load_fn, ".nam")
     ? load_nam (load_fn)
     : load_json (load_fn);
 
-  if (ret)
+  if (ret) {
     filename = load_fn;
-  else {
-    unload_model ();
+    m_loaded.store (true, std::memory_order_release);
+  } else {
+    reset_unlocked ();
+    m_rtneural_model.reset ();
+    m_nam_model.reset ();
+    m_engine_mode = ENGINE_NONE;
     filename = "";
+    m_loaded.store (false, std::memory_order_release);
   }
   
   return ret;
 }
 
-void c_neuralamp::reset () {
+void c_neuralamp::reset_unlocked () {
   if (m_rtneural_model) m_rtneural_model->reset ();
   if (m_nam_model) m_nam_model->Reset (samplerate, MAX_BLOCK_SIZE);
   warmup = 5; CP
 }
 
+void c_neuralamp::reset () {
+  std::lock_guard<std::mutex> lock (model_mutex);
+  reset_unlocked ();
+}
+
 void c_neuralamp::unload_model () {
-  reset ();
+  std::lock_guard<std::mutex> lock (model_mutex);
+  m_loaded.store (false, std::memory_order_release);
+  reset_unlocked ();
   m_rtneural_model.reset ();
   m_nam_model.reset ();
   m_engine_mode = ENGINE_NONE;
@@ -378,11 +415,42 @@ void c_neuralblender::set_bypass (bool bypass) {
   m_bypass.store (bypass, std::memory_order_relaxed);
 }
 
+bool c_neuralblender::lane_mute (size_t which) const {
+  if (which >= NB_MAX_MODELS)
+    return false;
+
+  return m_lane_mute [which].load (std::memory_order_relaxed);
+}
+
+bool c_neuralblender::bypass () const {
+  return m_bypass.load (std::memory_order_relaxed);
+}
+
+float c_neuralblender::delay_ms (size_t which) const {
+  if (which >= NB_MAX_MODELS || !m_samplerate)
+    return 0.0f;
+
+  return (float) delays [which].frames () * 1000.0f / (float) m_samplerate;
+}
+
+void c_neuralblender::get_state (c_neuralblender_state &state) const {
+  state.bypass = bypass ();
+
+  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+    state.lanes [i].filename = amps [i].model_filename ();
+    state.lanes [i].gain_in = amps [i].gain_in;
+    state.lanes [i].gain_out = amps [i].gain_out;
+    state.lanes [i].delay_ms = delay_ms (i);
+    state.lanes [i].lane_mute = lane_mute (i);
+    state.lanes [i].loaded = amps [i].loaded ();
+  }
+}
+
 void c_neuralblender::update_mutes () {
   bool any_loaded = false;
 
   for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
-    const bool loaded = !amps [i].filename.empty ();
+    const bool loaded = amps [i].loaded ();
     amps [i].mute = !loaded;
     any_loaded |= loaded;
   }
@@ -405,7 +473,7 @@ bool c_neuralblender::load_model (size_t which, const char *fn) { CP
 
   int bf = 0;
   for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
-    if (!amps [i].filename.empty ())
+    if (amps [i].loaded ())
       bf |= (1 << i);
   }
   
@@ -458,7 +526,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
   bool any_loaded = false;
   bool any_active = false;
   for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
-    if (amps [lane].filename.empty ())
+    if (!amps [lane].loaded ())
       continue;
 
     any_loaded = true;
@@ -481,7 +549,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
   std::fill (out, out + nframes, 0.0f);
 
   for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
-    if (amps [lane].filename.empty () ||
+    if (!amps [lane].loaded () ||
         amps [lane].mute.load (std::memory_order_relaxed) ||
         m_lane_mute [lane].load (std::memory_order_relaxed))
       continue;

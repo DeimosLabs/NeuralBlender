@@ -218,6 +218,23 @@ static void clear_model_slot (Plugin *self, size_t which, bool notify) {
   self->notify_path [which] = notify;
 }
 
+static void get_state_path_features (
+    const LV2_Feature *const *features,
+    LV2_State_Map_Path **map_path,
+    LV2_State_Free_Path **free_path) {
+  if (map_path)
+    *map_path = NULL;
+  if (free_path)
+    *free_path = NULL;
+
+  for (int i = 0; features && features [i]; ++i) {
+    if (map_path && !strcmp (features [i]->URI, LV2_STATE__mapPath))
+      *map_path = (LV2_State_Map_Path *) features [i]->data;
+    else if (free_path && !strcmp (features [i]->URI, LV2_STATE__freePath))
+      *free_path = (LV2_State_Free_Path *) features [i]->data;
+  }
+}
+
 static LV2_State_Status save (
     LV2_Handle instance,
     LV2_State_Store_Function store,
@@ -225,16 +242,29 @@ static LV2_State_Status save (
     uint32_t flags,
     const LV2_Feature *const *features) {
 	    Plugin *self = (Plugin *) instance;
+	    LV2_State_Map_Path *map_path = NULL;
+	    LV2_State_Free_Path *free_path = NULL;
+	    get_state_path_features (features, &map_path, &free_path);
 	    
 		    for (int i = 0; i < NB_MAX_MODELS; i++) {
-		      const std::string &filename = self->blender.amps [i].filename;
+		      const std::string filename = self->blender.amps [i].model_filename ();
 		      const bool empty = filename.empty ();
+		      char *abstract_path = NULL;
+		      const char *stored_path = filename.c_str ();
+		      if (!empty && map_path && map_path->abstract_path)
+		        abstract_path = map_path->abstract_path (map_path->handle, filename.c_str ());
+		      if (abstract_path)
+		        stored_path = abstract_path;
+
 	      store (handle,
 	             self->urid_model [i],
-	             filename.c_str (),
-	             filename.size () + 1,
+	             stored_path,
+	             strlen (stored_path) + 1,
 	             empty ? self->urid_atom_String : self->urid_atom_Path,
 	             LV2_STATE_IS_POD);
+
+	      if (abstract_path && free_path && free_path->free_path)
+	        free_path->free_path (free_path->handle, abstract_path);
 		    }
   
     return LV2_STATE_SUCCESS;
@@ -248,6 +278,9 @@ static LV2_State_Status restore (
     const LV2_Feature *const *features) { 
     
     Plugin *self = (Plugin *) instance;
+    LV2_State_Map_Path *map_path = NULL;
+    LV2_State_Free_Path *free_path = NULL;
+    get_state_path_features (features, &map_path, &free_path);
 
     size_t size;
     uint32_t type;
@@ -262,9 +295,16 @@ static LV2_State_Status restore (
                     &valflags);
 
 		      if (p && type == self->urid_atom_Path && size > 1) {
-		        clear_model_slot (self, i, false);
 		        const char *path = (const char *) p;
-		        request_load (self, i, path);
+		        char *absolute_path = NULL;
+		        if (map_path && map_path->absolute_path)
+		          absolute_path = map_path->absolute_path (map_path->handle, path);
+
+		        clear_model_slot (self, i, false);
+		        request_load (self, i, absolute_path ? absolute_path : path);
+
+		        if (absolute_path && free_path && free_path->free_path)
+		          free_path->free_path (free_path->handle, absolute_path);
 		      } else {
 		        clear_model_slot (self, i, true);
 		      }
@@ -482,7 +522,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         self->notify_path [i] = false;
       }
     }
-    
+
     lv2_atom_forge_pop (&self->forge, &frame);
   }
   
@@ -492,10 +532,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       const LV2_Atom_Object *obj = (const LV2_Atom_Object *)&ev->body;
       
       if (obj->body.otype == self->urid_patch_Get) {
-        for (i = 0; i < NB_MAX_MODELS; i++) {
-          if (!self->current_model [i].empty ())
-            self->notify_path [i] = true;
-        }
+        for (i = 0; i < NB_MAX_MODELS; i++)
+          self->notify_path [i] = true;
 
         continue;
       }
