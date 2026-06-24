@@ -749,6 +749,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   if (!w)
     return;
   
+  w->flags |= HIDE_ON_DELETE;
   os_set_transient_for_hint (ui->main_widget, w);
   
   w->func.expose_callback = draw_main_window;
