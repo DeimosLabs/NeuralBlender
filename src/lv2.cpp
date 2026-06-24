@@ -520,6 +520,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
           self->current_model [i].c_str());
 
         self->notify_path [i] = false;
+        break; // throttle to 1 per cycle
       }
     }
 
