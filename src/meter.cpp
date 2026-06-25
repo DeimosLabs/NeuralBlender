@@ -922,10 +922,10 @@ void c_meterwidget::render_base (cairo_t *cr) {
   };
 
   const meter_line lines [] = {
-    { 0.5f,   0.0, 1.0, 0.0, 0.20 },
-    { 0.75f,  1.0, 1.0, 0.0, 0.20 },
-    { 0.875f, 1.0, 0.5, 0.0, 0.20 },
-    { 1.0f,   1.0, 0.0, 0.0, 0.20 },
+    { 0.5f,   0.0, 1.0, 0.0, 0.25 },
+    { 0.75f,  1.0, 1.0, 0.0, 0.25 },
+    { 0.875f, 1.0, 0.5, 0.0, 0.25 },
+    { 1.0f,   1.0, 0.0, 0.0, 0.25 },
   };
 
   cairo_set_line_width (cr, 1.0);
@@ -994,10 +994,13 @@ void c_meterwidget::draw_bar (cairo_t *cr, int at, int bar_th, float level, floa
     }
   }
 
-  const int holdpos = (int) (hold * met_len);
-  if (holdpos > 1 && holdpos < met_len) {
-    cairo_set_source_rgba (cr, 1.0, 1.0, 1.0, 0.65);
-    cairo_set_line_width (cr, 2.0);
+  //const int holdpos = (int) (hold * met_len);
+  if (hold > 0) {
+    int holdpos = (int) (hold * met_len);
+    holdpos = std::clamp(holdpos, 1, met_len);
+
+    cairo_set_source_rgba (cr, 1.0, 1.0, 1.0, 0.75);
+    cairo_set_line_width (cr, 1.0);
     if (vertical) {
       const double py = height - rec_size - holdpos + 0.5;
       cairo_move_to (cr, at, py);
