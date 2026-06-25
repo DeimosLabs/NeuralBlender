@@ -869,15 +869,15 @@ void c_lane_widgets::create (
   delay.set_value (0);
   delay.set_step (0.01);
   
-  meter_in.create (wp, "", w - 32, 24, 4, h - 48);
+  //meter_in.create (wp, "", w - 32, 24, 4, h - 48);
   meter_out.create (wp, "", w - 26, 24, 4, h - 48);
-  meter_in.set_vudata (&vudata_in);
+  //meter_in.set_vudata (&vudata_in);
   meter_out.set_vudata (&vudata_out);
-  meter_in.set_stereo (false);
+  //meter_in.set_stereo (false);
   meter_out.set_stereo (false);
-  vudata_in.set_l (1.0, 0.0);
-  vudata_in.set_r (1.0, 0.0);
+  //vudata_in.set_l (1.0, 0.0);
   vudata_out.set_l (1.0, 0.0);
+  //vudata_in.set_r (1.0, 0.0);
   vudata_out.set_r (1.0, 0.0);
   
   btn_browse.create (ui, wp, "Browse...",  94, 70, 100, 40);
@@ -917,6 +917,7 @@ void c_neuralblender_ui::update_cwd (std::string path) {
 }
 
 bool c_neuralblender_ui::create (Window parent_) { CP
+  size_t i;
   destroy ();
   
   main_init (&app);
@@ -945,9 +946,19 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_about.create (this, main_widget, "About...", 500, 16, 120, 40);
   btn_about.role = ROLE_ABOUT;
   aboutwindow.create (this);
-  for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
+  for (i = 0; i < NB_UI_MAX_LANES; i++) {
     lanes [i].create (this, main_widget, i, 20, 64 + i * 140, 600, 130);
   }
+  meter_in.create (main_widget, "", 8, 70, 4, 540);
+  meter_in.set_stereo (false);
+
+  if (blender) {
+    for (i = 0; i < NB_UI_MAX_LANES; i++) {
+      //blender->delays [i].meter_in = &lanes [i].vudata_in;
+      //blender->amps [i].meter_out = &lanes [i].vudata_out;
+    }
+  }
+
   widget_show_all (main_widget);
   expose_widget (main_widget);
 
@@ -969,12 +980,18 @@ void c_neuralblender_ui::destroy () { CP
   ui_ready = false;
 }
 
-int c_neuralblender_ui::idle () { CP
+int c_neuralblender_ui::idle () {
   if (!ui_ready) {
     CP
     return 0;
   }
-
+  
+  for (int i = 0; i < NB_MAX_MODELS; i++) {
+    //lanes [i].vudata_in.acknowledge ();
+    lanes [i].vudata_out.acknowledge ();
+    //expose_widget (lanes [i].meter_in.widget);
+    expose_widget (lanes [i].meter_out.widget);
+  }
   run_embedded (&app);
   return 0;
 }

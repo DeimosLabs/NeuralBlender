@@ -260,13 +260,7 @@ int main (int argc, char **argv) {
   
   g_blender.set_samplerate (jack_get_sample_rate (jack_client));
   g_blender.set_blocksize (jack_get_buffer_size (jack_client));
-  /*g_blender.delays [0].set_frames (0);
-  g_blender.delays [1].set_frames (24000);
-  g_blender.amps [0].gain_in = 1.0;
-  g_blender.amps [0].gain_out = 1.0;
-  g_blender.amps [1].gain_in = 1.0;
-  g_blender.amps [1].gain_out = 0.5;*/
-
+  
   if (jack_activate (jack_client)) {
     fprintf (stderr, "could not activate JACK client\n");
     jack_client_close (jack_client);

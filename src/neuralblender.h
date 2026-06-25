@@ -33,6 +33,8 @@
 #include "NAM/dsp.h"
 #include "NAM/get_dsp.h"
 
+#include "meter.h"
+
 #define MAX_DELAY_MS 300
 #define MAX_DELAY_FRAMES (MAX_DELAY_MS * 192)
 #define MAX_BLOCK_SIZE 8192
@@ -148,8 +150,10 @@ public:
   float delay_ms (size_t which) const;
   void get_state (c_neuralblender_state &state) const;
 
-  c_neuralamp amps [NB_MAX_MODELS];
   c_delayline delays [NB_MAX_MODELS];
+  c_neuralamp amps [NB_MAX_MODELS];
+  c_vudata meters_in [NB_MAX_MODELS];
+  c_vudata meters_out [NB_MAX_MODELS];
 
 private:
   void update_mutes ();

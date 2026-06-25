@@ -253,9 +253,8 @@ public:
   c_button btn_clear;
   c_combobox menu_list;
   
-  c_meterwidget meter_in;
+  //c_meterwidget meter_in; // we only have one input
   c_meterwidget meter_out;
-  c_vudata vudata_in;
   c_vudata vudata_out;
 };
 
@@ -294,6 +293,8 @@ public:
   c_button btn_about;
   c_lane_widgets lanes [NB_UI_MAX_LANES];
   c_filepicker filepickers [NB_UI_MAX_LANES];
+  c_meterwidget meter_in;
+  c_vudata vudata_in;
   c_aboutwindow aboutwindow;
   c_configfile configfile;
   bool ui_ready;

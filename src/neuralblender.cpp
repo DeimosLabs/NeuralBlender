@@ -109,13 +109,18 @@ void c_delayline::process_block (float *in, float *out, uint32_t nframes) {
 
     uint32_t readpos =
       (m_writepos + size - m_delay_frames) % size;
-
+    
+    /*if (meter_in)
+      meter_in->sample (m_buffer [readpos], 0.0);*/
     out [i] = m_buffer [readpos];
 
     m_writepos++;
     if (m_writepos >= size)
       m_writepos = 0;
   }
+  
+  /*if (meter_in)
+    meter_in->update ();*/
 }
 
 /******************************************************************************

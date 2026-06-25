@@ -10,10 +10,11 @@
 #pragma once
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 
 //#include "xputty.h"
-#include "xwidgets.h"
+//#include "xwidgets.h"
 
 #ifdef min
 #undef min
@@ -29,6 +30,10 @@
 #define VU_CLIP_HOLD    1.000000000f
 #define VU_XRUN_HOLD    1.000000000f
 #define VU_FALL_SPEED   0.030000000f
+
+typedef struct _cairo cairo_t;
+//struct cairo_t;
+class Widget_t;
 
 enum class meterwarn {
   REC,

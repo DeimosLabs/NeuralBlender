@@ -19,6 +19,18 @@
 
 #include "meter.h"
 
+#include "xputty.h"
+#include "xwidgets.h"
+
+// why does xputty define this?
+#ifdef min
+#undef min
+#endif
+
+#ifdef max
+#undef max
+#endif
+
 #ifdef CMDLINE_DEBUG
 #include "cmdline/cmdline.h"
 #define debug(...) cmdline_debug(stderr,ANSI_CYAN,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
