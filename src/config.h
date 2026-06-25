@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 #define CONFIG_CWD_KEY_NAME    "modelpath"
-#define CONFIG_FILE_NAME       ".config/neuralblender"
+#define CONFIG_FILE_NAME       ".config/neuralblender.conf"
 #define CONFIG_DEFAULT_DIR     "/"
 
 class c_configfile {
