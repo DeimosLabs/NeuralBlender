@@ -2,7 +2,8 @@
 /* NeuralBlender - RTNeural / NAM based amp modeler
  *
  * data compression / gzip utility functions
- * Old C code (kind of poorly) written by me, roughly translated to C++
+ * Old C code (kind of poorly) written by me years ago, roughly
+ * translated to C++ just now
 */
 
 #include <arpa/inet.h>

@@ -2,6 +2,8 @@
 /* NeuralBlender - RTNeural / NAM based amp modeler
  *
  * data compression / gzip utility functions
+ * Not used yet, but will be once we have any assets that would
+ * benefit from being compressed.
 */
 
 #include <stdio.h>
@@ -27,5 +29,4 @@ public:
       unsigned char *data,
       size_t data_length,
       size_t *r_zip_length);
-
 };
