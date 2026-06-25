@@ -36,7 +36,7 @@
 #include "neuralblender.h"
 
 #define NB_URI "http://deimos.ca/neuralblender"
-#define LV2_METER_FPS 60.0f
+#define LV2_METER_FPS 30.0
 
 //#define DEBUG
 

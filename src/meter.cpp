@@ -1001,11 +1001,11 @@ void c_meterwidget::draw_bar (cairo_t *cr, int at, int bar_th, float level, floa
     if (vertical) {
       const double py = height - rec_size - holdpos + 0.5;
       cairo_move_to (cr, at, py);
-      cairo_line_to (cr, at + bar_th - 1, py);
+      cairo_line_to (cr, at + bar_th, py);
     } else {
       const double px = rec_size + holdpos + 0.5;
       cairo_move_to (cr, px, at);
-      cairo_line_to (cr, px, at + bar_th - 1);
+      cairo_line_to (cr, px, at + bar_th);
     }
     cairo_stroke (cr);
   }
