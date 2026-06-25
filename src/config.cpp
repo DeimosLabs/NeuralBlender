@@ -69,7 +69,6 @@ static std::vector<std::string> read_lines (const std::string filename) {
 
 c_configfile::c_configfile () {
   std::string str = get_path ();
-  //set_item ("model_path", str);
 }
 
 std::string c_configfile::get_path () {
@@ -152,12 +151,12 @@ void c_configfile::dump () {
   }
 }
 
-bool c_configfile::read_file () {
+bool c_configfile::read_file () { CP
   std::string path = get_path ();
   return read_file (path);
 }
 
-bool c_configfile::read_file (std::string path) {
+bool c_configfile::read_file (std::string path) { CP
   if (path.size () <= 0) {
     debug ("no path returned from get_path");
     return false;
@@ -190,12 +189,12 @@ bool c_configfile::read_file (std::string path) {
   return true;
 }
 
-bool c_configfile::write_file () {
+bool c_configfile::write_file () { CP
   std::string path = get_path ();
   return write_file (path);
 }
 
-bool c_configfile::write_file (std::string path) {
+bool c_configfile::write_file (std::string path) { CP
   std::ofstream f (path);
   
   for (size_t i = 0; g_options [i].name.size () > 0; i++) {
