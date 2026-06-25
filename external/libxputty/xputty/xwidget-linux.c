@@ -1070,7 +1070,11 @@ void os_run_embedded(Xputty *main) {
         case ClientMessage:
             if (xev.xclient.data.l[0] == (long int)XInternAtom(main->dpy, "WM_DELETE_WINDOW", True) ) {
                 int i = childlist_find_widget(main->childlist, xev.xclient.window);
-                if(i<1) return;
+                if(i<0) return;
+                if(i==0) {
+                    main->run = false;
+                    return;
+                }
                 Widget_t *w = main->childlist->childs[i];
                 if(w->flags & HIDE_ON_DELETE) widget_hide(w);
                 else destroy_widget(w, main);
