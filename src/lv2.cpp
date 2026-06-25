@@ -111,8 +111,11 @@ typedef struct {
   LV2_URID urid_atom_Path      = 0;
   LV2_URID urid_atom_String    = 0;
   LV2_URID urid_atom_Blank     = 0;
+  LV2_URID urid_atom_Float     = 0;
+  LV2_URID urid_atom_Vector    = 0;
 
   LV2_URID urid_model [NB_MAX_MODELS] = { 0 };
+  LV2_URID urid_meters         = 0;
   LV2_URID urid_atom_URID      = 0;
   const LV2_Atom_Sequence *control = NULL;
   LV2_Atom_Sequence *notify    = NULL;
@@ -135,6 +138,10 @@ typedef struct {
   LV2_URID urid_atom_Sequence  = 0;
   bool notify_path [NB_MAX_MODELS] = { false };
   std::string current_path [NB_MAX_MODELS];
+
+  c_vudata meter_in;
+  c_vudata meters_out [NB_MAX_MODELS];
+  uint32_t meter_notify_samples = 0;
 } Plugin;
 
 // loader thread
@@ -336,6 +343,38 @@ static void forge_model_path_notify (Plugin *self,
   lv2_atom_forge_pop (&self->forge, &frame);
 }
 
+static void forge_meter_notify (Plugin *self) {
+  float values [(1 + NB_MAX_MODELS) * 2];
+  size_t n = 0;
+
+  values [n++] = self->meter_in.linear_l ();
+  values [n++] = self->meter_in.linear_peak_l ();
+
+  for (int i = 0; i < NB_MAX_MODELS; i++) {
+    values [n++] = self->meters_out [i].linear_l ();
+    values [n++] = self->meters_out [i].linear_peak_l ();
+  }
+
+  LV2_Atom_Forge_Frame frame;
+  lv2_atom_forge_frame_time (&self->forge, 0);
+  lv2_atom_forge_object (&self->forge,
+                         &frame,
+                         0,
+                         self->urid_patch_Set);
+
+  lv2_atom_forge_key (&self->forge, self->urid_patch_property);
+  lv2_atom_forge_urid (&self->forge, self->urid_meters);
+
+  lv2_atom_forge_key (&self->forge, self->urid_patch_value);
+  lv2_atom_forge_vector (&self->forge,
+                         sizeof (float),
+                         self->urid_atom_Float,
+                         n,
+                         values);
+
+  lv2_atom_forge_pop (&self->forge, &frame);
+}
+
 static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
                                double rate,
                                const char *bundle_path,
@@ -346,6 +385,9 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   self->blocksize = 0;
   
   self->blender.set_samplerate ((uint32_t)rate);
+  self->meter_in.samplerate = (int) rate;
+  for (int i = 0; i < NB_MAX_MODELS; i++)
+    self->meters_out [i].samplerate = (int) rate;
   //self->blender.load_model (0, "/tmp/a.nam");
   //self->blender.load_model (1, "/tmp/b.nam");
   
@@ -376,6 +418,8 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   self->urid_atom_String    = self->map->map (self->map->handle, LV2_ATOM__String);
   self->urid_atom_URID      = self->map->map (self->map->handle, LV2_ATOM__URID);
   self->urid_atom_Blank     = self->map->map (self->map->handle, LV2_ATOM__Blank);
+  self->urid_atom_Float     = self->map->map (self->map->handle, LV2_ATOM__Float);
+  self->urid_atom_Vector    = self->map->map (self->map->handle, LV2_ATOM__Vector);
   
   self->urid_model [0] =
     self->map->map(self->map->handle, "http://deimos.ca/neuralblender#ModelA");
@@ -388,6 +432,13 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   
   self->urid_model [3] =
   self->map->map(self->map->handle, "http://deimos.ca/neuralblender#ModelD");
+
+  self->urid_meters =
+    self->map->map(self->map->handle, "http://deimos.ca/neuralblender#Meters");
+
+  self->blender.meter_in = &self->meter_in;
+  for (int i = 0; i < NB_MAX_MODELS; i++)
+    self->blender.meters_out [i] = &self->meters_out [i];
   
   // start loader thread LAST
   self->loader_running = true;
@@ -524,6 +575,13 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       }
     }
 
+    const uint32_t meter_interval =
+      (uint32_t) (self->samplerate > 0.0 ? self->samplerate / 30.0 : 1600.0);
+    if (self->meter_notify_samples >= meter_interval) {
+      forge_meter_notify (self);
+      self->meter_notify_samples = 0;
+    }
+
     lv2_atom_forge_pop (&self->forge, &frame);
   }
   
@@ -582,6 +640,9 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   if (nframes != self->blocksize) {
     self->blocksize = nframes;
     self->blender.set_blocksize(nframes);
+    self->meter_in.bufsize = (int) nframes;
+    for (i = 0; i < NB_MAX_MODELS; i++)
+      self->meters_out [i].bufsize = (int) nframes;
   }
 
   if (self->bypass) {
@@ -631,6 +692,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   if (self->audio_in && self->audio_out) {
     self->blender.process_block ((float *) self->audio_in, self->audio_out, nframes);
   }
+
+  self->meter_notify_samples += nframes;
 }
 
 static void deactivate (LV2_Handle instance) {

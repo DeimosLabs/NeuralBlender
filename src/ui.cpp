@@ -872,7 +872,7 @@ void c_lane_widgets::create (
   meter_out.create (wp, "", w - 26, 24, 4, h - 48);
   meter_out.set_vudata (&vudata_out);
   meter_out.set_stereo (false);
-  vudata_out.set_l (1.0, 0.0);
+  vudata_out.set_l (0.0, 0.0);
   
   btn_browse.create (ui, wp, "Browse...",  94, 70, 100, 40);
   btn_clear.create  (ui, wp, "Clear",     205, 70, 100, 40);
@@ -946,7 +946,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   meter_in.create (main_widget, "", 8, 70, 4, 540);
   meter_in.set_vudata (&vudata_in);
   meter_in.set_stereo (false);
-  vudata_in.set_l (1.0, 0.0);
+  vudata_in.set_l (0.0, 0.0);
 
   if (blender) {
     for (i = 0; i < NB_UI_MAX_LANES; i++) {

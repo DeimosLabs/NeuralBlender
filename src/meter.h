@@ -54,6 +54,10 @@ public:
   float r () const;
   float peak_l () const;
   float peak_r () const;
+  float linear_l () const { return m_l.load (); }
+  float linear_r () const { return m_r.load (); }
+  float linear_peak_l () const { return m_peak_l.load (); }
+  float linear_peak_r () const { return m_peak_r.load (); }
   void acknowledge ();
 
   std::atomic<bool> needs_redraw { false };

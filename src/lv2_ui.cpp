@@ -73,11 +73,14 @@ public:
   LV2_URID urid_atom_Path = 0;
   LV2_URID urid_atom_String = 0;
   LV2_URID urid_atom_URID = 0;
+  LV2_URID urid_atom_Float = 0;
+  LV2_URID urid_atom_Vector = 0;
   LV2_URID urid_patch_Set = 0;
   LV2_URID urid_patch_Get = 0;
   LV2_URID urid_patch_property = 0;
   LV2_URID urid_patch_value = 0;
   LV2_URID urid_model [NB_UI_MAX_LANES] = { 0 };
+  LV2_URID urid_meters = 0;
   LV2UI_Port_Subscribe *subscribe = NULL;
   bool updating_from_host = false;
   
@@ -213,6 +216,36 @@ public:
     }
   }
 
+  void set_meter_values (const LV2_Atom *value) {
+    if (!value || value->type != urid_atom_Vector)
+      return;
+
+    const LV2_Atom_Vector *vec = (const LV2_Atom_Vector *) value;
+    if (vec->body.child_type != urid_atom_Float ||
+        vec->body.child_size != sizeof (float) ||
+        value->size < sizeof (LV2_Atom_Vector_Body))
+      return;
+
+    const uint32_t count =
+      (value->size - sizeof (LV2_Atom_Vector_Body)) / sizeof (float);
+    const uint32_t need = (1 + NB_UI_MAX_LANES) * 2;
+    if (count < need)
+      return;
+
+    const float *values =
+      (const float *) ((const uint8_t *) LV2_ATOM_BODY_CONST (value) +
+                       sizeof (LV2_Atom_Vector_Body));
+
+    size_t n = 0;
+    vudata_in.set_l (values [n], values [n + 1]);
+    n += 2;
+
+    for (size_t lane = 0; lane < NB_UI_MAX_LANES; lane++) {
+      lanes [lane].vudata_out.set_l (values [n], values [n + 1]);
+      n += 2;
+    }
+  }
+
   void handle_atom_event (const LV2_Atom *atom) {
     if (!atom)
       return;
@@ -232,11 +265,16 @@ public:
     if (!property || !value || property->type != urid_atom_URID)
       return;
 
+    const LV2_URID prop = ((const LV2_Atom_URID *) property)->body;
+    if (prop == urid_meters) {
+      set_meter_values (value);
+      return;
+    }
+
     if (value->type != urid_atom_Path &&
         value->type != urid_atom_String)
       return;
 
-    const LV2_URID prop = ((const LV2_Atom_URID *) property)->body;
     const char *path = (const char *) LV2_ATOM_BODY_CONST (value);
     set_model_property (prop, path);
   }
@@ -285,6 +323,8 @@ static LV2UI_Handle instantiate (
     ui->urid_atom_Path = ui->map->map (ui->map->handle, LV2_ATOM__Path);
     ui->urid_atom_String = ui->map->map (ui->map->handle, LV2_ATOM__String);
     ui->urid_atom_URID = ui->map->map (ui->map->handle, LV2_ATOM__URID);
+    ui->urid_atom_Float = ui->map->map (ui->map->handle, LV2_ATOM__Float);
+    ui->urid_atom_Vector = ui->map->map (ui->map->handle, LV2_ATOM__Vector);
     ui->urid_patch_Set = ui->map->map (ui->map->handle, LV2_PATCH__Set);
     ui->urid_patch_Get = ui->map->map (ui->map->handle, LV2_PATCH__Get);
     ui->urid_patch_property = ui->map->map (ui->map->handle, LV2_PATCH__property);
@@ -293,6 +333,7 @@ static LV2UI_Handle instantiate (
     ui->urid_model [1] = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#ModelB");
     ui->urid_model [2] = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#ModelC");
     ui->urid_model [3] = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#ModelD");
+    ui->urid_meters = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#Meters");
   }
 
   if (!ui->create (parent)) {
@@ -324,7 +365,7 @@ static void port_event (
   uint32_t port_index,
   uint32_t buffer_size,
   uint32_t format,
-  const void *buffer) { CP
+  const void *buffer) {
   
   c_lv2_ui *ui = (c_lv2_ui *) handle;
   if (!ui || !buffer)

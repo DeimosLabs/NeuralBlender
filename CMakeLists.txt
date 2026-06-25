@@ -43,6 +43,7 @@ execute_process (COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/timestamp.sh
 add_library(neuralblender_core OBJECT
   src/neuralblender.cpp
   src/gzip.cpp
+  src/meter_data.cpp
   
   external/NAM/get_dsp.cpp
   external/NAM/dsp.cpp
@@ -244,6 +245,7 @@ if (GUI)
     src/ui.cpp
     src/timestamp.cpp
     src/meter.cpp
+    src/meter_data.cpp
     $<TARGET_OBJECTS:neuralblender_data>
   )
 
