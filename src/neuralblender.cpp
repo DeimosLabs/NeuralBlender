@@ -582,8 +582,11 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
   std::fill (out, out + nframes, 0.0f);
 
   for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
-    if (!amps [lane].loaded ())
+    if (!amps [lane].loaded ()) {
+      if (meters_out [lane])
+        meters_out [lane]->update ();
       continue;
+    }
 
     if (amps [lane].mute.load (std::memory_order_relaxed) ||
         m_lane_mute [lane].load (std::memory_order_relaxed)) {
