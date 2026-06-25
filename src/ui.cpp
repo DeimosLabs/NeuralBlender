@@ -869,16 +869,10 @@ void c_lane_widgets::create (
   delay.set_value (0);
   delay.set_step (0.01);
   
-  //meter_in.create (wp, "", w - 32, 24, 4, h - 48);
   meter_out.create (wp, "", w - 26, 24, 4, h - 48);
-  //meter_in.set_vudata (&vudata_in);
   meter_out.set_vudata (&vudata_out);
-  //meter_in.set_stereo (false);
   meter_out.set_stereo (false);
-  //vudata_in.set_l (1.0, 0.0);
   vudata_out.set_l (1.0, 0.0);
-  //vudata_in.set_r (1.0, 0.0);
-  vudata_out.set_r (1.0, 0.0);
   
   btn_browse.create (ui, wp, "Browse...",  94, 70, 100, 40);
   btn_clear.create  (ui, wp, "Clear",     205, 70, 100, 40);
@@ -950,13 +944,15 @@ bool c_neuralblender_ui::create (Window parent_) { CP
     lanes [i].create (this, main_widget, i, 20, 64 + i * 140, 600, 130);
   }
   meter_in.create (main_widget, "", 8, 70, 4, 540);
+  meter_in.set_vudata (&vudata_in);
   meter_in.set_stereo (false);
+  vudata_in.set_l (1.0, 0.0);
 
   if (blender) {
     for (i = 0; i < NB_UI_MAX_LANES; i++) {
-      //blender->delays [i].meter_in = &lanes [i].vudata_in;
-      //blender->amps [i].meter_out = &lanes [i].vudata_out;
+      blender->meters_out [i] = &lanes [i].vudata_out;
     }
+    blender->meter_in = &vudata_in;
   }
 
   widget_show_all (main_widget);
@@ -986,11 +982,9 @@ int c_neuralblender_ui::idle () {
     return 0;
   }
   
+  meter_in.on_ui_timer ();
   for (int i = 0; i < NB_MAX_MODELS; i++) {
-    //lanes [i].vudata_in.acknowledge ();
-    lanes [i].vudata_out.acknowledge ();
-    //expose_widget (lanes [i].meter_in.widget);
-    expose_widget (lanes [i].meter_out.widget);
+    lanes [i].meter_out.on_ui_timer ();
   }
   run_embedded (&app);
   return 0;

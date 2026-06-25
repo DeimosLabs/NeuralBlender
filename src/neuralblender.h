@@ -152,8 +152,8 @@ public:
 
   c_delayline delays [NB_MAX_MODELS];
   c_neuralamp amps [NB_MAX_MODELS];
-  c_vudata meters_in [NB_MAX_MODELS];
-  c_vudata meters_out [NB_MAX_MODELS];
+  c_vudata *meter_in;
+  c_vudata *meters_out [NB_MAX_MODELS];
 
 private:
   void update_mutes ();

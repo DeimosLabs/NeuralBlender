@@ -157,7 +157,7 @@ static void ui_main () {
   //main_run (&g_ui.app);   // blocking xputty loop
   while (g_running && g_ui.app.run) {
     g_ui.idle ();
-    usleep (10000);
+    usleep (16777);
   }
   CP
   g_running = false;

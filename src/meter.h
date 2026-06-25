@@ -24,7 +24,7 @@
 #undef max
 #endif
 
-#define DEFAULT_VU_DB   -40.0f
+#define DEFAULT_VU_DB   -36.0f
 #define VU_REDRAW_EVERY 0.033333333f
 #define VU_PEAK_HOLD    1.000000000f
 #define VU_CLIP_HOLD    1.000000000f
@@ -69,6 +69,7 @@ private:
   static void atomic_max (std::atomic<float> &dst, float value);
   static void atomic_min (std::atomic<float> &dst, float value);
   float db_scaled (float f) const;
+  float display_to_linear (float f) const;
 
   std::atomic<float> m_l { 0.0f };
   std::atomic<float> m_r { 0.0f };

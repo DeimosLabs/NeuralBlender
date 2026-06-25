@@ -634,6 +634,17 @@ float c_vudata::db_scaled (float f) const {
   return clamp01 (ret);
 }
 
+float c_vudata::display_to_linear (float f) const {
+  const float scale = m_db_scale.load ();
+  f = clamp01 (f);
+
+  if (scale >= 0.0f)
+    return f;
+
+  const float db = scale * (1.0f - f);
+  return clamp01 (powf (10.0f, db / 20.0f));
+}
+
 // called at each processed sample
 bool c_vudata::sample (float l, float r) {
   const float old_plus_l = m_plus_l.load ();
@@ -677,11 +688,26 @@ bool c_vudata::update () {
     const float abs_l = clamp01 (std::max (std::fabs (plus_l), std::fabs (minus_l)));
     const float abs_r = clamp01 (std::max (std::fabs (plus_r), std::fabs (minus_r)));
 
-    if (abs_l != m_l.load () || abs_r != m_r.load ())
+    const float old_l = m_l.load ();
+    const float old_r = m_r.load ();
+    const float shown_l = db_scaled (old_l);
+    const float shown_r = db_scaled (old_r);
+    const float target_l = db_scaled (abs_l);
+    const float target_r = db_scaled (abs_r);
+    const float next_l = target_l >= shown_l
+      ? target_l
+      : std::max (target_l, shown_l - VU_FALL_SPEED);
+    const float next_r = target_r >= shown_r
+      ? target_r
+      : std::max (target_r, shown_r - VU_FALL_SPEED);
+    const float level_l = display_to_linear (next_l);
+    const float level_r = display_to_linear (next_r);
+
+    if (level_l != old_l || level_r != old_r)
       changed = true;
 
-    m_l.store (abs_l);
-    m_r.store (abs_r);
+    m_l.store (level_l);
+    m_r.store (level_r);
 
     if (now - m_timestamp_hold_l > peak_hold_frames)
       m_peak_l.store (0.0f);
@@ -774,16 +800,6 @@ void c_vudata::acknowledge () {
   clip_r.store (false);
   xrun_l.store (false);
   xrun_r.store (false);
-
-  const float old_l = m_l.load ();
-  const float old_r = m_r.load ();
-  const float new_l = clamp01 (old_l - VU_FALL_SPEED);
-  const float new_r = clamp01 (old_r - VU_FALL_SPEED);
-  m_l.store (new_l);
-  m_r.store (new_r);
-
-  needs_redraw.store (new_l > 0.0f || new_r > 0.0f ||
-                      m_peak_l.load () > 0.0f || m_peak_r.load () > 0.0f);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1233,4 +1249,3 @@ void c_meterwidget::on_paint (cairo_t *cr) {
   just replacing the shared c_vudata * with decoded atom messages into UI-owned c_vudata.
 
 */
-
