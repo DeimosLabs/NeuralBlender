@@ -43,7 +43,6 @@ execute_process (COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/timestamp.sh
 add_library(neuralblender_core OBJECT
   src/neuralblender.cpp
   src/gzip.cpp
-  src/meter_data.cpp
   
   external/NAM/get_dsp.cpp
   external/NAM/dsp.cpp
@@ -60,11 +59,20 @@ add_library(neuralblender_core OBJECT
   external/NAM/wavenet/slimmable.cpp
 )
 
+add_library(neuralblender_meter_data OBJECT
+  src/meter.cpp
+)
+
 set_target_properties(neuralblender_core PROPERTIES
   POSITION_INDEPENDENT_CODE ON
 )
 
+set_target_properties(neuralblender_meter_data PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+)
+
 add_dependencies(neuralblender_core generate_timestamp)
+add_dependencies(neuralblender_meter_data generate_timestamp)
 
 target_include_directories(neuralblender_core PUBLIC
   ${CMAKE_CURRENT_BINARY_DIR}
@@ -75,10 +83,20 @@ target_include_directories(neuralblender_core PUBLIC
   ${PROJECT_SOURCE_DIR}
 )
 
+target_include_directories(neuralblender_meter_data PUBLIC
+  ${CMAKE_CURRENT_BINARY_DIR}
+  ${PROJECT_SOURCE_DIR}
+  ${PROJECT_SOURCE_DIR}/src
+)
+
 target_compile_definitions(neuralblender_core PUBLIC
   NEURALBLENDER_VERSION="${PROJECT_VERSION}"
   NAM_SAMPLE_FLOAT
   DSP_SAMPLE_FLOAT
+)
+
+target_compile_definitions(neuralblender_meter_data PRIVATE
+  METER_DATA_ONLY
 )
 
 target_link_libraries(neuralblender_core PUBLIC Eigen3::Eigen z)
@@ -112,6 +130,7 @@ if (STANDALONE)
       src/standalone.cpp
       src/config.cpp
       src/timestamp.cpp
+      $<TARGET_OBJECTS:neuralblender_meter_data>
     )
     
     target_include_directories(neuralblender PRIVATE ${JACK_INCLUDE_DIRS})
@@ -245,7 +264,6 @@ if (GUI)
     src/ui.cpp
     src/timestamp.cpp
     src/meter.cpp
-    src/meter_data.cpp
     $<TARGET_OBJECTS:neuralblender_data>
   )
 
@@ -281,6 +299,7 @@ if (LV2)
   add_library(neuralblender_lv2 MODULE
     src/lv2.cpp
     src/timestamp.cpp
+    $<TARGET_OBJECTS:neuralblender_meter_data>
   )
 
   target_compile_options(neuralblender_lv2 PRIVATE
@@ -310,6 +329,7 @@ if (LV2)
     add_library(neuralblender_ui MODULE
       src/lv2_ui.cpp
       src/config.cpp
+      $<TARGET_OBJECTS:neuralblender_meter_data>
     )
 
     set_target_properties(neuralblender_ui PROPERTIES

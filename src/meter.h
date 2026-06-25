@@ -65,6 +65,7 @@ public:
   std::atomic<bool> clip_r { false };
   std::atomic<bool> xrun_l { false };
   std::atomic<bool> xrun_r { false };
+  float redraw_interval = VU_REDRAW_EVERY;
   int samplerate = 48000;
   int bufsize = 128;
 

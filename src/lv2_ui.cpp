@@ -216,6 +216,17 @@ public:
     }
   }
 
+  void redraw_meters_now () {
+    if (meter_in.needs_redraw () && meter_in.widget)
+      transparent_draw (meter_in.widget, NULL);
+
+    for (size_t lane = 0; lane < NB_UI_MAX_LANES; lane++) {
+      if (lanes [lane].meter_out.needs_redraw () &&
+          lanes [lane].meter_out.widget)
+        transparent_draw (lanes [lane].meter_out.widget, NULL);
+    }
+  }
+
   void set_meter_values (const LV2_Atom *value) {
     if (!value || value->type != urid_atom_Vector)
       return;
@@ -244,6 +255,8 @@ public:
       lanes [lane].vudata_out.set_l (values [n], values [n + 1]);
       n += 2;
     }
+
+    redraw_meters_now ();
   }
 
   void handle_atom_event (const LV2_Atom *atom) {

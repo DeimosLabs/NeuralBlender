@@ -36,6 +36,7 @@
 #include "neuralblender.h"
 
 #define NB_URI "http://deimos.ca/neuralblender"
+#define LV2_METER_FPS 60.0f
 
 //#define DEBUG
 
@@ -386,8 +387,11 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   
   self->blender.set_samplerate ((uint32_t)rate);
   self->meter_in.samplerate = (int) rate;
-  for (int i = 0; i < NB_MAX_MODELS; i++)
+  self->meter_in.redraw_interval = 1.0f / LV2_METER_FPS;
+  for (int i = 0; i < NB_MAX_MODELS; i++) {
     self->meters_out [i].samplerate = (int) rate;
+    self->meters_out [i].redraw_interval = 1.0f / LV2_METER_FPS;
+  }
   //self->blender.load_model (0, "/tmp/a.nam");
   //self->blender.load_model (1, "/tmp/b.nam");
   
@@ -562,6 +566,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     lv2_atom_forge_sequence_head (&self->forge, &frame, 0);
     
     // model loaded from UI?
+    bool sent_path_notify = false;
     for (i = 0; i < NB_MAX_MODELS; i++) {
       if (self->notify_path [i]) {
         debug ("notify_path [%d]", i);
@@ -571,13 +576,14 @@ static void run (LV2_Handle instance, uint32_t nframes) {
           self->current_model [i].c_str());
 
         self->notify_path [i] = false;
+        sent_path_notify = true;
         break; // throttle to 1 per cycle
       }
     }
 
     const uint32_t meter_interval =
-      (uint32_t) (self->samplerate > 0.0 ? self->samplerate / 30.0 : 1600.0);
-    if (self->meter_notify_samples >= meter_interval) {
+      (uint32_t) (self->samplerate > 0.0 ? self->samplerate / LV2_METER_FPS : 1600.0);
+    if (!sent_path_notify && self->meter_notify_samples >= meter_interval) {
       forge_meter_notify (self);
       self->meter_notify_samples = 0;
     }

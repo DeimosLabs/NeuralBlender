@@ -1047,7 +1047,8 @@ void c_neuralblender_ui::apply_state (const c_neuralblender_state &state) {
     lanes [i].btn_mute.set_value (lane.lane_mute);
 
     filepickers [i].selected_file = lane.filename;
-    //filepickers [i].current_dir = path_dirname (lane.filename);
+    if (!lane.filename.empty ())
+      filepickers [i].current_dir = path_dirname (lane.filename);
     filepickers [i].scan_current_dir ();
     filepickers [i].add_files_from_dir (&lanes [i].menu_list);
   }
