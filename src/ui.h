@@ -27,6 +27,7 @@
 #include "xputty.h"
 #include "xwidgets.h"
 #include "dialogs/xfile-dialog.h"
+#include "config.h"
 
 // why does xputty define this?
 #ifdef min
@@ -37,7 +38,7 @@
 #undef max
 #endif
 
-#define NB_UI_MAX_LANES 4
+#define NB_UI_MAX_LANES        4
 
 class c_neuralblender;
 struct c_neuralblender_state;
@@ -196,6 +197,8 @@ public:
   void hide ();
   void scan_current_dir ();
   void add_files_from_dir (c_combobox *cb);
+  std::string get_current_dir ();
+  void set_current_dir (std::string str);
   bool is_visible () const;
 
   void on_file_select (c_widget *w, const std::string &filename);
@@ -259,8 +262,11 @@ public:
   int idle ();
   void draw ();
   void apply_state (const c_neuralblender_state &state);
-  virtual bool load_model (size_t which, const char *filename) = 0;
+  void update_cwd (std::string path);
+  void on_filebrowse_pre (c_widget *w);
+  void on_fileselected_pre (c_widget *w, const char *path);
   
+  virtual bool load_model (size_t which, const char *filename) = 0;
   virtual void on_gain_in (c_widget *w, float f)               = 0;
   virtual void on_gain_out (c_widget *w, float f)              = 0;
   virtual void on_delay (c_widget *w, float f)                 = 0;
@@ -283,6 +289,9 @@ public:
   c_lane_widgets lanes [NB_UI_MAX_LANES];
   c_filepicker filepickers [NB_UI_MAX_LANES];
   c_aboutwindow aboutwindow;
+  c_configfile configfile;
   bool ui_ready;
   bool updating_from_state = false;
+  bool config_file_read = false;
+  bool config_file_written = false;
 };

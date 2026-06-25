@@ -13,7 +13,7 @@ option(STANDALONE     "Build standalone JACK client" ON)
 option(LV2            "Build LV2 plugin" ON)
 option(GUI            "Enable GUI" ON)
 option(DEBUG          "Debug build" OFF)
-option(TRACE          "Debug (mostly) UI code" OFF)
+option(TRACE          "Debug (mostly) UI code" ON)
 option(NOASAN         "Disable asan on debug build" ON)
 
 find_package(PkgConfig REQUIRED)
@@ -42,6 +42,7 @@ execute_process (COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/timestamp.sh
 
 add_library(neuralblender_core OBJECT
   src/neuralblender.cpp
+  src/gzip.cpp
   
   external/NAM/get_dsp.cpp
   external/NAM/dsp.cpp
@@ -79,7 +80,7 @@ target_compile_definitions(neuralblender_core PUBLIC
   DSP_SAMPLE_FLOAT
 )
 
-target_link_libraries(neuralblender_core PUBLIC Eigen3::Eigen)
+target_link_libraries(neuralblender_core PUBLIC Eigen3::Eigen z)
 
 if (DEBUG)
   message(STATUS "Debug enabled")
@@ -108,6 +109,7 @@ if (STANDALONE)
 
     add_executable(neuralblender
       src/standalone.cpp
+      src/config.cpp
       src/timestamp.cpp
     )
     
@@ -304,6 +306,7 @@ if (LV2)
   if(GUI)    
     add_library(neuralblender_ui MODULE
       src/lv2_ui.cpp
+      src/config.cpp
     )
 
     set_target_properties(neuralblender_ui PROPERTIES

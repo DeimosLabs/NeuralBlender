@@ -24,13 +24,15 @@
 #include <unistd.h>
 #include "neuralblender.h"
 #include "timestamp.h"
+#include "config.h"
 
 #ifdef HAVE_GUI
 #include <thread>
 #include "ui.h"
 #include "xputty.h"
 #endif
-
+#include "gzip.h"
+#include "data.h"
 #ifdef CMDLINE_DEBUG
 #include "cmdline/cmdline.h"
 #define debug(...) cmdline_debug(stderr,ANSI_RED,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)

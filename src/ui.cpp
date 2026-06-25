@@ -145,6 +145,7 @@ void c_button::on_mouseup () {
     break;
     
     case ROLE_BROWSE: CP
+      ui->on_filebrowse_pre (this);
       ui->on_filebrowse (this);
       if (filepicker)
         filepicker->show ();
@@ -528,6 +529,11 @@ static void filepicker_response(void *w_, void *user_data) { CP
     }
   }
 
+  if (fp->ui && !fp->current_dir.empty ()) {
+    fp->ui->configfile.set_item (CONFIG_CWD_KEY_NAME, fp->current_dir);
+    fp->ui->configfile.write_file ();
+  }
+
   fp->dialog = NULL;
 
   if (!user_data) {
@@ -571,6 +577,7 @@ static void filepicker_response(void *w_, void *user_data) { CP
   cb->clear ();
   //cb->add (filename);
   fp->add_files_from_dir (cb);
+  ui->on_fileselected_pre (cw, filename);
   ui->on_fileselected (cw, filename);
 }
 
@@ -640,7 +647,12 @@ void c_filepicker::show () { CP
     dialog = NULL;
   }
   parent->func.dialog_callback = filepicker_response;
-  const char *path = current_dir.empty () ? "/usr/nam" : current_dir.c_str ();
+  if (ui) {
+    ui->configfile.read_file ();
+    current_dir = ui->configfile.get_item (CONFIG_CWD_KEY_NAME);
+  }
+  debug ("current_dir='%s'", current_dir.c_str ());
+  const char *path = current_dir.empty () ? CONFIG_DEFAULT_DIR : current_dir.c_str ();
   dialog = open_file_dialog (parent, path, ".nam|.json|.aidax");
 }
 
@@ -648,6 +660,18 @@ void c_filepicker::hide () { CP
 }
 
 void c_filepicker::on_file_select (c_widget *cw, const std::string &filename) { CP
+  debug ("current_dir='%s'", current_dir.c_str ());
+  if (!ui)
+    return;
+}
+
+std::string c_filepicker::get_current_dir () {
+  return current_dir;
+}
+
+void c_filepicker::set_current_dir (std::string str) {
+  current_dir = str;
+  scan_current_dir ();
 }
 
 static bool is_supported_model_filename (const std::string &path) {
@@ -712,7 +736,7 @@ void c_filepicker::scan_current_dir () {
   cb->set_selection (sel);
 }*/
 
-void c_filepicker::add_files_from_dir(c_combobox *cb) {
+void c_filepicker::add_files_from_dir (c_combobox *cb) {
   if (!cb)
     return;
 
@@ -720,17 +744,17 @@ void c_filepicker::add_files_from_dir(c_combobox *cb) {
 
   int sel = -1;
 
-  for (size_t i = 0; i < filelist.size(); i++) {
-    cb->items.push_back(filelist[i]);
+  for (size_t i = 0; i < filelist.size (); i++) {
+    cb->items.push_back (filelist [i]);
 
     std::string full = current_dir;
-    if (!full.empty() && full.back() != '/')
+    if (!full.empty () && full.back () != '/')
       full += '/';
-    full += filelist[i];
+    full += filelist [i];
 
-    if (full == selected_file || filelist[i] == selected_file) {
+    if (full == selected_file || filelist [i] == selected_file) {
       sel = (int) i;
-      debug("found selected: %d", sel);
+      debug ("found selected: %d", sel);
     }
   }
 
@@ -880,6 +904,12 @@ c_neuralblender_ui::~c_neuralblender_ui () { CP
   destroy ();
 }
 
+void c_neuralblender_ui::update_cwd (std::string path) {
+  CP
+  debug ("path='%s'", path.c_str ());
+  configfile.set_item (CONFIG_CWD_KEY_NAME, path_dirname (path));
+}
+
 bool c_neuralblender_ui::create (Window parent_) { CP
   destroy ();
   
@@ -949,6 +979,14 @@ void c_neuralblender_ui::draw () {
   widget_draw (main_widget, NULL);
 }
 
+void c_neuralblender_ui::on_filebrowse_pre (c_widget *w) {
+  CP
+}
+
+void c_neuralblender_ui::on_fileselected_pre (c_widget *w, const char *path) {
+  CP
+}
+
 static std::string path_dirname (const std::string &path) {
   const size_t pos = path.find_last_of ('/');
   if (pos == std::string::npos)
@@ -991,7 +1029,7 @@ void c_neuralblender_ui::apply_state (const c_neuralblender_state &state) {
     lanes [i].btn_mute.set_value (lane.lane_mute);
 
     filepickers [i].selected_file = lane.filename;
-    filepickers [i].current_dir = path_dirname (lane.filename);
+    //filepickers [i].current_dir = path_dirname (lane.filename);
     filepickers [i].scan_current_dir ();
     filepickers [i].add_files_from_dir (&lanes [i].menu_list);
   }
