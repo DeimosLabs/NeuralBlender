@@ -145,7 +145,7 @@ void c_button::on_mouseup () {
     break;
     
     case ROLE_BROWSE: CP
-      ui->on_filebrowse_pre (this);
+      //ui->on_filebrowse_pre (this);
       ui->on_filebrowse (this);
       if (filepicker)
         filepicker->show ();
@@ -577,7 +577,7 @@ static void filepicker_response(void *w_, void *user_data) { CP
   cb->clear ();
   //cb->add (filename);
   fp->add_files_from_dir (cb);
-  ui->on_fileselected_pre (cw, filename);
+  //ui->on_fileselected_pre (cw, filename);
   ui->on_fileselected (cw, filename);
 }
 
@@ -839,19 +839,14 @@ void c_lane_widgets::create (
   lane_widget.create (ui, parent, label, x, y, w, h);
   Widget_t *wp = lane_widget.widget;
   
-  menu_list.create (ui, wp, label, 104, 24, 330, 32);
+  menu_list.create (ui, wp, label, 94, 24, 320, 32);
   menu_list.widget->func.value_changed_callback = combobox_selected_callback;
   menu_list.lane = which;
   
-  /*for (int i = 0; i < 5; i++) {
-    snprintf (label, 31, "Item %d", i + 1);
-    combobox_add_entry (menu_list.widget, label);
-  }*/
-  
   int knobs_left = w - 180;
-  gain_in.create (ui, wp, "Input", knobs_left + 32, 36, 64, 64);
-  gain_out.create (ui, wp, "Output", knobs_left + 90, 36, 64, 64);
-  delay.create (ui, wp, "Delay", 32, 36, 64, 64);
+  gain_in.create (ui, wp, "Input", knobs_left + 6, 36, 64, 64);
+  gain_out.create (ui, wp, "Output", knobs_left + 75, 36, 64, 64);
+  delay.create (ui, wp, "Delay", 22, 36, 64, 64);
   gain_in.role = ROLE_GAIN_IN;
   gain_out.role = ROLE_GAIN_IN;
   delay.role = ROLE_DELAY;
@@ -874,9 +869,20 @@ void c_lane_widgets::create (
   delay.set_value (0);
   delay.set_step (0.01);
   
-  btn_browse.create (ui, wp, "Browse...",  104, 70, 100, 40);
-  btn_clear.create  (ui, wp, "Clear",     220, 70, 100, 40);
-  btn_mute.create   (ui, wp, "Mute",      336, 70, 100, 40, true);
+  meter_in.create (wp, "", w - 32, 24, 4, h - 48);
+  meter_out.create (wp, "", w - 26, 24, 4, h - 48);
+  meter_in.set_vudata (&vudata_in);
+  meter_out.set_vudata (&vudata_out);
+  meter_in.set_stereo (false);
+  meter_out.set_stereo (false);
+  vudata_in.set_l (1.0, 0.0);
+  vudata_in.set_r (1.0, 0.0);
+  vudata_out.set_l (1.0, 0.0);
+  vudata_out.set_r (1.0, 0.0);
+  
+  btn_browse.create (ui, wp, "Browse...",  94, 70, 100, 40);
+  btn_clear.create  (ui, wp, "Clear",     205, 70, 100, 40);
+  btn_mute.create   (ui, wp, "Mute",      316, 70, 100, 40, true);
   btn_browse.lane = which;
   btn_clear.lane = which;
   btn_mute.lane = which;
@@ -928,6 +934,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   if (!main_widget)
     return false;
 
+  os_register_wm_delete_window (main_widget);
   widget_set_title (main_widget, "NeuralBlender");
   main_widget->func.expose_callback = draw_main_window;
   label_big.create (this, main_widget, "NeuralBlender", 120, 12, 400, 32);
@@ -962,7 +969,7 @@ void c_neuralblender_ui::destroy () { CP
   ui_ready = false;
 }
 
-int c_neuralblender_ui::idle () {
+int c_neuralblender_ui::idle () { CP
   if (!ui_ready) {
     CP
     return 0;
@@ -979,13 +986,13 @@ void c_neuralblender_ui::draw () {
   widget_draw (main_widget, NULL);
 }
 
-void c_neuralblender_ui::on_filebrowse_pre (c_widget *w) {
+/*void c_neuralblender_ui::on_filebrowse_pre (c_widget *w) {
   CP
 }
 
 void c_neuralblender_ui::on_fileselected_pre (c_widget *w, const char *path) {
   CP
-}
+}*/
 
 static std::string path_dirname (const std::string &path) {
   const size_t pos = path.find_last_of ('/');

@@ -154,7 +154,11 @@ static void ui_main () {
   fprintf (stderr, "UI running...\n");
   
   CP
-  main_run (&g_ui.app);   // blocking xputty loop
+  //main_run (&g_ui.app);   // blocking xputty loop
+  while (g_running && g_ui.app.run) {
+    g_ui.idle ();
+    usleep (10000);
+  }
   CP
   g_running = false;
   //exit (0);

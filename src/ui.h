@@ -28,6 +28,7 @@
 #include "xwidgets.h"
 #include "dialogs/xfile-dialog.h"
 #include "config.h"
+#include "meter.h"
 
 // why does xputty define this?
 #ifdef min
@@ -251,6 +252,11 @@ public:
   c_button btn_browse;
   c_button btn_clear;
   c_combobox menu_list;
+  
+  c_meterwidget meter_in;
+  c_meterwidget meter_out;
+  c_vudata vudata_in;
+  c_vudata vudata_out;
 };
 
 class c_neuralblender_ui {
@@ -263,8 +269,8 @@ public:
   void draw ();
   void apply_state (const c_neuralblender_state &state);
   void update_cwd (std::string path);
-  void on_filebrowse_pre (c_widget *w);
-  void on_fileselected_pre (c_widget *w, const char *path);
+  /*void on_filebrowse_pre (c_widget *w);
+  void on_fileselected_pre (c_widget *w, const char *path);*/
   
   virtual bool load_model (size_t which, const char *filename) = 0;
   virtual void on_gain_in (c_widget *w, float f)               = 0;

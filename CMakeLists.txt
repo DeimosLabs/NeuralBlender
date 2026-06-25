@@ -243,6 +243,7 @@ if (GUI)
   add_library(neuralblender_gui STATIC
     src/ui.cpp
     src/timestamp.cpp
+    src/meter.cpp
     $<TARGET_OBJECTS:neuralblender_data>
   )
 
