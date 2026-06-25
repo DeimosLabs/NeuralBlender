@@ -267,6 +267,7 @@ public:
   int idle ();
   void draw ();
   void apply_state (const c_neuralblender_state &state);
+  void clear_lane_model_ui (size_t which);
   void update_cwd (std::string path);
   /*void on_filebrowse_pre (c_widget *w);
   void on_fileselected_pre (c_widget *w, const char *path);*/

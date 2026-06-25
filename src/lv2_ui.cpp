@@ -147,7 +147,7 @@ public:
   void on_delay (c_widget *w, float f)                 { CP; write_control (lane_port (w->lane, PORT_A_DELAY), f); }
   void on_filebrowse (c_widget *w)                     { CP }
   void on_fileselected (c_widget *w, const char *path) { CP }
-  void on_fileclear (c_widget *w)                      { CP; write_model_path (w->lane, ""); }
+  void on_fileclear (c_widget *w)                      { CP; clear_lane_model_ui (w->lane); write_model_path (w->lane, ""); }
   void on_mute (c_widget *w, bool b)                   { CP; write_control (lane_port (w->lane, PORT_A_MUTE), b ? 1.0f : 0.0f); }
   void on_bypass (c_widget *w, bool b)                 { CP; write_control (PORT_BYPASS, b ? 1.0f : 0.0f); }
   void on_about (c_widget *w)                          { CP }

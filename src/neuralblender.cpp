@@ -496,6 +496,8 @@ bool c_neuralblender::unload_model (size_t which) { CP
     return false;
 
   amps [which].unload_model ();
+  if (meters_out [which])
+    meters_out [which]->update ();
   update_mutes ();
   return true;
 }
@@ -564,6 +566,10 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
 
   if (!any_loaded) {
     delays [0].process_block (process_in, out, nframes);
+    for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
+      if (meters_out [lane])
+        meters_out [lane]->update ();
+    }
     return;
   }
 

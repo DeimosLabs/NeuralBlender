@@ -290,6 +290,7 @@ void c_combobox::create (
 
 void c_combobox::clear () { CP
   items.clear ();
+  selected = -1;
   update_widget ();
 }
 
@@ -364,6 +365,8 @@ void c_combobox::update_widget () {
     adj_set_value (view_port->adj, top);
     adj_set_state (list->slider->adj, adj_get_state (view_port->adj));
     expose_widget (view_port);
+  } else {
+    widget->label = label.c_str ();
   }
   updating_widget = false;
   
@@ -997,6 +1000,14 @@ void c_neuralblender_ui::draw () {
   widget_draw (main_widget, NULL);
 }
 
+void c_neuralblender_ui::clear_lane_model_ui (size_t which) {
+  if (which >= NB_UI_MAX_LANES)
+    return;
+
+  filepickers [which].selected_file.clear ();
+  lanes [which].menu_list.clear ();
+}
+
 /*void c_neuralblender_ui::on_filebrowse_pre (c_widget *w) {
   CP
 }
@@ -1047,10 +1058,13 @@ void c_neuralblender_ui::apply_state (const c_neuralblender_state &state) {
     lanes [i].btn_mute.set_value (lane.lane_mute);
 
     filepickers [i].selected_file = lane.filename;
-    if (!lane.filename.empty ())
+    if (lane.filename.empty ()) {
+      lanes [i].menu_list.clear ();
+    } else {
       filepickers [i].current_dir = path_dirname (lane.filename);
-    filepickers [i].scan_current_dir ();
-    filepickers [i].add_files_from_dir (&lanes [i].menu_list);
+      filepickers [i].scan_current_dir ();
+      filepickers [i].add_files_from_dir (&lanes [i].menu_list);
+    }
   }
 
   updating_from_state = false;
