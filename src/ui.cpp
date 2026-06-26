@@ -650,10 +650,6 @@ static void combobox_changed (void *w_, void *user_data) {
   combo->on_change (index);
 }
 
-static void meter_resized (void *w_, void *user_data) {
-  CP
-}
-
 void c_filepicker::create (
     c_neuralblender_ui *ui_,
     Widget_t *parent_,
@@ -891,7 +887,6 @@ void c_lane_widgets::create (
   meter_out.set_vudata (&vudata_out);
   meter_out.set_stereo (false);
   vudata_out.set_l (0.0, 0.0);
-  meter_out.widget->func.resize_notify_callback = meter_resized;
   
   btn_browse.create (ui, wp, "Browse...",  94, 70, 100, 40);
   btn_clear.create  (ui, wp, "Clear",     205, 70, 100, 40);
@@ -984,7 +979,6 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   meter_in.set_vudata (&vudata_in);
   meter_in.set_stereo (false);
   vudata_in.set_l (0.0, 0.0);
-  meter_in.widget->func.resize_notify_callback = meter_resized;
   
   if (blender) {
     for (i = 0; i < NB_UI_MAX_LANES; i++) {

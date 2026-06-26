@@ -527,13 +527,11 @@ void c_customwidget::create (Widget_t *parent_,
   widget = create_widget (parent->app, parent, x, y, w, h);
   if (!widget)
     return;
-
+  
   widget->label = label;
   widget->parent_struct = this;
   widget->scale.gravity = CENTER;
   widget->func.expose_callback = draw_cb;
-  widget->func.configure_callback = configure_cb;
-  widget->func.resize_notify_callback = configure_cb;
   widget->func.enter_callback = enter_cb;
   widget->func.leave_callback = leave_cb;
   widget->func.button_press_callback = button_press_cb;
@@ -541,6 +539,7 @@ void c_customwidget::create (Widget_t *parent_,
   widget->func.motion_callback = motion_cb;
   widget->func.key_press_callback = key_press_cb;
   widget->func.key_release_callback = key_release_cb;
+  widget->func.configure_notify_callback = configure_cb;
 
   for (int i = 0; i < 8; ++i)
     mousedown_x [i] = mousedown_y [i] = -16384;
@@ -654,20 +653,17 @@ void c_customwidget::draw_cb (void *w_, void *userdata) {
 
 void c_customwidget::configure_cb (void *w_, void *userdata) {
   (void) userdata;
+  Widget_t *w = (Widget_t *) w_;
   c_customwidget *cw = custom_from_widget (w_);
-  if (!cw)
+  if (!w || !cw)
     return;
 
   cw->sync_metrics ();
-}
 
-void c_customwidget::enter_cb (void *w_, void *userdata) {
-  (void) userdata;
-  c_customwidget *cw = custom_from_widget (w_);
-  if (!cw)
-    return;
-
-  cw->on_visible ();
+  Metrics_t metrics;
+  os_get_window_metrics (w, &metrics);
+  if (w->width == metrics.width && w->height == metrics.height)
+    cw->expose ();
 }
 
 void c_customwidget::leave_cb (void *w_, void *userdata) {
@@ -778,6 +774,15 @@ void c_customwidget::key_release_cb (void *w_, void *event_, void *userdata) {
   cw->on_keyup ((int) event->xkey.keycode);
 }
 
+void c_customwidget::enter_cb (void *w_, void *userdata) {
+  (void) userdata;
+  c_customwidget *cw = custom_from_widget (w_);
+  if (!cw)
+    return;
+
+  cw->on_visible ();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // c_testwidget
 
@@ -844,7 +849,7 @@ void c_meterwidget::on_ui_timer () {
   
 }
 
-void c_meterwidget::set_stereo (bool b) {
+void c_meterwidget::set_stereo (bool b) { CP
   stereo = b;
   invalidate_base ();
 }
@@ -862,9 +867,10 @@ void c_meterwidget::set_r (float level, float hold, bool clip, bool xrun) {
 }
 
 void c_meterwidget::on_resize (int w, int h) {
-  (void) w;
-  (void) h;
+  width = w;
+  height = h;
   update_geometry ();
+  invalidate_base ();
 }
 
 void c_meterwidget::update_geometry () {
