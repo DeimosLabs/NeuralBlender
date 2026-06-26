@@ -65,6 +65,12 @@
 @@UI        ui:portIndex 18
 @@UI    ] , [
 @@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 21
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 22
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
 @@UI        lv2:symbol "NOTIFY" ;
 @@UI        ui:notifyType atom:Blank
 @@UI    ] ;

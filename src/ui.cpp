@@ -1026,6 +1026,7 @@ void c_neuralblender_ui::vu_on (bool b) { CP
   for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
     widget_show (lanes [i].meter_out.widget);
   }
+  on_vu (&btn_vu, b);
 }
 
 void c_neuralblender_ui::vu_off () { CP
@@ -1035,6 +1036,7 @@ void c_neuralblender_ui::vu_off () { CP
   for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
     widget_hide (lanes [i].meter_out.widget);
   }
+  on_vu (&btn_vu, false);
 }
 
 void c_neuralblender_ui::on_excl (bool b) { CP

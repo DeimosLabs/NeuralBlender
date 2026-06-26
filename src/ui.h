@@ -297,6 +297,7 @@ public:
   virtual void on_fileclear (c_widget *w)                      = 0;
   virtual void on_mute (c_widget *w, bool b)                   = 0;
   virtual void on_muteall (c_widget *w, bool b)                = 0;
+  virtual void on_vu (c_widget *w, bool b)                     = 0;
   virtual void on_excl (c_widget *w, int n)                    = 0;
   virtual void on_bypass (c_widget *w, bool b)                 = 0;
   virtual void on_about (c_widget *w)                          = 0;

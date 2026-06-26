@@ -78,7 +78,8 @@ enum {
 
   PORT_CONTROL,
   PORT_NOTIFY,
-  PORT_VU_ENABLE
+  PORT_VU_ENABLE,
+  PORT_MUTE_ALL
 };
 
 typedef struct {
@@ -93,6 +94,7 @@ typedef struct {
   const float *lane_mute   [NB_MAX_MODELS] = { NULL };
   const float *bypass      = NULL;
   const float *vu_enable   = NULL;
+  const float *mute_all    = NULL;
   
   float last_delay         [NB_MAX_MODELS] = { 0.0 };
   float last_gain_in_db    [NB_MAX_MODELS] = { 0.0 };
@@ -100,6 +102,7 @@ typedef struct {
   float last_lane_mute     [NB_MAX_MODELS] = { 0.0 };
   float last_bypass        = 1.0;
   float last_vu_enable     = 1.0;
+  float last_mute_all      = 0.0;
 
   // dsp
   c_neuralblender blender;
@@ -546,6 +549,10 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
     case PORT_VU_ENABLE:
       self->vu_enable = (const float *) data;
     break;
+
+    case PORT_MUTE_ALL:
+      self->mute_all = (const float *) data;
+    break;
   }
 }
 
@@ -664,6 +671,22 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     if (v != self->last_bypass) { CP
       self->last_bypass = v;
       self->blender.set_bypass (v < 0.5f);
+    }
+  }
+
+  if (self->vu_enable) {
+    const float v = *self->vu_enable;
+    if (v != self->last_vu_enable) { CP
+      self->last_vu_enable = v;
+      self->blender.do_vu = v >= 0.5f;
+    }
+  }
+
+  if (self->mute_all) {
+    const float v = *self->mute_all;
+    if (v != self->last_mute_all) { CP
+      self->last_mute_all = v;
+      self->blender.mute_all = v >= 0.5f;
     }
   }
   

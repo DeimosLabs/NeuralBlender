@@ -93,6 +93,7 @@ public:
   void on_fileclear (c_widget *w);
   void on_mute (c_widget *w, bool b);
   void on_muteall (c_widget *w, bool b);
+  void on_vu (c_widget *w, bool);
   void on_excl (c_widget *w, int which);
   void on_bypass (c_widget *w, bool b);
   void on_about (c_widget *w);
@@ -140,6 +141,11 @@ void c_standalone_ui::on_mute (c_widget *w, bool b) {
 void c_standalone_ui::on_muteall (c_widget *w, bool b) {
   debug ("lane %d, b=%d", w->lane, (int) b);
   g_blender.mute_all = b;
+}
+
+void c_standalone_ui::on_vu (c_widget *w, bool b) {
+  debug ("b=%d", (int) b);
+  g_blender.do_vu = b;
 }
 
 void c_standalone_ui::on_excl (c_widget *w, int n) {

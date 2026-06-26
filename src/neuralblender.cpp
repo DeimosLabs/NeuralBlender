@@ -518,6 +518,10 @@ static void update_loaded_output_meters (c_neuralblender *blender) {
 }
 
 void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
+  static size_t asdf;
+  if (asdf++ % 100 == 0) {
+    debug ("mute_all=%d, do_vu=%d", (int) mute_all, (int) do_vu);
+  }
   if (!in || !out || !nframes)
     return;
     
