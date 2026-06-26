@@ -23,7 +23,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include "neuralblender.h"
-#include "timestamp.h"
+//#include "timestamp.h"
 #include "config.h"
 
 #ifdef HAVE_GUI
@@ -41,6 +41,8 @@
 #define CP
 #define BP
 #endif
+
+extern const char *g_build_timestamp;
 
 static c_neuralblender g_blender;
 //const char *g_build_timestamp = BUILD_TIMESTAMP;
@@ -90,6 +92,8 @@ public:
   void on_fileselected (c_widget *w, const char *path);
   void on_fileclear (c_widget *w);
   void on_mute (c_widget *w, bool b);
+  void on_muteall (c_widget *w, bool b);
+  void on_excl (c_widget *w, int which);
   void on_bypass (c_widget *w, bool b);
   void on_about (c_widget *w);
 };
@@ -131,6 +135,15 @@ void c_standalone_ui::on_fileclear (c_widget *w) {
 void c_standalone_ui::on_mute (c_widget *w, bool b) {
   debug ("lane %d, b=%d", w->lane, (int) b);
   g_blender.set_lane_mute (w->lane, b);
+}
+
+void c_standalone_ui::on_muteall (c_widget *w, bool b) {
+  debug ("lane %d, b=%d", w->lane, (int) b);
+  g_blender.mute_all = b;
+}
+
+void c_standalone_ui::on_excl (c_widget *w, int n) {
+  debug ("lane %d, b=%d", w->lane, n);
 }
 
 void c_standalone_ui::on_bypass (c_widget *w, bool b) {
@@ -275,7 +288,7 @@ int main (int argc, char **argv) {
   fprintf(stderr, "NeuralBlender running. Connect ports manually. Press ctrl+C to quit.\n");
 #endif
   while (g_running)
-    usleep (1000);
+    usleep (10000);
   CP
   //ui_thread.join ();
   CP

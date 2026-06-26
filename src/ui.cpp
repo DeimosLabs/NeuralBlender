@@ -102,27 +102,31 @@ void c_button::create (
     c_neuralblender_ui *ui_,
     Widget_t *parent,
     const char *label_,
-    int x, int y, int w, int h) {
+    int x, int y, int w, int h,
+    _button_style style) {
+  
+  switch (style) {
+    case BTN_CHECKBOX:
+      is_toggle = true;
+      widget = add_check_button (parent, label.c_str (), x, y, w, h);
+      widget->func.value_changed_callback = button_value_changed;
+    break;
     
-  if (is_toggle) {
-    widget = add_toggle_button (parent, label.c_str (), x, y, w, h);
-    widget->func.value_changed_callback = button_value_changed;
-  } else {
-    widget = add_button (parent, label.c_str (), x, y, w, h);
-    widget->func.double_click_callback = button_double_click;
-    widget->func.button_release_callback = button_mouse_up;
+    case BTN_TOGGLE:
+      is_toggle = true;
+      widget = add_toggle_button (parent, label.c_str (), x, y, w, h);
+      widget->func.value_changed_callback = button_value_changed;
+    break;
+    
+    default:
+      is_toggle = false;
+      widget = add_button (parent, label.c_str (), x, y, w, h);
+      widget->func.double_click_callback = button_double_click;
+      widget->func.button_release_callback = button_mouse_up;
+    break;
   }
-  c_widget::create (ui_, parent, label_, x, y, w, h);
-}
-
-void c_button::create (
-    c_neuralblender_ui *ui_,
-    Widget_t *parent,
-    const char *label_,
-    int x, int y, int w, int h, bool is_toggle_) {
     
-  is_toggle = is_toggle_;
-  create (ui_, parent, label_, x, y, w, h);
+  c_widget::create (ui_, parent, label_, x, y, w, h);
 }
 
 void c_button::on_mouseup () {
@@ -142,6 +146,13 @@ void c_button::on_mouseup () {
     
     case ROLE_MUTE: CP
       ui->on_mute (this, value);
+    break;
+    
+    case ROLE_MUTEALL: CP
+      /*for (size_t i = 0; i < NB_UI_MAX_LANES; i++)
+        ui->lanes [i].meter_out.set_l (0, 0);
+      ui->on_muteall (this, value);*/
+      ui->on_muteall (this, value);
     break;
     
     case ROLE_BROWSE: CP
@@ -166,26 +177,40 @@ void c_button::on_mouseup () {
       ui->aboutwindow.hide ();
     break;
     
+    case ROLE_VUTOGGLE: CP
+      ui->vu_on (value);
+    break;
+    
+    case ROLE_EXCLTOGGLE: CP
+      ui->on_excl (value);
+    break;
+    
     default: CP
     break;
   }
 }
 
-/*bool c_button::value () {
+void xevfunc_dummy (void *a, void *b)          { }
+void evfunc_dummy (void *a, void *b, void *c)  { }
+
+bool c_button::set_value (bool value_) {
   if (!widget || !widget->adj)
     return false;
 
-  return adj_get_value (widget->adj) >= 0.5f;
-}*/
-
-bool c_button::set_value (bool value) {
-  if (!widget || !widget->adj)
-    return false;
-
-  this->value = value;
+  value = value_;
+  
+  // avoid firing unwanted callbacks
+  xevfunc oldvaluechanged = widget->func.value_changed_callback;
+  xevfunc oldadj = widget->func.adj_callback;
+  widget->func.value_changed_callback = xevfunc_dummy;
+  widget->func.adj_callback = xevfunc_dummy;
+  
   adj_set_value (widget->adj, this->value ? 1.0f : 0.0f);
   widget->state = this->value ? 3 : 0;
   expose_widget (widget);
+  widget->func.value_changed_callback = oldvaluechanged;
+  widget->func.adj_callback = oldadj;
+  
   return true;
 }
 
@@ -625,6 +650,10 @@ static void combobox_changed (void *w_, void *user_data) {
   combo->on_change (index);
 }
 
+static void meter_resized (void *w_, void *user_data) {
+  CP
+}
+
 void c_filepicker::create (
     c_neuralblender_ui *ui_,
     Widget_t *parent_,
@@ -724,20 +753,6 @@ void c_filepicker::scan_current_dir () {
   std::sort (filelist.begin (), filelist.end ());
   debug ("scan '%s': %zu model files", current_dir.c_str (), filelist.size ());
 }
-
-/*void c_filepicker::add_files_from_dir (c_combobox *cb) {
-  CP
-  int i, sel = -1;
-  
-  for (i = 0; i < filelist.size (); i++) {
-    cb->add (filelist [i]);
-    if (filelist [i] == selected_file) {
-      sel = i;
-      debug ("found selected: %d", i);
-    }
-  }
-  cb->set_selection (sel);
-}*/
 
 void c_filepicker::add_files_from_dir (c_combobox *cb) {
   if (!cb)
@@ -872,14 +887,17 @@ void c_lane_widgets::create (
   delay.set_value (0);
   delay.set_step (0.01);
   
-  meter_out.create (wp, "", w - 26, 24, 4, h - 48);
+  meter_out.create (wp, "", w - 26, 24, 5, h - 48);
   meter_out.set_vudata (&vudata_out);
   meter_out.set_stereo (false);
   vudata_out.set_l (0.0, 0.0);
+  meter_out.widget->func.resize_notify_callback = meter_resized;
   
   btn_browse.create (ui, wp, "Browse...",  94, 70, 100, 40);
   btn_clear.create  (ui, wp, "Clear",     205, 70, 100, 40);
-  btn_mute.create   (ui, wp, "Mute",      316, 70, 100, 40, true);
+  //btn_excl.create   (ui, wp, "Use",       316, 70, 100, 40, BTN_TOGGLE);
+  btn_mute.create   (ui, wp, "Mute",      316, 70, 100, 40, BTN_TOGGLE);
+  btn_mute.set_value (false);
   btn_browse.lane = which;
   btn_clear.lane = which;
   btn_mute.lane = which;
@@ -927,40 +945,57 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   parent = parent_;
   if (!parent)
     parent = DefaultRootWindow (display);
-
-  main_widget = create_window (&app, parent, 0, 0, 640, 640);
+  
+  main_widget = create_window (&app, parent, 0, 0, 640, 650);
   if (!main_widget)
     return false;
-
+    
+  widget_set_icon_from_png (main_widget, data_neuralblender_logo_512_png);
+  
   os_register_wm_delete_window (main_widget);
   widget_set_title (main_widget, "NeuralBlender");
   main_widget->func.expose_callback = draw_main_window;
   label_big.create (this, main_widget, "NeuralBlender", 120, 12, 400, 32);
   label_big.textsize = 1.5;
-  btn_enable.create (this, main_widget, "Enabled",  20, 16, 120, 40, true);
+  btn_enable.create (this, main_widget, "Enabled",  20, 12, 120, 40, BTN_TOGGLE);
   btn_enable.set_value (true);
   btn_enable.role = ROLE_BYPASS;
-  btn_about.create (this, main_widget, "About...", 500, 16, 120, 40);
+  btn_about.create (this, main_widget, "About...", 500, 600, 120, 40);
   btn_about.role = ROLE_ABOUT;
+  btn_muteall.create (this, main_widget, "Mute all", 500, 12, 120, 40, BTN_TOGGLE);
+  btn_muteall.role = ROLE_MUTEALL;
+  
+  btn_vu.create (this, main_widget, "VU meters", 20, 604, 32, 32, BTN_CHECKBOX);
+  btn_vu.role = ROLE_VUTOGGLE;
+  btn_vu.set_value (do_vu);
+  btn_exclmode.create (this, main_widget, "Exclusive mode", 200, 604, 32, 32, BTN_CHECKBOX);
+  btn_exclmode.set_value (do_excl);
+  btn_exclmode.role = ROLE_EXCLTOGGLE;
+  label_vu.create (this, main_widget, "VU meters", 60, 604, 120, 32);
+  label_vu.align = TEXT_LEFT;
+  label_exclmode.create (this, main_widget, "Exclusive mode (WIP!!)", 240, 604, 180, 32);
+  label_exclmode.align = TEXT_LEFT;
+  
   aboutwindow.create (this);
   for (i = 0; i < NB_UI_MAX_LANES; i++) {
-    lanes [i].create (this, main_widget, i, 20, 64 + i * 140, 600, 130);
+    lanes [i].create (this, main_widget, i, 20, 60 + i * 135, 600, 130);
   }
-  meter_in.create (main_widget, "", 8, 70, 4, 540);
+  meter_in.create (main_widget, "", 8, 70, 5, 520);
   meter_in.set_vudata (&vudata_in);
   meter_in.set_stereo (false);
   vudata_in.set_l (0.0, 0.0);
-
+  meter_in.widget->func.resize_notify_callback = meter_resized;
+  
   if (blender) {
     for (i = 0; i < NB_UI_MAX_LANES; i++) {
       blender->meters_out [i] = &lanes [i].vudata_out;
     }
     blender->meter_in = &vudata_in;
   }
-
+  
   widget_show_all (main_widget);
   expose_widget (main_widget);
-
+  
   window = main_widget->widget;
   CP
   XFlush (display);
@@ -979,15 +1014,49 @@ void c_neuralblender_ui::destroy () { CP
   ui_ready = false;
 }
 
+void c_neuralblender_ui::vu_on (bool b) { CP
+  if (!b) {
+    vu_off ();
+    return;
+  }
+  
+  do_vu = true;
+  
+  widget_show (meter_in.widget);
+  for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
+    widget_show (lanes [i].meter_out.widget);
+  }
+}
+
+void c_neuralblender_ui::vu_off () { CP
+  do_vu = false;
+  
+  widget_hide (meter_in.widget);
+  for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
+    widget_hide (lanes [i].meter_out.widget);
+  }
+}
+
+void c_neuralblender_ui::on_excl (bool b) { CP
+}
+
+void c_neuralblender_ui::excl_select (size_t which) { CP
+  for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
+    
+  }
+}
+
 int c_neuralblender_ui::idle () {
   if (!ui_ready) {
     CP
     return 0;
   }
   
-  meter_in.on_ui_timer ();
-  for (int i = 0; i < NB_MAX_MODELS; i++) {
-    lanes [i].meter_out.on_ui_timer ();
+  if (do_vu) {
+    meter_in.on_ui_timer ();
+    for (int i = 0; i < NB_MAX_MODELS; i++) {
+      lanes [i].meter_out.on_ui_timer ();
+    }
   }
   run_embedded (&app);
   return 0;

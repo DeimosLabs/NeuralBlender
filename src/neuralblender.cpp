@@ -110,17 +110,12 @@ void c_delayline::process_block (float *in, float *out, uint32_t nframes) {
     uint32_t readpos =
       (m_writepos + size - m_delay_frames) % size;
     
-    /*if (meter_in)
-      meter_in->sample (m_buffer [readpos], 0.0);*/
     out [i] = m_buffer [readpos];
 
     m_writepos++;
     if (m_writepos >= size)
       m_writepos = 0;
   }
-  
-  /*if (meter_in)
-    meter_in->update ();*/
 }
 
 /******************************************************************************
@@ -512,7 +507,10 @@ bool c_neuralblender::set_delay_ms (size_t which, float ms) {
 static void update_loaded_output_meters (c_neuralblender *blender) {
   if (!blender)
     return;
-
+    
+  if (!blender->do_vu)
+    return;
+  
   for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
     if (blender->amps [lane].loaded () && blender->meters_out [lane])
       blender->meters_out [lane]->update ();
@@ -522,7 +520,7 @@ static void update_loaded_output_meters (c_neuralblender *blender) {
 void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
   if (!in || !out || !nframes)
     return;
-
+    
   float *process_in = in;
   if (in == out) {
     if (m_input_buf.size () < nframes)
@@ -530,8 +528,8 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     memcpy (m_input_buf.data (), in, nframes * sizeof (float));
     process_in = m_input_buf.data ();
   }
-
-  if (meter_in) {
+  
+  if (do_vu && meter_in) {
     for (uint32_t i = 0; i < nframes; i++)
       meter_in->sample (process_in [i], 0.0f);
     meter_in->update ();
@@ -541,6 +539,18 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     if (process_in != out)
       memcpy (out, process_in, nframes * sizeof (float));
     update_loaded_output_meters (this);
+    return;
+  }
+  
+  /*if (mute_all) {
+    for (size_t i = 0; i < nframes; i++)
+      out [i] = 0.0;
+    return;
+  }*/
+  if (mute_all) {
+    std::fill(out, out + nframes, 0.0f);
+    if (do_vu)
+      update_loaded_output_meters(this);
     return;
   }
 
@@ -567,7 +577,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
   if (!any_loaded) {
     delays [0].process_block (process_in, out, nframes);
     for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
-      if (meters_out [lane])
+      if (do_vu && meters_out [lane])
         meters_out [lane]->update ();
     }
     return;
@@ -575,7 +585,8 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
 
   if (!any_active) {
     std::fill (out, out + nframes, 0.0f);
-    update_loaded_output_meters (this);
+    if (do_vu)
+      update_loaded_output_meters (this);
     return;
   }
 
@@ -583,14 +594,14 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
 
   for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
     if (!amps [lane].loaded ()) {
-      if (meters_out [lane])
+      if (meters_out [lane] && do_vu)
         meters_out [lane]->update ();
       continue;
     }
 
     if (amps [lane].mute.load (std::memory_order_relaxed) ||
         m_lane_mute [lane].load (std::memory_order_relaxed)) {
-      if (meters_out [lane])
+      if (meters_out [lane] && do_vu)
         meters_out [lane]->update ();
       continue;
     }
@@ -599,12 +610,12 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     amps [lane].process_block (m_delay_bufs [lane].data (), m_model_bufs [lane].data (), nframes);
 
     for (uint32_t i = 0; i < nframes; ++i) {
-      if (meters_out [lane])
+      if (meters_out [lane] && do_vu)
         meters_out [lane]->sample (m_model_bufs [lane] [i], 0.0);
       out [i] += m_model_bufs [lane][i];
     }
 
-    if (meters_out [lane])
+    if (meters_out [lane] && do_vu)
       meters_out [lane]->update ();
   }
 

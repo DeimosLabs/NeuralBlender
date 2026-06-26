@@ -154,6 +154,8 @@ public:
   c_neuralamp amps [NB_MAX_MODELS];
   c_vudata *meter_in;
   c_vudata *meters_out [NB_MAX_MODELS];
+  bool do_vu = true;
+  bool mute_all = false;
 
 private:
   void update_mutes ();

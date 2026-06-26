@@ -17,7 +17,8 @@
  * ----------------------------------------------------------------------------
  *
  * LV2 layer for NeuralBlender
- * Thanks to codex for help esp. on all the boilerplate code
+ * Thanks to codex for help esp. on all the boilerplate code, of which this
+ * file consists 99.5% entirely of.
  */
 
 #include <stdlib.h>
@@ -76,7 +77,8 @@ enum {
   PORT_D_MUTE,
 
   PORT_CONTROL,
-  PORT_NOTIFY
+  PORT_NOTIFY,
+  PORT_VU_ENABLE
 };
 
 typedef struct {
@@ -89,13 +91,15 @@ typedef struct {
   const float *gain_out_db [NB_MAX_MODELS] = { NULL };
   const float *delay       [NB_MAX_MODELS] = { NULL };
   const float *lane_mute   [NB_MAX_MODELS] = { NULL };
-  const float *bypass           = NULL;
+  const float *bypass      = NULL;
+  const float *vu_enable   = NULL;
   
   float last_delay         [NB_MAX_MODELS] = { 0.0 };
   float last_gain_in_db    [NB_MAX_MODELS] = { 0.0 };
   float last_gain_out_db   [NB_MAX_MODELS] = { 0.0 };
   float last_lane_mute     [NB_MAX_MODELS] = { 0.0 };
   float last_bypass        = 1.0;
+  float last_vu_enable     = 1.0;
 
   // dsp
   c_neuralblender blender;
@@ -125,10 +129,10 @@ typedef struct {
   std::thread loader_thread;
   std::mutex loader_mutex;
   std::condition_variable loader_cv;
-
+  
   std::atomic<bool> loader_running { true };
   std::atomic<bool> load_requested { false };
-
+  
   bool pending_load [NB_MAX_MODELS] = { false };
   //size_t pending_which         = 0;
   std::string pending_path [NB_MAX_MODELS];
@@ -537,6 +541,10 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
     
     case PORT_NOTIFY:
       self->notify = (LV2_Atom_Sequence *) data;
+    break;
+    
+    case PORT_VU_ENABLE:
+      self->vu_enable = (const float *) data;
     break;
   }
 }

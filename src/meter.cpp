@@ -1,6 +1,5 @@
 
-/*
- * NeuralBlender - meter widget.
+/* NeuralBlender - meter widget.
  * Original wxWidgets version was written for DIRT (Delt's Impulse
  * Response Tool) - see https://github.com/DeimosLabs/dirt
  *
@@ -837,8 +836,12 @@ bool c_meterwidget::needs_redraw () {
 }
 
 void c_meterwidget::on_ui_timer () {
-  if (needs_redraw ())
-    expose ();
+/*  if (needs_redraw ())
+    expose ();*/
+  
+  if (needs_redraw () && widget)
+    transparent_draw (widget, NULL);
+  
 }
 
 void c_meterwidget::set_stereo (bool b) {

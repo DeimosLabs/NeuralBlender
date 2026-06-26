@@ -1,6 +1,5 @@
 
-/*
- * NeuralBlender - meter widget.
+/* NeuralBlender - meter widget.
  * Original wxWidgets version was written for DIRT (Delt's Impulse
  * Response Tool) - see https://github.com/DeimosLabs/dirt
  *

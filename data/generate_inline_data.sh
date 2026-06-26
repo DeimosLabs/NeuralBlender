@@ -32,7 +32,7 @@ datadir="`readlink -f "$datadir"`"
 destdir="`pwd -P`"
 destdir="`readlink -f "$destdir"`"
 srcdir="`readlink -f "$datadir/.."`"
-timestamp_script="${datadir}/timestamp_build.sh"
+timestamp_script="${srcdir}/timestamp.sh"
 data_c="$destdir/$cname"
 data_h="$destdir/$hname"
 listfile_in="`basename "$0"`"
@@ -309,11 +309,14 @@ else
   echo "$baseme: inline data up to date, no need to regenerate"
 fi
 
-cd "$startwd"
+cd "$startwd/.."
+rm "timestamp.h" 2>/dev/null
 echo
-if [ -x "$timestamp_script" ]; then
+if [ -r "$timestamp_script" ]; then
+  pwd
+  timestamp.h
   echo "$baseme: generating build timestamp..."
-  "$timestamp_script" >/dev/null
+  bash "$timestamp_script" >/dev/null
 else
   echo "$baseme: `basename "$timestamp_script"` not generating timestamp"
 fi

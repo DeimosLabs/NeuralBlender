@@ -39,7 +39,7 @@
 #undef max
 #endif
 
-#define NB_UI_MAX_LANES        4
+#define NB_UI_MAX_LANES 4
 
 class c_neuralblender;
 struct c_neuralblender_state;
@@ -52,18 +52,29 @@ enum _textalign {
 };
 
 enum _widget_role {
+  ROLE_NONE,
   ROLE_ABOUT,
   ROLE_ABOUTOK,
   ROLE_UNKNOWN,
   ROLE_MUTE,
+  ROLE_MUTEALL,
   ROLE_BROWSE,
   ROLE_LOADFILE,
   ROLE_CLEAR,
   ROLE_GAIN_IN,
   ROLE_GAIN_OUT,
   ROLE_DELAY,
+  ROLE_VUTOGGLE,
+  ROLE_EXCLTOGGLE,
   ROLE_BYPASS,
   ROLE_MASTER
+};
+
+enum _button_style {
+  BTN_NORMAL,
+  BTN_TOGGLE,
+  BTN_CHECKBOX
+  //BTN_RADIO
 };
 
 class c_filepicker;
@@ -127,13 +138,14 @@ public:
       c_neuralblender_ui *ui,
       Widget_t *parent,
       const char *label,
-      int x, int y, int w, int h);
+      int x, int y, int w, int h,
+      _button_style s = BTN_NORMAL);
       
-  void create (
+  /*void create (
       c_neuralblender_ui *ui,
       Widget_t *parent,
       const char *label, 
-      int x, int y, int w, int h, bool is_toggle);
+      int x, int y, int w, int h, bool is_toggle);*/
       
   bool set_value (bool value);
   bool set_label (const char *label);
@@ -249,6 +261,7 @@ public:
   c_knob gain_out;
   c_knob delay;
   c_button btn_mute;
+  //c_button btn_excl;
   c_button btn_browse;
   c_button btn_clear;
   c_combobox menu_list;
@@ -269,8 +282,11 @@ public:
   void apply_state (const c_neuralblender_state &state);
   void clear_lane_model_ui (size_t which);
   void update_cwd (std::string path);
-  /*void on_filebrowse_pre (c_widget *w);
-  void on_fileselected_pre (c_widget *w, const char *path);*/
+  
+  void vu_on (bool b = true);
+  void vu_off ();
+  void on_excl (bool b = true);
+  void excl_select (size_t which);
   
   virtual bool load_model (size_t which, const char *filename) = 0;
   virtual void on_gain_in (c_widget *w, float f)               = 0;
@@ -280,6 +296,8 @@ public:
   virtual void on_fileselected (c_widget *w, const char *path) = 0;
   virtual void on_fileclear (c_widget *w)                      = 0;
   virtual void on_mute (c_widget *w, bool b)                   = 0;
+  virtual void on_muteall (c_widget *w, bool b)                = 0;
+  virtual void on_excl (c_widget *w, int n)                    = 0;
   virtual void on_bypass (c_widget *w, bool b)                 = 0;
   virtual void on_about (c_widget *w)                          = 0;
   
@@ -291,13 +309,20 @@ public:
   Window parent;
   c_label  label_big;
   c_button btn_enable;
+  c_button btn_muteall;
   c_button btn_about;
+  c_button btn_vu;
+  c_button btn_exclmode;
+  c_label  label_vu;
+  c_label  label_exclmode;
   c_lane_widgets lanes [NB_UI_MAX_LANES];
   c_filepicker filepickers [NB_UI_MAX_LANES];
   c_meterwidget meter_in;
   c_vudata vudata_in;
   c_aboutwindow aboutwindow;
   c_configfile configfile;
+  bool do_vu = true;
+  bool do_excl = false;
   bool ui_ready;
   bool updating_from_state = false;
   bool config_file_read = false;
