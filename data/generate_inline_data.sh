@@ -314,7 +314,7 @@ rm "timestamp.h" 2>/dev/null
 echo
 if [ -r "$timestamp_script" ]; then
   pwd
-  timestamp.h
+  timestamp.sh
   echo "$baseme: generating build timestamp..."
   bash "$timestamp_script" >/dev/null
 else
