@@ -71,7 +71,12 @@ static float linear_to_db_meter (float f) {
   return 20.0f * log10f (f);
 }
 
-float c_vudata::db_scaled (float f) const {
+void c_vudata::set_headroom (float db) {
+  m_headroom_db.store (std::max (0.0f, db));
+  needs_redraw.store (true);
+}
+
+/*float c_vudata::db_scaled (float f) const {
   const float scale = m_db_scale.load ();
   float ret = 0.0f;
 
@@ -86,17 +91,37 @@ float c_vudata::db_scaled (float f) const {
   }
 
   return clamp01 (ret);
+}*/
+
+// new version: takes m_headroom_db into account
+float c_vudata::db_scaled (float f) const {
+  const float min_db = m_db_scale.load ();
+
+  if (min_db >= 0.0f)
+    return clamp01 (f);
+
+  const float max_db = m_headroom_db.load ();
+  if (max_db <= min_db)
+    return clamp01 (f);
+
+  const float db = linear_to_db_meter (f);
+  return clamp01 ((db - min_db) / (max_db - min_db));
 }
 
+
 float c_vudata::display_to_linear (float f) const {
-  const float scale = m_db_scale.load ();
+  const float min_db = m_db_scale.load ();
   f = clamp01 (f);
 
-  if (scale >= 0.0f)
+  if (min_db >= 0.0f)
     return f;
 
-  const float db = scale * (1.0f - f);
-  return clamp01 (powf (10.0f, db / 20.0f));
+  const float max_db = m_headroom_db.load ();
+  if (max_db <= min_db)
+    return f;
+
+  const float db = min_db + f * (max_db - min_db);
+  return powf (10.0f, db / 20.0f);
 }
 
 bool c_vudata::sample (float l, float r) {
@@ -137,8 +162,8 @@ bool c_vudata::update () {
     const float minus_l = m_minus_l.exchange (0.0f);
     const float plus_r = m_plus_r.exchange (0.0f);
     const float minus_r = m_minus_r.exchange (0.0f);
-    const float abs_l = clamp01 (std::max (std::fabs (plus_l), std::fabs (minus_l)));
-    const float abs_r = clamp01 (std::max (std::fabs (plus_r), std::fabs (minus_r)));
+    const float abs_l = std::max (std::fabs (plus_l), std::fabs (minus_l));
+    const float abs_r = std::max (std::fabs (plus_r), std::fabs (minus_r));
 
     const float old_l = m_l.load ();
     const float old_r = m_r.load ();
@@ -216,16 +241,16 @@ void c_vudata::set_db_scale (float db) {
 }
 
 void c_vudata::set_l (float level, float hold, bool clip, bool xrun) {
-  m_l.store (clamp01 (level));
-  m_peak_l.store (clamp01 (hold));
+  m_l.store (std::max (0.0f, level));
+  m_peak_l.store (std::max (0.0f, hold));
   clip_l.store (clip);
   xrun_l.store (xrun);
   needs_redraw.store (true);
 }
 
 void c_vudata::set_r (float level, float hold, bool clip, bool xrun) {
-  m_r.store (clamp01 (level));
-  m_peak_r.store (clamp01 (hold));
+  m_r.store (std::max (0.0f, level));
+  m_peak_r.store (std::max (0.0f, hold));
   clip_r.store (clip);
   xrun_r.store (xrun);
   needs_redraw.store (true);
@@ -827,9 +852,16 @@ void c_meterwidget::set_db_scale (float f) {
     data->set_db_scale (f);
 }
 
+void c_meterwidget::set_headroom (float f) {
+  headroom = std::max (0.0f, f);
+  if (data)
+    data->set_headroom (headroom);
+}
+
 void c_meterwidget::set_vudata (c_vudata *v) {
   data = v;
   set_db_scale (db_scale);
+  set_headroom (headroom);
 }
 
 c_vudata *c_meterwidget::get_vudata () {

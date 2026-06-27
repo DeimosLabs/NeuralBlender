@@ -23,12 +23,13 @@
 #undef max
 #endif
 
-#define DEFAULT_VU_DB   -36.0f
-#define VU_REDRAW_EVERY 0.033333333f
-#define VU_PEAK_HOLD    1.000000000f
-#define VU_CLIP_HOLD    1.000000000f
-#define VU_XRUN_HOLD    1.000000000f
-#define VU_FALL_SPEED   0.030000000f
+#define DEFAULT_VU_DB       -36.0f
+#define DEFAULT_VU_HEADROOM 3.0f
+#define VU_REDRAW_EVERY     0.033333333f
+#define VU_PEAK_HOLD        1.000000000f
+#define VU_CLIP_HOLD        1.000000000f
+#define VU_XRUN_HOLD        1.000000000f
+#define VU_FALL_SPEED       0.030000000f
 
 typedef struct _cairo cairo_t;
 //struct cairo_t;
@@ -48,6 +49,7 @@ public:
   void set_db_scale (float db);
   void set_l (float level, float hold, bool clip = false, bool xrun = false);
   void set_r (float level, float hold, bool clip = false, bool xrun = false);
+  void set_headroom (float db);
 
   float l () const;
   float r () const;
@@ -80,6 +82,7 @@ private:
   std::atomic<float> m_peak_l { 0.0f };
   std::atomic<float> m_peak_r { 0.0f };
   std::atomic<float> m_db_scale { DEFAULT_VU_DB };
+  std::atomic<float> m_headroom_db { DEFAULT_VU_HEADROOM };
   std::atomic<float> m_plus_l { 0.0f };
   std::atomic<float> m_plus_r { 0.0f };
   std::atomic<float> m_minus_l { 0.0f };
@@ -179,6 +182,7 @@ public:
                int x, int y, int w, int h) override;
 
   void set_db_scale (float f);
+  void set_headroom (float f);
   void set_vudata (c_vudata *v);
   c_vudata *get_vudata ();
   bool needs_redraw ();
@@ -208,6 +212,7 @@ private:
 
   bool stereo = true;
   int met_len = -1;
+  float headroom = DEFAULT_VU_HEADROOM;
   int ln = 0;
   int th = 0;
   int t1 = 0;

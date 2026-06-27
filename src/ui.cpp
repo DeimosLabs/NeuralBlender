@@ -448,6 +448,11 @@ void c_label::draw (void *w_, void *ptr) {
   cairo_new_path (w->crb);
 }
 
+static inline float db_to_bar_pos (float db, float min_db, float headroom_db) {
+  return std::clamp ((db - min_db) / (headroom_db - min_db), 0.0f, 1.0f);
+}
+
+
 static uint64_t get_unique_id () {
   static uint64_t current = 1;
   return current++;
@@ -982,12 +987,12 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_vu.create (this, main_widget, "VU meters", 20, 604, 32, 32, BTN_CHECKBOX);
   btn_vu.role = ROLE_VUTOGGLE;
   btn_vu.set_value (state.do_vu);
-  btn_exclmode.create (this, main_widget, "Exclusive mode", 200, 604, 32, 32, BTN_CHECKBOX);
+  btn_exclmode.create (this, main_widget, "Exclusive mode", 180, 604, 32, 32, BTN_CHECKBOX);
   btn_exclmode.set_value (state.do_excl);
   btn_exclmode.role = ROLE_EXCL_TOGGLE;
   label_vu.create (this, main_widget, "VU meters", 60, 604, 120, 32);
   label_vu.align = TEXT_LEFT;
-  label_exclmode.create (this, main_widget, "Exclusive mode", 240, 604, 180, 32);
+  label_exclmode.create (this, main_widget, "Exclusive mode", 220, 604, 180, 32);
   label_exclmode.align = TEXT_LEFT;
 
   aboutwindow.create (this);
