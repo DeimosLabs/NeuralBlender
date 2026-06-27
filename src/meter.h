@@ -12,8 +12,9 @@
 #include <cstddef>
 #include <cstdint>
 
-//#include "xputty.h"
-//#include "xwidgets.h"
+//#ifndef METER_DATA_ONLY
+//#include "ui.h"
+//#endif
 
 #ifdef min
 #undef min
@@ -95,6 +96,8 @@ private:
   size_t m_timestamp_xrun_l = 0;
   size_t m_timestamp_xrun_r = 0;
 };
+
+#ifndef METER_DATA_ONLY
 
 class c_customwidget {
 public:
@@ -221,3 +224,5 @@ private:
   int t4 = 0;
   int tp = 1;
 };
+
+#endif // METER_DATA_ONLY

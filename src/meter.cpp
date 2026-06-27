@@ -19,17 +19,7 @@
 
 #include "meter.h"
 
-#include "xputty.h"
-#include "xwidgets.h"
-#endif
-
-// why does xputty define this?
-#ifdef min
-#undef min
-#endif
-
-#ifdef max
-#undef max
+#include "xputty_compat.h"
 #endif
 
 #ifdef CMDLINE_DEBUG

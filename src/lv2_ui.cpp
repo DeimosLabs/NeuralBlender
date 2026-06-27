@@ -35,21 +35,29 @@ enum {
   PORT_A_GAIN_OUT,
   PORT_A_DELAY,
   PORT_A_MUTE,
+  PORT_A_DCFLIP,
+  PORT_A_CALIBRATE,
 
   PORT_B_GAIN_IN,
   PORT_B_GAIN_OUT,
   PORT_B_DELAY,
   PORT_B_MUTE,
+  PORT_B_DCFLIP,
+  PORT_B_CALIBRATE,
 
   PORT_C_GAIN_IN,
   PORT_C_GAIN_OUT,
   PORT_C_DELAY,
   PORT_C_MUTE,
+  PORT_C_DCFLIP,
+  PORT_C_CALIBRATE,
 
   PORT_D_GAIN_IN,
   PORT_D_GAIN_OUT,
   PORT_D_DELAY,
   PORT_D_MUTE,
+  PORT_D_DCFLIP,
+  PORT_D_CALIBRATE,
 
   PORT_CONTROL,
   PORT_NOTIFY,
@@ -96,7 +104,7 @@ public:
   }
 
   uint32_t lane_port (size_t lane, uint32_t first) const {
-    return first + (uint32_t) lane * 4;
+    return first + (uint32_t) lane * 6;
   }
 
   bool write_model_path (size_t which, const char *filename) {
@@ -154,6 +162,8 @@ public:
   void on_fileselected (c_widget *w, const char *path) { CP }
   void on_fileclear (c_widget *w)                      { CP; clear_lane_model_ui (w->lane); write_model_path (w->lane, ""); }
   void on_mute (c_widget *w, bool b)                   { CP; write_control (lane_port (w->lane, PORT_A_MUTE), b ? 1.0f : 0.0f); }
+  void on_dcflip (c_widget *w, bool b)                 { CP; write_control (lane_port (w->lane, PORT_A_DCFLIP), b ? 1.0f : 0.0f); }
+  void on_calibrate (c_widget *w, bool b)              { CP; write_control (lane_port (w->lane, PORT_A_CALIBRATE), b ? 1.0f : 0.0f); }
   void on_muteall (c_widget *w, bool b)                { CP; write_control (PORT_MUTE_ALL, b ? 1.0f : 0.0f); }
   void on_excl (c_widget *w, int n) {
     CP
@@ -204,7 +214,7 @@ public:
     }
 
     for (size_t lane = 0; lane < NB_UI_MAX_LANES; lane++) {
-      const uint32_t base = PORT_A_GAIN_IN + (uint32_t) lane * 4;
+      const uint32_t base = PORT_A_GAIN_IN + (uint32_t) lane * 6;
       if (port == base) {
         state.lanes [lane].gain_in = db_to_gain (value);
         break;
@@ -216,6 +226,12 @@ public:
         break;
       } else if (port == base + 3) {
         state.lanes [lane].lane_mute = value >= 0.5f;
+        break;
+      } else if (port == base + 4) {
+        state.lanes [lane].dcflip = value >= 0.5f;
+        break;
+      } else if (port == base + 5) {
+        state.lanes [lane].do_calib = value >= 0.5f;
         break;
       }
     }
@@ -324,7 +340,7 @@ public:
     if (!subscribe)
       return;
 
-    for (uint32_t port = PORT_BYPASS; port <= PORT_D_MUTE; ++port)
+    for (uint32_t port = PORT_BYPASS; port <= PORT_D_CALIBRATE; ++port)
       subscribe->subscribe (subscribe->handle, port, 0, NULL);
     subscribe->subscribe (subscribe->handle, PORT_VU_ENABLE, 0, NULL);
     subscribe->subscribe (subscribe->handle, PORT_MUTE_ALL, 0, NULL);

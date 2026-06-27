@@ -29,7 +29,6 @@
 #ifdef HAVE_GUI
 #include <thread>
 #include "ui.h"
-#include "xputty.h"
 #endif
 #include "gzip.h"
 #include "data.h"
@@ -92,6 +91,8 @@ public:
   void on_fileselected (c_widget *w, const char *path);
   void on_fileclear (c_widget *w);
   void on_mute (c_widget *w, bool b);
+  void on_dcflip (c_widget *w, bool b);
+  void on_calibrate (c_widget *w, bool b);
   void on_muteall (c_widget *w, bool b);
   void on_vu (c_widget *w, bool);
   //void on_excl (c_widget *w, int which);
@@ -146,9 +147,19 @@ void c_standalone_ui::on_fileclear (c_widget *w) {
   g_blender.set_lane_mute (w->lane, b);
 }*/
 
-void c_standalone_ui::on_mute(c_widget *w, bool b) {
+void c_standalone_ui::on_mute (c_widget *w, bool b) {
   state.lanes [w->lane].lane_mute = b;
-  apply_effective_controls();
+  apply_effective_controls ();
+}
+
+void c_standalone_ui::on_dcflip (c_widget *w, bool b) {
+  state.lanes [w->lane].dcflip = b;
+  apply_effective_controls ();
+}
+
+void c_standalone_ui::on_calibrate (c_widget *w, bool b) {
+  state.lanes [w->lane].do_calib = b;
+  apply_effective_controls ();
 }
 
 void c_standalone_ui::on_muteall (c_widget *w, bool b) {
@@ -161,11 +172,12 @@ void c_standalone_ui::on_vu (c_widget *w, bool b) {
   g_blender.do_vu = b;
 }
 
-/*void c_standalone_ui::on_excl (c_widget *w, int n) {
+/* these are UI only
+void c_standalone_ui::on_excl (c_widget *w, int n) {
   debug ("lane %d, b=%d", w->lane, n);
-}*/
+}
 
-/*void c_standalone_ui::on_bypass (c_widget *w, bool b) {
+void c_standalone_ui::on_bypass (c_widget *w, bool b) {
   debug ("lane %d, b=%d", w->lane, (int) b);
   g_blender.set_bypass (!b);
 }*/

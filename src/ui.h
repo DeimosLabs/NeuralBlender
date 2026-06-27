@@ -24,22 +24,15 @@
 #include <string>
 #include <vector>
 
-#include "xputty.h"
-#include "xwidgets.h"
-#include "dialogs/xfile-dialog.h"
+#include "xputty_compat.h"
 #include "config.h"
-#include "meter.h"
-
-// why does xputty define this?
-#ifdef min
-#undef min
-#endif
-
-#ifdef max
-#undef max
-#endif
 
 #define NB_UI_MAX_LANES 4
+#define NB_BG_R 0.10
+#define NB_BG_G 0.10
+#define NB_BG_B 0.10
+#define NB_BG_A 1.00
+
 
 class c_neuralblender;
 struct c_neuralblender_state;
@@ -64,8 +57,11 @@ enum _widget_role {
   ROLE_GAIN_IN,
   ROLE_GAIN_OUT,
   ROLE_DELAY,
+  ROLE_DCFLIP,
+  ROLE_CALIBRATE,
   ROLE_VUTOGGLE,
   ROLE_EXCL_TOGGLE,
+  ROLE_ADV_TOGGLE,
   ROLE_EXCL_USE,
   ROLE_BYPASS,
   ROLE_MASTER
@@ -87,6 +83,17 @@ public:
       Widget_t *parent,
       const char *label,
       int x, int y, int w, int h);
+  
+  virtual void move_resize (int x, int y, int w, int h);
+  virtual void move (int x, int y);
+  virtual void resize (int w, int h);
+  virtual bool set_label (const char *label);
+  virtual void set_bg_color (const float r,
+                             const float g,
+                             const float b);
+  virtual void set_fg_color (const float r,
+                             const float g,
+                             const float b);
 
   // backpointers to parent objects
   Widget_t *widget         = NULL;
@@ -98,7 +105,14 @@ public:
   _widget_role role        = ROLE_UNKNOWN;
   uint64_t id              = -1;
   uint64_t lane            = -1;
+  
+  inline int x () { return widget && widget->app ? (int) (widget->scale.init_x / widget->app->hdpi) : 0; }
+  inline int y () { return widget && widget->app ? (int) (widget->scale.init_y / widget->app->hdpi) : 0; }
+  inline int w () { return widget && widget->app ? (int) (widget->scale.init_width / widget->app->hdpi) : 0; }
+  inline int h () { return widget && widget->app ? (int) (widget->scale.init_height / widget->app->hdpi) : 0; }
 };
+
+#include "meter.h"
 
 class c_frame : public c_widget {
 public:
@@ -107,6 +121,39 @@ public:
       Widget_t *parent,
       const char *label,
       int x, int y, int w, int h);
+  void set_bg_color (const float r, const float g, const float b) override;
+  void set_fg_color (const float r, const float g, const float b) override;
+      
+  float frame_thickness = 2.0;
+};
+
+class c_container : public c_widget {
+public:
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label,
+      int x, int y, int w, int h);
+  void set_bg_color (const float r, const float g, const float b) override;
+};
+
+class c_meter : public c_widget {
+public:
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label,
+      int x, int y, int w, int h);
+  void move_resize (int x, int y, int w, int h) override;
+  void show ();
+  void hide ();
+      
+  c_meterwidget meter;
+  
+  inline void on_ui_timer () { meter.on_ui_timer (); }
+  inline void set_vudata (c_vudata *p) {meter.set_vudata (p); }
+  inline void set_stereo (bool b) { meter.set_stereo (b); }
+  inline bool needs_redraw () { return meter.needs_redraw (); }
 };
 
 class c_label : public c_widget {
@@ -117,9 +164,11 @@ public:
       const char *label,
       int x, int y, int w, int h);
 
+  void set_bg_color (const float r, const float g, const float b) override;
+  void set_fg_color (const float r, const float g, const float b) override;
   static void draw (void *w, void *userdata);
   float textsize = 1.0;
-  _textalign align = TEXT_CENTER;
+  _textalign align = TEXT_LEFT;
 };
 
 class c_image : public c_widget {
@@ -149,9 +198,10 @@ public:
       int x, int y, int w, int h, bool is_toggle);*/
 
   bool set_value (bool value);
-  bool set_label (const char *label);
+  void set_bg_color (const float r, const float g, const float b) override;
+  void set_fg_color (const float r, const float g, const float b) override;
   virtual void on_mouseup ();
-
+  
   bool is_toggle = false;
   bool value = false;
 
@@ -170,6 +220,8 @@ public:
   void set_min (float min);
   void set_max (float max);
   void set_step (float max);
+  void set_bg_color (const float r, const float g, const float b) override;
+  void set_fg_color (const float r, const float g, const float b) override;
   virtual void on_change ();
   virtual void on_doubleclick ();
   float min = 0;
@@ -192,6 +244,10 @@ public:
   void add (const std::string &str);
   void set_selection (int n);
   int get_selection ();
+
+  void move_resize (int x, int y, int w, int h) override;
+  void set_bg_color (const float r, const float g, const float b) override;
+  void set_fg_color (const float r, const float g, const float b) override;
 
   virtual void on_change (int x);
 
@@ -252,13 +308,19 @@ public:
       Widget_t *parent,
       size_t which,
       int x, int y, int w, int h);
+      
+  void move_resize (int x, int y, int w, int h);
 
   //bool user_mute = false;
   size_t lane_id = -1;
   c_neuralblender_ui *ui = NULL;
   size_t which_lane = 0;
-  Widget_t *main_widget;
+  Widget_t *main_widget = NULL;
+  Widget_t *wreg = NULL;
+  Widget_t *wadv = NULL;
   c_frame lane_widget;
+  c_container cont_regcontrols;
+  c_container cont_advcontrols;
   c_knob gain_in;
   c_knob gain_out;
   c_knob delay;
@@ -266,10 +328,18 @@ public:
   c_button btn_excl;
   c_button btn_browse;
   c_button btn_clear;
+  c_button btn_flip;
+  c_button btn_calib;
   c_combobox menu_list;
+  c_label label_flip;
+  c_label label_calib;
+  
+  int knob_size = 64;
+  int knob_top = 0;
+  int knob_right = 0;
 
   //c_meterwidget meter_in; // we only have one input
-  c_meterwidget meter_out;
+  c_meter meter_out;
   c_vudata vudata_out;
 };
 
@@ -287,6 +357,8 @@ public:
   void set_lane_mute (size_t which, bool b);
   void vu_on (bool b = true);
   void vu_off ();
+  void show_advanced_settings (bool b = true);
+  void hide_advanced_settings ();
   size_t choose_exclusive_lane () const;
   //void excl_select (size_t which);
   void sync_widgets_from_state (const c_neuralblender_state &state);
@@ -301,9 +373,12 @@ public:
   virtual void on_fileclear (c_widget *w)                      = 0;
   virtual void on_mute (c_widget *w, bool b)                   = 0;
   virtual void on_muteall (c_widget *w, bool b)                = 0;
+  virtual void on_dcflip (c_widget *w, bool b)                 = 0;
+  virtual void on_calibrate (c_widget *w, bool b)              = 0;
   virtual void on_vu (c_widget *w, bool b)                     = 0;
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
-          void on_excl_use (c_widget *w, bool b)                  ; // UI only
+          void on_excl_use (c_widget *w, bool b)                  ;
+  virtual void on_advanced (c_widget *w, bool b)                  ; 
   virtual void on_bypass (c_widget *w, bool b)                 = 0;
   virtual void on_about (c_widget *w)                          = 0;
 
@@ -313,17 +388,22 @@ public:
   Xputty app;
   Widget_t *main_widget = NULL;
   Window parent;
-  c_label  label_big;
-  c_button btn_enable;
-  c_button btn_muteall;
-  c_button btn_about;
-  c_button btn_vu;
-  c_button btn_exclmode;
-  c_label  label_vu;
-  c_label  label_exclmode;
+  
+  c_container    cont_checkboxes;
+  c_label        label_big;
+  c_button       btn_enable;
+  c_button       btn_muteall;
+  c_button       btn_about;
+  c_button       btn_vu;
+  c_button       btn_exclmode;
+  c_button       btn_advanced;
+  c_label        label_vu;
+  c_label        label_exclmode;
+  c_label        label_advanced;
   c_lane_widgets lanes [NB_UI_MAX_LANES];
-  c_filepicker filepickers [NB_UI_MAX_LANES];
-  c_meterwidget meter_in;
+  c_filepicker   filepickers [NB_UI_MAX_LANES];
+  c_meter        meter_in;
+  
   c_vudata vudata_in;
   c_aboutwindow aboutwindow;
   c_configfile configfile;
@@ -337,4 +417,5 @@ public:
   bool updating_from_state = false;
   bool config_file_read = false;
   bool config_file_written = false;
+  bool show_advanced = false;
 };

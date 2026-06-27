@@ -38,6 +38,24 @@ static std::string path_basename (const std::string &path);
 
 extern const char *g_build_timestamp;
 
+static void set_widget_color_all_states (
+    Widget_t *w,
+    Color_mod mod,
+    const float r,
+    const float g,
+    const float b,
+    const float a = 1.0f) {
+
+  if (!w)
+    return;
+
+  set_widget_color (w, NORMAL_,      mod, r, g, b, a);
+  set_widget_color (w, PRELIGHT_,    mod, r, g, b, a);
+  set_widget_color (w, SELECTED_,    mod, r, g, b, a);
+  set_widget_color (w, ACTIVE_,      mod, r, g, b, a);
+  set_widget_color (w, INSENSITIVE_, mod, r, g, b, a);
+}
+
 // this one must be called AFTER add_* (Widget_t *, ...) in child create functions
 void c_widget::create (
     c_neuralblender_ui *ui_,
@@ -47,16 +65,93 @@ void c_widget::create (
 
   debug ("label_='%s'", label_);
   id = get_unique_id ();
-  label = label_;
+  label = label_ ? label_ : "";
   ui = ui_;
   if (!ui) { debug ("!ui"); }
   if (!widget) {
     debug ("!widget");
     return;
   }
-
+  
+  widget->scale.gravity = NONE;
   widget->parent_struct = this;
   widget->label = label.c_str ();
+}
+
+bool c_widget::set_label (const char *label_) {
+  label = label_ ? label_ : "";
+  if (!widget)
+    return false;
+
+  widget->label = label.c_str ();
+  expose_widget (widget);
+  return true;
+}
+
+void c_widget::set_bg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
+  if (widget)
+    expose_widget (widget);
+}
+
+void c_widget::set_fg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, TEXT_, r, g, b);
+  set_widget_color_all_states (widget, FORGROUND_, r, g, b);
+  if (widget)
+    expose_widget (widget);
+}
+
+void c_widget::move_resize (int x, int y, int w, int h) {
+  if (!widget)
+    return;
+
+  const int sx = x * widget->app->hdpi;
+  const int sy = y * widget->app->hdpi;
+  const int sw = std::max (1, (int) (w * widget->app->hdpi));
+  const int sh = std::max (1, (int) (h * widget->app->hdpi));
+
+  widget->x = sx;
+  widget->y = sy;
+  widget->scale.init_x = sx;
+  widget->scale.init_y = sy;
+  widget->scale.init_width = sw;
+  widget->scale.init_height = sh;
+
+  os_move_window (widget->app->dpy, widget, sx, sy);
+  os_resize_window (widget->app->dpy, widget, sw, sh);
+  widget->func.configure_callback (widget, NULL);
+  expose_widget (widget);
+}
+
+void c_widget::move (int x, int y) {
+  if (!widget)
+    return;
+
+  const int sx = x * widget->app->hdpi;
+  const int sy = y * widget->app->hdpi;
+
+  widget->x = sx;
+  widget->y = sy;
+  widget->scale.init_x = sx;
+  widget->scale.init_y = sy;
+
+  os_move_window (widget->app->dpy, widget, sx, sy);
+  expose_widget (widget);
+}
+
+void c_widget::resize (int w, int h) {
+  if (!widget)
+    return;
+
+  const int sw = std::max (1, (int) (w * widget->app->hdpi));
+  const int sh = std::max (1, (int) (h * widget->app->hdpi));
+
+  widget->scale.init_width = sw;
+  widget->scale.init_height = sh;
+
+  os_resize_window (widget->app->dpy, widget, sw, sh);
+  widget->func.configure_callback (widget, NULL);
+  expose_widget (widget);
 }
 
 void c_frame::create (
@@ -64,10 +159,96 @@ void c_frame::create (
     Widget_t *parent,
     const char *label_,
     int x, int y, int w, int h) {
-
-  widget = add_frame (parent, label.c_str (), x, y, w, h);
+  
+  widget = add_frame (parent, label_ ? label_ : "", x, y, w, h);
+  
   c_widget::create (ui_, parent, label_, x, y, w, h);
 }
+
+void c_frame::set_bg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
+  set_widget_color_all_states (widget, FRAME_, r, g, b);
+  if (widget)
+    expose_widget (widget);
+}
+
+void c_frame::set_fg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, TEXT_, r, g, b);
+  if (widget)
+    expose_widget (widget);
+}
+
+void c_meter::create (
+    c_neuralblender_ui *ui_,
+    Widget_t *parent,
+    const char *label_,
+    int x, int y, int w, int h) {
+
+  if (!parent || !parent->app)
+    return;
+
+  widget = create_widget (parent->app, parent, x, y, w, h);
+  c_widget::create (ui_, parent, label_, x, y, w, h);
+  meter.create (widget, label_, 0, 0, w, h);
+}
+
+void c_meter::move_resize (int x, int y, int w, int h) {
+  c_widget::move_resize (x, y, w, h);
+
+  Widget_t *child = meter.widget;
+  if (!child)
+    return;
+
+  const int sw = std::max (1, (int) (w * child->app->hdpi));
+  const int sh = std::max (1, (int) (h * child->app->hdpi));
+
+  child->x = 0;
+  child->y = 0;
+  child->scale.init_x = 0;
+  child->scale.init_y = 0;
+  child->scale.init_width = sw;
+  child->scale.init_height = sh;
+
+  os_move_window (child->app->dpy, child, 0, 0);
+  os_resize_window (child->app->dpy, child, sw, sh);
+  child->func.configure_callback (child, NULL);
+  expose_widget (child);
+}
+
+void c_meter::show () {
+  if (widget)
+    widget_show (widget);
+  if (meter.widget)
+    widget_show (meter.widget);
+  if (widget)
+    expose_widget (widget);
+  if (meter.widget)
+    expose_widget (meter.widget);
+}
+
+void c_meter::hide () {
+  if (meter.widget)
+    widget_hide (meter.widget);
+  if (widget)
+    widget_hide (widget);
+}
+
+void c_container::create (
+    c_neuralblender_ui *ui_,
+    Widget_t *parent,
+    const char *label_,
+    int x, int y, int w, int h) {
+    
+  widget = create_widget (parent->app, parent, x, y, w, h);
+  c_widget::create (ui_, parent, label_, x, y, w, h);
+}
+
+void c_container::set_bg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
+  if (widget)
+    expose_widget (widget);
+}
+
 
 void c_label::create (
     c_neuralblender_ui *ui_,
@@ -79,6 +260,18 @@ void c_label::create (
   widget = add_label (parent, label.c_str (), x, y, w, h);
   widget->func.expose_callback = c_label::draw;
   c_widget::create (ui_, parent, label_, x, y, w, h);
+}
+
+void c_label::set_bg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
+  if (widget)
+    expose_widget (widget);
+}
+
+void c_label::set_fg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, TEXT_, r, g, b);
+  if (widget)
+    expose_widget (widget);
 }
 
 void c_image::create (
@@ -147,8 +340,21 @@ void c_button::on_mouseup () {
     case ROLE_MUTE: CP
       ui->on_mute (this, value);
       if (lane >= 0 && lane < NB_UI_MAX_LANES) {
-        //ui->lanes [lane].user_mute = value;
         ui->state.lanes [lane].lane_mute = value;
+      }
+    break;
+
+    case ROLE_DCFLIP: CP
+      ui->on_dcflip (this, value);
+      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
+        ui->state.lanes [lane].dcflip = value;
+      }
+    break;
+
+    case ROLE_CALIBRATE: CP
+      ui->on_calibrate (this, value);
+      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
+        ui->state.lanes [lane].do_calib = value;
       }
     break;
 
@@ -197,6 +403,10 @@ void c_button::on_mouseup () {
     case ROLE_EXCL_USE:
       ui->on_excl_use (this, value);
     break;
+    
+    case ROLE_ADV_TOGGLE:
+      ui->on_advanced (this, value);
+    break;
 
     default: CP
     break;
@@ -228,14 +438,17 @@ bool c_button::set_value (bool value_) {
   return true;
 }
 
-bool c_button::set_label (const char *label_) {
-  label = label_ ? label_ : "";
-  if (!widget)
-    return false;
+void c_button::set_bg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, LIGHT_, r, g, b);
+  if (widget)
+    expose_widget (widget);
+}
 
-  widget->label = label.c_str ();
-  expose_widget (widget);
-  return true;
+void c_button::set_fg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, TEXT_, r, g, b);
+  set_widget_color_all_states (widget, FORGROUND_, r, g, b);
+  if (widget)
+    expose_widget (widget);
 }
 
 void c_knob::create (
@@ -249,6 +462,19 @@ void c_knob::create (
   widget->func.value_changed_callback = knob_value_changed;
   widget->func.double_click_callback = knob_double_click;
   c_widget::create (ui_, parent, label_, x, y, w, h);
+}
+
+void c_knob::set_bg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, BASE_, r, g, b);
+  if (widget)
+    expose_widget (widget);
+}
+
+void c_knob::set_fg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, FORGROUND_, r, g, b);
+  set_widget_color_all_states (widget, TEXT_, r, g, b);
+  if (widget)
+    expose_widget (widget);
 }
 
 void c_knob::set_min (float x) {
@@ -325,6 +551,82 @@ void c_combobox::create (
   combobox_set_menu_size (widget, 16);
 
   update_widget ();
+}
+
+void c_combobox::set_bg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, SHADOW_, r, g, b);
+  set_widget_color_all_states (widget, BASE_, r, g, b);
+  set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
+
+  if (widget && widget->childlist && widget->childlist->elem > 0)
+    set_widget_color_all_states (widget->childlist->childs [0], LIGHT_, r, g, b);
+
+  if (widget && widget->childlist && widget->childlist->elem > 1) {
+    Widget_t *menu = widget->childlist->childs [1];
+    set_widget_color_all_states (menu, BACKGROUND_, r, g, b);
+    if (menu && menu->childlist && menu->childlist->elem > 0) {
+      Widget_t *view_port = menu->childlist->childs [0];
+      set_widget_color_all_states (view_port, BASE_, r, g, b);
+      set_widget_color_all_states (view_port, BACKGROUND_, r, g, b);
+    }
+  }
+
+  if (widget)
+    expose_widget (widget);
+}
+
+void c_combobox::set_fg_color (const float r, const float g, const float b) {
+  set_widget_color_all_states (widget, TEXT_, r, g, b);
+  set_widget_color_all_states (widget, FRAME_, r, g, b);
+
+  if (widget && widget->childlist && widget->childlist->elem > 0) {
+    set_widget_color_all_states (widget->childlist->childs [0], TEXT_, r, g, b);
+    set_widget_color_all_states (widget->childlist->childs [0], FORGROUND_, r, g, b);
+  }
+
+  if (widget && widget->childlist && widget->childlist->elem > 1) {
+    Widget_t *menu = widget->childlist->childs [1];
+    set_widget_color_all_states (menu, TEXT_, r, g, b);
+    set_widget_color_all_states (menu, FRAME_, r, g, b);
+    if (menu && menu->childlist && menu->childlist->elem > 0) {
+      Widget_t *view_port = menu->childlist->childs [0];
+      set_widget_color_all_states (view_port, TEXT_, r, g, b);
+      set_widget_color_all_states (view_port, FRAME_, r, g, b);
+    }
+  }
+
+  if (widget)
+    expose_widget (widget);
+}
+
+// work around xputty's weirdness
+void c_combobox::move_resize (int x, int y, int w, int h) {
+  c_widget::move_resize (x, y, w, h);
+
+  if (!widget || !widget->childlist || widget->childlist->elem < 1)
+    return;
+
+  Widget_t *button = widget->childlist->childs [0];
+  if (!button)
+    return;
+
+  const int bw = 20;
+  const int sx = std::max (0, (int) ((w - bw) * widget->app->hdpi));
+  const int sw = std::max (1, (int) (bw * widget->app->hdpi));
+  const int sh = std::max (1, (int) (h * widget->app->hdpi));
+
+  button->x = sx;
+  button->y = 0;
+  button->scale.init_x = sx;
+  button->scale.init_y = 0;
+  button->scale.init_width = sw;
+  button->scale.init_height = sh;
+
+  os_move_window (button->app->dpy, button, sx, 0);
+  os_resize_window (button->app->dpy, button, sw, sh);
+  button->func.configure_callback (button, NULL);
+  expose_widget (button);
+  expose_widget (widget);
 }
 
 void c_combobox::clear () { CP
@@ -428,11 +730,15 @@ void c_label::draw (void *w_, void *ptr) {
   if (!metrics.visible)
     return;
 
+  use_bg_color_scheme (w, NORMAL_);
+  cairo_rectangle (w->crb, 0, 0, metrics.width, metrics.height);
+  cairo_fill (w->crb);
+
   cairo_text_extents_t extents;
-  use_text_color_scheme (w, get_color_state (w));
+  use_text_color_scheme (w, NORMAL_);
   cairo_set_font_size (w->crb, (w->app->normal_font * textsize) / w->scale.ascale);
   cairo_text_extents (w->crb, text, &extents);
-
+  
   const double padding = 2.0 * w->app->hdpi;
   double x = padding - extents.x_bearing;
   if (align == TEXT_CENTER)
@@ -469,7 +775,8 @@ static void draw_main_window (void *w_, void *user_data) {
   if (!metrics.visible)
     return;
 
-  cairo_set_source_rgb (w->crb, 0.12, 0.12, 0.12);
+  use_bg_color_scheme (w, get_color_state (w));
+  //cairo_set_source_rgb (w->crb, NB_BG_R, NB_BG_G, NB_BG_B);
   cairo_rectangle (w->crb, 0, 0, metrics.width, metrics.height);
   cairo_fill (w->crb);
 }
@@ -520,7 +827,7 @@ static void button_value_changed (void *w_, void *value_) {
     return;
 
   const float value = *(float *) value_;
-  debug ("value=%f", value);
+  //debug ("value=%f", value);
   Widget_t *w = (Widget_t *) w_;
   if (!w || !w->parent_struct) {
     return;
@@ -577,7 +884,7 @@ static void filepicker_response(void *w_, void *user_data) { CP
   }
 
   if (fp->ui && !fp->current_dir.empty ()) {
-    fp->ui->configfile.set_item (CONFIG_CWD_KEY_NAME, fp->current_dir);
+    fp->ui->configfile.set_item (CONFIG_KEY_NAME_CWD, fp->current_dir);
     fp->ui->configfile.write_file ();
   }
 
@@ -697,7 +1004,7 @@ void c_filepicker::show () { CP
   parent->func.dialog_callback = filepicker_response;
   if (ui) {
     ui->configfile.read_file ();
-    current_dir = ui->configfile.get_item (CONFIG_CWD_KEY_NAME);
+    current_dir = ui->configfile.get_item (CONFIG_KEY_NAME_CWD);
   }
   debug ("current_dir='%s'", current_dir.c_str ());
   const char *path = current_dir.empty () ? CONFIG_DEFAULT_DIR : current_dir.c_str ();
@@ -867,53 +1174,58 @@ void c_lane_widgets::create (
     Widget_t *parent,
     size_t which,
     int x, int y, int w, int h) { CP
-
+  
+  knob_top = (h - knob_size) / 2;
+  
   char label [64];
   ui = ui_;
-  snprintf (label, 31, "Amp %c", 'A' + which);
+  snprintf (label, 31, "Amp %c", (char) ('A' + which));
   lane_id = which;
   lane_widget.create (ui, parent, label, x, y, w, h);
+  lane_widget.widget->scale.gravity = NONE;
+  
   Widget_t *wp = lane_widget.widget;
-
-  menu_list.create (ui, wp, label, 94, 24, 320, 32);
+  main_widget = wp;
+  cont_regcontrols.create (ui, wp, "", 0, 0, 600, 64);
+  cont_advcontrols.create (ui, wp, "", 0, 0, 300, 64);
+  wreg = cont_regcontrols.widget;
+  wadv = cont_advcontrols.widget;
+  wreg->scale.gravity = NONE;
+  wadv->scale.gravity = NONE;
+  
+  // regular controls
+  menu_list.create (ui, wreg, label, 0, 0, 320, 32);
   menu_list.widget->func.value_changed_callback = combobox_selected_callback;
   menu_list.lane = which;
 
-  int knobs_left = w - 180;
-  gain_in.create (ui, wp, "Input", knobs_left + 6, 36, 64, 64);
-  gain_out.create (ui, wp, "Output", knobs_left + 75, 36, 64, 64);
-  delay.create (ui, wp, "Delay", 22, 36, 64, 64);
-  gain_in.role = ROLE_GAIN_IN;
-  gain_out.role = ROLE_GAIN_IN;
-  delay.role = ROLE_DELAY;
+  int knobs_right = w - 180;
+  gain_in.create (ui, wreg, "Input", knobs_right + 6, knob_top, knob_size, knob_size);
   gain_in.lane = gain_out.lane = delay.lane = which;
   gain_in.set_min (-40);
   gain_in.set_max (40);
   gain_in.set_defaultvalue (0);
   gain_in.set_value (0);
   gain_in.set_step (1);
+  gain_in.role = ROLE_GAIN_IN;
+  
+  gain_out.create (ui, wreg, "Output", knobs_right + 75, knob_top, knob_size, knob_size);
   gain_out.role = ROLE_GAIN_OUT;
   gain_out.set_min (-40);
   gain_out.set_max (40);
   gain_out.set_defaultvalue (0);
   gain_out.set_value (0);
   gain_out.set_step (1);
-  delay.role = ROLE_DELAY;
-  delay.set_min (0);
-  delay.set_max (30);
-  delay.set_defaultvalue (0);
-  delay.set_value (0);
-  delay.set_step (0.01);
-
-  meter_out.create (wp, "", w - 26, 24, 5, h - 48);
+  gain_out.role = ROLE_GAIN_OUT;
+  
+  meter_out.create (ui, wreg, "", 0, 0, 5, 120);
   meter_out.set_vudata (&vudata_out);
   meter_out.set_stereo (false);
   vudata_out.set_l (0.0, 0.0);
-
-  btn_browse.create (ui, wp, "Browse...",  94, 70, 100, 40);
-  btn_clear.create  (ui, wp, "Clear",     205, 70, 100, 40);
-  btn_excl.create   (ui, wp, "Use",       316, 70, 100, 40, BTN_TOGGLE);
-  btn_mute.create   (ui, wp, "Mute",      316, 70, 100, 40, BTN_TOGGLE);
+  
+  btn_browse.create (ui, wreg, "Browse...", 0, 0, 100, 40);
+  btn_clear.create  (ui, wreg, "Clear",     0, 0, 100, 40);
+  btn_excl.create   (ui, wreg, "Use",       0, 0, 100, 40, BTN_TOGGLE);
+  btn_mute.create   (ui, wreg, "Mute",      0, 0, 100, 40, BTN_TOGGLE);
   btn_mute.set_value (false);
   btn_browse.lane = which;
   btn_clear.lane = which;
@@ -923,13 +1235,79 @@ void c_lane_widgets::create (
   btn_mute.role = ROLE_MUTE;
   btn_excl.role = ROLE_EXCL_USE;
   btn_excl.lane = which;
+  
+  // advanced controls
+  delay.role = ROLE_DELAY;
+  delay.create (ui, wadv, "Delay", 0, 0, knob_size, knob_size);
+  delay.set_min (0);
+  delay.set_max (30);
+  delay.set_defaultvalue (0);
+  delay.set_value (0);
+  delay.set_step (0.01);
+  delay.role = ROLE_DELAY;
 
+  btn_flip.create   (ui, wadv, "DC flip", 0, 0, 32, 32, BTN_CHECKBOX);
+  btn_calib.create   (ui, wadv, "Calib", 0, 0, 32, 32, BTN_CHECKBOX);
+  label_flip.create (ui, wadv, "DC flip", 0, 0, 75, 32);
+  label_calib.create (ui, wadv, "Calib.", 0, 0, 75, 32);
+  
   if (ui && which < NB_UI_MAX_LANES) {
     ui->filepickers [which].create (ui, btn_browse.widget, which, "Select file");
     btn_browse.filepicker = &ui->filepickers [which];
     btn_browse.lane = which;
     ui->filepickers [which].lane = which;
   }
+  
+  move_resize (x, y, w, h);
+}
+
+void c_lane_widgets::move_resize (
+    int x, int y, int w, int h) {
+  
+  if (!main_widget)
+    return;
+
+  lane_widget.move_resize (x, y, w, h);
+  knob_top = (h - knob_size) / 2;
+
+  int split = 0;
+  
+  if (ui && ui->show_advanced)
+    split = w * 15 / 64;
+  
+  cont_advcontrols.move_resize (0, 0, split, h);
+  cont_regcontrols.move_resize (split, 0, w - split, h);
+  
+  // regular controls
+  const int reg_w = cont_regcontrols.w ();
+  knob_right = std::max (16, reg_w - 150);
+  const int menu_width = std::max (64, knob_right - 32);
+  menu_list.move_resize (16, 24, menu_width, 32);
+  int button_padding = 4;
+  int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
+  int button_left = menu_list.x ();
+  int button_top = menu_list.y () + menu_list.h () + 8;
+  int button_height = h * 2 / 5;
+  btn_browse.move_resize (button_left, button_top, button_width, button_height);
+  btn_clear.move_resize (button_left + button_width + button_padding,
+                         button_top, button_width, button_height);
+  btn_mute.move_resize (button_left + (button_width + button_padding) * 2,
+                         button_top, button_width, button_height);
+  btn_excl.move_resize (btn_mute.x (), btn_mute.y (), btn_mute.w (), btn_mute.h ());
+  
+  gain_in.move_resize (knob_right, knob_top, knob_size, knob_size);
+  gain_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size);
+  meter_out.move_resize (knob_right + 130, 16, 5, h - 32);
+  
+  // advanced controls
+  delay.move_resize (22, knob_top, knob_size, knob_size);
+  if (ui && ui->show_advanced) {
+    widget_show_all (cont_advcontrols.widget);
+    expose_widget (cont_advcontrols.widget);
+  } else {
+    widget_hide (cont_advcontrols.widget);
+  }
+
 }
 
 c_neuralblender_ui::c_neuralblender_ui () { CP
@@ -947,17 +1325,16 @@ c_neuralblender_ui::~c_neuralblender_ui () { CP
 void c_neuralblender_ui::update_cwd (std::string path) {
   CP
   debug ("path='%s'", path.c_str ());
-  configfile.set_item (CONFIG_CWD_KEY_NAME, path_dirname (path));
+  configfile.set_item (CONFIG_KEY_NAME_CWD, path_dirname (path));
 }
 
 bool c_neuralblender_ui::create (Window parent_) { CP
   size_t i;
   destroy ();
-
+  
   main_init (&app);
-  ui_ready = true;
   app.small_font = 12 * app.hdpi;
-  app.normal_font = 15 * app.hdpi;
+  app.normal_font = 14 * app.hdpi;
   app.big_font = 20 * app.hdpi;
   display = app.dpy;
 
@@ -965,41 +1342,56 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   if (!parent)
     parent = DefaultRootWindow (display);
 
-  main_widget = create_window (&app, parent, 0, 0, 640, 650);
+  main_widget = create_window (&app, parent, 0, 0, 650, 650);
   if (!main_widget)
     return false;
+    
+  main_widget->scale.gravity = NONE;
 
   widget_set_icon_from_png (main_widget, data_neuralblender_logo_512_png);
 
   os_register_wm_delete_window (main_widget);
   widget_set_title (main_widget, "NeuralBlender");
   main_widget->func.expose_callback = draw_main_window;
-  label_big.create (this, main_widget, "NeuralBlender", 120, 12, 400, 32);
+  label_big.create (this, main_widget, "NeuralBlender", 120, 24, 400, 40);
+  label_big.align = TEXT_CENTER;
   label_big.textsize = 1.5;
+  
   btn_enable.create (this, main_widget, "Enabled",  20, 12, 120, 40, BTN_TOGGLE);
   btn_enable.set_value (true);
   btn_enable.role = ROLE_BYPASS;
-  btn_about.create (this, main_widget, "About...", 500, 600, 120, 40);
+  btn_about.create (this, main_widget, "About...", 520, 600, 100, 40);
   btn_about.role = ROLE_ABOUT;
   btn_muteall.create (this, main_widget, "Mute all", 500, 12, 120, 40, BTN_TOGGLE);
   btn_muteall.role = ROLE_MUTEALL;
-
-  btn_vu.create (this, main_widget, "VU meters", 20, 604, 32, 32, BTN_CHECKBOX);
+  
+  cont_checkboxes.create (this, main_widget, "", 8, 604, 500, 40);
+  cont_checkboxes.widget->scale.gravity = NONE;
+  
+  btn_vu.create (this, cont_checkboxes.widget, "VU", 0, 0, 32, 32, BTN_CHECKBOX);
+  label_vu.create (this, cont_checkboxes.widget, "VU meters", 32, 0, 80, 32);
   btn_vu.role = ROLE_VUTOGGLE;
   btn_vu.set_value (state.do_vu);
-  btn_exclmode.create (this, main_widget, "Exclusive mode", 180, 604, 32, 32, BTN_CHECKBOX);
+  label_vu.widget->scale.gravity = WESTCENTER;
+  
+  btn_advanced.create (this, cont_checkboxes.widget, "Adv.", 140, 0, 32, 32, BTN_CHECKBOX);
+  label_advanced.create (this, cont_checkboxes.widget, "Show advanced", 172, 0, 150, 32);
+  show_advanced = state.showadvanced;
+  btn_advanced.set_value (state.showadvanced);
+  btn_advanced.role = ROLE_ADV_TOGGLE;
+  label_advanced.widget->scale.gravity = WESTCENTER;
+  
+  btn_exclmode.create (this, cont_checkboxes.widget, "Excl. mode", 320, 0, 32, 32, BTN_CHECKBOX);
+  label_exclmode.create (this, cont_checkboxes.widget, "Excl. mode", 352, 0, 150, 32);
   btn_exclmode.set_value (state.do_excl);
   btn_exclmode.role = ROLE_EXCL_TOGGLE;
-  label_vu.create (this, main_widget, "VU meters", 60, 604, 120, 32);
-  label_vu.align = TEXT_LEFT;
-  label_exclmode.create (this, main_widget, "Exclusive mode", 220, 604, 180, 32);
-  label_exclmode.align = TEXT_LEFT;
-
+  label_exclmode.widget->scale.gravity = WESTCENTER;
+  
   aboutwindow.create (this);
   for (i = 0; i < NB_UI_MAX_LANES; i++) {
-    lanes [i].create (this, main_widget, i, 20, 60 + i * 135, 600, 130);
+    lanes [i].create (this, main_widget, i, 0, 0, 640, 130);
   }
-  meter_in.create (main_widget, "", 8, 70, 5, 520);
+  meter_in.create (this, main_widget, "", 6, 70, 5, 520);
   meter_in.set_vudata (&vudata_in);
   meter_in.set_stereo (false);
   vudata_in.set_l (0.0, 0.0);
@@ -1010,11 +1402,18 @@ bool c_neuralblender_ui::create (Window parent_) { CP
     }
     blender->meter_in = &vudata_in;
   }
+  
+  if (state.showadvanced) {
+    show_advanced_settings ();
+  } else {
+    hide_advanced_settings ();
+  }
 
   widget_show_all (main_widget);
   expose_widget (main_widget);
 
   window = main_widget->widget;
+  ui_ready = true;
   CP
   XFlush (display);
   CP
@@ -1032,6 +1431,39 @@ void c_neuralblender_ui::destroy () { CP
   ui_ready = false;
 }
 
+void c_neuralblender_ui::show_advanced_settings (bool b) {
+  CP
+  show_advanced = b;
+  state.showadvanced = b;
+  
+  int window_width = b ? 720 : 580;
+  int lane_width = window_width - 32;
+  int lane_height = 130;
+
+  os_resize_window (display, main_widget, window_width, 660);
+  main_widget->func.configure_callback (main_widget, NULL);
+  
+  cont_checkboxes.move_resize (16, 604, b ? 500 : 450, 40);
+  
+  btn_enable.move_resize (16, 12, 120, 40);
+  btn_muteall.move_resize (window_width - 136, 12, 120, 40);
+  btn_about.move_resize (btn_muteall.x () + 20, 600, 100, 40);
+  label_exclmode.set_label (b ? "Exclusive mode" : "Excl. mode");
+  label_big.move_resize (150, 0, window_width - 300, 48);
+  
+  for (int i = 0; i < NB_UI_MAX_LANES; i++) {
+    lanes [i].move_resize (16, 60 + i * (lane_height + 5), lane_width, 130);
+    lanes [i].btn_flip.move_resize (84, 32, 32, 32);
+    lanes [i].btn_calib.move_resize (84, 72, 32, 32);
+    lanes [i].label_flip.move_resize (114, 32, 80, 32);
+    lanes [i].label_calib.move_resize (114, 72, 80, 32);
+  }
+}
+
+void c_neuralblender_ui::hide_advanced_settings () {
+  show_advanced_settings (false);
+}
+
 void c_neuralblender_ui::vu_on (bool b) { CP
   if (!b) {
     vu_off ();
@@ -1040,9 +1472,9 @@ void c_neuralblender_ui::vu_on (bool b) { CP
 
   state.do_vu = true;
 
-  widget_show (meter_in.widget);
+  meter_in.show ();
   for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
-    widget_show (lanes [i].meter_out.widget);
+    lanes [i].meter_out.show ();
   }
   on_vu (&btn_vu, b);
 }
@@ -1050,9 +1482,9 @@ void c_neuralblender_ui::vu_on (bool b) { CP
 void c_neuralblender_ui::vu_off () { CP
   state.do_vu = false;
 
-  widget_hide (meter_in.widget);
+  meter_in.hide ();
   for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
-    widget_hide (lanes [i].meter_out.widget);
+    lanes [i].meter_out.hide ();
   }
   on_vu (&btn_vu, false);
 }
@@ -1108,6 +1540,12 @@ void c_neuralblender_ui::on_excl_use (c_widget *w, bool b) {
   on_excl (w, (int) w->lane + 1);
 }
 
+void c_neuralblender_ui::on_advanced (c_widget *w, bool b) {
+  (void) w;
+  debug ("b=%d", (int) b);
+  show_advanced_settings (b);
+}
+
 int c_neuralblender_ui::idle () {
   if (!ui_ready) {
     CP
@@ -1139,14 +1577,6 @@ void c_neuralblender_ui::clear_lane_model_ui (size_t which) {
   state.lanes [which].filename.clear ();
   lanes [which].menu_list.clear ();
 }
-
-/*void c_neuralblender_ui::on_filebrowse_pre (c_widget *w) {
-  CP
-}
-
-void c_neuralblender_ui::on_fileselected_pre (c_widget *w, const char *path) {
-  CP
-}*/
 
 static std::string path_dirname (const std::string &path) {
   const size_t pos = path.find_last_of ('/');
@@ -1218,13 +1648,13 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
 
   btn_vu.set_value (state.do_vu);
   if (state.do_vu) {
-    widget_show (meter_in.widget);
+    meter_in.show ();
     for (size_t i = 0; i < NB_UI_MAX_LANES; ++i)
-      widget_show (lanes [i].meter_out.widget);
+      lanes [i].meter_out.show ();
   } else {
-    widget_hide (meter_in.widget);
+    meter_in.hide ();
     for (size_t i = 0; i < NB_UI_MAX_LANES; ++i)
-      widget_hide (lanes [i].meter_out.widget);
+      lanes [i].meter_out.hide ();
   }
 
   btn_exclmode.set_value (state.exclusive_lane > 0);

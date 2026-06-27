@@ -10,7 +10,8 @@
 #include <filesystem>
 #include <stdio.h>
 
-#define CONFIG_CWD_KEY_NAME    "modelpath"
+#define CONFIG_KEY_NAME_CWD    "modelpath"
+#define CONFIG_KEY_NAME_ADV    "showadvanced"
 #define CONFIG_FILE_NAME       ".config/neuralblender.conf"
 #define CONFIG_DEFAULT_DIR     "/"
 

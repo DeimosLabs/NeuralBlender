@@ -65,6 +65,12 @@
 @@UI        ui:portIndex 18
 @@UI    ] , [
 @@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 19
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 20
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
 @@UI        ui:portIndex 21
 @@UI    ] , [
 @@UI        ui:plugin <http://deimos.ca/neuralblender> ;
@@ -72,6 +78,24 @@
 @@UI    ] , [
 @@UI        ui:plugin <http://deimos.ca/neuralblender> ;
 @@UI        ui:portIndex 23
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 24
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 25
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 26
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 29
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 30
+@@UI    ] , [
+@@UI        ui:plugin <http://deimos.ca/neuralblender> ;
+@@UI        ui:portIndex 31
 @@UI    ] , [
 @@UI        ui:plugin <http://deimos.ca/neuralblender> ;
 @@UI        lv2:symbol "NOTIFY" ;

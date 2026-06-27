@@ -44,11 +44,11 @@ static bool ends_with (const std::string &a, const std::string &b, bool casesens
   bool ret = true;
   size_t len_a = a.length ();
   size_t len_b = b.length ();
-  
+
   if (len_a < len_b)
     return false;
   size_t startpos = len_a - len_b;
-  
+
   for (size_t i = 0; i < len_b; i++) {
     unsigned char ca = a [startpos + i];
     unsigned char cb = b [i];
@@ -61,7 +61,7 @@ static bool ends_with (const std::string &a, const std::string &b, bool casesens
       break;
     }
   }
-  
+
   return ret;
 }
 
@@ -75,14 +75,15 @@ static bool is_supported_model_path (const std::string &path) {
  * c_delayline
  */
 
-c_delayline::c_delayline () 
+c_delayline::c_delayline ()
 : m_buffer (MAX_DELAY_FRAMES, 0.0f) { CP
 }
 
 c_delayline::~c_delayline () { CP
 }
 
-bool c_delayline::set_frames (uint32_t frames) { CP
+bool c_delayline::set_frames (uint32_t frames) {
+  debug ("frames=%d", (int) frames);
   if (frames >= m_buffer.size ())
     return false;
 
@@ -101,7 +102,7 @@ void c_delayline::clear () { CP
 
 void c_delayline::process_block (float *in, float *out, uint32_t nframes) {
   if (!nframes) return;
-  
+
   const uint32_t size = (uint32_t) m_buffer.size ();
 
   for (uint32_t i = 0; i < nframes; ++i) {
@@ -109,7 +110,7 @@ void c_delayline::process_block (float *in, float *out, uint32_t nframes) {
 
     uint32_t readpos =
       (m_writepos + size - m_delay_frames) % size;
-    
+
     out [i] = m_buffer [readpos];
 
     m_writepos++;
@@ -119,7 +120,7 @@ void c_delayline::process_block (float *in, float *out, uint32_t nframes) {
 }
 
 /******************************************************************************
- * c_neuralamp 
+ * c_neuralamp
  */
 
 c_neuralamp::c_neuralamp () { CP
@@ -168,7 +169,7 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
     fprintf (stderr,
             "Loaded NAM model: %s\n",
             fn.c_str ());
-            
+
     m_engine_mode = ENGINE_NAM;
     return true;
   }
@@ -196,12 +197,12 @@ bool c_neuralamp::load_json (const std::string &fn) { CP
       fprintf (stderr, "RTNeural parser returned null: %s\n", fn.c_str ());
       return false;
     }
-    
+
     new_model->reset ();
     m_nam_model.reset ();
     m_rtneural_model = std::move (new_model);
     m_engine_mode = ENGINE_JSON;
-    
+
     fprintf (stderr, "Loaded model: %s\n", fn.c_str ());
     return true;
   }
@@ -225,11 +226,11 @@ bool c_neuralamp::load_model (const std::string &fn) { CP
     unload_model ();
     return false;
   }
-  
+
   std::lock_guard<std::mutex> lock (model_mutex);
   m_loaded.store (false, std::memory_order_release);
   reset_unlocked ();
-  
+
   const bool ret = ends_with (load_fn, ".nam")
     ? load_nam (load_fn)
     : load_json (load_fn);
@@ -245,7 +246,7 @@ bool c_neuralamp::load_model (const std::string &fn) { CP
     filename = "";
     m_loaded.store (false, std::memory_order_release);
   }
-  
+
   return ret;
 }
 
@@ -280,21 +281,21 @@ static void copy_with_gain (float *in, float *out, uint32_t nframes, float gain)
 void c_neuralamp::process_block (float *in, float *out, uint32_t nframes)
 {
   if (!out) return;
-  
+
   if (mute.load (std::memory_order_relaxed) || !model_mutex.try_lock ()) {
     memset (out, 0, nframes * sizeof (float));
     return;
   }
-  
+
   // releases when it goes out of scope
   std::lock_guard<std::mutex> lock (model_mutex, std::adopt_lock);
-  
+
   // output gain at minimum (-40dB) -> silence
   /*if (gain_out <= 0.01) {
     memset (out, 0, nframes * sizeof (float));
     return;
   }*/
-  
+
   if (warmup > 0) {
     debug ("skipping block, warmup=%d", warmup);
     warmup--;
@@ -322,7 +323,7 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes)
       }
       return;
     break;
-    
+
     case ENGINE_NAM:
       if (!m_nam_model) {
         copy_with_gain (in, out, nframes, gain_in * gain_out);
@@ -341,7 +342,10 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes)
         m_nam_model->process (inputs, outputs, (int) nframes);
 
         for (uint32_t i = 0; i < nframes; ++i)
-          out[i] = std::clamp (out [i] * gain_out, -1.0f, 1.0f);
+          if (dcflip)
+            out [i] = -1.0f * std::clamp (out [i] * gain_out, -1.0f, 1.0f);
+          else
+            out [i] = std::clamp (out [i] * gain_out, -1.0f, 1.0f);
       }
       return;
     break;
@@ -358,10 +362,12 @@ c_neuralblender::c_neuralblender () { CP
   for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
     m_lane_mute [i].store (false, std::memory_order_relaxed);
     meters_out [i] = nullptr;
+    amps [i].dcflip = false;
   }
 
   m_bypass.store (false, std::memory_order_relaxed);
   update_mutes ();
+
 }
 
 c_neuralblender::~c_neuralblender () { CP
@@ -382,6 +388,22 @@ void c_neuralblender::set_blocksize (uint32_t bs) { CP
     m_delay_bufs [i].resize (MAX_BLOCK_SIZE);
     m_model_bufs [i].resize (MAX_BLOCK_SIZE);
   }
+}
+
+void c_neuralblender::dcflip (size_t which, bool b) {
+  amps [which].dcflip = b;
+}
+
+bool c_neuralblender::is_dcflipped (size_t which) {
+  return amps [which].dcflip;
+}
+
+void c_neuralblender::calib_on (size_t which, bool b) {
+  amps [which].do_calib = b;
+}
+
+bool c_neuralblender::is_calib_on (size_t which) {
+  return amps [which].do_calib;
 }
 
 bool c_neuralblender::set_delay_frames (size_t which, uint32_t frames) { CP
@@ -448,6 +470,8 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
     state.lanes [i].delay_ms = delay_ms (i);
     state.lanes [i].lane_mute = lane_mute (i);
     state.lanes [i].loaded = amps [i].loaded ();
+    state.lanes [i].dcflip = amps [i].dcflip;
+    state.lanes [i].do_calib = amps [i].do_calib;
   }
 }
 
@@ -481,7 +505,7 @@ bool c_neuralblender::load_model (size_t which, const char *fn) { CP
     if (amps [i].loaded ())
       bf |= (1 << i);
   }
-  
+
   debug ("mute bitfield 0x%02x", bf);
   update_mutes ();
   return ret;
@@ -508,10 +532,10 @@ bool c_neuralblender::set_delay_ms (size_t which, float ms) {
 static void update_loaded_output_meters (c_neuralblender *blender) {
   if (!blender)
     return;
-    
+
   if (!blender->do_vu)
     return;
-  
+
   for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
     if (blender->amps [lane].loaded () && blender->meters_out [lane])
       blender->meters_out [lane]->update ();
@@ -521,7 +545,7 @@ static void update_loaded_output_meters (c_neuralblender *blender) {
 void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
   if (!in || !out || !nframes)
     return;
-    
+
   float *process_in = in;
   if (in == out) {
     if (m_input_buf.size () < nframes)
@@ -529,7 +553,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     memcpy (m_input_buf.data (), in, nframes * sizeof (float));
     process_in = m_input_buf.data ();
   }
-  
+
   if (do_vu && meter_in) {
     for (uint32_t i = 0; i < nframes; i++)
       meter_in->sample (process_in [i], 0.0f);
@@ -542,7 +566,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     update_loaded_output_meters (this);
     return;
   }
-  
+
   /*if (mute_all) {
     for (size_t i = 0; i < nframes; i++)
       out [i] = 0.0;

@@ -60,21 +60,29 @@ enum {
   PORT_A_GAIN_OUT,
   PORT_A_DELAY,
   PORT_A_MUTE,
+  PORT_A_DCFLIP,
+  PORT_A_CALIBRATE,
 
   PORT_B_GAIN_IN,
   PORT_B_GAIN_OUT,
   PORT_B_DELAY,
   PORT_B_MUTE,
+  PORT_B_DCFLIP,
+  PORT_B_CALIBRATE,
 
   PORT_C_GAIN_IN,
   PORT_C_GAIN_OUT,
   PORT_C_DELAY,
   PORT_C_MUTE,
-  
+  PORT_C_DCFLIP,
+  PORT_C_CALIBRATE,
+
   PORT_D_GAIN_IN,
   PORT_D_GAIN_OUT,
   PORT_D_DELAY,
   PORT_D_MUTE,
+  PORT_D_DCFLIP,
+  PORT_D_CALIBRATE,
 
   PORT_CONTROL,
   PORT_NOTIFY,
@@ -93,6 +101,8 @@ typedef struct {
   const float *gain_out_db [NB_MAX_MODELS] = { NULL };
   const float *delay       [NB_MAX_MODELS] = { NULL };
   const float *lane_mute   [NB_MAX_MODELS] = { NULL };
+  const float *dcflip      [NB_MAX_MODELS] = { NULL };
+  const float *calibrate   [NB_MAX_MODELS] = { NULL };
   const float *bypass      = NULL;
   const float *vu_enable   = NULL;
   const float *mute_all    = NULL;
@@ -102,6 +112,8 @@ typedef struct {
   float last_gain_in_db    [NB_MAX_MODELS] = { 0.0 };
   float last_gain_out_db   [NB_MAX_MODELS] = { 0.0 };
   float last_lane_mute     [NB_MAX_MODELS] = { 0.0 };
+  float last_dcflip        [NB_MAX_MODELS] = { 0.0 };
+  float last_calibrate     [NB_MAX_MODELS] = { 0.0 };
   float last_bypass        = 1.0;
   float last_vu_enable     = 1.0;
   float last_mute_all      = 0.0;
@@ -518,6 +530,14 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
       self->lane_mute [0] = (const float *) data;
       break;
 
+    case PORT_A_DCFLIP:
+      self->dcflip [0] = (const float *) data;
+      break;
+
+    case PORT_A_CALIBRATE:
+      self->calibrate [0] = (const float *) data;
+      break;
+
     case PORT_B_GAIN_IN:
       self->gain_in_db [1] = (float *) data;
       break;
@@ -532,6 +552,14 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
 
     case PORT_B_MUTE:
       self->lane_mute [1] = (const float *) data;
+      break;
+
+    case PORT_B_DCFLIP:
+      self->dcflip [1] = (const float *) data;
+      break;
+
+    case PORT_B_CALIBRATE:
+      self->calibrate [1] = (const float *) data;
       break;
 
     case PORT_C_GAIN_IN:
@@ -550,6 +578,14 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
       self->lane_mute [2] = (const float *) data;
       break;
 
+    case PORT_C_DCFLIP:
+      self->dcflip [2] = (const float *) data;
+      break;
+
+    case PORT_C_CALIBRATE:
+      self->calibrate [2] = (const float *) data;
+      break;
+
     case PORT_D_GAIN_IN:
       self->gain_in_db [3] = (float *) data;
       break;
@@ -564,6 +600,14 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
 
     case PORT_D_MUTE:
       self->lane_mute [3] = (const float *) data;
+      break;
+
+    case PORT_D_DCFLIP:
+      self->dcflip [3] = (const float *) data;
+      break;
+
+    case PORT_D_CALIBRATE:
+      self->calibrate [3] = (const float *) data;
       break;
 
     case PORT_CONTROL:
@@ -763,6 +807,22 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         self->last_lane_mute [i] = v;
         self->base_lane_mute [i] = v >= 0.5f;
         apply_effective_controls (self);
+      }
+    }
+
+    if (self->dcflip [i]) {
+      const float v = *self->dcflip [i];
+      if (v != self->last_dcflip [i]) { CP
+        self->last_dcflip [i] = v;
+        self->blender.dcflip (i, v >= 0.5f);
+      }
+    }
+
+    if (self->calibrate [i]) {
+      const float v = *self->calibrate [i];
+      if (v != self->last_calibrate [i]) { CP
+        self->last_calibrate [i] = v;
+        self->blender.calib_on (i, v >= 0.5f);
       }
     }
   }

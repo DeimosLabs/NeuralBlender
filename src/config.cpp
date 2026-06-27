@@ -22,7 +22,8 @@ struct s_option {
   std::string name;
   std::string value;
 } g_options [] = {
-  { CONFIG_CWD_KEY_NAME, "" },
+  { CONFIG_KEY_NAME_CWD, "" },
+  { CONFIG_KEY_NAME_ADV, "" },
   { "", "" }
 };
 

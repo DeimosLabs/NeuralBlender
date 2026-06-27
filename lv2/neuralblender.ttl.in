@@ -126,6 +126,26 @@ nb:ModelD
         a lv2:InputPort ,
           lv2:ControlPort ;
         lv2:index 7 ;
+        lv2:symbol "a_dcflip" ;
+        lv2:name "A Phase Flip" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] , [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 8 ;
+        lv2:symbol "a_calibrate" ;
+        lv2:name "A Normalize Level" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] , [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 9 ;
         lv2:symbol "b_gain_in" ;
         lv2:name "B Input Gain" ;
         lv2:default 0.0 ;
@@ -134,7 +154,7 @@ nb:ModelD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 8 ;
+        lv2:index 10 ;
         lv2:symbol "b_gain_out" ;
         lv2:name "B Output Gain" ;
         lv2:default 0.0 ;
@@ -143,16 +163,16 @@ nb:ModelD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 9 ;
+        lv2:index 11 ;
         lv2:symbol "b_delay" ;
         lv2:name "B Delay (ms)" ;
-        lv2:default 0 ;
-        lv2:minimum 0 ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
         lv2:maximum 30
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 10 ;
+        lv2:index 12 ;
         lv2:symbol "b_mute" ;
         lv2:name "B Mute" ;
         lv2:portProperty lv2:toggled ;
@@ -162,7 +182,27 @@ nb:ModelD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 11 ;
+        lv2:index 13 ;
+        lv2:symbol "b_dcflip" ;
+        lv2:name "B Phase Flip" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] , [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 14 ;
+        lv2:symbol "b_calibrate" ;
+        lv2:name "B Normalize Level" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] , [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 15 ;
         lv2:symbol "c_gain_in" ;
         lv2:name "C Input Gain" ;
         lv2:default 0.0 ;
@@ -171,7 +211,7 @@ nb:ModelD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 12 ;
+        lv2:index 16 ;
         lv2:symbol "c_gain_out" ;
         lv2:name "C Output Gain" ;
         lv2:default 0.0 ;
@@ -180,16 +220,16 @@ nb:ModelD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 13 ;
+        lv2:index 17 ;
         lv2:symbol "c_delay" ;
         lv2:name "C Delay (ms)" ;
-        lv2:default 0 ;
-        lv2:minimum 0 ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
         lv2:maximum 30
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 14 ;
+        lv2:index 18 ;
         lv2:symbol "c_mute" ;
         lv2:name "C Mute" ;
         lv2:portProperty lv2:toggled ;
@@ -199,7 +239,27 @@ nb:ModelD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 15 ;
+        lv2:index 19 ;
+        lv2:symbol "c_dcflip" ;
+        lv2:name "C Phase Flip" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] , [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 20 ;
+        lv2:symbol "c_calibrate" ;
+        lv2:name "C Normalize Level" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] , [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 21 ;
         lv2:symbol "d_gain_in" ;
         lv2:name "D Input Gain" ;
         lv2:default 0.0 ;
@@ -208,7 +268,7 @@ nb:ModelD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 16 ;
+        lv2:index 22 ;
         lv2:symbol "d_gain_out" ;
         lv2:name "D Output Gain" ;
         lv2:default 0.0 ;
@@ -217,18 +277,38 @@ nb:ModelD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 17 ;
+        lv2:index 23 ;
         lv2:symbol "d_delay" ;
         lv2:name "D Delay (ms)" ;
-        lv2:default 0 ;
-        lv2:minimum 0 ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
         lv2:maximum 30
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 18 ;
+        lv2:index 24 ;
         lv2:symbol "d_mute" ;
         lv2:name "D Mute" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] , [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 25 ;
+        lv2:symbol "d_dcflip" ;
+        lv2:name "D Phase Flip" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] , [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 26 ;
+        lv2:symbol "d_calibrate" ;
+        lv2:name "D Normalize Level" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
@@ -239,7 +319,7 @@ nb:ModelD
         atom:bufferType atom:Sequence ;
         atom:supports patch:Message ;
         lv2:designation lv2:control ;
-        lv2:index 19 ;
+        lv2:index 27 ;
         lv2:symbol "CONTROL" ;
         lv2:name "Control"
     ] , [
@@ -248,37 +328,37 @@ nb:ModelD
         atom:bufferType atom:Sequence ;
         atom:supports patch:Message ;
         lv2:designation lv2:control ;
-        lv2:index 20 ;
+        lv2:index 28 ;
         lv2:symbol "NOTIFY" ;
         lv2:name "Notify"
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 21 ;
+        lv2:index 29 ;
         lv2:symbol "vu_enable" ;
         lv2:name "VU Meters" ;
         lv2:default 1 ;
         lv2:minimum 0 ;
         lv2:maximum 1 ;
-        lv2:portProperty lv2:toggled ;
+        lv2:portProperty lv2:toggled
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 22 ;
+        lv2:index 30 ;
         lv2:symbol "mute_all" ;
         lv2:name "Mute All" ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1 ;
-        lv2:portProperty lv2:toggled ;
+        lv2:portProperty lv2:toggled
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 23 ;
+        lv2:index 31 ;
         lv2:symbol "exclusive_lane" ;
         lv2:name "Exclusive Lane" ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 4 ;
-        lv2:portProperty lv2:integer ;
+        lv2:portProperty lv2:integer
     ].

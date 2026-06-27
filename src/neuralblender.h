@@ -35,11 +35,19 @@
 
 #include "meter.h"
 
-#define MAX_DELAY_MS 300
+#ifdef max
+#undef max
+#endif
+#ifdef min
+#undef min
+#endif
+
+#define MAX_DELAY_MS     30
 #define MAX_DELAY_FRAMES (MAX_DELAY_MS * 192)
-#define MAX_BLOCK_SIZE 8192
-#define NB_MAX_MODELS 4
-#define DB_SILENCE -120
+#define MAX_BLOCK_SIZE   8192
+#define NB_MAX_MODELS    4
+#define DB_SILENCE       -120
+#define DB_CALIB_TARGET  -18
 
 enum _engine_mode {
   ENGINE_NONE,
@@ -69,7 +77,7 @@ public:
   bool set_frames (uint32_t f);
   uint32_t frames () const;
   void clear ();
-  
+
 private:
   uint32_t m_delay_frames = 0;
   std::vector<float> m_buffer;
@@ -83,6 +91,8 @@ struct c_neuralblender_lane_state {
   float delay_ms = 0.0f;
   bool lane_mute = false;
   bool loaded = false;
+  bool dcflip = false;
+  bool do_calib = false;
 };
 
 struct c_neuralblender_state {
@@ -90,6 +100,7 @@ struct c_neuralblender_state {
   bool bypass = false;
   bool do_excl = false;
   bool do_vu = true;
+  bool showadvanced = false;
   bool mute_all = false;
   int  exclusive_lane = 0;
   c_neuralblender_lane_state lanes [NB_MAX_MODELS];
@@ -102,25 +113,29 @@ public:
   ~c_neuralamp ();
   void set_samplerate (uint32_t sr);
   void set_blocksize (uint32_t bs);
-  
+
   bool load_model (const std::string &filename = "");
   void unload_model ();
   void reset ();
+  float calibrate (const float *data, size_t sz);
 
   //float process_sample (float x);
   void process_block (float *in, float *out, uint32_t nframes);
 
   bool loaded () const;
   std::string model_filename () const;
-  
-  std::string filename = "";
-  float       gain_in  = 1.0f;
-  float       gain_out = 1.0f;
-  uint32_t    samplerate = 48000;
-  uint32_t    blocksize = -1;
-  std::atomic<bool> mute { false };
-  int warmup = 5;
-  
+
+  std::string filename     = "";
+  float       gain_in      = 1.0f;
+  float       gain_out     = 1.0f;
+  uint32_t    samplerate   = 48000;
+  uint32_t    blocksize    = -1;
+  std::atomic<bool> mute   { false };
+  int         warmup       = 5;
+  bool        dcflip       = false;
+  bool        do_calib     = false;
+  float       trim         = 1.0f;
+
 private:
   void reset_unlocked ();
   bool load_json ( const std::string &filename);
@@ -130,10 +145,9 @@ private:
   std::unique_ptr<RTNeural::Model<float>> m_rtneural_model;
   mutable std::mutex model_mutex;
   std::atomic<bool> m_loaded { false };
-  
+
   _engine_mode m_engine_mode = ENGINE_NONE;
 };
-
 
 class c_neuralblender {
 public:
@@ -154,6 +168,10 @@ public:
   bool bypass () const;
   float delay_ms (size_t which) const;
   void get_state (c_neuralblender_state &state) const;
+  void dcflip (size_t which, bool b);
+  void calib_on (size_t which, bool b);
+  bool is_dcflipped (size_t which);
+  bool is_calib_on (size_t which);
 
   c_delayline delays [NB_MAX_MODELS];
   c_neuralamp amps [NB_MAX_MODELS];
@@ -170,7 +188,7 @@ private:
   std::vector <float> m_input_buf;
   std::atomic<bool> m_lane_mute [NB_MAX_MODELS];
   std::atomic<bool> m_bypass { false };
-  
+
   bool       m_ready = false;
   uint32_t   m_samplerate = 48000;
   //uint32_t   m_blocksize = 256;
