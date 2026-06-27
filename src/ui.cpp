@@ -1139,6 +1139,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   for (i = 0; text [i]; i++) {
     int h = (i == 0 ? 20 : (180 + i * 24));
     labels [i].create (ui, w, text [i], 0, h, 400, 24);
+    labels [i].align = TEXT_CENTER;
   }
 
   char buf [64];
@@ -1147,6 +1148,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   labels [0].textsize = 1.5;
   labels [i].create (ui, w, buf, 0, 360, 400, 20);
   labels [i].textsize = 0.75;
+  labels [i].align = TEXT_CENTER;
 
   img_logo.create (ui, w, "", (400-160)/2, 64, 160, 160);
   img_logo.set_png (data_neuralblender_logo_160_png);
