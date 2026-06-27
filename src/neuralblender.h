@@ -86,7 +86,12 @@ struct c_neuralblender_lane_state {
 };
 
 struct c_neuralblender_state {
+  std::string current_dir;
   bool bypass = false;
+  bool do_excl = false;
+  bool do_vu = true;
+  bool mute_all = false;
+  int  exclusive_lane = 0;
   c_neuralblender_lane_state lanes [NB_MAX_MODELS];
 };
 

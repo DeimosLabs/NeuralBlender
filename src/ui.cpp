@@ -3,7 +3,7 @@
  *
  * Shared UI code
  */
- 
+
 #include <string.h>
 #include <algorithm>
 #include <dirent.h>
@@ -44,7 +44,7 @@ void c_widget::create (
     Widget_t *parent,
     const char *label_,
     int x, int y, int w, int h) {
-    
+
   debug ("label_='%s'", label_);
   id = get_unique_id ();
   label = label_;
@@ -54,7 +54,7 @@ void c_widget::create (
     debug ("!widget");
     return;
   }
-  
+
   widget->parent_struct = this;
   widget->label = label.c_str ();
 }
@@ -64,7 +64,7 @@ void c_frame::create (
     Widget_t *parent,
     const char *label_,
     int x, int y, int w, int h) {
-    
+
   widget = add_frame (parent, label.c_str (), x, y, w, h);
   c_widget::create (ui_, parent, label_, x, y, w, h);
 }
@@ -74,7 +74,7 @@ void c_label::create (
     Widget_t *parent,
     const char *label_,
     int x, int y, int w, int h) {
-    
+
   role = ROLE_UNKNOWN;
   widget = add_label (parent, label.c_str (), x, y, w, h);
   widget->func.expose_callback = c_label::draw;
@@ -104,28 +104,28 @@ void c_button::create (
     const char *label_,
     int x, int y, int w, int h,
     _button_style style) {
-  
+
   switch (style) {
     case BTN_CHECKBOX:
       is_toggle = true;
-      widget = add_check_button (parent, label.c_str (), x, y, w, h);
+      widget = add_check_button (parent, label_ ? label_ : "", x, y, w, h);
       widget->func.value_changed_callback = button_value_changed;
     break;
-    
+
     case BTN_TOGGLE:
       is_toggle = true;
-      widget = add_toggle_button (parent, label.c_str (), x, y, w, h);
+      widget = add_toggle_button (parent, label_ ? label_ : "", x, y, w, h);
       widget->func.value_changed_callback = button_value_changed;
     break;
-    
+
     default:
       is_toggle = false;
-      widget = add_button (parent, label.c_str (), x, y, w, h);
+      widget = add_button (parent, label_ ? label_ : "", x, y, w, h);
       widget->func.double_click_callback = button_double_click;
       widget->func.button_release_callback = button_mouse_up;
     break;
   }
-    
+
   c_widget::create (ui_, parent, label_, x, y, w, h);
 }
 
@@ -137,24 +137,28 @@ void c_button::on_mouseup () {
 
   if (ui->updating_from_state)
     return;
-  
+
   switch (role) {
     case ROLE_BYPASS: CP
       ui->on_bypass (this, value);
       set_label (value ? "Enabled" : "Bypass");
     break;
-    
+
     case ROLE_MUTE: CP
       ui->on_mute (this, value);
+      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
+        //ui->lanes [lane].user_mute = value;
+        ui->state.lanes [lane].lane_mute = value;
+      }
     break;
-    
+
     case ROLE_MUTEALL: CP
       /*for (size_t i = 0; i < NB_UI_MAX_LANES; i++)
         ui->lanes [i].meter_out.set_l (0, 0);
       ui->on_muteall (this, value);*/
       ui->on_muteall (this, value);
     break;
-    
+
     case ROLE_BROWSE: CP
       //ui->on_filebrowse_pre (this);
       ui->on_filebrowse (this);
@@ -163,11 +167,11 @@ void c_button::on_mouseup () {
       else
         debug ("!filepicker");
     break;
-    
+
     case ROLE_CLEAR: CP
       ui->on_fileclear (this);
     break;
-    
+
     case ROLE_ABOUT: CP
       ui->aboutwindow.show ();
       ui->on_about (this);
@@ -176,18 +180,28 @@ void c_button::on_mouseup () {
     case ROLE_ABOUTOK: CP
       ui->aboutwindow.hide ();
     break;
-    
+
     case ROLE_VUTOGGLE: CP
       ui->vu_on (value);
     break;
-    
-    case ROLE_EXCLTOGGLE: CP
-      ui->on_excl (value);
+
+    case ROLE_EXCL_TOGGLE: CP
+      if (value) {
+        size_t exclusive_lane = ui->choose_exclusive_lane ();
+        ui->on_excl (this, exclusive_lane); // this is 1-BASED, 0 = normal mode
+      } else {
+        ui->on_excl (this, 0);
+      }
     break;
-    
+
+    case ROLE_EXCL_USE:
+      ui->on_excl_use (this, value);
+    break;
+
     default: CP
     break;
   }
+  //ui->sync_widgets_from_state (ui->state);
 }
 
 void xevfunc_dummy (void *a, void *b)          { }
@@ -198,19 +212,19 @@ bool c_button::set_value (bool value_) {
     return false;
 
   value = value_;
-  
+
   // avoid firing unwanted callbacks
   xevfunc oldvaluechanged = widget->func.value_changed_callback;
   xevfunc oldadj = widget->func.adj_callback;
   widget->func.value_changed_callback = xevfunc_dummy;
   widget->func.adj_callback = xevfunc_dummy;
-  
+
   adj_set_value (widget->adj, this->value ? 1.0f : 0.0f);
   widget->state = this->value ? 3 : 0;
   expose_widget (widget);
   widget->func.value_changed_callback = oldvaluechanged;
   widget->func.adj_callback = oldadj;
-  
+
   return true;
 }
 
@@ -229,7 +243,7 @@ void c_knob::create (
     Widget_t *parent,
     const char *label_,
     int x, int y, int w, int h) {
-    
+
   label = label_;
   widget = add_knob (parent, label.c_str (), x, y, w, h);
   widget->func.value_changed_callback = knob_value_changed;
@@ -277,7 +291,7 @@ void c_knob::on_change () {
       debug ("lane %d gain in %f", lane, g);
       ui->on_gain_in (this, g);
     break;
-    
+
     case ROLE_GAIN_OUT:
       debug ("lane %d gain out %f", lane, g);
       ui->on_gain_out (this, g);
@@ -287,7 +301,7 @@ void c_knob::on_change () {
       debug ("lane %d delay %f", lane, value);
       ui->on_delay (this, value);
     break;
-    
+
     default:
       debug ("unknown knob set to %f", g);
     break;
@@ -304,12 +318,12 @@ void c_combobox::create (
     Widget_t *parent,
     const char *label_,
     int x, int y, int w, int h) {
-    
+
   label = label_;
   widget = add_combobox (parent, label.c_str (), x, y, w, h);
   c_widget::create (ui_, parent, label_, x, y, w, h);
   combobox_set_menu_size (widget, 16);
-  
+
   update_widget ();
 }
 
@@ -331,7 +345,7 @@ void c_combobox::on_change (int x) {
     return;
 
   set_selection (x);
-  
+
   if (x < 0 || x >= (int) items.size ()) {
     debug ("item out of range: %d", x);
     return;
@@ -341,7 +355,7 @@ void c_combobox::on_change (int x) {
     fullpath = ui->filepickers [lane].current_dir + "/" + items [x];
   else
     fullpath = items [x];
-  
+
   ui->load_model (lane, fullpath.c_str ());
 }
 
@@ -361,17 +375,17 @@ int c_combobox::get_selection () {
 void c_combobox::update_widget () {
   int i, n = items.size ();
   debug ("%d items", n);
-  
+
   updating_widget = true;
   combobox_delete_entrys (widget);
   for (i = 0; i < n; i++) {
     combobox_add_entry (widget, items [i].c_str ());
   }
-  
+
   // more xputty internals... thanks to codex for the help on this!
   if (selected >= 0 && selected < i) {
     combobox_set_active_entry (widget, selected);
-    
+
     Widget_t *menu = widget->childlist->childs [1];
     Widget_t *view_port = menu->childlist->childs [0];
     ComboBox_t *list = (ComboBox_t *) view_port->parent_struct;
@@ -394,7 +408,7 @@ void c_combobox::update_widget () {
     widget->label = label.c_str ();
   }
   updating_widget = false;
-  
+
   expose_widget (widget);
 }
 
@@ -408,26 +422,26 @@ void c_label::draw (void *w_, void *ptr) {
   const float textsize = self ? self->textsize : 1.0f;
   const _textalign align = self ? self->align : TEXT_CENTER;
   const char *text = w->label ? w->label : "";
-  
+
   Metrics_t metrics;
   os_get_window_metrics (w, &metrics);
   if (!metrics.visible)
     return;
-  
+
   cairo_text_extents_t extents;
   use_text_color_scheme (w, get_color_state (w));
   cairo_set_font_size (w->crb, (w->app->normal_font * textsize) / w->scale.ascale);
   cairo_text_extents (w->crb, text, &extents);
-  
+
   const double padding = 2.0 * w->app->hdpi;
   double x = padding - extents.x_bearing;
   if (align == TEXT_CENTER)
     x = (metrics.width - extents.width) * 0.5 - extents.x_bearing;
   else if (align == TEXT_RIGHT)
     x = metrics.width - padding - extents.width - extents.x_bearing;
-  
+
   const double y = (metrics.height - extents.height) * 0.5 - extents.y_bearing;
-  
+
   cairo_move_to (w->crb, x, y);
   cairo_text_path (w->crb, text);
   cairo_fill (w->crb);
@@ -455,7 +469,7 @@ static void draw_main_window (void *w_, void *user_data) {
   cairo_fill (w->crb);
 }
 
-static void button_double_click (void *w_, void *event, void *user_data) { 
+static void button_double_click (void *w_, void *event, void *user_data) {
   (void) event;
   (void) user_data;
 
@@ -490,7 +504,7 @@ static void button_mouse_up (void *w_, void *event, void *user_data) {
   w->state = 0;
   if (w->adj_y) adj_set_value (w->adj_y, 0.0);
   expose_widget (w);
-  
+
   auto *b = (c_button *) w->parent_struct;
   b->on_mouseup ();
 }
@@ -574,7 +588,7 @@ static void filepicker_response(void *w_, void *user_data) { CP
     debug ("!filename");
     return;
   }
-  
+
   c_neuralblender_ui *ui = fp->ui;
   size_t lane = fp->lane;
 
@@ -590,17 +604,18 @@ static void filepicker_response(void *w_, void *user_data) { CP
     debug ("!cw");
     return;
   }
-  
-  debug ("current_dir: '%s'", fp->current_dir.c_str ());
-  
-  fp->selected_file = std::string (filename);
-  fp->current_dir = path_dirname (fp->selected_file);
+
+  debug ("current_dir: '%s'", ui->state.current_dir.c_str ());
+
+  //fp->selected_file = std::string (filename);
+  ui->state.lanes [lane].filename = std::string (filename);
+  ui->state.current_dir = path_dirname (ui->state.lanes [lane].filename);
   fp->scan_current_dir ();
   for (int i = 0; i < fp->filelist.size (); i++) {
     debug ("filelist [%d]: '%s'", i, fp->filelist [i].c_str ());
   }
   ui->load_model (cw->lane, filename);
-  
+
   c_combobox *cb = &ui->lanes [lane].menu_list;
   cb->clear ();
   //cb->add (filename);
@@ -611,7 +626,7 @@ static void filepicker_response(void *w_, void *user_data) { CP
 
 static void combobox_selected_callback (void *w_, void *user_data) { CP
   Widget_t *w = (Widget_t *) w_;
-  
+
   int index = (int) adj_get_value (w->adj);
 
   Widget_t *menu = w->childlist->childs[1];
@@ -655,7 +670,7 @@ void c_filepicker::create (
     Widget_t *parent_,
     size_t lane_,
     const char *title_) {
-    
+
   CP
   ui = ui_;
   parent = parent_;
@@ -757,6 +772,7 @@ void c_filepicker::add_files_from_dir (c_combobox *cb) {
   cb->items.clear();
 
   int sel = -1;
+  std::string selected_file = ui->state.lanes [lane].filename;
 
   for (size_t i = 0; i < filelist.size (); i++) {
     cb->items.push_back (filelist [i]);
@@ -765,6 +781,7 @@ void c_filepicker::add_files_from_dir (c_combobox *cb) {
     if (!full.empty () && full.back () != '/')
       full += '/';
     full += filelist [i];
+
 
     if (full == selected_file || filelist [i] == selected_file) {
       sel = (int) i;
@@ -786,15 +803,15 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   w = create_window (&ui->app, os_get_root_window (&ui->app, IS_WINDOW), 0, 0, 400, 450);
   if (!w)
     return;
-  
+
   w->flags |= HIDE_ON_DELETE;
   os_set_transient_for_hint (ui->main_widget, w);
-  
+
   w->func.expose_callback = draw_main_window;
   widget_set_title (w, "About NeuralBlender");
   btn_ok.create (ui, w, "OK", 160, 400, 80, 40);
   btn_ok.role = ROLE_ABOUTOK;
-  
+
   const char *text [] = {
     "NeuralBlender",
     "",
@@ -805,20 +822,20 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
     "github.com/DeimosLabs/NeuralBlender",
     NULL
   };
-  
+
   int i;
   for (i = 0; text [i]; i++) {
     int h = (i == 0 ? 20 : (180 + i * 24));
     labels [i].create (ui, w, text [i], 0, h, 400, 24);
   }
-  
+
   char buf [64];
   snprintf (buf, 63, "Build timestamp: %s", g_build_timestamp);
 
   labels [0].textsize = 1.5;
   labels [i].create (ui, w, buf, 0, 360, 400, 20);
   labels [i].textsize = 0.75;
-  
+
   img_logo.create (ui, w, "", (400-160)/2, 64, 160, 160);
   img_logo.set_png (data_neuralblender_logo_160_png);
 }
@@ -845,18 +862,18 @@ void c_lane_widgets::create (
     Widget_t *parent,
     size_t which,
     int x, int y, int w, int h) { CP
-  
+
   char label [64];
   ui = ui_;
   snprintf (label, 31, "Amp %c", 'A' + which);
   lane_id = which;
   lane_widget.create (ui, parent, label, x, y, w, h);
   Widget_t *wp = lane_widget.widget;
-  
+
   menu_list.create (ui, wp, label, 94, 24, 320, 32);
   menu_list.widget->func.value_changed_callback = combobox_selected_callback;
   menu_list.lane = which;
-  
+
   int knobs_left = w - 180;
   gain_in.create (ui, wp, "Input", knobs_left + 6, 36, 64, 64);
   gain_out.create (ui, wp, "Output", knobs_left + 75, 36, 64, 64);
@@ -882,15 +899,15 @@ void c_lane_widgets::create (
   delay.set_defaultvalue (0);
   delay.set_value (0);
   delay.set_step (0.01);
-  
+
   meter_out.create (wp, "", w - 26, 24, 5, h - 48);
   meter_out.set_vudata (&vudata_out);
   meter_out.set_stereo (false);
   vudata_out.set_l (0.0, 0.0);
-  
+
   btn_browse.create (ui, wp, "Browse...",  94, 70, 100, 40);
   btn_clear.create  (ui, wp, "Clear",     205, 70, 100, 40);
-  //btn_excl.create   (ui, wp, "Use",       316, 70, 100, 40, BTN_TOGGLE);
+  btn_excl.create   (ui, wp, "Use",       316, 70, 100, 40, BTN_TOGGLE);
   btn_mute.create   (ui, wp, "Mute",      316, 70, 100, 40, BTN_TOGGLE);
   btn_mute.set_value (false);
   btn_browse.lane = which;
@@ -899,6 +916,8 @@ void c_lane_widgets::create (
   btn_browse.role = ROLE_BROWSE;
   btn_clear.role = ROLE_CLEAR;
   btn_mute.role = ROLE_MUTE;
+  btn_excl.role = ROLE_EXCL_USE;
+  btn_excl.lane = which;
 
   if (ui && which < NB_UI_MAX_LANES) {
     ui->filepickers [which].create (ui, btn_browse.widget, which, "Select file");
@@ -929,24 +948,24 @@ void c_neuralblender_ui::update_cwd (std::string path) {
 bool c_neuralblender_ui::create (Window parent_) { CP
   size_t i;
   destroy ();
-  
+
   main_init (&app);
   ui_ready = true;
   app.small_font = 12 * app.hdpi;
   app.normal_font = 15 * app.hdpi;
   app.big_font = 20 * app.hdpi;
   display = app.dpy;
-  
+
   parent = parent_;
   if (!parent)
     parent = DefaultRootWindow (display);
-  
+
   main_widget = create_window (&app, parent, 0, 0, 640, 650);
   if (!main_widget)
     return false;
-    
+
   widget_set_icon_from_png (main_widget, data_neuralblender_logo_512_png);
-  
+
   os_register_wm_delete_window (main_widget);
   widget_set_title (main_widget, "NeuralBlender");
   main_widget->func.expose_callback = draw_main_window;
@@ -959,18 +978,18 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_about.role = ROLE_ABOUT;
   btn_muteall.create (this, main_widget, "Mute all", 500, 12, 120, 40, BTN_TOGGLE);
   btn_muteall.role = ROLE_MUTEALL;
-  
+
   btn_vu.create (this, main_widget, "VU meters", 20, 604, 32, 32, BTN_CHECKBOX);
   btn_vu.role = ROLE_VUTOGGLE;
-  btn_vu.set_value (do_vu);
+  btn_vu.set_value (state.do_vu);
   btn_exclmode.create (this, main_widget, "Exclusive mode", 200, 604, 32, 32, BTN_CHECKBOX);
-  btn_exclmode.set_value (do_excl);
-  btn_exclmode.role = ROLE_EXCLTOGGLE;
+  btn_exclmode.set_value (state.do_excl);
+  btn_exclmode.role = ROLE_EXCL_TOGGLE;
   label_vu.create (this, main_widget, "VU meters", 60, 604, 120, 32);
   label_vu.align = TEXT_LEFT;
-  label_exclmode.create (this, main_widget, "Exclusive mode (WIP!!)", 240, 604, 180, 32);
+  label_exclmode.create (this, main_widget, "Exclusive mode", 240, 604, 180, 32);
   label_exclmode.align = TEXT_LEFT;
-  
+
   aboutwindow.create (this);
   for (i = 0; i < NB_UI_MAX_LANES; i++) {
     lanes [i].create (this, main_widget, i, 20, 60 + i * 135, 600, 130);
@@ -979,17 +998,17 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   meter_in.set_vudata (&vudata_in);
   meter_in.set_stereo (false);
   vudata_in.set_l (0.0, 0.0);
-  
+
   if (blender) {
     for (i = 0; i < NB_UI_MAX_LANES; i++) {
       blender->meters_out [i] = &lanes [i].vudata_out;
     }
     blender->meter_in = &vudata_in;
   }
-  
+
   widget_show_all (main_widget);
   expose_widget (main_widget);
-  
+
   window = main_widget->widget;
   CP
   XFlush (display);
@@ -1013,9 +1032,9 @@ void c_neuralblender_ui::vu_on (bool b) { CP
     vu_off ();
     return;
   }
-  
-  do_vu = true;
-  
+
+  state.do_vu = true;
+
   widget_show (meter_in.widget);
   for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
     widget_show (lanes [i].meter_out.widget);
@@ -1024,8 +1043,8 @@ void c_neuralblender_ui::vu_on (bool b) { CP
 }
 
 void c_neuralblender_ui::vu_off () { CP
-  do_vu = false;
-  
+  state.do_vu = false;
+
   widget_hide (meter_in.widget);
   for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
     widget_hide (lanes [i].meter_out.widget);
@@ -1033,13 +1052,55 @@ void c_neuralblender_ui::vu_off () { CP
   on_vu (&btn_vu, false);
 }
 
-void c_neuralblender_ui::on_excl (bool b) { CP
+size_t c_neuralblender_ui::choose_exclusive_lane () const {
+  if (state.exclusive_lane > 0 &&
+      state.exclusive_lane <= (int) NB_UI_MAX_LANES)
+    return (size_t) state.exclusive_lane;
+
+  if (last_exclusive_lane > 0 && last_exclusive_lane <= NB_UI_MAX_LANES)
+    return last_exclusive_lane;
+
+  for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+    if (!state.lanes [i].filename.empty () &&
+        !state.lanes [i].lane_mute)
+      return i + 1;
+  }
+
+  for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+    //if (!filepickers [i].selected_file.empty ())
+    if (!state.lanes [i].filename.empty ())
+      return i + 1;
+  }
+
+  for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+    if (!state.lanes [i].lane_mute)
+      return i + 1;
+  }
+
+  return 1;
 }
 
-void c_neuralblender_ui::excl_select (size_t which) { CP
-  for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
-    
-  }
+void c_neuralblender_ui::on_excl (c_widget *w, int n) {
+  debug ("n=%d", n);
+  state.exclusive_lane = n;
+  if (n > 0 && n <= (int) NB_UI_MAX_LANES)
+    last_exclusive_lane = (size_t) n;
+  if (!w)
+    return;
+
+  btn_exclmode.set_value (state.exclusive_lane != 0);
+  apply_effective_controls();
+  sync_widgets_from_state (state);
+}
+
+void c_neuralblender_ui::on_excl_use (c_widget *w, bool b) {
+  (void) b;
+  if (!w)
+    return;
+
+  debug ("lane %d, value=%d", (int) w->lane + 1, (int) b);
+
+  on_excl (w, (int) w->lane + 1);
 }
 
 int c_neuralblender_ui::idle () {
@@ -1047,8 +1108,8 @@ int c_neuralblender_ui::idle () {
     CP
     return 0;
   }
-  
-  if (do_vu) {
+
+  if (state.do_vu) {
     meter_in.on_ui_timer ();
     for (int i = 0; i < NB_MAX_MODELS; i++) {
       lanes [i].meter_out.on_ui_timer ();
@@ -1069,7 +1130,8 @@ void c_neuralblender_ui::clear_lane_model_ui (size_t which) {
   if (which >= NB_UI_MAX_LANES)
     return;
 
-  filepickers [which].selected_file.clear ();
+  //filepickers [which].selected_file.clear ();
+  state.lanes [which].filename.clear ();
   lanes [which].menu_list.clear ();
 }
 
@@ -1100,16 +1162,32 @@ static std::string path_basename (const std::string &path) {
   return path.substr (pos + 1);
 }
 
-void c_neuralblender_ui::apply_state (const c_neuralblender_state &state) {
-  if (!ui_ready)
+void c_neuralblender_ui::set_lane_mute (size_t which, bool b) {
+  debug ("which=%d, b=%d", (int) which, (int) b);
+  if (which >= NB_UI_MAX_LANES)
     return;
 
+  const bool old_updating = updating_from_state;
   updating_from_state = true;
 
-  const bool enabled = !state.bypass;
-  btn_enable.value = enabled;
-  btn_enable.set_value (enabled);
-  btn_enable.set_label (enabled ? "Enabled" : "Bypass");
+  lanes [which].btn_mute.value = b;
+  lanes [which].btn_mute.set_value (b);
+
+  updating_from_state = old_updating;
+}
+
+void c_neuralblender_ui::apply_effective_controls () {
+}
+
+void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &state_) {
+  if (!ui_ready)
+    return;
+  this->state = state_;
+  if (state.exclusive_lane > 0 &&
+      state.exclusive_lane <= (int) NB_UI_MAX_LANES)
+    last_exclusive_lane = (size_t) state.exclusive_lane;
+
+  updating_from_state = true;
 
   const size_t nlanes = NB_UI_MAX_LANES < NB_MAX_MODELS ? NB_UI_MAX_LANES : NB_MAX_MODELS;
   for (size_t i = 0; i < nlanes; ++i) {
@@ -1119,16 +1197,47 @@ void c_neuralblender_ui::apply_state (const c_neuralblender_state &state) {
     lanes [i].gain_out.set_value (gain_to_db (lane.gain_out));
     lanes [i].delay.set_value (lane.delay_ms);
 
-    lanes [i].btn_mute.value = lane.lane_mute;
-    lanes [i].btn_mute.set_value (lane.lane_mute);
-
-    filepickers [i].selected_file = lane.filename;
-    if (lane.filename.empty ()) {
+    //filepickers [i].selected_file = lane.filename;
+    if (state.lanes [i].filename.empty ()) {
       lanes [i].menu_list.clear ();
     } else {
-      filepickers [i].current_dir = path_dirname (lane.filename);
+      filepickers [i].current_dir = path_dirname (state.lanes [i].filename);
       filepickers [i].scan_current_dir ();
       filepickers [i].add_files_from_dir (&lanes [i].menu_list);
+    }
+  }
+
+  const bool enabled = !state.bypass;
+  btn_enable.set_value (enabled);
+  btn_enable.set_label (enabled ? "Enabled" : "Bypass");
+
+  btn_vu.set_value (state.do_vu);
+  if (state.do_vu) {
+    widget_show (meter_in.widget);
+    for (size_t i = 0; i < NB_UI_MAX_LANES; ++i)
+      widget_show (lanes [i].meter_out.widget);
+  } else {
+    widget_hide (meter_in.widget);
+    for (size_t i = 0; i < NB_UI_MAX_LANES; ++i)
+      widget_hide (lanes [i].meter_out.widget);
+  }
+
+  btn_exclmode.set_value (state.exclusive_lane > 0);
+
+  const bool exclusive_on = state.exclusive_lane > 0;
+  for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+    const bool selected =
+      exclusive_on && state.exclusive_lane == i + 1;
+
+    lanes [i].btn_mute.set_value (state.lanes [i].lane_mute);
+    lanes [i].btn_excl.set_value (selected);
+
+    if (exclusive_on) { CP
+      widget_hide (lanes [i].btn_mute.widget);
+      widget_show (lanes [i].btn_excl.widget);
+    } else { CP
+      widget_show (lanes [i].btn_mute.widget);
+      widget_hide (lanes [i].btn_excl.widget);
     }
   }
 

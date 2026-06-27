@@ -94,14 +94,19 @@ public:
   void on_mute (c_widget *w, bool b);
   void on_muteall (c_widget *w, bool b);
   void on_vu (c_widget *w, bool);
-  void on_excl (c_widget *w, int which);
+  //void on_excl (c_widget *w, int which);
   void on_bypass (c_widget *w, bool b);
   void on_about (c_widget *w);
+  void apply_effective_controls () override;
 };
 
 bool c_standalone_ui::load_model (size_t which, const char *filename) {
   debug ("which=%d, filename='%s'", (int) which, filename);
-  return blender->load_model (which, filename);
+  const bool loaded = blender->load_model (which, filename);
+  if (which < NB_MAX_MODELS)
+    state.lanes [which].loaded = loaded;
+  apply_effective_controls ();
+  return loaded;
 }
 
 void c_standalone_ui::on_gain_in (c_widget *w, float f) {
@@ -131,11 +136,19 @@ void c_standalone_ui::on_fileclear (c_widget *w) {
   debug ("lane %d", w->lane);
   g_blender.unload_model (w->lane);
   clear_lane_model_ui (w->lane);
+  if (w->lane >= 0 && w->lane < (int) NB_MAX_MODELS)
+    state.lanes [w->lane].loaded = false;
+  apply_effective_controls ();
 }
 
-void c_standalone_ui::on_mute (c_widget *w, bool b) {
+/*void c_standalone_ui::on_mute (c_widget *w, bool b) {
   debug ("lane %d, b=%d", w->lane, (int) b);
   g_blender.set_lane_mute (w->lane, b);
+}*/
+
+void c_standalone_ui::on_mute(c_widget *w, bool b) {
+  state.lanes [w->lane].lane_mute = b;
+  apply_effective_controls();
 }
 
 void c_standalone_ui::on_muteall (c_widget *w, bool b) {
@@ -148,17 +161,42 @@ void c_standalone_ui::on_vu (c_widget *w, bool b) {
   g_blender.do_vu = b;
 }
 
-void c_standalone_ui::on_excl (c_widget *w, int n) {
+/*void c_standalone_ui::on_excl (c_widget *w, int n) {
   debug ("lane %d, b=%d", w->lane, n);
-}
+}*/
 
-void c_standalone_ui::on_bypass (c_widget *w, bool b) {
+/*void c_standalone_ui::on_bypass (c_widget *w, bool b) {
   debug ("lane %d, b=%d", w->lane, (int) b);
   g_blender.set_bypass (!b);
+}*/
+
+void c_standalone_ui::on_bypass(c_widget *w, bool b) {
+  state.bypass = !b; // because Enabled button true means not bypassed
+  apply_effective_controls();
 }
 
 void c_standalone_ui::on_about (c_widget *w) {
   debug ("lane %d", w->lane);
+}
+
+void c_standalone_ui::apply_effective_controls () {
+  if (!blender)
+    return;
+
+  const bool exclusive_on = state.exclusive_lane > 0;
+  const size_t excl = exclusive_on ? (size_t) (state.exclusive_lane - 1) : 0;
+  const bool exclusive_empty =
+    exclusive_on &&
+    (excl >= NB_MAX_MODELS ||
+     (!state.lanes [excl].loaded && state.lanes [excl].filename.empty ()));
+
+  blender->set_bypass (state.bypass || exclusive_empty);
+
+  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+    const bool mute =
+      exclusive_on && !exclusive_empty ? i != excl : state.lanes [i].lane_mute;
+    blender->set_lane_mute (i, mute);
+  }
 }
 
 static std::thread ui_thread;
@@ -170,7 +208,7 @@ static void ui_main () {
   g_ui.create (0);        // no LV2 parent, so root/toplevel
   c_neuralblender_state state;
   g_blender.get_state (state);
-  g_ui.apply_state (state);
+  g_ui.sync_widgets_from_state (state);
   fprintf (stderr, "UI running...\n");
   
   CP

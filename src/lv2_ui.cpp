@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <math.h>
 
 #include <lv2/ui/ui.h>
 #include <lv2/atom/atom.h>
@@ -53,7 +54,8 @@ enum {
   PORT_CONTROL,
   PORT_NOTIFY,
   PORT_VU_ENABLE,
-  PORT_MUTE_ALL
+  PORT_MUTE_ALL,
+  PORT_EXCLUSIVE_LANE
 };
 
 #ifdef CMDLINE_DEBUG
@@ -153,35 +155,50 @@ public:
   void on_fileclear (c_widget *w)                      { CP; clear_lane_model_ui (w->lane); write_model_path (w->lane, ""); }
   void on_mute (c_widget *w, bool b)                   { CP; write_control (lane_port (w->lane, PORT_A_MUTE), b ? 1.0f : 0.0f); }
   void on_muteall (c_widget *w, bool b)                { CP; write_control (PORT_MUTE_ALL, b ? 1.0f : 0.0f); }
-  void on_excl (c_widget *w, int n)                    { CP }
+  void on_excl (c_widget *w, int n) {
+    CP
+    state.exclusive_lane = n;
+    if (n > 0 && n <= (int) NB_UI_MAX_LANES)
+      last_exclusive_lane = (size_t) n;
+    write_control (PORT_EXCLUSIVE_LANE, (float) n);
+    sync_widgets_from_state (state);
+  }
   void on_bypass (c_widget *w, bool b)                 { CP; write_control (PORT_BYPASS, b ? 1.0f : 0.0f); }
   void on_about (c_widget *w)                          { CP }
   void on_vu (c_widget *w, bool b)                     { CP; write_control (PORT_VU_ENABLE, b ? 1.0f : 0.0f); }
 
   void set_port_value (uint32_t port, float value) {
     updating_from_host = true;
-    updating_from_state = true;
 
     if (port == PORT_BYPASS) {
-      const bool enabled = value >= 0.5f;
-      btn_enable.set_value (enabled);
-      btn_enable.set_label (enabled ? "Enabled" : "Bypass");
-      updating_from_state = false;
+      state.bypass = value < 0.5f;
+      sync_widgets_from_state (state);
       updating_from_host = false;
       return;
     }
 
     if (port == PORT_VU_ENABLE) {
-      btn_vu.set_value (value >= 0.5f);
-      vu_on (value >= 0.5f);
-      updating_from_state = false;
+      state.do_vu = value >= 0.5f;
+      sync_widgets_from_state (state);
       updating_from_host = false;
       return;
     }
 
     if (port == PORT_MUTE_ALL) {
-      btn_muteall.set_value (value >= 0.5f);
-      updating_from_state = false;
+      state.mute_all = value >= 0.5f;
+      sync_widgets_from_state (state);
+      updating_from_host = false;
+      return;
+    }
+
+    if (port == PORT_EXCLUSIVE_LANE) {
+      int n = (int) lrintf (value);
+      if (n < 0)
+        n = 0;
+      if (n > (int) NB_UI_MAX_LANES)
+        n = (int) NB_UI_MAX_LANES;
+      state.exclusive_lane = n;
+      sync_widgets_from_state (state);
       updating_from_host = false;
       return;
     }
@@ -189,21 +206,21 @@ public:
     for (size_t lane = 0; lane < NB_UI_MAX_LANES; lane++) {
       const uint32_t base = PORT_A_GAIN_IN + (uint32_t) lane * 4;
       if (port == base) {
-        lanes [lane].gain_in.set_value (value);
+        state.lanes [lane].gain_in = db_to_gain (value);
         break;
       } else if (port == base + 1) {
-        lanes [lane].gain_out.set_value (value);
+        state.lanes [lane].gain_out = db_to_gain (value);
         break;
       } else if (port == base + 2) {
-        lanes [lane].delay.set_value (value);
+        state.lanes [lane].delay_ms = value;
         break;
       } else if (port == base + 3) {
-        lanes [lane].btn_mute.set_value (value >= 0.5f);
+        state.lanes [lane].lane_mute = value >= 0.5f;
         break;
       }
     }
 
-    updating_from_state = false;
+    sync_widgets_from_state (state);
     updating_from_host = false;
   }
 
@@ -212,20 +229,10 @@ public:
       return;
 
     const char *p = path ? path : "";
-    c_neuralblender_state state;
-    state.bypass = !btn_enable.value;
-    for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
-      state.lanes [i].filename = filepickers [i].selected_file;
-      state.lanes [i].gain_in = db_to_gain (lanes [i].gain_in.value);
-      state.lanes [i].gain_out = db_to_gain (lanes [i].gain_out.value);
-      state.lanes [i].delay_ms = lanes [i].delay.value;
-      state.lanes [i].lane_mute = lanes [i].btn_mute.value;
-      state.lanes [i].loaded = !state.lanes [i].filename.empty ();
-    }
     state.lanes [which].filename = p;
     state.lanes [which].loaded = p [0] != '\0';
 
-    apply_state (state);
+    sync_widgets_from_state (state);
   }
 
   void set_model_property (LV2_URID property, const char *path) {
@@ -321,6 +328,7 @@ public:
       subscribe->subscribe (subscribe->handle, port, 0, NULL);
     subscribe->subscribe (subscribe->handle, PORT_VU_ENABLE, 0, NULL);
     subscribe->subscribe (subscribe->handle, PORT_MUTE_ALL, 0, NULL);
+    subscribe->subscribe (subscribe->handle, PORT_EXCLUSIVE_LANE, 0, NULL);
   }
 };
 

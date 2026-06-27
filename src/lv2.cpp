@@ -79,7 +79,8 @@ enum {
   PORT_CONTROL,
   PORT_NOTIFY,
   PORT_VU_ENABLE,
-  PORT_MUTE_ALL
+  PORT_MUTE_ALL,
+  PORT_EXCLUSIVE_LANE
 };
 
 typedef struct {
@@ -95,6 +96,7 @@ typedef struct {
   const float *bypass      = NULL;
   const float *vu_enable   = NULL;
   const float *mute_all    = NULL;
+  const float *exclusive_lane = NULL;
   
   float last_delay         [NB_MAX_MODELS] = { 0.0 };
   float last_gain_in_db    [NB_MAX_MODELS] = { 0.0 };
@@ -103,6 +105,9 @@ typedef struct {
   float last_bypass        = 1.0;
   float last_vu_enable     = 1.0;
   float last_mute_all      = 0.0;
+  float last_exclusive_lane = 0.0;
+  bool base_lane_mute [NB_MAX_MODELS] = { false };
+  bool host_bypass = false;
 
   // dsp
   c_neuralblender blender;
@@ -150,7 +155,28 @@ typedef struct {
   c_vudata meter_in;
   c_vudata meters_out [NB_MAX_MODELS];
   uint32_t meter_notify_samples = 0;
+  std::atomic<bool> controls_dirty { false };
 } Plugin;
+
+static void apply_effective_controls (Plugin *self) {
+  if (!self)
+    return;
+
+  const int exclusive_lane = (int) lrintf (self->last_exclusive_lane);
+  const bool exclusive_on =
+    exclusive_lane > 0 && exclusive_lane <= (int) NB_MAX_MODELS;
+  const size_t excl = exclusive_on ? (size_t) (exclusive_lane - 1) : 0;
+  const bool exclusive_empty =
+    exclusive_on && !self->blender.amps [excl].loaded ();
+
+  self->blender.set_bypass (self->host_bypass || exclusive_empty);
+
+  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+    const bool mute =
+      exclusive_on && !exclusive_empty ? i != excl : self->base_lane_mute [i];
+    self->blender.set_lane_mute (i, mute);
+  }
+}
 
 // loader thread
 static void loader_main (Plugin *self) { CP
@@ -187,15 +213,16 @@ static void loader_main (Plugin *self) { CP
     fprintf (stderr, "NeuralBlender: loading model %zu: %s\n",
              which, path.c_str ());
 
-	    if (self->blender.load_model (which, path.c_str ())) {
-	      self->current_model [which] = path;
-	      self->notify_path [which] = true;
-	    } else {
-	      self->current_model [which].clear ();
-	      self->notify_path [which] = true;
-	    }
-	  }
-	}
+		    if (self->blender.load_model (which, path.c_str ())) {
+		      self->current_model [which] = path;
+		      self->notify_path [which] = true;
+		    } else {
+		      self->current_model [which].clear ();
+		      self->notify_path [which] = true;
+		    }
+        self->controls_dirty.store (true, std::memory_order_release);
+		  }
+		}
 
 // THIS RUNS IN DSP THREAD
 static void request_load (Plugin *self, size_t which, const char *path) {
@@ -231,6 +258,7 @@ static void clear_model_slot (Plugin *self, size_t which, bool notify) {
   self->blender.unload_model (which);
   self->current_model [which].clear ();
   self->notify_path [which] = notify;
+  apply_effective_controls (self);
 }
 
 static void get_state_path_features (
@@ -553,6 +581,10 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
     case PORT_MUTE_ALL:
       self->mute_all = (const float *) data;
     break;
+
+    case PORT_EXCLUSIVE_LANE:
+      self->exclusive_lane = (const float *) data;
+    break;
   }
 }
 
@@ -670,7 +702,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     const float v = *self->bypass;
     if (v != self->last_bypass) { CP
       self->last_bypass = v;
-      self->blender.set_bypass (v < 0.5f);
+      self->host_bypass = v < 0.5f;
+      apply_effective_controls (self);
     }
   }
 
@@ -687,6 +720,14 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     if (v != self->last_mute_all) { CP
       self->last_mute_all = v;
       self->blender.mute_all = v >= 0.5f;
+    }
+  }
+
+  if (self->exclusive_lane) {
+    const float v = *self->exclusive_lane;
+    if (v != self->last_exclusive_lane) { CP
+      self->last_exclusive_lane = v;
+      apply_effective_controls (self);
     }
   }
   
@@ -720,10 +761,14 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       const float v = *self->lane_mute [i];
       if (v != self->last_lane_mute [i]) { CP
         self->last_lane_mute [i] = v;
-        self->blender.set_lane_mute (i, v >= 0.5f);
+        self->base_lane_mute [i] = v >= 0.5f;
+        apply_effective_controls (self);
       }
     }
   }
+
+  if (self->controls_dirty.exchange (false, std::memory_order_acq_rel))
+    apply_effective_controls (self);
 
   // actual DSP
   if (self->audio_in && self->audio_out) {

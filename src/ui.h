@@ -65,7 +65,8 @@ enum _widget_role {
   ROLE_GAIN_OUT,
   ROLE_DELAY,
   ROLE_VUTOGGLE,
-  ROLE_EXCLTOGGLE,
+  ROLE_EXCL_TOGGLE,
+  ROLE_EXCL_USE,
   ROLE_BYPASS,
   ROLE_MASTER
 };
@@ -86,7 +87,7 @@ public:
       Widget_t *parent,
       const char *label,
       int x, int y, int w, int h);
-      
+
   // backpointers to parent objects
   Widget_t *widget         = NULL;
   Widget_t *parent         = NULL;
@@ -115,7 +116,7 @@ public:
       Widget_t *parent,
       const char *label,
       int x, int y, int w, int h);
-      
+
   static void draw (void *w, void *userdata);
   float textsize = 1.0;
   _textalign align = TEXT_CENTER;
@@ -140,20 +141,20 @@ public:
       const char *label,
       int x, int y, int w, int h,
       _button_style s = BTN_NORMAL);
-      
+
   /*void create (
       c_neuralblender_ui *ui,
       Widget_t *parent,
-      const char *label, 
+      const char *label,
       int x, int y, int w, int h, bool is_toggle);*/
-      
+
   bool set_value (bool value);
   bool set_label (const char *label);
   virtual void on_mouseup ();
-  
+
   bool is_toggle = false;
   bool value = false;
-  
+
 };
 
 class c_knob : public c_widget {
@@ -163,7 +164,7 @@ public:
       Widget_t *parent,
       const char *label,
       int x, int y, int w, int h);
-  
+
   void set_value (float v);
   void set_defaultvalue (float v);
   void set_min (float min);
@@ -186,16 +187,16 @@ public:
       Widget_t *parent,
       const char *label,
       int x, int y, int w, int h);
-  
+
   void clear ();
   void add (const std::string &str);
   void set_selection (int n);
   int get_selection ();
-  
+
   virtual void on_change (int x);
-  
+
   void update_widget ();
-  
+
   std::vector<std::string> items;
   int selected = -1;
   bool strip_directories = true;
@@ -222,7 +223,7 @@ public:
   size_t lane = -1;
 
   std::string title;
-  std::string selected_file;
+  //std::string selected_file;
   std::string current_dir;
   std::vector<std::string> filelist;
 };
@@ -230,10 +231,10 @@ public:
 class c_aboutwindow {
 public:
   void create (c_neuralblender_ui *ui);
-  
+
   void show ();
   void hide ();
-  
+
   Widget_t *w = NULL;
   c_button btn_ok;
   c_label labels [16];
@@ -245,13 +246,14 @@ class c_lane_widgets {
 public:
   //c_lane_widgets ();
   //~c_lane_widgets ();
-  
+
   void create (
       c_neuralblender_ui *ui,
       Widget_t *parent,
       size_t which,
       int x, int y, int w, int h);
-  
+
+  //bool user_mute = false;
   size_t lane_id = -1;
   c_neuralblender_ui *ui = NULL;
   size_t which_lane = 0;
@@ -261,11 +263,11 @@ public:
   c_knob gain_out;
   c_knob delay;
   c_button btn_mute;
-  //c_button btn_excl;
+  c_button btn_excl;
   c_button btn_browse;
   c_button btn_clear;
   c_combobox menu_list;
-  
+
   //c_meterwidget meter_in; // we only have one input
   c_meterwidget meter_out;
   c_vudata vudata_out;
@@ -279,15 +281,17 @@ public:
   void destroy ();
   int idle ();
   void draw ();
-  void apply_state (const c_neuralblender_state &state);
   void clear_lane_model_ui (size_t which);
   void update_cwd (std::string path);
-  
+
+  void set_lane_mute (size_t which, bool b);
   void vu_on (bool b = true);
   void vu_off ();
-  void on_excl (bool b = true);
-  void excl_select (size_t which);
-  
+  size_t choose_exclusive_lane () const;
+  //void excl_select (size_t which);
+  void sync_widgets_from_state (const c_neuralblender_state &state);
+  virtual void apply_effective_controls ();
+
   virtual bool load_model (size_t which, const char *filename) = 0;
   virtual void on_gain_in (c_widget *w, float f)               = 0;
   virtual void on_gain_out (c_widget *w, float f)              = 0;
@@ -298,10 +302,11 @@ public:
   virtual void on_mute (c_widget *w, bool b)                   = 0;
   virtual void on_muteall (c_widget *w, bool b)                = 0;
   virtual void on_vu (c_widget *w, bool b)                     = 0;
-  virtual void on_excl (c_widget *w, int n)                    = 0;
+  virtual void on_excl (c_widget *w, int n)                       ; // UI only
+          void on_excl_use (c_widget *w, bool b)                  ; // UI only
   virtual void on_bypass (c_widget *w, bool b)                 = 0;
   virtual void on_about (c_widget *w)                          = 0;
-  
+
   Display *display = NULL;
   Window window;
   c_neuralblender *blender = NULL;
@@ -322,8 +327,12 @@ public:
   c_vudata vudata_in;
   c_aboutwindow aboutwindow;
   c_configfile configfile;
-  bool do_vu = true;
-  bool do_excl = false;
+  //size_t exclusive_lane = 0; // 0: normal mode, 1-4: exclusive mode with lane [n - 1]
+  //bool user_bypass = false;
+  //bool do_vu = true;
+  //bool do_excl = false;
+  c_neuralblender_state state;
+  size_t last_exclusive_lane = 0; // 1-based lane remembered when exclusive mode is off
   bool ui_ready;
   bool updating_from_state = false;
   bool config_file_read = false;

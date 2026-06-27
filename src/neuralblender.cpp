@@ -439,7 +439,8 @@ float c_neuralblender::delay_ms (size_t which) const {
 
 void c_neuralblender::get_state (c_neuralblender_state &state) const {
   state.bypass = bypass ();
-
+  state.do_vu = do_vu;
+  state.mute_all = mute_all;
   for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
     state.lanes [i].filename = amps [i].model_filename ();
     state.lanes [i].gain_in = amps [i].gain_in;
