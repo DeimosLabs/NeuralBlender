@@ -774,6 +774,26 @@ static inline float db_to_bar_pos (float db, float min_db, float headroom_db) {
   return std::clamp ((db - min_db) / (headroom_db - min_db), 0.0f, 1.0f);
 }
 
+//extern "C" void configure_event (void *, void *);
+
+static void main_notify_callback (void *w_, void *user_data) {
+  //configure_event (w, user_data);
+  
+  Widget_t *w = (Widget_t *) w_;
+  if (!w || !w->parent_struct)
+    return;
+    
+  c_neuralblender_ui *ui = (c_neuralblender_ui *) w->parent_struct;
+
+  Metrics_t metrics;
+  os_get_window_metrics (w, &metrics);
+  if (!metrics.visible)
+    return;
+
+  ui->on_window_resize (
+      metrics.width / w->app->hdpi,
+      metrics.height / w->app->hdpi);
+}
 
 static uint64_t get_unique_id () {
   static uint64_t current = 1;
@@ -1290,7 +1310,7 @@ void c_lane_widgets::move_resize (
 
   int split = 0;
   
-  if (ui && ui->show_advanced)
+  if (ui && ui->state.showadvanced)
     split = w * 15 / 64;
   
   cont_advcontrols.move_resize (0, 0, split, h);
@@ -1319,13 +1339,20 @@ void c_lane_widgets::move_resize (
   
   // advanced controls
   delay.move_resize (22, knob_top, knob_size, knob_size);
-  if (ui && ui->show_advanced) {
+  if (ui && ui->state.showadvanced) {
     widget_show_all (cont_advcontrols.widget);
     expose_widget (cont_advcontrols.widget);
   } else {
     widget_hide (cont_advcontrols.widget);
   }
 
+  int adv_btn_x = 84;
+  int adv_btn_y = h / 5;
+  btn_flip.move_resize (adv_btn_x, adv_btn_y, 32, 32);
+  btn_calib.move_resize (adv_btn_x, h - adv_btn_y - 32, 32, 32);
+  label_flip.move_resize (adv_btn_x + 32, adv_btn_y, 80, 32);
+  label_calib.move_resize (adv_btn_x + 32, h - adv_btn_y - 32, 80, 32);
+  
 }
 
 c_neuralblender_ui::c_neuralblender_ui () { CP
@@ -1360,10 +1387,12 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   if (!parent)
     parent = DefaultRootWindow (display);
 
-  main_widget = create_window (&app, parent, 0, 0, 650, 650);
+  main_widget = create_window (&app, parent, 0, 0, 720, 640);
   if (!main_widget)
     return false;
-    
+  
+  main_widget->parent_struct = this;
+  main_widget->func.resize_notify_callback = main_notify_callback;
   main_widget->scale.gravity = NONE;
   set_widget_color_all_states (main_widget, BACKGROUND_, 0.125, 0.125, 0.125);
 
@@ -1395,7 +1424,6 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   
   btn_advanced.create (this, cont_checkboxes.widget, "Adv.", 140, 0, 32, 32, BTN_CHECKBOX);
   label_advanced.create (this, cont_checkboxes.widget, "Show advanced", 172, 0, 150, 32);
-  show_advanced = state.showadvanced;
   btn_advanced.set_value (state.showadvanced);
   btn_advanced.role = ROLE_ADV_TOGGLE;
   label_advanced.widget->scale.gravity = WESTCENTER;
@@ -1450,33 +1478,51 @@ void c_neuralblender_ui::destroy () { CP
   ui_ready = false;
 }
 
-void c_neuralblender_ui::show_advanced_settings (bool b) {
+void c_neuralblender_ui::reposition_widgets () {
   CP
-  show_advanced = b;
+  bool b = state.showadvanced;
   state.showadvanced = b;
   
-  int window_width = 720;//b ? 720 : 640;
-  int lane_width = window_width - 32;
-  int lane_height = 130;
+  if (!ui_resize_lock) {
+    Metrics_t metrics;
+    ui_resize_lock = true;
+    
+    int min_window_width = b ? 720 : 640;
+    int min_window_height = 640;
+    os_set_window_min_size (main_widget, min_window_width, min_window_height,
+                            min_window_width, min_window_height);
+    os_get_window_metrics (main_widget, &metrics);
+    int window_width = std::max (metrics.width, min_window_width);
+    int window_height = std::max (metrics.height, min_window_height);
+    if (window_width < min_window_width) {
+      window_width = min_window_width;
+      os_resize_window (display, main_widget, window_width, window_height);
+    }
+    int lane_width = window_width - 24;
+    //int lane_height = 130;
+    int lane_height = window_height / 5;
 
-  os_resize_window (display, main_widget, window_width, 660);
-  main_widget->func.configure_callback (main_widget, NULL);
-  
-  cont_checkboxes.move_resize (16, 604, b ? 500 : 450, 40);
-  
-  btn_enable.move_resize (16, 12, 120, 40);
-  btn_muteall.move_resize (window_width - 136, 12, 120, 40);
-  btn_about.move_resize (btn_muteall.x () + 20, 600, 100, 40);
-  label_exclmode.set_label (b ? "Exclusive mode" : "Excl. mode");
-  label_big.move_resize (150, 0, window_width - 300, 48);
-  
-  for (int i = 0; i < NB_UI_MAX_LANES; i++) {
-    lanes [i].move_resize (16, 60 + i * (lane_height + 5), lane_width, 130);
-    lanes [i].btn_flip.move_resize (84, 32, 32, 32);
-    lanes [i].btn_calib.move_resize (84, 72, 32, 32);
-    lanes [i].label_flip.move_resize (114, 32, 80, 32);
-    lanes [i].label_calib.move_resize (114, 72, 80, 32);
+    //main_widget->func.configure_callback (main_widget, NULL);
+    
+    cont_checkboxes.move_resize (16, window_height - 44, b ? 500 : 450, 40);
+    
+    btn_enable.move_resize (16, 12, 120, 40);
+    btn_muteall.move_resize (window_width - 136, 12, 120, 40);
+    btn_about.move_resize (btn_muteall.x () + 20, window_height - 50, 100, 40);
+    label_exclmode.set_label (b ? "Exclusive mode" : "Excl. mode");
+    label_big.move_resize (150, 0, window_width - 300, 48);
+    
+    for (int i = 0; i < NB_UI_MAX_LANES; i++) {
+      lanes [i].move_resize (12, 60 + i * (lane_height + 5), lane_width, lane_height);
+    }
+    ui_resize_lock = false;
   }
+}
+
+void c_neuralblender_ui::show_advanced_settings (bool b) {
+  //show_advanced = b;
+  state.showadvanced = b;
+  reposition_widgets ();
 }
 
 void c_neuralblender_ui::hide_advanced_settings () {
@@ -1534,6 +1580,11 @@ size_t c_neuralblender_ui::choose_exclusive_lane () const {
   }
 
   return 1;
+}
+
+void c_neuralblender_ui::on_window_resize (int w, int h) {
+  if (ui_ready && !ui_resize_lock)
+    reposition_widgets ();
 }
 
 void c_neuralblender_ui::on_excl (c_widget *w, int n) {

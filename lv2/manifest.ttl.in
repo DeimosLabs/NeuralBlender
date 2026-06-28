@@ -12,6 +12,7 @@
 @@UI    a ui:X11UI ;
 @@UI    lv2:extensionData ui:idleInterface ;
 @@UI    lv2:optionalFeature ui:idleInterface ;
+@@UI    lv2:optionalFeature ui:resize ;
 @@UI    ui:portNotification [
 @@UI        ui:plugin <http://deimos.ca/neuralblender> ;
 @@UI        ui:portIndex 2
