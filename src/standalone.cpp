@@ -104,8 +104,10 @@ public:
 bool c_standalone_ui::load_model (size_t which, const char *filename) {
   debug ("which=%d, filename='%s'", (int) which, filename);
   const bool loaded = blender->load_model (which, filename);
-  if (which < NB_MAX_MODELS)
+  if (which < NB_MAX_MODELS) {
     state.lanes [which].loaded = loaded;
+    state.lanes [which].filename = loaded && filename ? filename : "";
+  }
   apply_effective_controls ();
   if (which < NB_MAX_MODELS) {
     if (state.lanes [which].do_calib && loaded) {
@@ -115,7 +117,10 @@ bool c_standalone_ui::load_model (size_t which, const char *filename) {
     } else {
       blender->amps [which].calibrate (NULL, 0);
     }
+    stats [which * 2] = (float) blender->delays [which].frames ();
+    stats [which * 2 + 1] = blender->amps [which].trim;
   }
+  sync_widgets_from_state (state);
   return loaded;
 }
 
@@ -132,6 +137,10 @@ void c_standalone_ui::on_gain_out (c_widget *w, float f) {
 void c_standalone_ui::on_delay (c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
   g_blender.set_delay_ms (w->lane, f);
+  for (size_t i = 0; i < NB_MAX_MODELS; i++) {
+    stats [i * 2] = f;
+  }
+  update_stats ();
 }
 
 void c_standalone_ui::on_filebrowse (c_widget *w) {
@@ -179,6 +188,10 @@ void c_standalone_ui::on_calibrate (c_widget *w, bool b) { CP
   } else {
     g_blender.amps [which].calibrate (NULL, 0);
   }
+  for (size_t i = 0; i < NB_MAX_MODELS; i++) {
+    stats [i * 2 + 1] = g_blender.amps [i].trim;
+  }
+  update_stats ();
 }
 
 void c_standalone_ui::on_muteall (c_widget *w, bool b) {

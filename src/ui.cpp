@@ -1791,6 +1791,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
       filepickers [i].scan_current_dir ();
       filepickers [i].add_files_from_dir (&lanes [i].menu_list);
     }
+    update_stats ();
   }
 
   const bool enabled = !state.bypass;
