@@ -250,6 +250,87 @@ bool c_neuralamp::load_model (const std::string &fn) { CP
   return ret;
 }
 
+float c_neuralamp::get_block_rms (float *data, size_t nframes) {
+  if (!data || nframes == 0)
+    return 0.0f;
+
+  double sum = 0.0;
+
+  switch (m_engine_mode) {
+    case ENGINE_NONE:
+      return 0.0f;
+    break;
+
+    case ENGINE_JSON:
+      if (!m_rtneural_model) {
+        return 1.0f;
+      }
+
+      for (uint32_t i = 0; i < nframes; ++i) {
+        float input [1] = { data [i] };
+        float y = m_rtneural_model->forward (input);
+        sum += (double) y * (double) y;
+      }
+      return (float) sqrt (sum / (double) nframes);
+    break;
+
+    case ENGINE_NAM:
+      if (!m_nam_model) {
+        return 0.0f;
+      }
+
+      {
+        std::vector<float> buf (nframes);
+        NAM_SAMPLE *inputs [1]  = { data };
+        NAM_SAMPLE *outputs [1] = { buf.data () };
+
+        m_nam_model->process (inputs, outputs, (int) nframes);
+
+        for (uint32_t i = 0; i < nframes; ++i) {
+          const float y = buf [i];
+          sum += (double) y * (double) y;
+        }
+      }
+      return (float) sqrt (sum / (double) nframes);
+    break;
+    
+    default:
+      return 0.0f;
+  }
+}
+
+float c_neuralamp::calibrate (float *data, size_t size) {
+  debug ("data=0x%lx, size=%d", (long int) data, (int) size);
+  float ret = 0.0f;
+  
+  size_t i;
+  size_t blocksize = 128;
+  
+  reset ();
+  
+  if (data) {
+  
+    for (i = 0; i + blocksize <= size; i += blocksize)
+      ret = std::max (ret, get_block_rms (&data[i], blocksize));
+
+    const size_t left = size - i;
+    if (left > 0)
+      ret = std::max (ret, get_block_rms (&data[i], left));
+  }
+  debug ("ret = %f", ret);
+  
+  const float target = db_to_gain (DB_CALIB_TARGET);
+  if (ret > db_to_gain (DB_SILENCE) && std::isfinite (ret))
+    trim = target / ret;
+  else
+    trim = 1.0f;
+  
+  debug ("trim = %f", trim);
+  
+  reset ();
+  return ret;
+}
+
 void c_neuralamp::reset_unlocked () {
   if (m_rtneural_model) m_rtneural_model->reset ();
   if (m_nam_model) m_nam_model->Reset (samplerate, MAX_BLOCK_SIZE);
@@ -278,8 +359,7 @@ static void copy_with_gain (float *in, float *out, uint32_t nframes, float gain)
   //}
 }
 
-void c_neuralamp::process_block (float *in, float *out, uint32_t nframes)
-{
+void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
   if (!out) return;
 
   if (mute.load (std::memory_order_relaxed) || !model_mutex.try_lock ()) {
@@ -316,13 +396,16 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes)
         return;
       }
 
-      for (uint32_t i = 0; i < nframes; ++i) {
-        float input [1] = { in [i] * gain_in };
-        float y = m_rtneural_model->forward (input);
-        if (dcflip)
-          out[i] = -1.0f * std::clamp (y * gain_out, -1.0f, 1.0f);
-        else
-          out[i] = std::clamp (y * gain_out, -1.0f, 1.0f);
+      {
+        const float out_gain = gain_out * trim;
+        for (uint32_t i = 0; i < nframes; ++i) {
+          float input [1] = { in [i] * gain_in };
+          float y = m_rtneural_model->forward (input);
+          if (dcflip)
+            out[i] = -1.0f * std::clamp (y * out_gain, -1.0f, 1.0f);
+          else
+            out[i] = std::clamp (y * out_gain, -1.0f, 1.0f);
+        }
       }
       return;
     break;
@@ -344,11 +427,12 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes)
 
         m_nam_model->process (inputs, outputs, (int) nframes);
 
+        const float out_gain = gain_out * trim;
         for (uint32_t i = 0; i < nframes; ++i)
           if (dcflip)
-            out [i] = -1.0f * std::clamp (out [i] * gain_out, -1.0f, 1.0f);
+            out [i] = -1.0f * std::clamp (out [i] * out_gain, -1.0f, 1.0f);
           else
-            out [i] = std::clamp (out [i] * gain_out, -1.0f, 1.0f);
+            out [i] = std::clamp (out [i] * out_gain, -1.0f, 1.0f);
       }
       return;
     break;

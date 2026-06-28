@@ -339,12 +339,7 @@ void c_button::create (
 }
 
 void c_button::on_mouseup () {
-  if (!ui) {
-    debug ("!ui");
-    return;
-  }
-
-  if (ui->updating_from_state)
+  if (!ui || ui->updating_from_state)
     return;
 
   switch (role) {
@@ -368,21 +363,17 @@ void c_button::on_mouseup () {
     break;
 
     case ROLE_CALIBRATE: CP
-      ui->on_calibrate (this, value);
       if (lane >= 0 && lane < NB_UI_MAX_LANES) {
         ui->state.lanes [lane].do_calib = value;
       }
+      ui->on_calibrate (this, value);
     break;
 
     case ROLE_MUTEALL: CP
-      /*for (size_t i = 0; i < NB_UI_MAX_LANES; i++)
-        ui->lanes [i].meter_out.set_l (0, 0);
-      ui->on_muteall (this, value);*/
       ui->on_muteall (this, value);
     break;
 
     case ROLE_BROWSE: CP
-      //ui->on_filebrowse_pre (this);
       ui->on_filebrowse (this);
       if (filepicker)
         filepicker->show ();
@@ -1365,6 +1356,14 @@ c_neuralblender_ui::c_neuralblender_ui () { CP
   window = 0;
   main_widget = NULL;
   ui_ready = false;
+  unsigned char *scan = data_calib_f32;
+  const int sf = sizeof (float);
+  
+  for (size_t i = 0; i < data_calib_f32_len / sf; i += sf) {
+    float *f = (float *) scan;
+    scan += sizeof (float);
+    calib_data.push_back (*f);
+  }
 }
 
 c_neuralblender_ui::~c_neuralblender_ui () { CP

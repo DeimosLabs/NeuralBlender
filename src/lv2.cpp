@@ -190,7 +190,7 @@ static void apply_effective_controls (Plugin *self) {
   }
 }
 
-// loader thread
+// loader thread, also does calibration
 static void loader_main (Plugin *self) { CP
   while (true) {
     std::unique_lock<std::mutex> lock (self->loader_mutex);
@@ -225,16 +225,16 @@ static void loader_main (Plugin *self) { CP
     fprintf (stderr, "NeuralBlender: loading model %zu: %s\n",
              which, path.c_str ());
 
-		    if (self->blender.load_model (which, path.c_str ())) {
-		      self->current_model [which] = path;
-		      self->notify_path [which] = true;
-		    } else {
-		      self->current_model [which].clear ();
-		      self->notify_path [which] = true;
-		    }
-        self->controls_dirty.store (true, std::memory_order_release);
-		  }
-		}
+    if (self->blender.load_model (which, path.c_str ())) {
+      self->current_model [which] = path;
+      self->notify_path [which] = true;
+    } else {
+      self->current_model [which].clear ();
+      self->notify_path [which] = true;
+    }
+    self->controls_dirty.store (true, std::memory_order_release);
+  }
+}
 
 // THIS RUNS IN DSP THREAD
 static void request_load (Plugin *self, size_t which, const char *path) {

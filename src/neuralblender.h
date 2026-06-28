@@ -117,7 +117,7 @@ public:
   bool load_model (const std::string &filename = "");
   void unload_model ();
   void reset ();
-  float calibrate (const float *data, size_t sz);
+  float calibrate (float *data, size_t sz);
 
   //float process_sample (float x);
   void process_block (float *in, float *out, uint32_t nframes);
@@ -140,6 +140,7 @@ private:
   void reset_unlocked ();
   bool load_json ( const std::string &filename);
   bool load_nam ( const std::string &filename);
+  float get_block_rms (float *data, size_t sz);
   // model impl.
   std::unique_ptr<nam::DSP> m_nam_model;
   std::unique_ptr<RTNeural::Model<float>> m_rtneural_model;
@@ -182,7 +183,6 @@ public:
 
 private:
   void update_mutes ();
-
   std::vector <float> m_delay_bufs [NB_MAX_MODELS];
   std::vector <float> m_model_bufs [NB_MAX_MODELS];
   std::vector <float> m_input_buf;

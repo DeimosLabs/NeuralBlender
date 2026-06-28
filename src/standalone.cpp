@@ -142,11 +142,6 @@ void c_standalone_ui::on_fileclear (c_widget *w) {
   apply_effective_controls ();
 }
 
-/*void c_standalone_ui::on_mute (c_widget *w, bool b) {
-  debug ("lane %d, b=%d", w->lane, (int) b);
-  g_blender.set_lane_mute (w->lane, b);
-}*/
-
 void c_standalone_ui::on_mute (c_widget *w, bool b) {
   state.lanes [w->lane].lane_mute = b;
   apply_effective_controls ();
@@ -157,9 +152,19 @@ void c_standalone_ui::on_dcflip (c_widget *w, bool b) {
   apply_effective_controls ();
 }
 
-void c_standalone_ui::on_calibrate (c_widget *w, bool b) {
-  state.lanes [w->lane].do_calib = b;
+void c_standalone_ui::on_calibrate (c_widget *w, bool b) { CP
+  if (!w)
+    return;
+    
+  size_t which = w->lane;
+  
+  state.lanes [which].do_calib = b;
   apply_effective_controls ();
+  
+  if (b)
+    blender->amps [which].calibrate ((float *) calib_data.data (), calib_data.size ());
+  else
+    blender->amps [which].calibrate (NULL, 0);
 }
 
 void c_standalone_ui::on_muteall (c_widget *w, bool b) {
