@@ -17,7 +17,7 @@ Features:
 
 On my Intel Core7 ultra, it loads 4 models in the middle of a busy live session, 64 sample buffers / 3 periods, and DSP load typically stays below 50%, no xruns. (with DSP threads pinned to p-cores)
 
-Features considered for future versions: VST plugin, series mode(s), optionally more than 4 lanes, impulse response / convolution, etc...
+Features considered for future versions: VST plugin,series mode(s), optionally more than 4 lanes, prettier interface (other than default xputty), impulse response / convolution, etc...
 
 ![NeuralBlender custom UI](data/screenshot-ui.png)
 ![NeuralBlender in Ardour](data/screenshot-ardour.png)
