@@ -6,12 +6,12 @@ Features:
   - Supports nam A1, nam A2, aidax, and json model files.
   - Can load up to 4 models simultaneously 
   - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
-  - Each model slot has:
+  - Each model slot / lane has:
     - input gain
     - output gain
-    - pre-delay for phasing correction/effects.
+    - pre-delay for phasing correction/effects
+    - optional DC flip for more phasing effects
     - optional level calibration
-    - optional DC flip
 
 ![NeuralBlender custom UI](data/screenshot-ui.png)
 ![NeuralBlender in Ardour](data/screenshot-ardour.png)
