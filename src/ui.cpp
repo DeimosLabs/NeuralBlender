@@ -1485,6 +1485,7 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
   
   if (!ui_resize_lock) {
     Metrics_t metrics;
+    os_get_window_metrics (main_widget, &metrics);
     ui_resize_lock = true;
     
     int min_window_width = b ? 720 : 640;
@@ -1498,14 +1499,13 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
       window_width = min_window_width;
       window_height = min_window_height;
     } else {
-    os_get_window_metrics (main_widget, &metrics);
       window_width = std::max (metrics.width, min_window_width);
       window_height = std::max (metrics.height, min_window_height);
     }
     if (metrics.width < min_window_width ||
         metrics.height < min_window_height || snap_to_default) {
-      debug ("requesting window size:");
-      request_window_size (window_width, window_height);
+      bool ws = request_window_size (window_width, window_height);
+      debug ("request_window_size returned %d", (int) ws);
     }
     
     int lane_width = window_width - 24;
