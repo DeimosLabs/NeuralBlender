@@ -56,6 +56,18 @@ static void set_widget_color_all_states (
   set_widget_color (w, INSENSITIVE_, mod, r, g, b, a);
 }
 
+static void inherit_parent_bg_color (Widget_t *w, Widget_t *parent) {
+  if (!w || !parent || !parent->color_scheme)
+    return;
+
+  Colors *c = get_color_scheme (parent, NORMAL_);
+  if (!c)
+    return;
+
+  set_widget_color_all_states (
+      w, BACKGROUND_, c->bg [0], c->bg [1], c->bg [2], c->bg [3]);
+}
+
 // this one must be called AFTER add_* (Widget_t *, ...) in child create functions
 void c_widget::create (
     c_neuralblender_ui *ui_,
@@ -163,6 +175,7 @@ void c_frame::create (
   widget = add_frame (parent, label_ ? label_ : "", x, y, w, h);
   
   c_widget::create (ui_, parent, label_, x, y, w, h);
+  inherit_parent_bg_color (widget, parent);
 }
 
 void c_frame::set_bg_color (const float r, const float g, const float b) {
@@ -174,6 +187,7 @@ void c_frame::set_bg_color (const float r, const float g, const float b) {
 
 void c_frame::set_fg_color (const float r, const float g, const float b) {
   set_widget_color_all_states (widget, TEXT_, r, g, b);
+  set_widget_color_all_states (widget, FRAME_, r, g, b);
   if (widget)
     expose_widget (widget);
 }
@@ -241,6 +255,7 @@ void c_container::create (
     
   widget = create_widget (parent->app, parent, x, y, w, h);
   c_widget::create (ui_, parent, label_, x, y, w, h);
+  inherit_parent_bg_color (widget, parent);
 }
 
 void c_container::set_bg_color (const float r, const float g, const float b) {
@@ -260,6 +275,7 @@ void c_label::create (
   widget = add_label (parent, label.c_str (), x, y, w, h);
   widget->func.expose_callback = c_label::draw;
   c_widget::create (ui_, parent, label_, x, y, w, h);
+  inherit_parent_bg_color (widget, parent);
 }
 
 void c_label::set_bg_color (const float r, const float g, const float b) {
@@ -1349,6 +1365,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
     return false;
     
   main_widget->scale.gravity = NONE;
+  set_widget_color_all_states (main_widget, BACKGROUND_, 0.125, 0.125, 0.125);
 
   widget_set_icon_from_png (main_widget, data_neuralblender_logo_512_png);
 
@@ -1438,7 +1455,7 @@ void c_neuralblender_ui::show_advanced_settings (bool b) {
   show_advanced = b;
   state.showadvanced = b;
   
-  int window_width = b ? 720 : 580;
+  int window_width = 720;//b ? 720 : 640;
   int lane_width = window_width - 32;
   int lane_height = 130;
 
@@ -1669,6 +1686,9 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     lanes [i].btn_mute.set_value (state.lanes [i].lane_mute);
     lanes [i].btn_excl.set_value (selected);
 
+    for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
+      lanes [i].lane_widget.set_fg_color (0, 0, 0);
+    }
     if (exclusive_on) { CP
       widget_hide (lanes [i].btn_mute.widget);
       widget_show (lanes [i].btn_excl.widget);
@@ -1677,6 +1697,8 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
       widget_hide (lanes [i].btn_excl.widget);
     }
   }
+  if (exclusive_on)
+    lanes [state.exclusive_lane - 1].lane_widget.set_fg_color (0.1, 0.4, 0.4);
 
   updating_from_state = false;
 }
