@@ -131,6 +131,8 @@ void c_standalone_ui::on_filebrowse (c_widget *w) {
 
 void c_standalone_ui::on_fileselected (c_widget *w, const char *path) {
   debug ("lane %d, path='%s'", w->lane, path);
+  // is this the right place for this?
+  //g_blender.amps [w->lane].calibrate (NULL, 0);
 }
 
 void c_standalone_ui::on_fileclear (c_widget *w) {
@@ -161,10 +163,13 @@ void c_standalone_ui::on_calibrate (c_widget *w, bool b) { CP
   state.lanes [which].do_calib = b;
   apply_effective_controls ();
   
-  if (b)
-    blender->amps [which].calibrate ((float *) calib_data.data (), calib_data.size ());
-  else
-    blender->amps [which].calibrate (NULL, 0);
+  if (b) {
+    float *data = (float *) data_calib_f32;
+    const size_t samples = data_calib_f32_len / sizeof (float);
+    g_blender.amps [which].calibrate (data, samples);
+  } else {
+    g_blender.amps [which].calibrate (NULL, 0);
+  }
 }
 
 void c_standalone_ui::on_muteall (c_widget *w, bool b) {

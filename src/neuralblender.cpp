@@ -21,6 +21,7 @@
 
 #include <filesystem>
 #include "neuralblender.h"
+#include "data.h"
 
 //#define DEBUG
 
@@ -301,12 +302,13 @@ float c_neuralamp::get_block_rms (float *data, size_t nframes) {
 
 float c_neuralamp::calibrate (float *data, size_t size) {
   debug ("data=0x%lx, size=%d", (long int) data, (int) size);
+  std::lock_guard<std::mutex> lock (model_mutex);
   float ret = 0.0f;
   
   size_t i;
   size_t blocksize = 128;
   
-  reset ();
+  reset_unlocked ();
   
   if (data) {
   
@@ -327,7 +329,7 @@ float c_neuralamp::calibrate (float *data, size_t size) {
   
   debug ("trim = %f", (float) trim);
   
-  reset ();
+  reset_unlocked ();
   return ret;
 }
 
@@ -350,6 +352,7 @@ void c_neuralamp::unload_model () {
   m_nam_model.reset ();
   m_engine_mode = ENGINE_NONE;
   filename = "";
+  trim = 1.0f;
 }
 
 static void copy_with_gain (float *in, float *out, uint32_t nframes, float gain) {
@@ -458,6 +461,17 @@ c_neuralblender::c_neuralblender () { CP
 }
 
 c_neuralblender::~c_neuralblender () { CP
+}
+
+/*static*/ void c_neuralblender::get_calib_data (std::vector<float> &v) {
+  unsigned char *scan = data_calib_f32;
+  const int sf = sizeof (float);
+  
+  for (size_t i = 0; i < data_calib_f32_len / sf; i += sf) {
+    float *f = (float *) scan;
+    scan += sizeof (float);
+    v.push_back (*f);
+  }
 }
 
 void c_neuralblender::set_samplerate (uint32_t sr) { CP

@@ -35,6 +35,7 @@
 #include <lv2/atom/forge.h>
 
 #include "neuralblender.h"
+#include "data.h"
 
 #define NB_URI "http://deimos.ca/neuralblender"
 #define LV2_METER_FPS 30.0
@@ -153,6 +154,9 @@ typedef struct {
   std::atomic<bool> loader_running { true };
   std::atomic<bool> load_requested { false };
   
+  // hehe what a mess
+  bool pending_calibrate[NB_MAX_MODELS] = { false };
+  bool pending_calib_enabled[NB_MAX_MODELS] = { false };
   bool pending_load [NB_MAX_MODELS] = { false };
   //size_t pending_which         = 0;
   std::string pending_path [NB_MAX_MODELS];
@@ -163,11 +167,12 @@ typedef struct {
   LV2_URID urid_atom_Sequence  = 0;
   bool notify_path [NB_MAX_MODELS] = { false };
   std::string current_path [NB_MAX_MODELS];
-
+  
   c_vudata meter_in;
   c_vudata meters_out [NB_MAX_MODELS];
   uint32_t meter_notify_samples = 0;
   std::atomic<bool> controls_dirty { false };
+  
 } Plugin;
 
 static void apply_effective_controls (Plugin *self) {
@@ -191,48 +196,81 @@ static void apply_effective_controls (Plugin *self) {
 }
 
 // loader thread, also does calibration
+// keeps these tasks OFF the dsp thread
 static void loader_main (Plugin *self) { CP
   while (true) {
-    std::unique_lock<std::mutex> lock (self->loader_mutex);
-    
-    self->loader_cv.wait (lock, [&] {
-      bool any_pending_load = false;
-      for (int i = 0; i < NB_MAX_MODELS; i++)
-        if (self->pending_load [i])
-          any_pending_load = true;
+    size_t which = 0;
+    bool do_load = false;
+    bool do_calib = false;
+    bool calib_enabled = false;
+    std::string path;
+    { // scope: only hold this lock while moving pending jobs into locals
+      std::unique_lock<std::mutex> lock (self->loader_mutex);
 
-      return !self->loader_running || any_pending_load;
-    });
-    
-    if (!self->loader_running)
-      break;
-    
-    // TODO
-    size_t which = 0;//self->pending_load [0] ? 0 : 1;
-    for (int i = 0; i < NB_MAX_MODELS; i++) {
-      if (self->pending_load [i]) {
-        which = i;
+      self->loader_cv.wait(lock, [&] {
+        for (size_t i = 0; i < NB_MAX_MODELS; ++i)
+          if (self->pending_load [i] || self->pending_calibrate [i])
+            return true;
+        return !self->loader_running;
+      });
+
+      if (!self->loader_running)
         break;
+
+      for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+        if (self->pending_load [i]) {
+          which = i;
+          path = self->pending_path[i];
+          self->pending_load [i] = false;
+          do_load = true;
+          break;
+        }
       }
+
+      if (!do_load) {
+        for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+          if (self->pending_calibrate [i]) {
+            which = i;
+            calib_enabled = self->pending_calib_enabled [i];
+            self->pending_calibrate [i] = false;
+            do_calib = true;
+            break;
+          }
+        }
+      }
+    } // unlocks here
+
+    if (do_load) {
+      fprintf (stderr, "loader: load_model(%zu, \"%s\")\n", which, path.c_str ());
+      self->load_requested = false;
+
+      fprintf (stderr, "NeuralBlender: loading model %zu: %s\n",
+               which, path.c_str ());
+
+      if (self->blender.load_model (which, path.c_str ())) {
+        self->current_model [which] = path;
+        self->notify_path [which] = true;
+      } else {
+        self->current_model [which].clear ();
+        self->notify_path [which] = true;
+      }
+      self->controls_dirty.store (true, std::memory_order_release);
     }
-    const std::string path = self->pending_path [which];
-    self->pending_load [which] = false;
-    fprintf (stderr, "loader: load_model(%zu, \"%s\")\n", which, path.c_str ());
-    self->load_requested = false;
+    
+    // here calibration runs in the loader thread
+    if (do_calib) {
+      self->blender.calib_on (which, calib_enabled);
 
-    lock.unlock ();
+      if (calib_enabled) {
+        float *data = (float *) data_calib_f32;
+        const size_t samples = data_calib_f32_len / sizeof (float);
+        self->blender.amps [which].calibrate (data, samples);
+      } else {
+        self->blender.amps [which].calibrate (NULL, 0);
+      }
 
-    fprintf (stderr, "NeuralBlender: loading model %zu: %s\n",
-             which, path.c_str ());
-
-    if (self->blender.load_model (which, path.c_str ())) {
-      self->current_model [which] = path;
-      self->notify_path [which] = true;
-    } else {
-      self->current_model [which].clear ();
-      self->notify_path [which] = true;
+      self->controls_dirty.store (true, std::memory_order_release);
     }
-    self->controls_dirty.store (true, std::memory_order_release);
   }
 }
 
@@ -288,6 +326,20 @@ static void get_state_path_features (
     else if (free_path && !strcmp (features [i]->URI, LV2_STATE__freePath))
       *free_path = (LV2_State_Free_Path *) features [i]->data;
   }
+}
+
+static void request_calibrate (Plugin *self, size_t which, bool enabled) {
+  if (!self || which >= NB_MAX_MODELS)
+    return;
+
+  {
+    // scope
+    std::lock_guard<std::mutex> lock (self->loader_mutex);
+    self->pending_calibrate [which] = true;
+    self->pending_calib_enabled [which] = enabled;
+  }
+
+  self->loader_cv.notify_one ();
 }
 
 static LV2_State_Status save (
@@ -820,7 +872,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       const float v = *self->calibrate [i];
       if (v != self->last_calibrate [i]) { CP
         self->last_calibrate [i] = v;
-        self->blender.calib_on (i, v >= 0.5f);
+        request_calibrate (self, i, v >= 0.5f);
       }
     }
   }

@@ -1356,14 +1356,6 @@ c_neuralblender_ui::c_neuralblender_ui () { CP
   window = 0;
   main_widget = NULL;
   ui_ready = false;
-  unsigned char *scan = data_calib_f32;
-  const int sf = sizeof (float);
-  
-  for (size_t i = 0; i < data_calib_f32_len / sf; i += sf) {
-    float *f = (float *) scan;
-    scan += sizeof (float);
-    calib_data.push_back (*f);
-  }
 }
 
 c_neuralblender_ui::~c_neuralblender_ui () { CP

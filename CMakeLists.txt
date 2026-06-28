@@ -40,6 +40,30 @@ add_custom_target(generate_timestamp ALL
 execute_process (COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/timestamp.sh
                  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+add_custom_target(generate_inline_data ALL
+  COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh"
+  WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+  COMMENT "Generating inline data"
+)
+
+execute_process (COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+add_library(neuralblender_data OBJECT
+  ${CMAKE_CURRENT_BINARY_DIR}/data/data.cpp
+)
+
+add_dependencies(neuralblender_data generate_inline_data)
+
+set_target_properties(neuralblender_data PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+)
+
+target_include_directories(neuralblender_data PUBLIC
+  ${CMAKE_CURRENT_BINARY_DIR}
+  ${CMAKE_CURRENT_BINARY_DIR}/data
+)
+
 add_library(neuralblender_core OBJECT
   src/neuralblender.cpp
   src/gzip.cpp
@@ -72,10 +96,12 @@ set_target_properties(neuralblender_meter_data PROPERTIES
 )
 
 add_dependencies(neuralblender_core generate_timestamp)
+add_dependencies(neuralblender_core generate_inline_data)
 add_dependencies(neuralblender_meter_data generate_timestamp)
 
 target_include_directories(neuralblender_core PUBLIC
   ${CMAKE_CURRENT_BINARY_DIR}
+  ${CMAKE_CURRENT_BINARY_DIR}/data
   ${PROJECT_SOURCE_DIR}/external
   ${PROJECT_SOURCE_DIR}/external/RTNeural
   ${PROJECT_SOURCE_DIR}/external/NAM
@@ -130,6 +156,7 @@ if (STANDALONE)
       src/standalone.cpp
       src/config.cpp
       src/timestamp.cpp
+      $<TARGET_OBJECTS:neuralblender_data>
       $<TARGET_OBJECTS:neuralblender_meter_data>
     )
     
@@ -149,29 +176,6 @@ if (GUI)
   pkg_check_modules(CAIRO REQUIRED cairo)
   message(STATUS "X11: found")
   message(STATUS "Cairo: found")
-
-  add_custom_target(generate_inline_data ALL
-    COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh"
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    COMMENT "Generating inline data"
-  )
-
-  execute_process (COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-
-  add_library(neuralblender_data OBJECT
-    ${CMAKE_CURRENT_BINARY_DIR}/data/data.cpp
-  )
-
-  add_dependencies(neuralblender_data generate_inline_data)
-
-  set_target_properties(neuralblender_data PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-  )
-
-  target_include_directories(neuralblender_data PUBLIC
-    ${CMAKE_CURRENT_BINARY_DIR}
-  )
 
   add_library(xputty STATIC
     external/libxputty/xputty/xputty.c
@@ -264,7 +268,6 @@ if (GUI)
     src/ui.cpp
     src/timestamp.cpp
     src/meter.cpp
-    $<TARGET_OBJECTS:neuralblender_data>
   )
 
   add_dependencies(neuralblender_gui generate_inline_data)
@@ -299,6 +302,7 @@ if (LV2)
   add_library(neuralblender_lv2 MODULE
     src/lv2.cpp
     src/timestamp.cpp
+    $<TARGET_OBJECTS:neuralblender_data>
     $<TARGET_OBJECTS:neuralblender_meter_data>
   )
 
@@ -329,6 +333,7 @@ if (LV2)
     add_library(neuralblender_ui MODULE
       src/lv2_ui.cpp
       src/config.cpp
+      $<TARGET_OBJECTS:neuralblender_data>
       $<TARGET_OBJECTS:neuralblender_meter_data>
     )
 

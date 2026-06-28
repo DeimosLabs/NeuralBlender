@@ -392,8 +392,6 @@ public:
   Widget_t *main_widget = NULL;
   Window parent;
   
-  std::vector<float> calib_data;
-  
   c_container    cont_checkboxes;
   c_label        label_big;
   c_button       btn_enable;

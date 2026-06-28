@@ -173,6 +173,8 @@ public:
   bool calib_on (size_t which, bool b);
   bool is_dcflipped (size_t which);
   bool is_calib_on (size_t which);
+  
+  static void get_calib_data (std::vector<float> &v);
 
   c_delayline delays [NB_MAX_MODELS];
   c_neuralamp amps [NB_MAX_MODELS];
