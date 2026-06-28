@@ -25,6 +25,22 @@
 
 #define NB_UI_URI "http://deimos.ca/neuralblender#ui"
 
+#ifdef CMDLINE_DEBUG
+#define CMDLINE_IMPLEMENTATION // separate .so file for UI, so we need this here
+#include "cmdline/cmdline.h"
+#undef debug
+#undef CP
+#undef BP
+#define debug(...) cmdline_debug(stderr,ANSI_DARK_RED,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
+#else
+#undef debug
+#undef CP
+#undef BP
+#define debug(...) //do{}while(0)
+#define CP         //do{}while(0)
+#define BP         //do{}while(0)
+#endif
+
 enum _ui_feedback_type {
   ATOM_METERS,
   ATOM_STATS,
@@ -82,16 +98,6 @@ enum {
   PORT_MUTE_ALL,
   PORT_EXCLUSIVE_LANE
 };
-
-#ifdef CMDLINE_DEBUG
-#define CMDLINE_IMPLEMENTATION // separate .so file for UI, so we need this here
-#include "cmdline/cmdline.h"
-#define debug(...) cmdline_debug(stderr,ANSI_DARK_RED,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
-#else
-#define debug(...)
-#define CP
-#define BP
-#endif
 
 class c_lv2_ui : public c_neuralblender_ui {
 public:

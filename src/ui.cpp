@@ -18,14 +18,14 @@
 
 #include "data/data.h"
 
-#ifdef CMDLINE_DEBUG
-#include "cmdline/cmdline.h"
-#define debug(...) cmdline_debug(stderr,ANSI_MAGENTA,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
-/*#else
-#define debug(...) do{}while(0)
-#define CP         do{}while(0)
-#define BP         do{}while(0)*/
-#endif
+//#ifdef CMDLINE_DEBUG
+//#include "cmdline/cmdline.h"
+//#define debug(...) cmdline_debug(stderr,ANSI_MAGENTA,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
+//#else
+#define debug(...) //do{}while(0)
+#define CP         //do{}while(0)
+#define BP         //do{}while(0)
+//#endif
 
 static uint64_t get_unique_id ();
 static void button_mouse_up (void *w_, void *event, void *user_data);

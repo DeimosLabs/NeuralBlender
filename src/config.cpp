@@ -13,9 +13,9 @@
 #include "cmdline/cmdline.h"
 #define debug(...) cmdline_debug(stderr,ANSI_YELLOW,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
 #else
-#define debug(...) do{}while(0)
-#define CP         do{}while(0)
-#define BP         do{}while(0)
+#define debug(...) //do{}while(0)
+#define CP         //do{}while(0)
+#define BP         //do{}while(0)
 #endif
 
 struct s_option {
