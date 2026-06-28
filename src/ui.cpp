@@ -1168,14 +1168,18 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   const char *text [] = {
     "NeuralBlender",
     "",
+#ifdef LV2
     "An amp modeling plugin based on",
+#else
+    "An amp modeling app based on",
+#endif
     "RTNeural and NeuralAmpModeler",
     "",
     "by Deimos Laboratories",
     "github.com/DeimosLabs/NeuralBlender",
     NULL
   };
-
+  
   int i;
   for (i = 0; text [i]; i++) {
     int h = (i == 0 ? 20 : (180 + i * 24));
@@ -1550,7 +1554,7 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     btn_muteall.move_resize (window_width - 136, 12, 120, 40);
     btn_about.move_resize (btn_muteall.x (), window_height - 50, 120, 40);
     label_exclmode.set_label (b ? "Exclusive mode" : "Excl. mode");
-    label_big.move_resize (150, 0, window_width - 300, 48);
+    label_big.move_resize (150, 8, window_width - 300, 48);
     
     size_t i;
     for (i = 0; i < NB_UI_MAX_LANES; i++) {
