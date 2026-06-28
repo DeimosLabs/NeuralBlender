@@ -717,7 +717,7 @@ void c_combobox::update_widget () {
     Widget_t *menu = widget->childlist->childs [1];
     Widget_t *view_port = menu->childlist->childs [0];
     ComboBox_t *list = (ComboBox_t *) view_port->parent_struct;
-    int show_items = list->show_items > 0 ? list->show_items : 16;
+    int show_items = 16;
     int top = selected - (show_items / 2);
     int max_top = n - show_items;
 
@@ -733,6 +733,7 @@ void c_combobox::update_widget () {
     adj_set_state (list->slider->adj, adj_get_state (view_port->adj));
     expose_widget (view_port);
   } else {
+    combobox_set_menu_size (widget, 16);
     widget->label = label.c_str ();
   }
   updating_widget = false;
