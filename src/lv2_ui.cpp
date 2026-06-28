@@ -1,8 +1,8 @@
 
 /* NeuralBlender - RTNeural / NAM based amp modeler
  *
- * LV2 UI skeleton. Real widgets will be added here once the xputty
- * integration is wired in.
+ * lv2 user interface. Mostly written by codex because i don't
+ * like the lv2 api.
  */
 
 #include <stdlib.h>
@@ -95,6 +95,7 @@ public:
   LV2_URID urid_model [NB_UI_MAX_LANES] = { 0 };
   LV2_URID urid_meters = 0;
   LV2UI_Port_Subscribe *subscribe = NULL;
+  LV2UI_Resize *resize = NULL;
   bool updating_from_host = false;
   
   void write_control (uint32_t port, float value) {
@@ -176,6 +177,13 @@ public:
   void on_bypass (c_widget *w, bool b)                 { CP; write_control (PORT_BYPASS, b ? 1.0f : 0.0f); }
   void on_about (c_widget *w)                          { CP }
   void on_vu (c_widget *w, bool b)                     { CP; write_control (PORT_VU_ENABLE, b ? 1.0f : 0.0f); }
+
+  bool request_window_size (int w, int h) {
+    if (resize && resize->ui_resize)
+      return resize->ui_resize (resize->handle, w, h) == 0;
+
+    return c_neuralblender_ui::request_window_size (w, h);
+  }
 
   void set_port_value (uint32_t port, float value) {
     updating_from_host = true;
@@ -374,6 +382,8 @@ static LV2UI_Handle instantiate (
       ui->map = (LV2_URID_Map *) features [i]->data;
     } else if (!strcmp (features [i]->URI, LV2_UI__portSubscribe)) {
       ui->subscribe = (LV2UI_Port_Subscribe *) features [i]->data;
+    } else if (!strcmp (features [i]->URI, LV2_UI__resize)) {
+      ui->resize = (LV2UI_Resize *) features [i]->data;
     }
   }
 

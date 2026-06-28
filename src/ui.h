@@ -359,7 +359,7 @@ public:
   void vu_off ();
   void show_advanced_settings (bool b = true);
   void hide_advanced_settings ();
-  void reposition_widgets ();
+  void reposition_widgets (bool default_size = false);
   size_t choose_exclusive_lane () const;
   //void excl_select (size_t which);
   void sync_widgets_from_state (const c_neuralblender_state &state);
@@ -380,6 +380,7 @@ public:
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;
   virtual void on_window_resize (int w, int h)                    ;
+  virtual bool request_window_size (int w, int h)                 ;
   virtual void on_advanced (c_widget *w, bool b)                  ; 
   virtual void on_bypass (c_widget *w, bool b)                 = 0;
   virtual void on_about (c_widget *w)                          = 0;

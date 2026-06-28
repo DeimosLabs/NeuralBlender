@@ -1387,7 +1387,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   if (!parent)
     parent = DefaultRootWindow (display);
 
-  main_widget = create_window (&app, parent, 0, 0, 720, 640);
+  main_widget = create_window (&app, parent, 0, 0, 640, 640);
   if (!main_widget)
     return false;
   
@@ -1478,7 +1478,7 @@ void c_neuralblender_ui::destroy () { CP
   ui_ready = false;
 }
 
-void c_neuralblender_ui::reposition_widgets () {
+void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
   CP
   bool b = state.showadvanced;
   state.showadvanced = b;
@@ -1489,19 +1489,30 @@ void c_neuralblender_ui::reposition_widgets () {
     
     int min_window_width = b ? 720 : 640;
     int min_window_height = 640;
+    int window_width = min_window_width;
+    int window_height = min_window_height;
+    
     os_set_window_min_size (main_widget, min_window_width, min_window_height,
                             min_window_width, min_window_height);
-    os_get_window_metrics (main_widget, &metrics);
-    int window_width = std::max (metrics.width, min_window_width);
-    int window_height = std::max (metrics.height, min_window_height);
-    if (window_width < min_window_width) {
+    if (snap_to_default) {
       window_width = min_window_width;
-      os_resize_window (display, main_widget, window_width, window_height);
+      window_height = min_window_height;
+    } else {
+    os_get_window_metrics (main_widget, &metrics);
+      window_width = std::max (metrics.width, min_window_width);
+      window_height = std::max (metrics.height, min_window_height);
     }
+    if (metrics.width < min_window_width ||
+        metrics.height < min_window_height || snap_to_default) {
+      debug ("requesting window size:");
+      request_window_size (window_width, window_height);
+    }
+    
     int lane_width = window_width - 24;
     //int lane_height = 130;
     int lane_height = window_height / 5;
-
+    
+    debug ("window w/h %d,%d", window_width, window_height);
     //main_widget->func.configure_callback (main_widget, NULL);
     
     
@@ -1526,7 +1537,7 @@ void c_neuralblender_ui::reposition_widgets () {
 void c_neuralblender_ui::show_advanced_settings (bool b) {
   //show_advanced = b;
   state.showadvanced = b;
-  reposition_widgets ();
+  reposition_widgets (true);
 }
 
 void c_neuralblender_ui::hide_advanced_settings () {
@@ -1589,6 +1600,14 @@ size_t c_neuralblender_ui::choose_exclusive_lane () const {
 void c_neuralblender_ui::on_window_resize (int w, int h) {
   if (ui_ready && !ui_resize_lock)
     reposition_widgets ();
+}
+
+bool c_neuralblender_ui::request_window_size (int w, int h) {
+  if (!main_widget || !display)
+    return false;
+
+  os_resize_window (display, main_widget, w, h);
+  return true;
 }
 
 void c_neuralblender_ui::on_excl (c_widget *w, int n) {
