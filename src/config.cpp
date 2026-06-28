@@ -9,14 +9,8 @@
 #include <vector>
 #include "config.h"
 
-#ifdef CMDLINE_DEBUG
-#include "cmdline/cmdline.h"
-#define debug(...) cmdline_debug(stderr,ANSI_YELLOW,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
-#else
-#define debug(...) //do{}while(0)
-#define CP         //do{}while(0)
-#define BP         //do{}while(0)
-#endif
+#define CMDLINE_DEBUG_COLOR ANSI_DARK_YELLOW
+#include "cmdline/cmdline_debug.h"
 
 struct s_option {
   std::string name;

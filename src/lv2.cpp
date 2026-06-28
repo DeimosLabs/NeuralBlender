@@ -42,14 +42,9 @@
 
 //#define DEBUG
 
-#ifdef CMDLINE_DEBUG
-#include "cmdline/cmdline.h"
-#define debug(...) cmdline_debug(stderr,ANSI_DARK_BLUE,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
-#else
-#define debug(...) //do{}while(0)
-#define CP         //do{}while(0)
-#define BP         //do{}while(0)
-#endif
+#define CMDLINE_IMPLEMENTATION
+#define CMDLINE_DEBUG_COLOR ANSI_DARK_RED
+#include "cmdline/cmdline_debug.h"
 
 enum {
   PORT_AUDIO_IN = 0,
