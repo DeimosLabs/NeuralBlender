@@ -36,9 +36,9 @@
 #include "cmdline/cmdline.h"
 #define debug(...) cmdline_debug(stderr,ANSI_RED,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
 #else
-#define debug(...)
-#define CP
-#define BP
+#define debug(...) do{}while(0)
+#define CP         do{}while(0)
+#define BP         do{}while(0)
 #endif
 
 extern const char *g_build_timestamp;

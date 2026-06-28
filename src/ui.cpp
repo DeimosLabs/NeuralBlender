@@ -21,10 +21,10 @@
 #ifdef CMDLINE_DEBUG
 #include "cmdline/cmdline.h"
 #define debug(...) cmdline_debug(stderr,ANSI_MAGENTA,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
-#else
-#define debug(...)
-#define CP
-#define BP
+/*#else
+#define debug(...) do{}while(0)
+#define CP         do{}while(0)
+#define BP         do{}while(0)*/
 #endif
 
 static uint64_t get_unique_id ();

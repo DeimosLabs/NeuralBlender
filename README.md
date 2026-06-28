@@ -2,7 +2,16 @@
 
 A simple amp modeling plugin based on RTNeural and NeuralAmpModeler (NAM)
 
-Supports nam A1, nam A2, aidax, and json model files. Can load up to 4 models simultaneously and either blend or switch between them. Each lane has input gain, output gain, and pre-delay for phasing correction/effects.
+Features:
+  - Supports nam A1, nam A2, aidax, and json model files.
+  - Can load up to 4 models simultaneously 
+  - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
+  - Each lane has:
+    - input gain
+    - output gain
+    - pre-delay for phasing correction/effects.
+    - optional level calibration
+    - optional DC flip
 
 ![NeuralBlender custom UI](data/screenshot-ui.png)
 ![NeuralBlender in Ardour](data/screenshot-ardour.png)
