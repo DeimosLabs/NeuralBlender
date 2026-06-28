@@ -7,12 +7,15 @@ Features:
   - Standalone app and LV2 plugin
   - Can load up to 4 models simultaneously 
   - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
+  - VU meters can be disabled to save (a tiny bit of) DSP load
   - Each model slot / lane has:
     - input gain
     - output gain
     - pre-delay for phasing correction/effects
     - optional DC flip for more phasing effects
     - optional level calibration
+
+On my Intel Core7 ultra, it loads 4 models in the middle of a busy live session, 64 sample buffers / 3 periods, and DSP load typically stays below 50%, no xruns. (with DSP threads pinned to p-cores)
 
 Features considered for future versions: VST plugin, series mode(s), optionally more than 4 lanes, impulse response / convolution, etc...
 
