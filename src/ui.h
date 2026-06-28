@@ -333,6 +333,7 @@ public:
   c_combobox menu_list;
   c_label label_flip;
   c_label label_calib;
+  c_label label_stats;
   
   int knob_size = 64;
   int knob_top = 0;
@@ -361,6 +362,7 @@ public:
   void hide_advanced_settings ();
   void reposition_widgets (bool default_size = false);
   size_t choose_exclusive_lane () const;
+  void update_stats ();
   //void excl_select (size_t which);
   void sync_widgets_from_state (const c_neuralblender_state &state);
   void write_calib_state_if_consistent ();
@@ -424,5 +426,6 @@ public:
   bool config_file_written = false;
   //bool show_advanced = false;
   bool ui_resize_lock = false;
+  float stats [NB_UI_MAX_LANES * 2];
   //inline void reposition_widgets () { show_advanced_settings (show_advanced); }
 };

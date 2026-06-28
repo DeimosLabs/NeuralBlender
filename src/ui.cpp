@@ -1305,6 +1305,8 @@ void c_lane_widgets::create (
     btn_calib.set_value (ui->state.lanes [which].do_calib);
   label_flip.create (ui, wadv, "DC flip", 0, 0, 75, 32);
   label_calib.create (ui, wadv, "Calib.", 0, 0, 75, 32);
+  label_stats.create (ui, wadv, "(not loaded)", 0, 0, 75, 24);
+  label_stats.textsize = 0.75;
   
   if (ui && which < NB_UI_MAX_LANES) {
     ui->filepickers [which].create (ui, btn_browse.widget, which, "Select file");
@@ -1364,11 +1366,12 @@ void c_lane_widgets::move_resize (
   }
 
   int adv_btn_x = 84;
-  int adv_btn_y = h / 5;
+  int adv_btn_y = h * 2 / 11;
   btn_flip.move_resize (adv_btn_x, adv_btn_y, 32, 32);
   btn_calib.move_resize (adv_btn_x, h - adv_btn_y - 32, 32, 32);
   label_flip.move_resize (adv_btn_x + 32, adv_btn_y, 80, 32);
   label_calib.move_resize (adv_btn_x + 32, h - adv_btn_y - 32, 80, 32);
+  label_stats.move_resize (delay.x (), h - 25, 120, 16);
   
 }
 
@@ -1562,6 +1565,24 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     meter_in.move_resize (6, 64, 5, (lane_height + 5) * i - 12);
     
     ui_resize_lock = false;
+  }
+}
+
+// called from lv2_ui - runs in UI thread
+void c_neuralblender_ui::update_stats () {
+  char buf [128];
+  
+  for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
+    int nframes = stats [i * 2];
+    float trim = stats [i * 2 + 1];
+    
+    if (trim != 1.0f) {
+      snprintf (buf, 127, "%d frames, trim=%.02f", nframes, trim);
+    } else {
+      snprintf (buf, 127, "%d frames", nframes);
+    }  
+    lanes [i].label_stats.set_label (buf);
+    
   }
 }
 

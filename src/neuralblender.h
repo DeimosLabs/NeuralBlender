@@ -100,8 +100,8 @@ public:
   uint32_t frames () const;
   void clear ();
 
-private:
   uint32_t m_delay_frames = 0;
+private:
   std::vector<float> m_buffer;
   uint32_t m_writepos = 0;
 };

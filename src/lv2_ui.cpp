@@ -25,6 +25,12 @@
 
 #define NB_UI_URI "http://deimos.ca/neuralblender#ui"
 
+enum _ui_feedback_type {
+  ATOM_METERS,
+  ATOM_STATS,
+  ATOM_UNKNOWN
+};
+
 static std::string path_dirname (const std::string &path) {
   const size_t pos = path.find_last_of ('/');
   if (pos == std::string::npos)
@@ -105,6 +111,7 @@ public:
   LV2_URID urid_patch_value = 0;
   LV2_URID urid_model [NB_UI_MAX_LANES] = { 0 };
   LV2_URID urid_meters = 0;
+  LV2_URID urid_stats = 0;
   LV2UI_Port_Subscribe *subscribe = NULL;
   LV2UI_Resize *resize = NULL;
   bool updating_from_host = false;
@@ -343,7 +350,7 @@ public:
     }
   }
 
-  void set_meter_values (const LV2_Atom *value) {
+  void set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
     if (!value || value->type != urid_atom_Vector)
       return;
 
@@ -355,26 +362,50 @@ public:
 
     const uint32_t count =
       (value->size - sizeof (LV2_Atom_Vector_Body)) / sizeof (float);
-    const uint32_t need = (1 + NB_UI_MAX_LANES) * 2;
-    if (count < need)
-      return;
 
     const float *values =
       (const float *) ((const uint8_t *) LV2_ATOM_BODY_CONST (value) +
                        sizeof (LV2_Atom_Vector_Body));
 
-    size_t n = 0;
-    vudata_in.set_l (values [n], values [n + 1]);
-    n += 2;
+    switch (type) {
+      case ATOM_METERS: {
+        const uint32_t need = (1 + NB_UI_MAX_LANES) * 2;
+        if (count < need)
+          return;
 
-    for (size_t lane = 0; lane < NB_UI_MAX_LANES; lane++) {
-      lanes [lane].vudata_out.set_l (values [n], values [n + 1]);
-      n += 2;
+        size_t n = 0;
+        vudata_in.set_l (values [n], values [n + 1]);
+        n += 2;
+        
+        for (size_t lane = 0; lane < NB_UI_MAX_LANES; lane++) {
+          lanes [lane].vudata_out.set_l (values [n], values [n + 1]);
+          n += 2;
+        }
+
+        redraw_meters_now ();
+        break;
+      }
+
+      case ATOM_STATS: { CP
+        const uint32_t need = NB_UI_MAX_LANES * 2;
+        if (count < need)
+          return;
+
+        for (size_t lane = 0; lane < NB_UI_MAX_LANES; lane++) {
+          const size_t n = lane * 2;
+          stats [n] = values [n];
+          stats [n + 1] = values [n + 1];
+        }
+        
+        update_stats ();
+        break;
+      }
+
+      default: CP
+        break;
     }
-
-    redraw_meters_now ();
   }
-
+  
   void handle_atom_event (const LV2_Atom *atom) {
     if (!atom)
       return;
@@ -396,7 +427,11 @@ public:
 
     const LV2_URID prop = ((const LV2_Atom_URID *) property)->body;
     if (prop == urid_meters) {
-      set_meter_values (value);
+      set_ui_values (value, ATOM_METERS);
+      return;
+    }
+    if (prop == urid_stats) {
+      set_ui_values (value, ATOM_STATS);
       return;
     }
 
@@ -468,6 +503,7 @@ static LV2UI_Handle instantiate (
     ui->urid_model [2] = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#ModelC");
     ui->urid_model [3] = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#ModelD");
     ui->urid_meters = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#Meters");
+    ui->urid_stats = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#Stats");
   }
 
   if (!ui->create (parent)) {

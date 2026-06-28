@@ -142,6 +142,7 @@ typedef struct {
 
   LV2_URID urid_model [NB_MAX_MODELS] = { 0 };
   LV2_URID urid_meters         = 0;
+  LV2_URID urid_stats          = 0;
   LV2_URID urid_atom_URID      = 0;
   const LV2_Atom_Sequence *control = NULL;
   LV2_Atom_Sequence *notify    = NULL;
@@ -171,6 +172,7 @@ typedef struct {
   c_vudata meter_in;
   c_vudata meters_out [NB_MAX_MODELS];
   uint32_t meter_notify_samples = 0;
+  std::atomic<bool> stats_dirty { true };
   std::atomic<bool> controls_dirty { false };
   
 } Plugin;
@@ -208,6 +210,8 @@ static void run_calibration (Plugin *self, size_t which, bool enabled) {
   } else {
     self->blender.amps [which].calibrate (NULL, 0);
   }
+
+  self->stats_dirty.store (true, std::memory_order_release);
 }
 
 // loader thread, also does calibration
@@ -324,6 +328,7 @@ static void clear_model_slot (Plugin *self, size_t which, bool notify) {
   self->blender.unload_model (which);
   self->current_model [which].clear ();
   self->notify_path [which] = notify;
+  self->stats_dirty.store (true, std::memory_order_release);
   apply_effective_controls (self);
 }
 
@@ -489,6 +494,35 @@ static void forge_meter_notify (Plugin *self) {
   lv2_atom_forge_pop (&self->forge, &frame);
 }
 
+static void forge_stats_notify (Plugin *self) {
+  float values [NB_MAX_MODELS * 2];
+  size_t n = 0;
+
+  for (int i = 0; i < NB_MAX_MODELS; i++) {
+    values [n++] = (float) self->blender.delays [i].frames ();
+    values [n++] = self->blender.amps [i].trim.load (std::memory_order_acquire);
+  }
+
+  LV2_Atom_Forge_Frame frame;
+  lv2_atom_forge_frame_time (&self->forge, 0);
+  lv2_atom_forge_object (&self->forge,
+                         &frame,
+                         0,
+                         self->urid_patch_Set);
+
+  lv2_atom_forge_key (&self->forge, self->urid_patch_property);
+  lv2_atom_forge_urid (&self->forge, self->urid_stats);
+
+  lv2_atom_forge_key (&self->forge, self->urid_patch_value);
+  lv2_atom_forge_vector (&self->forge,
+                         sizeof (float),
+                         self->urid_atom_Float,
+                         n,
+                         values);
+
+  lv2_atom_forge_pop (&self->forge, &frame);
+}
+
 static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
                                double rate,
                                const char *bundle_path,
@@ -552,6 +586,9 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
 
   self->urid_meters =
     self->map->map(self->map->handle, "http://deimos.ca/neuralblender#Meters");
+
+  self->urid_stats =
+    self->map->map(self->map->handle, "http://deimos.ca/neuralblender#Stats");
 
   self->blender.meter_in = &self->meter_in;
   for (int i = 0; i < NB_MAX_MODELS; i++)
@@ -723,7 +760,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     lv2_atom_forge_sequence_head (&self->forge, &frame, 0);
     
     // model loaded from UI?
-    bool sent_path_notify = false;
+    bool sent_state_notify = false;
     for (i = 0; i < NB_MAX_MODELS; i++) {
       if (self->notify_path [i]) {
         debug ("notify_path [%d]", i);
@@ -733,14 +770,20 @@ static void run (LV2_Handle instance, uint32_t nframes) {
           self->current_model [i].c_str());
 
         self->notify_path [i] = false;
-        sent_path_notify = true;
+        sent_state_notify = true;
         break; // throttle to 1 per cycle
       }
     }
 
+    if (!sent_state_notify &&
+        self->stats_dirty.exchange (false, std::memory_order_acq_rel)) {
+      forge_stats_notify (self);
+      sent_state_notify = true;
+    }
+
     const uint32_t meter_interval =
       (uint32_t) (self->samplerate > 0.0 ? self->samplerate / LV2_METER_FPS : 1600.0);
-    if (!sent_path_notify && self->meter_notify_samples >= meter_interval) {
+    if (!sent_state_notify && self->meter_notify_samples >= meter_interval) {
       forge_meter_notify (self);
       self->meter_notify_samples = 0;
     }
@@ -864,6 +907,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       if (v != self->last_delay [i]) { CP
         self->last_delay [i] = v;
         self->blender.set_delay_ms (i, v);
+        self->stats_dirty.store (true, std::memory_order_release);
       }
     }
 
