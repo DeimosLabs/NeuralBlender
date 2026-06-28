@@ -76,7 +76,8 @@ remove_leading_prefix () {
   #else
   #  cat
   #fi
-  sed 's,_.*_data_,data_,g'
+  #sed 's,_.*_data_,data_,g'
+  sed 's,.*data/,data_,g'
 }
 
 # this function expects an absolute path, all path checking/parsing arleady done
