@@ -317,9 +317,12 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes)
       }
 
       for (uint32_t i = 0; i < nframes; ++i) {
-        float input[1] = { in[i] * gain_in };
-        float y = m_rtneural_model->forward(input);
-        out[i] = std::clamp(y * gain_out, -1.0f, 1.0f);
+        float input [1] = { in [i] * gain_in };
+        float y = m_rtneural_model->forward (input);
+        if (dcflip)
+          out[i] = -1.0f * std::clamp (y * gain_out, -1.0f, 1.0f);
+        else
+          out[i] = std::clamp (y * gain_out, -1.0f, 1.0f);
       }
       return;
     break;
@@ -390,19 +393,27 @@ void c_neuralblender::set_blocksize (uint32_t bs) { CP
   }
 }
 
-void c_neuralblender::dcflip (size_t which, bool b) {
+bool c_neuralblender::dcflip (size_t which, bool b) {
+  if (which >= NB_MAX_MODELS)
+    return false;
   amps [which].dcflip = b;
+  return true;
 }
 
 bool c_neuralblender::is_dcflipped (size_t which) {
+  if (which >= NB_MAX_MODELS) return false;
   return amps [which].dcflip;
 }
 
-void c_neuralblender::calib_on (size_t which, bool b) {
+bool c_neuralblender::calib_on (size_t which, bool b) {
+  if (which >= NB_MAX_MODELS)
+    return false;
   amps [which].do_calib = b;
+  return true;
 }
 
 bool c_neuralblender::is_calib_on (size_t which) {
+  if (which >= NB_MAX_MODELS) return false;
   return amps [which].do_calib;
 }
 

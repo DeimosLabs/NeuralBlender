@@ -168,8 +168,8 @@ public:
   bool bypass () const;
   float delay_ms (size_t which) const;
   void get_state (c_neuralblender_state &state) const;
-  void dcflip (size_t which, bool b);
-  void calib_on (size_t which, bool b);
+  bool dcflip (size_t which, bool b);
+  bool calib_on (size_t which, bool b);
   bool is_dcflipped (size_t which);
   bool is_calib_on (size_t which);
 

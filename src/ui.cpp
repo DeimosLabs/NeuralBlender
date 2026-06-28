@@ -1286,6 +1286,10 @@ void c_lane_widgets::create (
 
   btn_flip.create   (ui, wadv, "DC flip", 0, 0, 32, 32, BTN_CHECKBOX);
   btn_calib.create   (ui, wadv, "Calib", 0, 0, 32, 32, BTN_CHECKBOX);
+  btn_flip.role = ROLE_DCFLIP;
+  btn_calib.role = ROLE_CALIBRATE;
+  btn_flip.lane = which;
+  btn_calib.lane = which;
   label_flip.create (ui, wadv, "DC flip", 0, 0, 75, 32);
   label_calib.create (ui, wadv, "Calib.", 0, 0, 75, 32);
   
@@ -1515,7 +1519,6 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     debug ("window w/h %d,%d", window_width, window_height);
     //main_widget->func.configure_callback (main_widget, NULL);
     
-    
     cont_checkboxes.move_resize (16, window_height - 44, b ? 500 : 450, 40);
     
     btn_enable.move_resize (16, 12, 120, 40);
@@ -1724,6 +1727,8 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     lanes [i].gain_in.set_value (gain_to_db (lane.gain_in));
     lanes [i].gain_out.set_value (gain_to_db (lane.gain_out));
     lanes [i].delay.set_value (lane.delay_ms);
+    lanes [i].btn_flip.set_value (lane.dcflip);
+    lanes [i].btn_calib.set_value (lane.do_calib);
 
     //filepickers [i].selected_file = lane.filename;
     if (state.lanes [i].filename.empty ()) {

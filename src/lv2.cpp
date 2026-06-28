@@ -321,7 +321,6 @@ static LV2_State_Status save (
 	      if (abstract_path && free_path && free_path->free_path)
 	        free_path->free_path (free_path->handle, abstract_path);
 		    }
-  
     return LV2_STATE_SUCCESS;
 }
 
@@ -340,7 +339,7 @@ static LV2_State_Status restore (
     size_t size;
     uint32_t type;
     uint32_t valflags;
-    
+
     for (int i = 0; i < NB_MAX_MODELS; i++) {
       const void *p =
           retrieve (handle,
@@ -364,7 +363,6 @@ static LV2_State_Status restore (
 		        clear_model_slot (self, i, true);
 		      }
 		    }
-
     return LV2_STATE_SUCCESS;
 }
 

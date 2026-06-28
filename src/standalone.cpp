@@ -208,6 +208,8 @@ void c_standalone_ui::apply_effective_controls () {
     const bool mute =
       exclusive_on && !exclusive_empty ? i != excl : state.lanes [i].lane_mute;
     blender->set_lane_mute (i, mute);
+    blender->dcflip (i, state.lanes [i].dcflip);
+    blender->calib_on (i, state.lanes [i].do_calib);
   }
 }
 

@@ -179,8 +179,12 @@ public:
   void on_vu (c_widget *w, bool b)                     { CP; write_control (PORT_VU_ENABLE, b ? 1.0f : 0.0f); }
 
   bool request_window_size (int w, int h) {
-    if (resize && resize->ui_resize)
-      return resize->ui_resize (resize->handle, w, h) == 0;
+    if (resize && resize->ui_resize) {
+      const bool ok = resize->ui_resize (resize->handle, w, h) == 0;
+      if (ok && main_widget && display)
+        os_resize_window (display, main_widget, w, h);
+      return ok;
+    }
 
     return c_neuralblender_ui::request_window_size (w, h);
   }
