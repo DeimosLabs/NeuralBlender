@@ -363,6 +363,7 @@ public:
   size_t choose_exclusive_lane () const;
   //void excl_select (size_t which);
   void sync_widgets_from_state (const c_neuralblender_state &state);
+  void write_calib_state_if_consistent ();
   virtual void apply_effective_controls ();
 
   virtual bool load_model (size_t which, const char *filename) = 0;

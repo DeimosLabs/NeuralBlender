@@ -184,6 +184,8 @@ public:
 
 private:
   void update_mutes ();
+  bool consistent_calib_state (bool &enabled,
+      c_neuralblender_state &state) const;
   std::vector <float> m_delay_bufs [NB_MAX_MODELS];
   std::vector <float> m_model_bufs [NB_MAX_MODELS];
   std::vector <float> m_input_buf;

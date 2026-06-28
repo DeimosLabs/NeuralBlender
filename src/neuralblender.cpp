@@ -22,6 +22,7 @@
 #include <filesystem>
 #include "neuralblender.h"
 #include "data.h"
+#include "config.h"
 
 //#define DEBUG
 
@@ -572,6 +573,34 @@ float c_neuralblender::delay_ms (size_t which) const {
   return (float) delays [which].frames () * 1000.0f / (float) m_samplerate;
 }
 
+// returns whether all lanes are same state, if so sets
+// enabled to that state
+bool c_neuralblender::consistent_calib_state (bool &enabled,
+    c_neuralblender_state &state) const {
+
+  get_state (state);
+
+  bool all_on = true;
+  bool all_off = true;
+
+  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+    all_on  &= state.lanes[i].do_calib;
+    all_off &= !state.lanes[i].do_calib;
+  }
+
+  if (all_on) {
+    enabled = true;
+    return true;
+  }
+
+  if (all_off) {
+    enabled = false;
+    return true;
+  }
+
+  return false;
+}
+
 void c_neuralblender::get_state (c_neuralblender_state &state) const {
   state.bypass = bypass ();
   state.do_vu = do_vu;
@@ -586,6 +615,12 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
     state.lanes [i].dcflip = amps [i].dcflip;
     state.lanes [i].do_calib = amps [i].do_calib;
   }
+  
+  /*bool calib_enabled = false;
+  if (consistent_calib_state (calib_enabled, state)) {
+    configfile.set_item (CONFIG_KEY_NAME_CALIB, calib_enabled ? "1" : "0");
+    configfile.write_file ();
+  }*/
 }
 
 void c_neuralblender::update_mutes () {

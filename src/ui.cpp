@@ -338,6 +338,24 @@ void c_button::create (
   c_widget::create (ui_, parent, label_, x, y, w, h);
 }
 
+// calibration default is written to config ONLY if all
+// calib check boxes are on/off
+void c_neuralblender_ui::write_calib_state_if_consistent () {
+  bool all_on = true;
+  bool all_off = true;
+
+  for (size_t i = 0; i < NB_UI_MAX_LANES && i < NB_MAX_MODELS; ++i) {
+    all_on  &= state.lanes[i].do_calib;
+    all_off &= !state.lanes[i].do_calib;
+  }
+
+  if (!all_on && !all_off)
+    return;
+
+  configfile.set_item(CONFIG_KEY_NAME_CALIB, all_on ? "1" : "0");
+  configfile.write_file();
+}
+
 void c_button::on_mouseup () {
   if (!ui || ui->updating_from_state)
     return;
@@ -366,8 +384,7 @@ void c_button::on_mouseup () {
       if (lane >= 0 && lane < NB_UI_MAX_LANES) {
         ui->state.lanes [lane].do_calib = value;
       }
-      ui->configfile.set_item (CONFIG_KEY_NAME_CALIB, value ? "1" : "0");
-      ui->configfile.write_file ();
+      ui->write_calib_state_if_consistent ();
       ui->on_calibrate (this, value);
     break;
 
@@ -1283,6 +1300,8 @@ void c_lane_widgets::create (
   btn_calib.role = ROLE_CALIBRATE;
   btn_flip.lane = which;
   btn_calib.lane = which;
+  if (ui && which < NB_UI_MAX_LANES)
+    btn_calib.set_value (ui->state.lanes [which].do_calib);
   label_flip.create (ui, wadv, "DC flip", 0, 0, 75, 32);
   label_calib.create (ui, wadv, "Calib.", 0, 0, 75, 32);
   
@@ -1531,7 +1550,7 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     
     btn_enable.move_resize (16, 12, 120, 40);
     btn_muteall.move_resize (window_width - 136, 12, 120, 40);
-    btn_about.move_resize (btn_muteall.x () + 20, window_height - 50, 100, 40);
+    btn_about.move_resize (btn_muteall.x (), window_height - 50, 120, 40);
     label_exclmode.set_label (b ? "Exclusive mode" : "Excl. mode");
     label_big.move_resize (150, 0, window_width - 300, 48);
     

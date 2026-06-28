@@ -301,6 +301,7 @@ if (LV2)
 
   add_library(neuralblender_lv2 MODULE
     src/lv2.cpp
+    #src/config.cpp
     src/timestamp.cpp
     $<TARGET_OBJECTS:neuralblender_data>
     $<TARGET_OBJECTS:neuralblender_meter_data>
