@@ -325,7 +325,7 @@ float c_neuralamp::calibrate (float *data, size_t size) {
   else
     trim = 1.0f;
   
-  debug ("trim = %f", trim);
+  debug ("trim = %f", (float) trim);
   
   reset ();
   return ret;

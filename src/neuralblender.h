@@ -47,7 +47,7 @@
 #define MAX_BLOCK_SIZE   8192
 #define NB_MAX_MODELS    4
 #define DB_SILENCE       -120
-#define DB_CALIB_TARGET  -18
+#define DB_CALIB_TARGET  -9
 
 enum _engine_mode {
   ENGINE_NONE,
@@ -124,6 +124,7 @@ public:
 
   bool loaded () const;
   std::string model_filename () const;
+  std::atomic<float> trim { 1.0f };
 
   std::string filename     = "";
   float       gain_in      = 1.0f;
@@ -134,7 +135,6 @@ public:
   int         warmup       = 5;
   bool        dcflip       = false;
   bool        do_calib     = false;
-  float       trim         = 1.0f;
 
 private:
   void reset_unlocked ();
