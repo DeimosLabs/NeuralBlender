@@ -1325,7 +1325,7 @@ void c_lane_widgets::move_resize (
   int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
   int button_left = menu_list.x ();
   int button_top = menu_list.y () + menu_list.h () + 8;
-  int button_height = h * 2 / 5;
+  int button_height = h - 76;
   btn_browse.move_resize (button_left, button_top, button_width, button_height);
   btn_clear.move_resize (button_left + button_width + button_padding,
                          button_top, button_width, button_height);
@@ -1504,6 +1504,7 @@ void c_neuralblender_ui::reposition_widgets () {
 
     //main_widget->func.configure_callback (main_widget, NULL);
     
+    
     cont_checkboxes.move_resize (16, window_height - 44, b ? 500 : 450, 40);
     
     btn_enable.move_resize (16, 12, 120, 40);
@@ -1512,9 +1513,12 @@ void c_neuralblender_ui::reposition_widgets () {
     label_exclmode.set_label (b ? "Exclusive mode" : "Excl. mode");
     label_big.move_resize (150, 0, window_width - 300, 48);
     
-    for (int i = 0; i < NB_UI_MAX_LANES; i++) {
+    size_t i;
+    for (i = 0; i < NB_UI_MAX_LANES; i++) {
       lanes [i].move_resize (12, 60 + i * (lane_height + 5), lane_width, lane_height);
     }
+    meter_in.move_resize (6, 64, 5, (lane_height + 5) * i - 12);
+    
     ui_resize_lock = false;
   }
 }
