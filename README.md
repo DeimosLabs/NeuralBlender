@@ -6,7 +6,7 @@ Features:
   - Supports nam A1, nam A2, aidax, and json model files.
   - Can load up to 4 models simultaneously 
   - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
-  - Each lane has:
+  - Each model slot has:
     - input gain
     - output gain
     - pre-delay for phasing correction/effects.
