@@ -25,6 +25,17 @@
 
 #define NB_UI_URI "http://deimos.ca/neuralblender#ui"
 
+static std::string path_dirname (const std::string &path) {
+  const size_t pos = path.find_last_of ('/');
+  if (pos == std::string::npos)
+    return "";
+
+  if (pos == 0)
+    return "/";
+
+  return path.substr (0, pos);
+}
+
 enum {
   PORT_AUDIO_IN = 0,
   PORT_AUDIO_OUT,
@@ -191,24 +202,40 @@ public:
 
   void set_port_value (uint32_t port, float value) {
     updating_from_host = true;
+    const bool old_updating_from_state = updating_from_state;
+    updating_from_state = true;
 
     if (port == PORT_BYPASS) {
       state.bypass = value < 0.5f;
-      sync_widgets_from_state (state);
+      const bool enabled = !state.bypass;
+      btn_enable.set_value (enabled);
+      btn_enable.set_label (enabled ? "Enabled" : "Bypass");
+      updating_from_state = old_updating_from_state;
       updating_from_host = false;
       return;
     }
 
     if (port == PORT_VU_ENABLE) {
       state.do_vu = value >= 0.5f;
-      sync_widgets_from_state (state);
+      btn_vu.set_value (state.do_vu);
+      if (state.do_vu) {
+        meter_in.show ();
+        for (size_t i = 0; i < NB_UI_MAX_LANES; ++i)
+          lanes [i].meter_out.show ();
+      } else {
+        meter_in.hide ();
+        for (size_t i = 0; i < NB_UI_MAX_LANES; ++i)
+          lanes [i].meter_out.hide ();
+      }
+      updating_from_state = old_updating_from_state;
       updating_from_host = false;
       return;
     }
 
     if (port == PORT_MUTE_ALL) {
       state.mute_all = value >= 0.5f;
-      sync_widgets_from_state (state);
+      btn_muteall.set_value (state.mute_all);
+      updating_from_state = old_updating_from_state;
       updating_from_host = false;
       return;
     }
@@ -220,6 +247,7 @@ public:
       if (n > (int) NB_UI_MAX_LANES)
         n = (int) NB_UI_MAX_LANES;
       state.exclusive_lane = n;
+      updating_from_state = old_updating_from_state;
       sync_widgets_from_state (state);
       updating_from_host = false;
       return;
@@ -229,26 +257,44 @@ public:
       const uint32_t base = PORT_A_GAIN_IN + (uint32_t) lane * 6;
       if (port == base) {
         state.lanes [lane].gain_in = db_to_gain (value);
-        break;
+        lanes [lane].gain_in.set_value (value);
+        updating_from_state = old_updating_from_state;
+        updating_from_host = false;
+        return;
       } else if (port == base + 1) {
         state.lanes [lane].gain_out = db_to_gain (value);
-        break;
+        lanes [lane].gain_out.set_value (value);
+        updating_from_state = old_updating_from_state;
+        updating_from_host = false;
+        return;
       } else if (port == base + 2) {
         state.lanes [lane].delay_ms = value;
-        break;
+        lanes [lane].delay.set_value (value);
+        updating_from_state = old_updating_from_state;
+        updating_from_host = false;
+        return;
       } else if (port == base + 3) {
         state.lanes [lane].lane_mute = value >= 0.5f;
-        break;
+        lanes [lane].btn_mute.set_value (state.lanes [lane].lane_mute);
+        updating_from_state = old_updating_from_state;
+        updating_from_host = false;
+        return;
       } else if (port == base + 4) {
         state.lanes [lane].dcflip = value >= 0.5f;
-        break;
+        lanes [lane].btn_flip.set_value (state.lanes [lane].dcflip);
+        updating_from_state = old_updating_from_state;
+        updating_from_host = false;
+        return;
       } else if (port == base + 5) {
         state.lanes [lane].do_calib = value >= 0.5f;
-        break;
+        lanes [lane].btn_calib.set_value (state.lanes [lane].do_calib);
+        updating_from_state = old_updating_from_state;
+        updating_from_host = false;
+        return;
       }
     }
 
-    sync_widgets_from_state (state);
+    updating_from_state = old_updating_from_state;
     updating_from_host = false;
   }
 
@@ -260,7 +306,21 @@ public:
     state.lanes [which].filename = p;
     state.lanes [which].loaded = p [0] != '\0';
 
-    sync_widgets_from_state (state);
+    if (state.exclusive_lane > 0) {
+      sync_widgets_from_state (state);
+      return;
+    }
+
+    const bool old_updating_from_state = updating_from_state;
+    updating_from_state = true;
+    if (!p [0]) {
+      lanes [which].menu_list.clear ();
+    } else {
+      filepickers [which].current_dir = path_dirname (state.lanes [which].filename);
+      filepickers [which].scan_current_dir ();
+      filepickers [which].add_files_from_dir (&lanes [which].menu_list);
+    }
+    updating_from_state = old_updating_from_state;
   }
 
   void set_model_property (LV2_URID property, const char *path) {

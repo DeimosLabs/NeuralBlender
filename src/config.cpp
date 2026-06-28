@@ -24,6 +24,7 @@ struct s_option {
 } g_options [] = {
   { CONFIG_KEY_NAME_CWD, "" },
   { CONFIG_KEY_NAME_ADV, "" },
+  { CONFIG_KEY_NAME_CALIB, "" },
   { "", "" }
 };
 
@@ -93,6 +94,29 @@ void c_configfile::process_in (int which, std::string value) {
 }
 
 void c_configfile::process_out (int which, std::string value) {
+}
+
+bool c_configfile::istrue (std::string name) {
+  std::string value = get_item (name);
+  if (!value.size ())
+    return false;
+  
+  if (value == "1")
+    return true;
+  
+  if (value == "true")
+    return true;
+    
+  if (value == "yes")
+    return true;
+    
+  if (value == "TRUE")
+    return true;
+    
+  if (value == "YES")
+    return true;
+    
+  return false;
 }
 
 int c_configfile::find_item (std::string name) {
@@ -196,6 +220,10 @@ bool c_configfile::write_file () { CP
 }
 
 bool c_configfile::write_file (std::string path) { CP
+  std::filesystem::path p (path);
+  if (p.has_parent_path ())
+    mkdir_p (p.parent_path ().string ());
+
   std::ofstream f (path);
   
   for (size_t i = 0; g_options [i].name.size () > 0; i++) {

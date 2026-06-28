@@ -366,6 +366,8 @@ void c_button::on_mouseup () {
       if (lane >= 0 && lane < NB_UI_MAX_LANES) {
         ui->state.lanes [lane].do_calib = value;
       }
+      ui->configfile.set_item (CONFIG_KEY_NAME_CALIB, value ? "1" : "0");
+      ui->configfile.write_file ();
       ui->on_calibrate (this, value);
     break;
 
@@ -882,7 +884,7 @@ static void knob_value_changed (void *w_, void *value_) {
   }
 }
 
-static void filepicker_response(void *w_, void *user_data) { CP
+static void filepicker_response (void *w_, void *user_data) { CP
   Widget_t *w = (Widget_t *) w_;
   if (!w || !w->parent_struct) {
     debug("!w || !w->parent_struct");
@@ -1377,6 +1379,21 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   app.normal_font = 14 * app.hdpi;
   app.big_font = 20 * app.hdpi;
   display = app.dpy;
+  
+  std::string configitem;
+  
+  configfile.read_file ();
+  
+  if (configfile.istrue (CONFIG_KEY_NAME_ADV)) {
+    CP
+    state.showadvanced = true;
+  }
+
+  if (configfile.istrue (CONFIG_KEY_NAME_CALIB)) {
+    calib_default = true;
+    for (i = 0; i < NB_UI_MAX_LANES && i < NB_MAX_MODELS; ++i)
+      state.lanes [i].do_calib = true;
+  }
 
   parent = parent_;
   if (!parent)
@@ -1631,6 +1648,8 @@ void c_neuralblender_ui::on_advanced (c_widget *w, bool b) {
   (void) w;
   debug ("b=%d", (int) b);
   show_advanced_settings (b);
+  configfile.set_item (CONFIG_KEY_NAME_ADV, b ? "1" : "0");
+  configfile.write_file ();
 }
 
 int c_neuralblender_ui::idle () {
@@ -1704,7 +1723,9 @@ void c_neuralblender_ui::apply_effective_controls () {
 void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &state_) {
   if (!ui_ready)
     return;
+  const bool showadvanced = state.showadvanced;
   this->state = state_;
+  this->state.showadvanced = showadvanced;
   if (state.exclusive_lane > 0 &&
       state.exclusive_lane <= (int) NB_UI_MAX_LANES)
     last_exclusive_lane = (size_t) state.exclusive_lane;
@@ -1734,6 +1755,9 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   const bool enabled = !state.bypass;
   btn_enable.set_value (enabled);
   btn_enable.set_label (enabled ? "Enabled" : "Bypass");
+
+  btn_advanced.set_value (state.showadvanced);
+  show_advanced_settings (state.showadvanced);
 
   btn_vu.set_value (state.do_vu);
   if (state.do_vu) {

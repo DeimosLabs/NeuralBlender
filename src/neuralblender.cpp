@@ -314,13 +314,13 @@ float c_neuralamp::calibrate (float *data, size_t size) {
   
     for (i = 0; i + blocksize <= size; i += blocksize) {
       ret = std::max (ret, get_block_rms (&data[i], blocksize));
-      debug ("max %f", ret);
+      //debug ("max %f", ret);
     }
 
     const size_t left = size - i;
     if (left > 0) {
       ret = std::max (ret, get_block_rms (&data[i], left));
-      debug ("max %f", ret);
+      //debug ("max %f", ret);
     }
   }
   
@@ -330,7 +330,7 @@ float c_neuralamp::calibrate (float *data, size_t size) {
   else
     trim = 1.0f;
   
-  debug ("ret=%f", ret);
+  debug ("rms=%f", ret);
   debug ("trim=%f", (float) trim);
   
   reset_unlocked ();

@@ -47,7 +47,7 @@
 #define MAX_BLOCK_SIZE   8192
 #define NB_MAX_MODELS    4
 #define DB_SILENCE       -120
-#define DB_CALIB_TARGET  -9
+#define DB_CALIB_TARGET  -12
 
 enum _engine_mode {
   ENGINE_NONE,
@@ -67,22 +67,6 @@ static inline float gain_to_db (float gain) {
 
   return 20.0f * log10f(gain);
 }
-
-class c_delayline {
-public:
-  c_delayline ();
-  ~c_delayline ();
-  //float process_sample (float x);
-  void process_block (float *in, float *out, uint32_t nframes);
-  bool set_frames (uint32_t f);
-  uint32_t frames () const;
-  void clear ();
-
-private:
-  uint32_t m_delay_frames = 0;
-  std::vector<float> m_buffer;
-  uint32_t m_writepos = 0;
-};
 
 struct c_neuralblender_lane_state {
   std::string filename;
@@ -106,6 +90,21 @@ struct c_neuralblender_state {
   c_neuralblender_lane_state lanes [NB_MAX_MODELS];
 };
 
+class c_delayline {
+public:
+  c_delayline ();
+  ~c_delayline ();
+  //float process_sample (float x);
+  void process_block (float *in, float *out, uint32_t nframes);
+  bool set_frames (uint32_t f);
+  uint32_t frames () const;
+  void clear ();
+
+private:
+  uint32_t m_delay_frames = 0;
+  std::vector<float> m_buffer;
+  uint32_t m_writepos = 0;
+};
 
 class c_neuralamp {
 public:

@@ -241,7 +241,12 @@ static void ui_main () {
   g_ui.create (0);        // no LV2 parent, so root/toplevel
   c_neuralblender_state state;
   g_blender.get_state (state);
+  if (g_ui.calib_default) {
+    for (size_t i = 0; i < NB_MAX_MODELS; ++i)
+      state.lanes [i].do_calib = true;
+  }
   g_ui.sync_widgets_from_state (state);
+  g_ui.apply_effective_controls ();
   fprintf (stderr, "UI running...\n");
   
   CP
