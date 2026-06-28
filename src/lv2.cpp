@@ -156,7 +156,7 @@ typedef struct {
   
   // hehe what a mess
   bool pending_calibrate[NB_MAX_MODELS] = { false };
-  bool pending_calib_enabled[NB_MAX_MODELS] = { false };
+  std::atomic<bool> pending_calib_enabled[NB_MAX_MODELS] = {};
   bool pending_load [NB_MAX_MODELS] = { false };
   //size_t pending_which         = 0;
   std::string pending_path [NB_MAX_MODELS];
@@ -192,6 +192,21 @@ static void apply_effective_controls (Plugin *self) {
     const bool mute =
       exclusive_on && !exclusive_empty ? i != excl : self->base_lane_mute [i];
     self->blender.set_lane_mute (i, mute);
+  }
+}
+
+static void run_calibration (Plugin *self, size_t which, bool enabled) {
+  if (!self || which >= NB_MAX_MODELS)
+    return;
+
+  self->blender.calib_on (which, enabled);
+
+  if (enabled && self->blender.amps [which].loaded ()) {
+    float *data = (float *) data_calib_f32;
+    const size_t samples = data_calib_f32_len / sizeof (float);
+    self->blender.amps [which].calibrate (data, samples);
+  } else {
+    self->blender.amps [which].calibrate (NULL, 0);
   }
 }
 
@@ -231,7 +246,7 @@ static void loader_main (Plugin *self) { CP
         for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
           if (self->pending_calibrate [i]) {
             which = i;
-            calib_enabled = self->pending_calib_enabled [i];
+            calib_enabled = self->pending_calib_enabled [i].load (std::memory_order_acquire);
             self->pending_calibrate [i] = false;
             do_calib = true;
             break;
@@ -254,21 +269,22 @@ static void loader_main (Plugin *self) { CP
         self->current_model [which].clear ();
         self->notify_path [which] = true;
       }
+
+      bool calib_after_load =
+        self->calibrate [which] && *self->calibrate [which] >= 0.5f;
+      self->pending_calib_enabled [which].store (calib_after_load, std::memory_order_release);
+      {
+        std::lock_guard<std::mutex> lock (self->loader_mutex);
+        self->pending_calibrate [which] = false;
+      }
+
+      run_calibration (self, which, calib_after_load);
       self->controls_dirty.store (true, std::memory_order_release);
     }
     
     // here calibration runs in the loader thread
     if (do_calib) {
-      self->blender.calib_on (which, calib_enabled);
-
-      if (calib_enabled) {
-        float *data = (float *) data_calib_f32;
-        const size_t samples = data_calib_f32_len / sizeof (float);
-        self->blender.amps [which].calibrate (data, samples);
-      } else {
-        self->blender.amps [which].calibrate (NULL, 0);
-      }
-
+      run_calibration (self, which, calib_enabled);
       self->controls_dirty.store (true, std::memory_order_release);
     }
   }
@@ -336,7 +352,7 @@ static void request_calibrate (Plugin *self, size_t which, bool enabled) {
     // scope
     std::lock_guard<std::mutex> lock (self->loader_mutex);
     self->pending_calibrate [which] = true;
-    self->pending_calib_enabled [which] = enabled;
+    self->pending_calib_enabled [which].store (enabled, std::memory_order_release);
   }
 
   self->loader_cv.notify_one ();
@@ -870,9 +886,11 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 
     if (self->calibrate [i]) {
       const float v = *self->calibrate [i];
+      const bool enabled = v >= 0.5f;
+      self->pending_calib_enabled [i].store (enabled, std::memory_order_release);
       if (v != self->last_calibrate [i]) { CP
         self->last_calibrate [i] = v;
-        request_calibrate (self, i, v >= 0.5f);
+        request_calibrate (self, i, enabled);
       }
     }
   }

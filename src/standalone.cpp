@@ -107,6 +107,15 @@ bool c_standalone_ui::load_model (size_t which, const char *filename) {
   if (which < NB_MAX_MODELS)
     state.lanes [which].loaded = loaded;
   apply_effective_controls ();
+  if (which < NB_MAX_MODELS) {
+    if (state.lanes [which].do_calib && loaded) {
+      float *data = (float *) data_calib_f32;
+      const size_t samples = data_calib_f32_len / sizeof (float);
+      blender->amps [which].calibrate (data, samples);
+    } else {
+      blender->amps [which].calibrate (NULL, 0);
+    }
+  }
   return loaded;
 }
 
