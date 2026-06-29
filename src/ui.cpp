@@ -30,6 +30,7 @@ static void knob_double_click (void *w_, void *event, void *user_data);
 static void cb_draw_button (void *w_, void *user_data);
 static std::string path_dirname (const std::string &path);
 static std::string path_basename (const std::string &path);
+static void draw_gradient (void *w_, void *);
 
 static constexpr float DEFAULT_BG_R = 0.125f;
 static constexpr float DEFAULT_BG_G = 0.125f;
@@ -182,7 +183,7 @@ void c_frame::create (
     int x, int y, int w, int h) {
   
   widget = add_frame (parent, label_ ? label_ : "", x, y, w, h);
-  
+  //widget->func.expose_callback = draw_gradient;
   c_widget::create (ui_, parent, label_, x, y, w, h);
   inherit_parent_bg_color (widget, parent);
 }
@@ -950,6 +951,57 @@ static void main_notify_callback (void *w_, void *user_data) {
 static uint64_t get_unique_id () {
   static uint64_t current = 1;
   return current++;
+}
+
+static void draw_gradient (void *w_, void *) {
+  Widget_t *w = (Widget_t *) w_;
+  if (!w)
+    return;
+
+  Metrics_t m;
+  os_get_window_metrics (w, &m);
+  if (!m.visible)
+    return;
+
+  // Fill background first.
+  cairo_pattern_t *bg =
+      cairo_pattern_create_linear (0, 0, 0, m.height);
+
+  cairo_pattern_add_color_stop_rgba (bg, 0.0, 0.10, 0.10, 0.10, 1.0);
+  cairo_pattern_add_color_stop_rgba (bg, 1.0, 0.15, 0.15, 0.15, 1.0);
+
+  cairo_rectangle (w->crb, 0, 0, m.width, m.height);
+  cairo_set_source (w->crb, bg);
+  cairo_fill (w->crb);
+
+  cairo_pattern_destroy (bg);
+
+  const double inset = 1.5;
+  const double radius = 4.0;
+
+  cairo_new_path (w->crb);
+  cairo_arc (w->crb, inset + radius, inset + radius,
+             radius, M_PI, 3.0 * M_PI / 2.0);
+  cairo_arc (w->crb, m.width - inset - radius, inset + radius,
+             radius, 3.0 * M_PI / 2.0, 0.0);
+  cairo_arc (w->crb, m.width - inset - radius, m.height - inset - radius,
+             radius, 0.0, M_PI / 2.0);
+  cairo_arc (w->crb, inset + radius, m.height - inset - radius,
+             radius, M_PI / 2.0, M_PI);
+  cairo_close_path (w->crb);
+
+  cairo_pattern_t *pat =
+      cairo_pattern_create_linear (0, 0, m.width, m.height);
+
+  cairo_pattern_add_color_stop_rgba (pat, 0.0, 0.10, 0.55, 0.55, 1.0);
+  cairo_pattern_add_color_stop_rgba (pat, 0.5, 0.40, 0.40, 0.40, 1.0);
+  cairo_pattern_add_color_stop_rgba (pat, 1.0, 0.02, 0.18, 0.18, 1.0);
+
+  cairo_set_source (w->crb, pat);
+  cairo_set_line_width (w->crb, 2.0);
+  cairo_stroke (w->crb);
+
+  cairo_pattern_destroy (pat);
 }
 
 static void draw_main_window (void *w_, void *user_data) {

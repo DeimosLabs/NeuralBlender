@@ -307,7 +307,8 @@ float c_neuralamp::calibrate (float *data, size_t size) {
   if (data) {
   
     for (i = 0; i + blocksize <= size; i += blocksize) {
-      ret = std::max (ret, get_block_rms (&data[i], blocksize));
+      if (i > 3) // carla sends a few bogus blocks on plugin load
+        ret = std::max (ret, get_block_rms (&data[i], blocksize));
       //debug ("max %f", ret);
     }
 
