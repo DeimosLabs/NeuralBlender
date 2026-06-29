@@ -445,7 +445,7 @@ void c_button::on_mouseup () {
     default: CP
     break;
   }
-  //ui->sync_widgets_from_state (ui->state);
+  ui->sync_widgets_from_state (ui->state);
 }
 
 void xevfunc_dummy (void *a, void *b)          { }
@@ -1391,6 +1391,10 @@ void c_lane_widgets::move_resize (
 
 c_neuralblender_ui::c_neuralblender_ui () { CP
   memset (&app, 0, sizeof (app));
+  for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+    stats [i * 2] = 0.0f;
+    stats [i * 2 + 1] = 1.0f;
+  }
   display = NULL;
   window = 0;
   main_widget = NULL;

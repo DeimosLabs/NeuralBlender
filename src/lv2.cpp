@@ -755,7 +755,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     lv2_atom_forge_sequence_head (&self->forge, &frame, 0);
     
     // model loaded from UI?
-    bool sent_state_notify = false;
+    bool sent_path_notify = false;
     for (i = 0; i < NB_MAX_MODELS; i++) {
       if (self->notify_path [i]) {
         debug ("notify_path [%d]", i);
@@ -765,20 +765,20 @@ static void run (LV2_Handle instance, uint32_t nframes) {
           self->current_model [i].c_str());
 
         self->notify_path [i] = false;
-        sent_state_notify = true;
+        sent_path_notify = true;
         break; // throttle to 1 per cycle
       }
     }
 
-    if (!sent_state_notify &&
-        self->stats_dirty.exchange (false, std::memory_order_acq_rel)) {
+    const bool sent_stats_notify =
+      self->stats_dirty.exchange (false, std::memory_order_acq_rel);
+    if (sent_stats_notify)
       forge_stats_notify (self);
-      sent_state_notify = true;
-    }
 
     const uint32_t meter_interval =
       (uint32_t) (self->samplerate > 0.0 ? self->samplerate / LV2_METER_FPS : 1600.0);
-    if (!sent_state_notify && self->meter_notify_samples >= meter_interval) {
+    if (!sent_path_notify && !sent_stats_notify &&
+        self->meter_notify_samples >= meter_interval) {
       forge_meter_notify (self);
       self->meter_notify_samples = 0;
     }
@@ -794,6 +794,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       if (obj->body.otype == self->urid_patch_Get) {
         for (i = 0; i < NB_MAX_MODELS; i++)
           self->notify_path [i] = true;
+        self->stats_dirty.store (true, std::memory_order_release);
 
         continue;
       }
