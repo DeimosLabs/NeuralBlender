@@ -134,9 +134,8 @@ void c_standalone_ui::on_gain_out (c_widget *w, float f) {
 void c_standalone_ui::on_delay (c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
   g_blender.set_delay_ms (w->lane, f);
-  for (size_t i = 0; i < NB_MAX_MODELS; i++) {
-    stats [i * 2] = f;
-  }
+  if (w->lane < NB_MAX_MODELS)
+    stats [w->lane * 2] = (float) g_blender.delays [w->lane].frames ();
   update_stats ();
 }
 

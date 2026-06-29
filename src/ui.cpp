@@ -27,6 +27,7 @@ static void button_double_click (void *w_, void *event, void *user_data);
 static void button_value_changed (void *w_, void *value);
 static void knob_value_changed (void *w_, void *value);
 static void knob_double_click (void *w_, void *event, void *user_data);
+static void cb_draw_button (void *w_, void *user_data);
 static std::string path_dirname (const std::string &path);
 static std::string path_basename (const std::string &path);
 
@@ -311,8 +312,96 @@ void c_image::set_png (const unsigned char *png) {
   if (!widget || !png)
     return;
 
-  widget_get_png(widget, png);
-  expose_widget(widget);
+  widget_get_png (widget, png);
+  expose_widget (widget);
+}
+
+static cairo_surface_t *button_image_for_state (c_button *b, Widget_t *w) {
+  const bool on = w->adj && adj_get_value (w->adj) >= 0.5f;
+  const bool hover = (w->flags & HAS_FOCUS) || w->state == 1;
+  const bool down = w->state == 2;
+
+  if (down && hover && b->img_down_hover) return b->img_down_hover;
+  if (down && b->img_down) return b->img_down;
+  if (!on && hover && b->img_off_hover) return b->img_off_hover;
+  if (hover && b->img_hover) return b->img_hover;
+  if (on && b->img_on) return b->img_on;
+  return b->img_off;
+}
+
+static void draw_text (Widget_t *w) { CP
+  Metrics_t m;
+  os_get_window_metrics (w, &m);
+  if (!m.visible)
+    return;
+
+  use_bg_color_scheme (w, get_color_state (w));
+  cairo_rectangle (w->crb, 0, 0, m.width, m.height);
+  cairo_fill (w->crb);
+
+  use_text_color_scheme (w, get_color_state(w));
+  cairo_set_font_size (w->crb, w->app->normal_font / w->scale.ascale);
+
+  const char *label = w->label ? w->label : "";
+  cairo_text_extents_t ext;
+  cairo_text_extents (w->crb, label, &ext);
+
+  cairo_move_to (
+    w->crb,
+    (m.width - ext.width) * 0.5 - ext.x_bearing,
+    (m.height - ext.height) * 0.5 - ext.y_bearing
+  );
+  cairo_show_text (w->crb, label);
+}
+
+static void cb_draw_button (void *w_, void *) { CP
+  Widget_t *w = (Widget_t *) w_;
+  if (!w || !w->parent_struct || !w->crb)
+    return;
+
+  c_button *b = (c_button *) w->parent_struct;
+  cairo_surface_t *img = button_image_for_state (b, w);
+  if (!img) {
+    draw_text (w);
+    return;
+  }
+
+  Metrics_t m;
+  os_get_window_metrics (w, &m);
+  if (!m.visible)
+    return;
+  
+  if (cairo_surface_status (img) != CAIRO_STATUS_SUCCESS) {
+    // fall back to drawing text
+    draw_text (w);
+    return;
+  }
+
+  const double iw = cairo_image_surface_get_width (img);
+  const double ih = cairo_image_surface_get_height (img);
+  if (iw <= 0 || ih <= 0)
+    return;
+
+  cairo_save(w->crb);
+
+  cairo_scale (w->crb, (double) m.width / iw, (double) m.height / ih);
+  cairo_set_source_surface (w->crb, img, 0, 0);
+  cairo_rectangle (w->crb, 0, 0, iw, ih);
+  cairo_fill (w->crb);
+
+  cairo_restore (w->crb);
+}
+
+
+c_button::c_button () { CP }
+
+c_button::~c_button () { CP
+  if (img_off)        cairo_surface_destroy (img_off);
+  if (img_on)         cairo_surface_destroy (img_on);
+  if (img_hover)      cairo_surface_destroy (img_hover);
+  if (img_down)       cairo_surface_destroy (img_down);
+  if (img_down_hover) cairo_surface_destroy (img_down_hover);
+  if (img_off_hover)  cairo_surface_destroy (img_off_hover);
 }
 
 void c_button::create (
@@ -335,6 +424,19 @@ void c_button::create (
       widget->func.value_changed_callback = button_value_changed;
     break;
 
+    case BTN_IMAGETOGGLE:
+      is_toggle = true;
+      widget = add_image_toggle_button (parent, label_ ? label_ : "", x, y, w, h);
+      widget->func.value_changed_callback = button_value_changed;
+    break;
+
+    case BTN_IMAGE:
+      is_toggle = false;
+      widget = add_image_button (parent, label_ ? label_ : "", x, y, w, h);
+      widget->func.double_click_callback = button_double_click;
+      widget->func.button_release_callback = button_mouse_up;
+    break;
+    
     default:
       is_toggle = false;
       widget = add_button (parent, label_ ? label_ : "", x, y, w, h);
@@ -342,8 +444,39 @@ void c_button::create (
       widget->func.button_release_callback = button_mouse_up;
     break;
   }
-
+  
   c_widget::create (ui_, parent, label_, x, y, w, h);
+  if (style == BTN_IMAGE || style == BTN_IMAGETOGGLE)
+    widget->func.expose_callback = cb_draw_button;
+}
+
+void c_button::set_image (const unsigned char *pngdata, _button_state which) {
+  cairo_surface_t **csp = nullptr;
+
+  switch (which) {
+    case BTN_OFF:        csp = &img_off; break;
+    case BTN_ON:         csp = &img_on; break;
+    case BTN_HOVER:      csp = &img_hover; break;
+    case BTN_DOWN:       csp = &img_down; break;
+    case BTN_DOWN_HOVER: csp = &img_down_hover; break;
+    case BTN_OFF_HOVER:  csp = &img_off_hover; break;
+    default: return;
+  }
+
+  if (*csp) {
+    cairo_surface_destroy(*csp);
+    *csp = nullptr;
+  }
+
+  if (!pngdata)
+    return;
+
+  *csp = cairo_image_surface_create_from_stream(pngdata);
+
+  if (cairo_surface_status(*csp) != CAIRO_STATUS_SUCCESS) {
+    cairo_surface_destroy(*csp);
+    *csp = nullptr;
+  }
 }
 
 // calibration default is written to config ONLY if all
@@ -1459,6 +1592,12 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   label_big.textsize = 1.5;
   
   btn_enable.create (this, main_widget, "Enabled",  20, 12, 120, 40, BTN_TOGGLE);
+  /*btn_enable.set_image_on (data_xputty_approved_png);
+  btn_enable.set_image_hover (data_xputty_exit_png);
+  btn_enable.set_image_down_hover (data_xputty_eject_png);
+  btn_enable.set_image_down (data_xputty_error_png);
+  btn_enable.set_image_off (data_xputty_gear_png);
+  btn_enable.set_image_off_hover (data_xputty_question_png);*/
   btn_enable.set_value (true);
   btn_enable.role = ROLE_BYPASS;
   btn_about.create (this, main_widget, "About...", 520, 600, 100, 40);

@@ -154,7 +154,7 @@ std::string c_configfile::get_item (size_t n) {
 }
 
 std::string c_configfile::get_item (std::string str) {
-  dump ();
+  //dump ();
   int n = find_item (str);
   if (n < 0)
     return "";
@@ -202,8 +202,8 @@ bool c_configfile::read_file (std::string path) { CP
       }
     }
   }
-  debug ("dump:");
-  this->dump ();
+  //debug ("dump:");
+  //this->dump ();
   
   return true;
 }

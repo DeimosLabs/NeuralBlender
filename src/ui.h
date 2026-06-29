@@ -70,8 +70,19 @@ enum _widget_role {
 enum _button_style {
   BTN_NORMAL,
   BTN_TOGGLE,
-  BTN_CHECKBOX
-  //BTN_RADIO
+  BTN_CHECKBOX,
+  BTN_RADIO,
+  BTN_IMAGE,
+  BTN_IMAGETOGGLE
+};
+
+enum _button_state {
+  BTN_OFF,
+  BTN_ON,
+  BTN_HOVER,
+  BTN_DOWN,
+  BTN_DOWN_HOVER,
+  BTN_OFF_HOVER
 };
 
 class c_filepicker;
@@ -185,6 +196,8 @@ public:
 
 class c_button : public c_widget {
 public:
+  c_button ();
+  ~c_button ();
   void create (
       c_neuralblender_ui *ui,
       Widget_t *parent,
@@ -192,20 +205,35 @@ public:
       int x, int y, int w, int h,
       _button_style s = BTN_NORMAL);
 
-  /*void create (
-      c_neuralblender_ui *ui,
-      Widget_t *parent,
-      const char *label,
-      int x, int y, int w, int h, bool is_toggle);*/
-
   bool set_value (bool value);
   void set_bg_color (const float r, const float g, const float b) override;
   void set_fg_color (const float r, const float g, const float b) override;
   virtual void on_mouseup ();
   
+  void set_image (const unsigned char *png, _button_state which);
+  
+  inline void set_image_on (const unsigned char *png)
+    { set_image (png, BTN_ON); }
+  inline void set_image_off (const unsigned char *png)
+    { set_image (png, BTN_OFF); }
+  inline void set_image_hover (const unsigned char *png)
+    { set_image (png, BTN_HOVER); }
+  inline void set_image_down (const unsigned char *png)
+    { set_image (png, BTN_DOWN); }
+  inline void set_image_down_hover (const unsigned char *png)
+    { set_image (png, BTN_DOWN_HOVER); }
+  inline void set_image_off_hover (const unsigned char *png)
+    { set_image (png, BTN_OFF_HOVER); }
+  
   bool is_toggle = false;
   bool value = false;
-
+  
+  cairo_surface_t *img_off = NULL;
+  cairo_surface_t *img_on = NULL;
+  cairo_surface_t *img_hover = NULL;
+  cairo_surface_t *img_down = NULL;
+  cairo_surface_t *img_down_hover = NULL;
+  cairo_surface_t *img_off_hover = NULL;
 };
 
 class c_knob : public c_widget {
