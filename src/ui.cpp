@@ -30,6 +30,10 @@ static void knob_double_click (void *w_, void *event, void *user_data);
 static std::string path_dirname (const std::string &path);
 static std::string path_basename (const std::string &path);
 
+static constexpr float DEFAULT_BG_R = 0.125f;
+static constexpr float DEFAULT_BG_G = 0.125f;
+static constexpr float DEFAULT_BG_B = 0.125f;
+
 extern const char *g_build_timestamp;
 
 static void set_widget_color_all_states (
@@ -48,9 +52,15 @@ static void set_widget_color_all_states (
   set_widget_color (w, SELECTED_,    mod, r, g, b, a);
   set_widget_color (w, ACTIVE_,      mod, r, g, b, a);
   set_widget_color (w, INSENSITIVE_, mod, r, g, b, a);
+
+}
+// for xputty widget colors
+static void set_default_bg_color(Widget_t *w) {
+  set_widget_color_all_states(w, BACKGROUND_, DEFAULT_BG_R, DEFAULT_BG_G, DEFAULT_BG_B);
 }
 
 static void inherit_parent_bg_color (Widget_t *w, Widget_t *parent) {
+  return;
   if (!w || !parent || !parent->color_scheme)
     return;
 
@@ -61,6 +71,8 @@ static void inherit_parent_bg_color (Widget_t *w, Widget_t *parent) {
   set_widget_color_all_states (
       w, BACKGROUND_, c->bg [0], c->bg [1], c->bg [2], c->bg [3]);
 }
+
+static void _dummy_callback (void *w_, void* user_data) {}
 
 // this one must be called AFTER add_* (Widget_t *, ...) in child create functions
 void c_widget::create (
@@ -78,6 +90,8 @@ void c_widget::create (
     debug ("!widget");
     return;
   }
+  set_default_bg_color (widget);
+  widget->func.configure_notify_callback = _dummy_callback;
   
   widget->scale.gravity = NONE;
   widget->parent_struct = this;
@@ -90,21 +104,21 @@ bool c_widget::set_label (const char *label_) {
     return false;
 
   widget->label = label.c_str ();
-  expose_widget (widget);
+  expose ();
   return true;
 }
 
 void c_widget::set_bg_color (const float r, const float g, const float b) {
   set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 void c_widget::set_fg_color (const float r, const float g, const float b) {
   set_widget_color_all_states (widget, TEXT_, r, g, b);
   set_widget_color_all_states (widget, FORGROUND_, r, g, b);
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 void c_widget::move_resize (int x, int y, int w, int h) {
@@ -126,7 +140,7 @@ void c_widget::move_resize (int x, int y, int w, int h) {
   os_move_window (widget->app->dpy, widget, sx, sy);
   os_resize_window (widget->app->dpy, widget, sw, sh);
   widget->func.configure_callback (widget, NULL);
-  expose_widget (widget);
+  expose ();
 }
 
 void c_widget::move (int x, int y) {
@@ -142,7 +156,7 @@ void c_widget::move (int x, int y) {
   widget->scale.init_y = sy;
 
   os_move_window (widget->app->dpy, widget, sx, sy);
-  expose_widget (widget);
+  expose ();
 }
 
 void c_widget::resize (int w, int h) {
@@ -157,7 +171,7 @@ void c_widget::resize (int w, int h) {
 
   os_resize_window (widget->app->dpy, widget, sw, sh);
   widget->func.configure_callback (widget, NULL);
-  expose_widget (widget);
+  expose ();
 }
 
 void c_frame::create (
@@ -176,14 +190,14 @@ void c_frame::set_bg_color (const float r, const float g, const float b) {
   set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
   set_widget_color_all_states (widget, FRAME_, r, g, b);
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 void c_frame::set_fg_color (const float r, const float g, const float b) {
   set_widget_color_all_states (widget, TEXT_, r, g, b);
   set_widget_color_all_states (widget, FRAME_, r, g, b);
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 void c_meter::create (
@@ -229,7 +243,7 @@ void c_meter::show () {
   if (meter.widget)
     widget_show (meter.widget);
   if (widget)
-    expose_widget (widget);
+    expose ();
   if (meter.widget)
     expose_widget (meter.widget);
 }
@@ -255,7 +269,7 @@ void c_container::create (
 void c_container::set_bg_color (const float r, const float g, const float b) {
   set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 
@@ -275,13 +289,13 @@ void c_label::create (
 void c_label::set_bg_color (const float r, const float g, const float b) {
   set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 void c_label::set_fg_color (const float r, const float g, const float b) {
   set_widget_color_all_states (widget, TEXT_, r, g, b);
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 void c_image::create (
@@ -451,7 +465,7 @@ bool c_button::set_value (bool value_) {
 
   adj_set_value (widget->adj, this->value ? 1.0f : 0.0f);
   widget->state = this->value ? 3 : 0;
-  expose_widget (widget);
+  expose ();
   widget->func.value_changed_callback = oldvaluechanged;
   widget->func.adj_callback = oldadj;
 
@@ -461,14 +475,14 @@ bool c_button::set_value (bool value_) {
 void c_button::set_bg_color (const float r, const float g, const float b) {
   set_widget_color_all_states (widget, LIGHT_, r, g, b);
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 void c_button::set_fg_color (const float r, const float g, const float b) {
   set_widget_color_all_states (widget, TEXT_, r, g, b);
   set_widget_color_all_states (widget, FORGROUND_, r, g, b);
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 void c_knob::create (
@@ -487,14 +501,14 @@ void c_knob::create (
 void c_knob::set_bg_color (const float r, const float g, const float b) {
   set_widget_color_all_states (widget, BASE_, r, g, b);
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 void c_knob::set_fg_color (const float r, const float g, const float b) {
   set_widget_color_all_states (widget, FORGROUND_, r, g, b);
   set_widget_color_all_states (widget, TEXT_, r, g, b);
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 void c_knob::set_min (float x) {
@@ -515,7 +529,7 @@ void c_knob::set_value (float x) {
 
   adj_set_value (widget->adj, x);
   value = adj_get_value (widget->adj);
-  expose_widget (widget);
+  expose ();
 }
 
 void c_knob::set_defaultvalue (float x) {
@@ -592,7 +606,7 @@ void c_combobox::set_bg_color (const float r, const float g, const float b) {
   }
 
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 void c_combobox::set_fg_color (const float r, const float g, const float b) {
@@ -616,7 +630,7 @@ void c_combobox::set_fg_color (const float r, const float g, const float b) {
   }
 
   if (widget)
-    expose_widget (widget);
+    expose ();
 }
 
 // work around xputty's weirdness
@@ -646,7 +660,7 @@ void c_combobox::move_resize (int x, int y, int w, int h) {
   os_resize_window (button->app->dpy, button, sw, sh);
   button->func.configure_callback (button, NULL);
   expose_widget (button);
-  expose_widget (widget);
+  expose ();
 }
 
 void c_combobox::clear () { CP
@@ -732,7 +746,7 @@ void c_combobox::update_widget () {
   }
   updating_widget = false;
 
-  expose_widget (widget);
+  expose ();
 }
 
 void c_label::draw (void *w_, void *ptr) {
@@ -1222,6 +1236,7 @@ void c_lane_widgets::create (
     size_t which,
     int x, int y, int w, int h) { CP
   
+  move_resize (x, y, w, h);
   knob_top = (h - knob_size) / 2;
   
   char label [64];
@@ -1313,7 +1328,6 @@ void c_lane_widgets::create (
     ui->filepickers [which].lane = which;
   }
   
-  move_resize (x, y, w, h);
 }
 
 void c_lane_widgets::move_resize (

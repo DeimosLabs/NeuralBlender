@@ -94,7 +94,7 @@ public:
   virtual void set_fg_color (const float r,
                              const float g,
                              const float b);
-
+  
   // backpointers to parent objects
   Widget_t *widget         = NULL;
   Widget_t *parent         = NULL;
@@ -105,6 +105,7 @@ public:
   _widget_role role        = ROLE_UNKNOWN;
   uint64_t id              = -1;
   uint64_t lane            = -1;
+  inline void expose () { if (widget) expose_widget (widget); }
   
   inline int x () { return widget && widget->app ? (int) (widget->scale.init_x / widget->app->hdpi) : 0; }
   inline int y () { return widget && widget->app ? (int) (widget->scale.init_y / widget->app->hdpi) : 0; }
