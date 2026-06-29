@@ -1170,7 +1170,9 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   w = create_window (&ui->app, os_get_root_window (&ui->app, IS_WINDOW), 0, 0, 400, 450);
   if (!w)
     return;
-
+    
+  set_widget_color_all_states (w, BACKGROUND_, DEFAULT_BG_R, DEFAULT_BG_G, DEFAULT_BG_B);  
+  
   w->flags |= HIDE_ON_DELETE;
   os_set_transient_for_hint (ui->main_widget, w);
 
