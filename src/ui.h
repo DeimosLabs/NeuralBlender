@@ -75,11 +75,11 @@ public:
   c_neuralblender_ui *ui = NULL;
   size_t which_lane = 0;
   Widget_t *main_widget = NULL;
-  Widget_t *wreg = NULL;
-  Widget_t *wadv = NULL;
+  //Widget_t *wreg = NULL;
+  //Widget_t *wadv = NULL;
   c_frame lane_widget;
   c_container cont_regcontrols;
-  c_container cont_advcontrols;
+  //c_container cont_advcontrols;
   c_knob gain_in;
   c_knob gain_out;
   c_knob delay;
@@ -92,7 +92,8 @@ public:
   c_combobox menu_list;
   c_label label_flip;
   c_label label_calib;
-  c_label label_stats;
+  c_label label_frames;
+  c_label label_trim;
   
   int knob_size = 64;
   int knob_top = 0;
@@ -117,8 +118,8 @@ public:
   void set_lane_mute (size_t which, bool b);
   void vu_on (bool b = true);
   void vu_off ();
-  void show_advanced_settings (bool b = true);
-  void hide_advanced_settings ();
+  //void show_advanced_settings (bool b = true);
+  //void hide_advanced_settings ();
   void reposition_widgets (bool default_size = false);
   size_t choose_exclusive_lane () const;
   void update_stats ();
@@ -143,7 +144,7 @@ public:
           void on_excl_use (c_widget *w, bool b)                  ;
   virtual void on_window_resize (int w, int h)                    ;
   virtual bool request_window_size (int w, int h)                 ;
-  virtual void on_advanced (c_widget *w, bool b)                  ; 
+  //virtual void on_advanced (c_widget *w, bool b)                  ; 
   virtual void on_bypass (c_widget *w, bool b)                 = 0;
   virtual void on_about (c_widget *w)                          = 0;
 

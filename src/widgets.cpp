@@ -151,7 +151,9 @@ static const t_statecolors &colors_for (
     case WSTYLE_TOGGLE:
     case WSTYLE_IMAGE:
     case WSTYLE_IMAGE_BUTTON:
+    case WSTYLE_IMAGE_BUTTON_NOFRAME:
     case WSTYLE_IMAGE_TOGGLE:
+    case WSTYLE_IMAGE_TOGGLE_NOFRAME:
     case WSTYLE_DISABLED:
     default:
       return control_colors_for_state (g_colors->button, state);
@@ -305,19 +307,6 @@ static void draw_rounded_rect (
   draw_rounded_rect (w, x, y, width, height, radius, colors, line_width);
 }
 
-void inherit_parent_bg_color (Widget_t *w, Widget_t *parent) {
-  return;
-  if (!w || !parent || !parent->color_scheme)
-    return;
-
-  Colors *c = get_color_scheme (parent, NORMAL_);
-  if (!c)
-    return;
-
-  set_widget_color_all_states (
-      w, BACKGROUND_, c->bg [0], c->bg [1], c->bg [2], c->bg [3]);
-}
-
 unsigned long x11_color_pixel (
     Display *display,
     const t_gradientcolors &colors) {
@@ -354,19 +343,6 @@ void set_x11_window_background (
 }
 
 void cb_dummy (void *w_, void* user_data) {}
-
-cairo_surface_t *button_image_for_state (c_button *b, Widget_t *w) {
-  const bool on = w->adj && adj_get_value (w->adj) >= 0.5f;
-  const bool hover = (w->flags & HAS_FOCUS) || w->state == 1;
-  const bool down = w->state == 2;
-
-  if (down && hover && b->img_down_hover) return b->img_down_hover;
-  if (down && b->img_down) return b->img_down;
-  if (!on && hover && b->img_off_hover) return b->img_off_hover;
-  if (hover && b->img_hover) return b->img_hover;
-  if (on && b->img_on) return b->img_on;
-  return b->img_off;
-}
 
 void main_notify_callback (void *w_, void *user_data) {
   //configure_event (w, user_data);
@@ -405,123 +381,6 @@ void cb_draw_main_window (void *w_, void *user_data) { CP
 
   fill_rounded_rect (w, 0, 0, metrics.width, metrics.height,
                      0.0f, g_colors->window_bg);
-}
-
-void button_double_click (void *w_, void *event, void *user_data) {
-  (void) event;
-  (void) user_data;
-
-  Widget_t *w = (Widget_t *) w_;
-  if (!w)
-    return;
-
-  w->state = 0;
-  if (w->adj_y)
-    adj_set_value (w->adj_y, 0.0);
-  expose_widget (w);
-  auto *b = (c_button *) w->parent_struct;
-  b->on_mouseup ();
-}
-
-void knob_double_click (void *w_, void *event, void *user_data) {
-  (void) event;
-  (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
-  if (!w)
-    return;
-  auto *k = (c_knob *) w->parent_struct;
-  k->on_doubleclick ();
-}
-
-static void button_mouse_up (void *w_, void *event, void *user_data) {
-  (void) event;
-  (void) user_data;
-
-  auto *w = (Widget_t *) w_;
-  if (!w) return;
-  w->state = 0;
-  if (w->adj_y) adj_set_value (w->adj_y, 0.0);
-  expose_widget (w);
-
-  auto *b = (c_button *) w->parent_struct;
-  b->on_mouseup ();
-}
-
-// here value_ points to a float
-static void button_value_changed (void *w_, void *value_) {
-  if (!value_)
-    return;
-
-  const float value = *(float *) value_;
-  //debug ("value=%f", value);
-  Widget_t *w = (Widget_t *) w_;
-  if (!w || !w->parent_struct) {
-    return;
-  }
-
-  c_button *b = (c_button *) w->parent_struct;
-  b->value = value >= 0.5f;
-  b->on_mouseup ();
-}
-
-static _widget_state button_state_from_xputty (Widget_t *w) {
-  if (!w)
-    return WSTATE_UNKNOWN;
-
-  const bool on = w->adj && adj_get_value (w->adj) >= 0.5f;
-  const bool hover = (w->flags & HAS_FOCUS) || w->state == 1;
-  const bool down = w->state == 2;
-
-  if (down && hover) return WSTATE_DOWN_HOVER;
-  if (down)          return WSTATE_DOWN;
-  if (!on && hover)  return WSTATE_OFF_HOVER;
-  if (on && hover)   return WSTATE_ON_HOVER;
-  if (hover)         return WSTATE_HOVER;
-  if (on)            return WSTATE_ON;
-  return WSTATE_OFF;
-}
-
-void knob_value_changed (void *w_, void *value_) {
-  if (!value_)
-    return;
-
-  const float value = *(float *) value_;
-  Widget_t *w = (Widget_t *) w_;
-  if (!w || !w->parent_struct) {
-    return;
-  }
-
-  c_knob *k = (c_knob *) w->parent_struct;
-  if (k->value != value) {
-    k->value = value;
-    k->on_change ();
-  }
-}
-
-static void combobox_selected_callback (void *w_, void *user_data) { CP
-  Widget_t *w = (Widget_t *) w_;
-
-  int index = (int) adj_get_value (w->adj);
-
-  Widget_t *menu = w->childlist->childs[1];
-  Widget_t *view_port = menu->childlist->childs[0];
-  ComboBox_t *list = (ComboBox_t *) view_port->parent_struct;
-
-  const char *label = NULL;
-  if (index >= 0 && index < (int) list->list_size)
-    label = list->list_names [index];
-
-  // index + label are selected item
-  c_combobox *cb = (c_combobox *) w->parent_struct;
-  if (!cb) {
-    debug ("!cb");
-    return;
-  }
-  cb->selected = index;
-  if (cb->updating_widget)
-    return;
-
-  cb->on_change (index);
 }
 
 // this one must be called AFTER add_* (Widget_t *, ...) in child create functions
@@ -661,7 +520,6 @@ void c_frame::create (
   widget = add_frame (parent, label_ ? label_ : "", x, y, w, h);
   widget->func.expose_callback = c_frame::cb_draw;
   c_widget::create (ui_, parent, label_, x, y, w, h);
-  inherit_parent_bg_color (widget, parent);
 }
 
 void c_frame::cb_draw (void *w_, void *user_data) {
@@ -686,6 +544,16 @@ void c_frame::cb_draw (void *w_, void *user_data) {
   draw_rounded_rect (w, UI_FRAME_RADIUS, c.fg, 2.0f);
 }
 
+
+void c_container::create (
+    c_neuralblender_ui *ui_,
+    Widget_t *parent,
+    const char *label_,
+    int x, int y, int w, int h) {
+
+  widget = create_widget (parent->app, parent, x, y, w, h);
+  c_widget::create (ui_, parent, label_, x, y, w, h);
+}
 
 void c_meter::create (
     c_neuralblender_ui *ui_,
@@ -742,17 +610,6 @@ void c_meter::hide () {
     widget_hide (widget);
 }
 
-void c_container::create (
-    c_neuralblender_ui *ui_,
-    Widget_t *parent,
-    const char *label_,
-    int x, int y, int w, int h) {
-
-  widget = create_widget (parent->app, parent, x, y, w, h);
-  c_widget::create (ui_, parent, label_, x, y, w, h);
-  inherit_parent_bg_color (widget, parent);
-}
-
 void c_label::create (
     c_neuralblender_ui *ui_,
     Widget_t *parent,
@@ -763,7 +620,46 @@ void c_label::create (
   widget = add_label (parent, label.c_str (), x, y, w, h);
   widget->func.expose_callback = c_label::cb_draw;
   c_widget::create (ui_, parent, label_, x, y, w, h);
-  inherit_parent_bg_color (widget, parent);
+}
+
+void c_label::cb_draw (void *w_, void *ptr) {
+  (void) ptr;
+  Widget_t *w = (Widget_t *) w_;
+  if (!w)
+    return;
+
+  c_label *self = (c_label *) w->parent_struct;
+  const float textsize = self ? self->textsize : 1.0f;
+  const _textalign align = self ? self->align : TEXT_CENTER;
+  const char *text = w->label ? w->label : "";
+
+  Metrics_t metrics;
+  os_get_window_metrics (w, &metrics);
+  if (!metrics.visible)
+    return;
+
+  use_bg_color_scheme (w, NORMAL_);
+  //cairo_rectangle (w->crb, 0, 0, metrics.width, metrics.height);
+  //cairo_fill (w->crb);
+
+  cairo_text_extents_t extents;
+  use_text_color_scheme (w, NORMAL_);
+  cairo_set_font_size (w->crb, (w->app->normal_font * textsize) / w->scale.ascale);
+  cairo_text_extents (w->crb, text, &extents);
+
+  const double padding = 2.0 * w->app->hdpi;
+  double x = padding - extents.x_bearing;
+  if (align == TEXT_CENTER)
+    x = (metrics.width - extents.width) * 0.5 - extents.x_bearing;
+  else if (align == TEXT_RIGHT)
+    x = metrics.width - padding - extents.width - extents.x_bearing;
+
+  const double y = (metrics.height - extents.height) * 0.5 - extents.y_bearing;
+
+  cairo_move_to (w->crb, x, y);
+  cairo_text_path (w->crb, text);
+  cairo_fill (w->crb);
+  cairo_new_path (w->crb);
 }
 
 void c_image::create (
@@ -781,6 +677,83 @@ void c_image::set_png (const unsigned char *png) {
 
   widget_get_png (widget, png);
   expose_widget (widget);
+}
+
+static cairo_surface_t *button_image_for_state (c_button *b, Widget_t *w) {
+  const bool on = w->adj && adj_get_value (w->adj) >= 0.5f;
+  const bool hover = (w->flags & HAS_FOCUS) || w->state == 1;
+  const bool down = w->state == 2;
+
+  if (down && hover && b->img_down_hover) return b->img_down_hover;
+  if (down && b->img_down) return b->img_down;
+  if (!on && hover && b->img_off_hover) return b->img_off_hover;
+  if (hover && b->img_hover) return b->img_hover;
+  if (on && b->img_on) return b->img_on;
+  return b->img_off;
+}
+
+static _widget_state button_state_from_xputty (Widget_t *w) {
+  if (!w)
+    return WSTATE_UNKNOWN;
+
+  const bool on = w->adj && adj_get_value (w->adj) >= 0.5f;
+  const bool hover = (w->flags & HAS_FOCUS) || w->state == 1;
+  const bool down = w->state == 2;
+
+  if (down && hover) return WSTATE_DOWN_HOVER;
+  if (down)          return WSTATE_DOWN;
+  if (!on && hover)  return WSTATE_OFF_HOVER;
+  if (on && hover)   return WSTATE_ON_HOVER;
+  if (hover)         return WSTATE_HOVER;
+  if (on)            return WSTATE_ON;
+  return WSTATE_OFF;
+}
+
+static void button_double_click (void *w_, void *event, void *user_data) {
+  (void) event;
+  (void) user_data;
+
+  Widget_t *w = (Widget_t *) w_;
+  if (!w)
+    return;
+
+  w->state = 0;
+  if (w->adj_y)
+    adj_set_value (w->adj_y, 0.0);
+  expose_widget (w);
+  auto *b = (c_button *) w->parent_struct;
+  b->on_mouseup ();
+}
+
+static void button_mouse_up (void *w_, void *event, void *user_data) {
+  (void) event;
+  (void) user_data;
+
+  auto *w = (Widget_t *) w_;
+  if (!w) return;
+  w->state = 0;
+  if (w->adj_y) adj_set_value (w->adj_y, 0.0);
+  expose_widget (w);
+
+  auto *b = (c_button *) w->parent_struct;
+  b->on_mouseup ();
+}
+
+// here value_ points to a float
+static void button_value_changed (void *w_, void *value_) {
+  if (!value_)
+    return;
+
+  const float value = *(float *) value_;
+  //debug ("value=%f", value);
+  Widget_t *w = (Widget_t *) w_;
+  if (!w || !w->parent_struct) {
+    return;
+  }
+
+  c_button *b = (c_button *) w->parent_struct;
+  b->value = value >= 0.5f;
+  b->on_mouseup ();
 }
 
 c_button::c_button () { CP }
@@ -887,9 +860,9 @@ void c_button::cb_draw (void *w, void *user_data) {
       fill_rounded_rect (widget, UI_BUTTON_RADIUS, colors.bg);
       draw_rounded_rect (widget, UI_BUTTON_RADIUS, colors.fg, 2.0f);
     break;
-
-    case WSTYLE_IMAGE_TOGGLE:
-    case WSTYLE_IMAGE_BUTTON:
+    
+    case WSTYLE_IMAGE_TOGGLE_NOFRAME:
+    case WSTYLE_IMAGE_BUTTON_NOFRAME:
       // xputty takes care of images for us, if we set them
       // using set_image_* methods.
       if (draw_button_image (widget, self))
@@ -902,6 +875,15 @@ void c_button::cb_draw (void *w, void *user_data) {
                           self->text_r, self->text_g, self->text_b);
     break;
 
+    case WSTYLE_IMAGE_TOGGLE:
+    case WSTYLE_IMAGE_BUTTON:
+      // didn't draw? fall back to normal frame/text
+      fill_rounded_rect (widget, UI_BUTTON_RADIUS, colors.bg);
+      draw_rounded_rect (widget, UI_BUTTON_RADIUS, colors.fg, 2.0f);
+      draw_button_image (widget, self);
+
+    break;
+    
     default:
       fill_rounded_rect (widget, UI_BUTTON_RADIUS, colors.bg);
       draw_rounded_rect (widget, UI_BUTTON_RADIUS, colors.fg, 2.0f);
@@ -938,6 +920,346 @@ void c_button::set_image (const unsigned char *pngdata, _widget_state which) {
     cairo_surface_destroy(*csp);
     *csp = nullptr;
   }
+}
+
+void c_button::on_mouseup () {
+  if (!ui || ui->updating_from_state)
+    return;
+
+  switch (role) {
+    case ROLE_BYPASS: CP
+      ui->on_bypass (this, value);
+      set_label (value ? "Enabled" : "Bypass");
+    break;
+
+    case ROLE_MUTE: CP
+      ui->on_mute (this, value);
+      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
+        ui->state.lanes [lane].lane_mute = value;
+      }
+    break;
+
+    case ROLE_DCFLIP: CP
+      ui->on_dcflip (this, value);
+      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
+        ui->state.lanes [lane].dcflip = value;
+      }
+    break;
+
+    case ROLE_CALIBRATE: CP
+      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
+        ui->state.lanes [lane].do_calib = value;
+      }
+      ui->write_calib_state_if_consistent ();
+      ui->on_calibrate (this, value);
+    break;
+
+    case ROLE_MUTEALL: CP
+      ui->on_muteall (this, value);
+    break;
+
+    case ROLE_BROWSE: CP
+      ui->on_filebrowse (this);
+      if (filepicker)
+        filepicker->show ();
+      else
+        debug ("!filepicker");
+    break;
+
+    case ROLE_CLEAR: CP
+      ui->on_fileclear (this);
+    break;
+
+    case ROLE_ABOUT: CP
+      ui->aboutwindow.show ();
+      ui->on_about (this);
+    break;
+
+    case ROLE_ABOUTOK: CP
+      ui->aboutwindow.hide ();
+    break;
+
+    case ROLE_VUTOGGLE: CP
+      ui->vu_on (value);
+    break;
+
+    case ROLE_EXCL_TOGGLE: CP
+      if (value) {
+        size_t exclusive_lane = ui->choose_exclusive_lane ();
+        ui->on_excl (this, exclusive_lane); // this is 1-BASED, 0 = normal mode
+      } else {
+        ui->on_excl (this, 0);
+      }
+    break;
+
+    case ROLE_EXCL_USE:
+      ui->on_excl_use (this, value);
+    break;
+
+    //case ROLE_ADV_TOGGLE:
+    //  ui->on_advanced (this, value);
+    //break;
+
+    default: CP
+    break;
+  }
+  ui->sync_widgets_from_state (ui->state);
+}
+
+void xevfunc_dummy (void *a, void *b)          { }
+void evfunc_dummy (void *a, void *b, void *c)  { }
+
+bool c_button::set_value (bool value_) {
+  if (!widget || !widget->adj)
+    return false;
+
+  value = value_;
+
+  // avoid firing unwanted callbacks
+  xevfunc oldvaluechanged = widget->func.value_changed_callback;
+  xevfunc oldadj = widget->func.adj_callback;
+  widget->func.value_changed_callback = xevfunc_dummy;
+  widget->func.adj_callback = xevfunc_dummy;
+
+  adj_set_value (widget->adj, this->value ? 1.0f : 0.0f);
+  widget->state = this->value ? 3 : 0;
+  expose ();
+  widget->func.value_changed_callback = oldvaluechanged;
+  widget->func.adj_callback = oldadj;
+
+  return true;
+}
+
+void knob_double_click (void *w_, void *event, void *user_data) {
+  (void) event;
+  (void) user_data;
+  Widget_t *w = (Widget_t *) w_;
+  if (!w)
+    return;
+  auto *k = (c_knob *) w->parent_struct;
+  k->on_doubleclick ();
+}
+
+void knob_value_changed (void *w_, void *value_) {
+  if (!value_)
+    return;
+
+  const float value = *(float *) value_;
+  Widget_t *w = (Widget_t *) w_;
+  if (!w || !w->parent_struct) {
+    return;
+  }
+
+  c_knob *k = (c_knob *) w->parent_struct;
+  if (k->value != value) {
+    k->value = value;
+    k->on_change ();
+  }
+}
+
+void c_knob::create (
+    c_neuralblender_ui *ui_,
+    Widget_t *parent,
+    const char *label_,
+    int x, int y, int w, int h) {
+
+  label = label_;
+  widget = add_knob (parent, label.c_str (), x, y, w, h);
+  widget->func.value_changed_callback = knob_value_changed;
+  widget->func.double_click_callback = knob_double_click;
+  c_widget::create (ui_, parent, label_, x, y, w, h);
+}
+
+void c_knob::set_min (float x) {
+  min = x;
+  adj_set_min_value (widget->adj, x);
+}
+
+void c_knob::set_max (float x) {
+  max = x;
+  adj_set_max_value (widget->adj, x);
+}
+
+void c_knob::set_value (float x) {
+  if (!widget || !widget->adj) {
+    value = x;
+    return;
+  }
+
+  adj_set_value (widget->adj, x);
+  value = adj_get_value (widget->adj);
+  expose ();
+}
+
+void c_knob::set_defaultvalue (float x) {
+  defaultvalue = x;
+}
+
+void c_knob::set_step (float x) {
+  step = widget->adj->step = x;
+}
+
+void c_knob::on_change () {
+  //debug ("value=%f", value);
+  if (ui && ui->updating_from_state)
+    return;
+
+  float g = db_to_gain (value);
+  switch (role) {
+    case ROLE_GAIN_IN:
+      debug ("lane %d gain in %f", lane, g);
+      ui->on_gain_in (this, g);
+    break;
+
+    case ROLE_GAIN_OUT:
+      debug ("lane %d gain out %f", lane, g);
+      ui->on_gain_out (this, g);
+    break;
+
+    case ROLE_DELAY:
+      debug ("lane %d delay %f", lane, value);
+      ui->on_delay (this, value);
+    break;
+
+    default:
+      debug ("unknown knob set to %f", g);
+    break;
+  }
+}
+
+void c_knob::on_doubleclick () { CP
+  if (reset_on_doubleclick)
+    set_value (defaultvalue);
+}
+
+void c_combobox::create (
+    c_neuralblender_ui *ui_,
+    Widget_t *parent,
+    const char *label_,
+    int x, int y, int w, int h) {
+
+  label = label_;
+  widget = add_combobox (parent, label.c_str (), x, y, w, h);
+  c_widget::create (ui_, parent, label_, x, y, w, h);
+  combobox_set_menu_size (widget, 16);
+
+  update_widget ();
+}
+
+// work around xputty's weirdness
+void c_combobox::move_resize (int x, int y, int w, int h) {
+  c_widget::move_resize (x, y, w, h);
+
+  if (!widget || !widget->childlist || widget->childlist->elem < 1)
+    return;
+
+  Widget_t *button = widget->childlist->childs [0];
+  if (!button)
+    return;
+
+  const int bw = 20;
+  const int sx = std::max (0, (int) ((w - bw) * widget->app->hdpi));
+  const int sw = std::max (1, (int) (bw * widget->app->hdpi));
+  const int sh = std::max (1, (int) (h * widget->app->hdpi));
+
+  button->x = sx;
+  button->y = 0;
+  button->scale.init_x = sx;
+  button->scale.init_y = 0;
+  button->scale.init_width = sw;
+  button->scale.init_height = sh;
+
+  os_move_window (button->app->dpy, button, sx, 0);
+  os_resize_window (button->app->dpy, button, sw, sh);
+  button->func.configure_callback (button, NULL);
+  expose_widget (button);
+  expose ();
+}
+
+void c_combobox::clear () { CP
+  items.clear ();
+  selected = -1;
+  update_widget ();
+}
+
+void c_combobox::add (const std::string &str) {
+  debug ("str=%s", str.c_str ());
+  items.push_back (str);
+  update_widget ();
+}
+
+void c_combobox::on_change (int x) {
+  debug ("x=%d", x);
+  if (ui && ui->updating_from_state)
+    return;
+
+  set_selection (x);
+
+  if (x < 0 || x >= (int) items.size ()) {
+    debug ("item out of range: %d", x);
+    return;
+  }
+  std::string fullpath;
+  if (strip_directories) // yay spaghetti
+    fullpath = ui->filepickers [lane].current_dir + "/" + items [x];
+  else
+    fullpath = items [x];
+
+  ui->load_model (lane, fullpath.c_str ());
+}
+
+void c_combobox::set_selection (int n) {
+  if (n >= 0 && n < (int) items.size())
+    selected = n;
+  else
+    selected = -1;
+
+  update_widget();
+}
+
+int c_combobox::get_selection () {
+  return selected;
+}
+
+void c_combobox::update_widget () {
+  int i, n = items.size ();
+  debug ("%d items", n);
+
+  updating_widget = true;
+  combobox_delete_entrys (widget);
+  for (i = 0; i < n; i++) {
+    combobox_add_entry (widget, items [i].c_str ());
+  }
+
+  // more xputty internals... thanks to codex for the help on this!
+  if (selected >= 0 && selected < i) {
+    combobox_set_active_entry (widget, selected);
+
+    Widget_t *menu = widget->childlist->childs [1];
+    Widget_t *view_port = menu->childlist->childs [0];
+    ComboBox_t *list = (ComboBox_t *) view_port->parent_struct;
+    int show_items = 16;
+    int top = selected - (show_items / 2);
+    int max_top = n - show_items;
+
+    if (max_top < 0)
+      max_top = 0;
+    if (top < 0)
+      top = 0;
+    if (top > max_top)
+      top = max_top;
+
+    combobox_set_menu_size (widget, show_items);
+    adj_set_value (view_port->adj, top);
+    adj_set_state (list->slider->adj, adj_get_state (view_port->adj));
+    expose_widget (view_port);
+  } else {
+    combobox_set_menu_size (widget, 16);
+    widget->label = label.c_str ();
+  }
+  updating_widget = false;
+
+  expose ();
 }
 
 static void filepicker_response (void *w_, void *user_data) { CP
@@ -1140,4 +1462,3 @@ void c_filepicker::add_files_from_dir (c_combobox *cb) {
          current_dir.c_str (), selected_file.c_str (), filelist.size (), sel);
   cb->update_widget();
 }
-

@@ -92,359 +92,6 @@ void c_neuralblender_ui::write_calib_state_if_consistent () {
   configfile.write_file();
 }
 
-void c_button::on_mouseup () {
-  if (!ui || ui->updating_from_state)
-    return;
-
-  switch (role) {
-    case ROLE_BYPASS: CP
-      ui->on_bypass (this, value);
-      set_label (value ? "Enabled" : "Bypass");
-    break;
-
-    case ROLE_MUTE: CP
-      ui->on_mute (this, value);
-      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
-        ui->state.lanes [lane].lane_mute = value;
-      }
-    break;
-
-    case ROLE_DCFLIP: CP
-      ui->on_dcflip (this, value);
-      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
-        ui->state.lanes [lane].dcflip = value;
-      }
-    break;
-
-    case ROLE_CALIBRATE: CP
-      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
-        ui->state.lanes [lane].do_calib = value;
-      }
-      ui->write_calib_state_if_consistent ();
-      ui->on_calibrate (this, value);
-    break;
-
-    case ROLE_MUTEALL: CP
-      ui->on_muteall (this, value);
-    break;
-
-    case ROLE_BROWSE: CP
-      ui->on_filebrowse (this);
-      if (filepicker)
-        filepicker->show ();
-      else
-        debug ("!filepicker");
-    break;
-
-    case ROLE_CLEAR: CP
-      ui->on_fileclear (this);
-    break;
-
-    case ROLE_ABOUT: CP
-      ui->aboutwindow.show ();
-      ui->on_about (this);
-    break;
-
-    case ROLE_ABOUTOK: CP
-      ui->aboutwindow.hide ();
-    break;
-
-    case ROLE_VUTOGGLE: CP
-      ui->vu_on (value);
-    break;
-
-    case ROLE_EXCL_TOGGLE: CP
-      if (value) {
-        size_t exclusive_lane = ui->choose_exclusive_lane ();
-        ui->on_excl (this, exclusive_lane); // this is 1-BASED, 0 = normal mode
-      } else {
-        ui->on_excl (this, 0);
-      }
-    break;
-
-    case ROLE_EXCL_USE:
-      ui->on_excl_use (this, value);
-    break;
-
-    case ROLE_ADV_TOGGLE:
-      ui->on_advanced (this, value);
-    break;
-
-    default: CP
-    break;
-  }
-  ui->sync_widgets_from_state (ui->state);
-}
-
-void xevfunc_dummy (void *a, void *b)          { }
-void evfunc_dummy (void *a, void *b, void *c)  { }
-
-bool c_button::set_value (bool value_) {
-  if (!widget || !widget->adj)
-    return false;
-
-  value = value_;
-
-  // avoid firing unwanted callbacks
-  xevfunc oldvaluechanged = widget->func.value_changed_callback;
-  xevfunc oldadj = widget->func.adj_callback;
-  widget->func.value_changed_callback = xevfunc_dummy;
-  widget->func.adj_callback = xevfunc_dummy;
-
-  adj_set_value (widget->adj, this->value ? 1.0f : 0.0f);
-  widget->state = this->value ? 3 : 0;
-  expose ();
-  widget->func.value_changed_callback = oldvaluechanged;
-  widget->func.adj_callback = oldadj;
-
-  return true;
-}
-
-void c_knob::create (
-    c_neuralblender_ui *ui_,
-    Widget_t *parent,
-    const char *label_,
-    int x, int y, int w, int h) {
-
-  label = label_;
-  widget = add_knob (parent, label.c_str (), x, y, w, h);
-  widget->func.value_changed_callback = knob_value_changed;
-  widget->func.double_click_callback = knob_double_click;
-  c_widget::create (ui_, parent, label_, x, y, w, h);
-}
-
-void c_knob::set_min (float x) {
-  min = x;
-  adj_set_min_value (widget->adj, x);
-}
-
-void c_knob::set_max (float x) {
-  max = x;
-  adj_set_max_value (widget->adj, x);
-}
-
-void c_knob::set_value (float x) {
-  if (!widget || !widget->adj) {
-    value = x;
-    return;
-  }
-
-  adj_set_value (widget->adj, x);
-  value = adj_get_value (widget->adj);
-  expose ();
-}
-
-void c_knob::set_defaultvalue (float x) {
-  defaultvalue = x;
-}
-
-void c_knob::set_step (float x) {
-  step = widget->adj->step = x;
-}
-
-void c_knob::on_change () {
-  //debug ("value=%f", value);
-  if (ui && ui->updating_from_state)
-    return;
-
-  float g = db_to_gain (value);
-  switch (role) {
-    case ROLE_GAIN_IN:
-      debug ("lane %d gain in %f", lane, g);
-      ui->on_gain_in (this, g);
-    break;
-
-    case ROLE_GAIN_OUT:
-      debug ("lane %d gain out %f", lane, g);
-      ui->on_gain_out (this, g);
-    break;
-
-    case ROLE_DELAY:
-      debug ("lane %d delay %f", lane, value);
-      ui->on_delay (this, value);
-    break;
-
-    default:
-      debug ("unknown knob set to %f", g);
-    break;
-  }
-}
-
-void c_knob::on_doubleclick () { CP
-  if (reset_on_doubleclick)
-    set_value (defaultvalue);
-}
-
-void c_combobox::create (
-    c_neuralblender_ui *ui_,
-    Widget_t *parent,
-    const char *label_,
-    int x, int y, int w, int h) {
-
-  label = label_;
-  widget = add_combobox (parent, label.c_str (), x, y, w, h);
-  c_widget::create (ui_, parent, label_, x, y, w, h);
-  combobox_set_menu_size (widget, 16);
-
-  update_widget ();
-}
-
-// work around xputty's weirdness
-void c_combobox::move_resize (int x, int y, int w, int h) {
-  c_widget::move_resize (x, y, w, h);
-
-  if (!widget || !widget->childlist || widget->childlist->elem < 1)
-    return;
-
-  Widget_t *button = widget->childlist->childs [0];
-  if (!button)
-    return;
-
-  const int bw = 20;
-  const int sx = std::max (0, (int) ((w - bw) * widget->app->hdpi));
-  const int sw = std::max (1, (int) (bw * widget->app->hdpi));
-  const int sh = std::max (1, (int) (h * widget->app->hdpi));
-
-  button->x = sx;
-  button->y = 0;
-  button->scale.init_x = sx;
-  button->scale.init_y = 0;
-  button->scale.init_width = sw;
-  button->scale.init_height = sh;
-
-  os_move_window (button->app->dpy, button, sx, 0);
-  os_resize_window (button->app->dpy, button, sw, sh);
-  button->func.configure_callback (button, NULL);
-  expose_widget (button);
-  expose ();
-}
-
-void c_combobox::clear () { CP
-  items.clear ();
-  selected = -1;
-  update_widget ();
-}
-
-void c_combobox::add (const std::string &str) {
-  debug ("str=%s", str.c_str ());
-  items.push_back (str);
-  update_widget ();
-}
-
-void c_combobox::on_change (int x) {
-  debug ("x=%d", x);
-  if (ui && ui->updating_from_state)
-    return;
-
-  set_selection (x);
-
-  if (x < 0 || x >= (int) items.size ()) {
-    debug ("item out of range: %d", x);
-    return;
-  }
-  std::string fullpath;
-  if (strip_directories) // yay spaghetti
-    fullpath = ui->filepickers [lane].current_dir + "/" + items [x];
-  else
-    fullpath = items [x];
-
-  ui->load_model (lane, fullpath.c_str ());
-}
-
-void c_combobox::set_selection (int n) {
-  if (n >= 0 && n < (int) items.size())
-    selected = n;
-  else
-    selected = -1;
-
-  update_widget();
-}
-
-int c_combobox::get_selection () {
-  return selected;
-}
-
-void c_combobox::update_widget () {
-  int i, n = items.size ();
-  debug ("%d items", n);
-
-  updating_widget = true;
-  combobox_delete_entrys (widget);
-  for (i = 0; i < n; i++) {
-    combobox_add_entry (widget, items [i].c_str ());
-  }
-
-  // more xputty internals... thanks to codex for the help on this!
-  if (selected >= 0 && selected < i) {
-    combobox_set_active_entry (widget, selected);
-
-    Widget_t *menu = widget->childlist->childs [1];
-    Widget_t *view_port = menu->childlist->childs [0];
-    ComboBox_t *list = (ComboBox_t *) view_port->parent_struct;
-    int show_items = 16;
-    int top = selected - (show_items / 2);
-    int max_top = n - show_items;
-
-    if (max_top < 0)
-      max_top = 0;
-    if (top < 0)
-      top = 0;
-    if (top > max_top)
-      top = max_top;
-
-    combobox_set_menu_size (widget, show_items);
-    adj_set_value (view_port->adj, top);
-    adj_set_state (list->slider->adj, adj_get_state (view_port->adj));
-    expose_widget (view_port);
-  } else {
-    combobox_set_menu_size (widget, 16);
-    widget->label = label.c_str ();
-  }
-  updating_widget = false;
-
-  expose ();
-}
-
-void c_label::cb_draw (void *w_, void *ptr) {
-  (void) ptr;
-  Widget_t *w = (Widget_t *) w_;
-  if (!w)
-    return;
-
-  c_label *self = (c_label *) w->parent_struct;
-  const float textsize = self ? self->textsize : 1.0f;
-  const _textalign align = self ? self->align : TEXT_CENTER;
-  const char *text = w->label ? w->label : "";
-
-  Metrics_t metrics;
-  os_get_window_metrics (w, &metrics);
-  if (!metrics.visible)
-    return;
-
-  use_bg_color_scheme (w, NORMAL_);
-  //cairo_rectangle (w->crb, 0, 0, metrics.width, metrics.height);
-  //cairo_fill (w->crb);
-
-  cairo_text_extents_t extents;
-  use_text_color_scheme (w, NORMAL_);
-  cairo_set_font_size (w->crb, (w->app->normal_font * textsize) / w->scale.ascale);
-  cairo_text_extents (w->crb, text, &extents);
-
-  const double padding = 2.0 * w->app->hdpi;
-  double x = padding - extents.x_bearing;
-  if (align == TEXT_CENTER)
-    x = (metrics.width - extents.width) * 0.5 - extents.x_bearing;
-  else if (align == TEXT_RIGHT)
-    x = metrics.width - padding - extents.width - extents.x_bearing;
-
-  const double y = (metrics.height - extents.height) * 0.5 - extents.y_bearing;
-
-  cairo_move_to (w->crb, x, y);
-  cairo_text_path (w->crb, text);
-  cairo_fill (w->crb);
-  cairo_new_path (w->crb);
-}
-
 void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   ui = ui_;
   if (!ui || !ui->ui_ready || w)
@@ -533,19 +180,19 @@ void c_lane_widgets::create (
   Widget_t *wp = lane_widget.widget;
   main_widget = wp;
   cont_regcontrols.create (ui, wp, "", 0, 0, 600, 64);
-  cont_advcontrols.create (ui, wp, "", 0, 0, 300, 64);
-  wreg = cont_regcontrols.widget;
-  wadv = cont_advcontrols.widget;
-  wreg->scale.gravity = NONE;
-  wadv->scale.gravity = NONE;
+  //cont_advcontrols.create (ui, wp, "", 0, 0, 300, 64);
+  wp = cont_regcontrols.widget;
+  //wadv = cont_advcontrols.widget;
+  wp->scale.gravity = NONE;
+  //wadv->scale.gravity = NONE;
   
   // regular controls
-  menu_list.create (ui, wreg, label, 0, 0, 320, 32);
+  menu_list.create (ui, wp, label, 0, 0, 320, 32);
   menu_list.widget->func.value_changed_callback = combobox_selected_callback;
   menu_list.lane = which;
 
   int knobs_right = w - 180;
-  gain_in.create (ui, wreg, "Input", knobs_right + 6, knob_top, knob_size, knob_size);
+  gain_in.create (ui, wp, "Input", knobs_right + 6, knob_top, knob_size, knob_size);
   gain_in.lane = gain_out.lane = delay.lane = which;
   gain_in.set_min (-40);
   gain_in.set_max (40);
@@ -554,7 +201,7 @@ void c_lane_widgets::create (
   gain_in.set_step (1);
   gain_in.role = ROLE_GAIN_IN;
   
-  gain_out.create (ui, wreg, "Output", knobs_right + 75, knob_top, knob_size, knob_size);
+  gain_out.create (ui, wp, "Output", knobs_right + 75, knob_top, knob_size, knob_size);
   gain_out.role = ROLE_GAIN_OUT;
   gain_out.set_min (-40);
   gain_out.set_max (40);
@@ -563,15 +210,15 @@ void c_lane_widgets::create (
   gain_out.set_step (1);
   gain_out.role = ROLE_GAIN_OUT;
   
-  meter_out.create (ui, wreg, "", 0, 0, 5, 120);
+  meter_out.create (ui, wp, "", 0, 0, 5, 120);
   meter_out.set_vudata (&vudata_out);
   meter_out.set_stereo (false);
   vudata_out.set_l (0.0, 0.0);
   
-  btn_browse.create (ui, wreg, "Browse...", 0, 0, 100, 40);
-  btn_clear.create  (ui, wreg, "Clear",     0, 0, 100, 40);
-  btn_excl.create   (ui, wreg, "Use",       0, 0, 100, 40, WSTYLE_TOGGLE);
-  btn_mute.create   (ui, wreg, "Mute",      0, 0, 100, 40, WSTYLE_TOGGLE);
+  btn_browse.create (ui, wp, "Load", 0, 0, 100, 40, WSTYLE_IMAGE_BUTTON);
+  btn_clear.create  (ui, wp, "Clear",     0, 0, 100, 40, WSTYLE_IMAGE_BUTTON);
+  btn_excl.create   (ui, wp, "Use",       0, 0, 100, 40, WSTYLE_TOGGLE);
+  btn_mute.create   (ui, wp, "Mute",      0, 0, 100, 40, WSTYLE_TOGGLE);
   btn_mute.set_value (false);
   btn_browse.lane = which;
   btn_clear.lane = which;
@@ -584,7 +231,7 @@ void c_lane_widgets::create (
   
   // advanced controls
   delay.role = ROLE_DELAY;
-  delay.create (ui, wadv, "Delay", 0, 0, knob_size, knob_size);
+  delay.create (ui, wp, "Delay", 0, 0, knob_size, knob_size);
   delay.set_min (0);
   delay.set_max (30);
   delay.set_defaultvalue (0);
@@ -592,18 +239,48 @@ void c_lane_widgets::create (
   delay.set_step (0.01);
   delay.role = ROLE_DELAY;
 
-  btn_flip.create   (ui, wadv, "DC flip", 0, 0, 32, 32, WSTYLE_CHECKBOX);
-  btn_calib.create   (ui, wadv, "Calib", 0, 0, 32, 32, WSTYLE_CHECKBOX);
+  btn_flip.create   (ui, wp, "DC flip", 0, 0, 32, 32, WSTYLE_IMAGE_TOGGLE);
+  btn_calib.create   (ui, wp, "Calib", 0, 0, 32, 32, WSTYLE_IMAGE_TOGGLE);
   btn_flip.role = ROLE_DCFLIP;
   btn_calib.role = ROLE_CALIBRATE;
   btn_flip.lane = which;
   btn_calib.lane = which;
   if (ui && which < NB_UI_MAX_LANES)
     btn_calib.set_value (ui->state.lanes [which].do_calib);
-  label_flip.create (ui, wadv, "DC flip", 0, 0, 75, 32);
-  label_calib.create (ui, wadv, "Calib.", 0, 0, 75, 32);
-  label_stats.create (ui, wadv, "(not loaded)", 0, 0, 75, 24);
-  label_stats.textsize = 0.75;
+  //label_flip.create (ui, wp, "DC flip", 0, 0, 75, 32);
+  //label_calib.create (ui, wp, "Calib.", 0, 0, 75, 32);
+  label_frames.create (ui, wp, "(not loaded)", 0, 0, 75, 24);
+  label_frames.textsize = 0.75;
+  label_trim.create (ui, wp, "1.0", 0, 0, 75, 24);
+  label_trim.textsize = 0.75;
+
+  btn_browse.set_image_on (data_icon_folder_small_png);
+  btn_browse.set_image_off (data_icon_folder_small_png);
+  btn_browse.set_image_hover (data_icon_folder_small_png);
+  btn_browse.set_image_down (data_icon_folder_small_png);
+  btn_browse.set_image_down_hover (data_icon_folder_small_png);
+  btn_browse.set_image_off_hover (data_icon_folder_small_png);
+  
+  btn_clear.set_image_on (data_icon_x_small_png);
+  btn_clear.set_image_off (data_icon_x_small_png);
+  btn_clear.set_image_hover (data_icon_x_small_png);
+  btn_clear.set_image_down (data_icon_x_small_png);
+  btn_clear.set_image_down_hover (data_icon_x_small_png);
+  btn_clear.set_image_off_hover (data_icon_x_small_png);
+  
+  btn_calib.set_image_on (data_icon_calib_small_png);
+  btn_calib.set_image_off (data_icon_calib_small_png);
+  btn_calib.set_image_hover (data_icon_calib_small_png);
+  btn_calib.set_image_down (data_icon_calib_small_png);
+  btn_calib.set_image_down_hover (data_icon_calib_small_png);
+  btn_calib.set_image_off_hover (data_icon_calib_small_png);
+  
+  btn_flip.set_image_on (data_icon_phase_small_png);
+  btn_flip.set_image_off (data_icon_phase_small_png);
+  btn_flip.set_image_hover (data_icon_phase_small_png);
+  btn_flip.set_image_down (data_icon_phase_small_png);
+  btn_flip.set_image_down_hover (data_icon_phase_small_png);
+  btn_flip.set_image_off_hover (data_icon_phase_small_png);
   
   if (ui && which < NB_UI_MAX_LANES) {
     ui->filepickers [which].create (ui, btn_browse.widget, which, "Select file");
@@ -625,50 +302,55 @@ void c_lane_widgets::move_resize (
 
   int split = 0;
   
-  if (ui && ui->state.showadvanced)
-    split = w * 15 / 64;
+  /*if (ui && ui->state.showadvanced)
+    split = w * 15 / 64;*/
   
-  cont_advcontrols.move_resize (0, 0, split, h);
-  cont_regcontrols.move_resize (split, 0, w - split, h);
+  //cont_advcontrols.move_resize (0, 0, split, h);
+  //cont_regcontrols.move_resize (split, 0, w - split, h);
+  cont_regcontrols.move_resize (0, 0, w, h);
   
-  // regular controls
+  delay.move_resize (22, knob_top, knob_size, knob_size);
+  //if (ui && ui->state.showadvanced) {
+  //  widget_show_all (cont_advcontrols.widget);
+  //  expose_widget (cont_advcontrols.widget);
+  //} else {
+  //  widget_hide (cont_advcontrols.widget);
+  //}
+
+  int button_padding = 4;
+  
   const int reg_w = cont_regcontrols.w ();
   knob_right = std::max (16, reg_w - 150);
-  const int menu_width = std::max (64, knob_right - 32);
-  menu_list.move_resize (16, 24, menu_width, 32);
-  int button_padding = 4;
-  int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
+  const int menu_x = delay.x () + delay.w () + 8;
+  const int menu_width = std::max (64, w - menu_x - (w - knob_right) - button_padding) - 32;
+  menu_list.move_resize (menu_x, 24, menu_width, 32);
+  //int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
   int button_left = menu_list.x ();
   int button_top = menu_list.y () + menu_list.h () + 8;
-  int button_height = h - 76;
-  btn_browse.move_resize (button_left, button_top, button_width, button_height);
-  btn_clear.move_resize (button_left + button_width + button_padding,
-                         button_top, button_width, button_height);
-  btn_mute.move_resize (button_left + (button_width + button_padding) * 2,
-                         button_top, button_width, button_height);
+  int button_width = std::min (h - 76, w / 10);
+  
+  btn_browse.move_resize (button_left, button_top, button_width, button_width);
+  btn_clear.move_resize (btn_browse.x () + btn_browse.w () + button_padding,
+                         button_top, button_width, button_width);
+  btn_flip.move_resize (btn_clear.x () + btn_browse.w () + button_padding,
+                         button_top, button_width, button_width);
+  btn_calib.move_resize (btn_flip.x () + btn_browse.w () + button_padding,
+                         button_top, button_width, button_width);
+                         
+  int mute_x = btn_calib.x () + btn_calib.w () + button_padding;
+  int mute_width = menu_list.x () + menu_list.w () - mute_x;
+  btn_mute.move_resize (mute_x,
+                         button_top, mute_width, button_width);
   btn_excl.move_resize (btn_mute.x (), btn_mute.y (), btn_mute.w (), btn_mute.h ());
   
   gain_in.move_resize (knob_right, knob_top, knob_size, knob_size);
   gain_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size);
   meter_out.move_resize (knob_right + 130, 16, 5, h - 32);
   
-  // advanced controls
-  delay.move_resize (22, knob_top, knob_size, knob_size);
-  if (ui && ui->state.showadvanced) {
-    widget_show_all (cont_advcontrols.widget);
-    expose_widget (cont_advcontrols.widget);
-  } else {
-    widget_hide (cont_advcontrols.widget);
-  }
-
   int adv_btn_x = 84;
   int adv_btn_y = h * 2 / 11;
-  btn_flip.move_resize (adv_btn_x, adv_btn_y, 32, 32);
-  btn_calib.move_resize (adv_btn_x, h - adv_btn_y - 32, 32, 32);
-  label_flip.move_resize (adv_btn_x + 32, adv_btn_y, 80, 32);
-  label_calib.move_resize (adv_btn_x + 32, h - adv_btn_y - 32, 80, 32);
-  label_stats.move_resize (delay.x (), h - 25, 120, 16);
-  
+  label_frames.move_resize (delay.x (), h - 25, delay.w (), 16);
+  label_trim.move_resize (gain_in.x (), h - 25, gain_in.w (), 16);
 }
 
 c_neuralblender_ui::c_neuralblender_ui () { CP
@@ -762,14 +444,14 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_vu.set_value (state.do_vu);
   label_vu.widget->scale.gravity = WESTCENTER;
   
-  btn_advanced.create (this, cont_checkboxes.widget, "Adv.", 140, 0, 32, 32, WSTYLE_CHECKBOX);
-  label_advanced.create (this, cont_checkboxes.widget, "Show advanced", 172, 0, 150, 32);
-  btn_advanced.set_value (state.showadvanced);
-  btn_advanced.role = ROLE_ADV_TOGGLE;
-  label_advanced.widget->scale.gravity = WESTCENTER;
+  //btn_advanced.create (this, cont_checkboxes.widget, "Adv.", 140, 0, 32, 32, WSTYLE_CHECKBOX);
+  //label_advanced.create (this, cont_checkboxes.widget, "Show advanced", 172, 0, 150, 32);
+  //btn_advanced.set_value (state.showadvanced);
+  //btn_advanced.role = ROLE_ADV_TOGGLE;
+  //label_advanced.widget->scale.gravity = WESTCENTER;
   
-  btn_exclmode.create (this, cont_checkboxes.widget, "Excl. mode", 320, 0, 32, 32, WSTYLE_CHECKBOX);
-  label_exclmode.create (this, cont_checkboxes.widget, "Excl. mode", 352, 0, 150, 32);
+  btn_exclmode.create (this, cont_checkboxes.widget, "Excl. mode", 140, 0, 32, 32, WSTYLE_CHECKBOX);
+  label_exclmode.create (this, cont_checkboxes.widget, "Exclusive mode", 172, 0, 150, 32);
   btn_exclmode.set_value (state.do_excl);
   btn_exclmode.role = ROLE_EXCL_TOGGLE;
   label_exclmode.widget->scale.gravity = WESTCENTER;
@@ -790,11 +472,13 @@ bool c_neuralblender_ui::create (Window parent_) { CP
     blender->meter_in = &vudata_in;
   }
   
-  if (state.showadvanced) {
-    show_advanced_settings ();
-  } else {
-    hide_advanced_settings ();
-  }
+  //if (state.showadvanced) {
+  //  show_advanced_settings ();
+  //} else {
+  //  hide_advanced_settings ();
+  //}
+  
+  reposition_widgets ();
 
   widget_show_all (main_widget);
   widget_draw (main_widget, NULL);
@@ -820,34 +504,20 @@ void c_neuralblender_ui::destroy () { CP
 
 void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
   CP
-  bool b = state.showadvanced;
-  state.showadvanced = b;
+  //state.showadvanced = b;
   
   if (!ui_resize_lock) {
     Metrics_t metrics;
     os_get_window_metrics (main_widget, &metrics);
     ui_resize_lock = true;
     
-    int min_window_width = b ? 720 : 640;
+    int min_window_width = 640;
     int min_window_height = 640;
     int window_width = min_window_width;
     int window_height = min_window_height;
     
     os_set_window_min_size (main_widget, min_window_width, min_window_height,
                             min_window_width, min_window_height);
-    if (snap_to_default) {
-      window_width = min_window_width;
-      window_height = min_window_height;
-    } else {
-      window_width = std::max (metrics.width, min_window_width);
-      window_height = std::max (metrics.height, min_window_height);
-    }
-    if (metrics.width < min_window_width ||
-        metrics.height < min_window_height || snap_to_default) {
-      bool ws = request_window_size (window_width, window_height);
-      debug ("request_window_size returned %d", (int) ws);
-    }
-    
     int lane_width = window_width - 24;
     //int lane_height = 130;
     int lane_height = window_height / 5;
@@ -855,12 +525,12 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     debug ("window w/h %d,%d", window_width, window_height);
     //main_widget->func.configure_callback (main_widget, NULL);
     
-    cont_checkboxes.move_resize (16, window_height - 44, b ? 500 : 450, 40);
+    cont_checkboxes.move_resize (16, window_height - 44, 450, 40);
     
     btn_enable.move_resize (16, 12, 120, 40);
     btn_muteall.move_resize (window_width - 136, 12, 120, 40);
     btn_about.move_resize (btn_muteall.x (), window_height - 50, 120, 40);
-    label_exclmode.set_label (b ? "Exclusive mode" : "Excl. mode");
+    //label_exclmode.set_label ("Exclusive mode");
     label_big.move_resize (150, 8, window_width - 300, 48);
     
     size_t i;
@@ -881,17 +551,24 @@ void c_neuralblender_ui::update_stats () {
     int nframes = stats [i * 2];
     float trim = stats [i * 2 + 1];
     
-    if (trim != 1.0f) {
+    /*if (trim != 1.0f) {
       snprintf (buf, 127, "%d frames, trim=%.02f", nframes, trim);
     } else {
       snprintf (buf, 127, "%d frames", nframes);
-    }  
-    lanes [i].label_stats.set_label (buf);
+    } */
+    
+    snprintf (buf, 127, "%d frames", nframes);
+    lanes [i].label_frames.set_label (buf);
+    if (trim == 1.00)
+      snprintf (buf, 127, "");
+    else
+      snprintf (buf, 127, "trim=%.02f", trim);
+    lanes [i].label_trim.set_label (buf);
     
   }
 }
 
-void c_neuralblender_ui::show_advanced_settings (bool b) {
+/*void c_neuralblender_ui::show_advanced_settings (bool b) {
   //show_advanced = b;
   state.showadvanced = b;
   reposition_widgets (true);
@@ -899,7 +576,7 @@ void c_neuralblender_ui::show_advanced_settings (bool b) {
 
 void c_neuralblender_ui::hide_advanced_settings () {
   show_advanced_settings (false);
-}
+}*/
 
 void c_neuralblender_ui::vu_on (bool b) { CP
   if (!b) {
@@ -990,13 +667,13 @@ void c_neuralblender_ui::on_excl_use (c_widget *w, bool b) {
   on_excl (w, (int) w->lane + 1);
 }
 
-void c_neuralblender_ui::on_advanced (c_widget *w, bool b) {
+/*void c_neuralblender_ui::on_advanced (c_widget *w, bool b) {
   (void) w;
   debug ("b=%d", (int) b);
   show_advanced_settings (b);
   configfile.set_item (CONFIG_KEY_NAME_ADV, b ? "1" : "0");
   configfile.write_file ();
-}
+}*/
 
 int c_neuralblender_ui::idle () {
   if (!ui_ready) {
@@ -1084,8 +761,8 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   btn_enable.set_value (enabled);
   btn_enable.set_label (enabled ? "Enabled" : "Bypass");
 
-  btn_advanced.set_value (state.showadvanced);
-  show_advanced_settings (state.showadvanced);
+  /*btn_advanced.set_value (state.showadvanced);
+  show_advanced_settings (state.showadvanced);*/
 
   btn_vu.set_value (state.do_vu);
   if (state.do_vu) {
