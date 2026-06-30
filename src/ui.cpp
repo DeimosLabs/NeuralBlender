@@ -582,7 +582,7 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     
     btn_enable.move_resize (16, 12, 120, 40);
     btn_muteall.move_resize (window_width - 136, 12, 120, 40);
-    btn_about.move_resize (btn_muteall.x (), window_height - 50, 120, 40);
+    btn_about.move_resize (btn_muteall.x (), window_height - 48, 120, 40);
     //label_exclmode.set_label ("Exclusive mode");
     label_big.move_resize (150, 8, window_width - 300, 48);
     
