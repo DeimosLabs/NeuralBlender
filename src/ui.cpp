@@ -12,472 +12,66 @@
 #include "neuralblender.h"
 #include "ui.h"
 
-#include "xdrawing_area.h"
-#include "xpngloader.h"
-#include "widgets/xcombobox_private.h"
-
 #include "data/data.h"
 
 #define CMDLINE_DEBUG_COLOR ANSI_MAGENTA
 #include "cmdline/cmdline_debug.h"
 
-static uint64_t get_unique_id ();
-static void button_mouse_up (void *w_, void *event, void *user_data);
-static void button_double_click (void *w_, void *event, void *user_data);
-static void button_value_changed (void *w_, void *value);
-static void knob_value_changed (void *w_, void *value);
-static void knob_double_click (void *w_, void *event, void *user_data);
-static void cb_draw_button (void *w_, void *user_data);
-static std::string path_dirname (const std::string &path);
-static std::string path_basename (const std::string &path);
-static void draw_gradient (void *w_, void *);
-
-static constexpr float DEFAULT_BG_R = 0.125f;
-static constexpr float DEFAULT_BG_G = 0.125f;
-static constexpr float DEFAULT_BG_B = 0.125f;
-
 extern const char *g_build_timestamp;
 
-static void set_widget_color_all_states (
-    Widget_t *w,
-    Color_mod mod,
-    const float r,
-    const float g,
-    const float b,
-    const float a = 1.0f) {
+std::string path_dirname (const std::string &path) {
+  const size_t pos = path.find_last_of ('/');
+  if (pos == std::string::npos)
+    return "";
 
-  if (!w)
-    return;
+  if (pos == 0)
+    return "/";
 
-  set_widget_color (w, NORMAL_,      mod, r, g, b, a);
-  set_widget_color (w, PRELIGHT_,    mod, r, g, b, a);
-  set_widget_color (w, SELECTED_,    mod, r, g, b, a);
-  set_widget_color (w, ACTIVE_,      mod, r, g, b, a);
-  set_widget_color (w, INSENSITIVE_, mod, r, g, b, a);
-
-}
-// for xputty widget colors
-static void set_default_bg_color(Widget_t *w) {
-  set_widget_color_all_states(w, BACKGROUND_, DEFAULT_BG_R, DEFAULT_BG_G, DEFAULT_BG_B);
+  return path.substr (0, pos);
 }
 
-static void inherit_parent_bg_color (Widget_t *w, Widget_t *parent) {
-  return;
-  if (!w || !parent || !parent->color_scheme)
-    return;
+std::string path_basename (const std::string &path) {
+  const size_t pos = path.find_last_of ('/');
+  if (pos == std::string::npos)
+    return path;
 
-  Colors *c = get_color_scheme (parent, NORMAL_);
-  if (!c)
-    return;
-
-  set_widget_color_all_states (
-      w, BACKGROUND_, c->bg [0], c->bg [1], c->bg [2], c->bg [3]);
+  return path.substr (pos + 1);
 }
 
-static void _dummy_callback (void *w_, void* user_data) {}
+bool is_supported_model_filename (const std::string &path) {
+  std::string lower = path;
+  std::transform (lower.begin (), lower.end (), lower.begin (),
+                  [] (unsigned char c) { return (char) std::tolower (c); });
 
-// this one must be called AFTER add_* (Widget_t *, ...) in child create functions
-void c_widget::create (
-    c_neuralblender_ui *ui_,
-    Widget_t *parent,
-    const char *label_,
-    int x, int y, int w, int h) {
-
-  debug ("label_='%s'", label_);
-  id = get_unique_id ();
-  label = label_ ? label_ : "";
-  ui = ui_;
-  if (!ui) { debug ("!ui"); }
-  if (!widget) {
-    debug ("!widget");
-    return;
-  }
-  set_default_bg_color (widget);
-  widget->func.configure_notify_callback = _dummy_callback;
-  
-  widget->scale.gravity = NONE;
-  widget->parent_struct = this;
-  widget->label = label.c_str ();
+  return (lower.size () >= 4 && lower.rfind (".nam") == lower.size () - 4) ||
+         (lower.size () >= 5 && lower.rfind (".json") == lower.size () - 5) ||
+         (lower.size () >= 6 && lower.rfind (".aidax") == lower.size () - 6);
 }
 
-bool c_widget::set_label (const char *label_) {
-  label = label_ ? label_ : "";
-  if (!widget)
-    return false;
-
-  widget->label = label.c_str ();
-  expose ();
-  return true;
-}
-
-void c_widget::set_bg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
-  if (widget)
-    expose ();
-}
-
-void c_widget::set_fg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, TEXT_, r, g, b);
-  set_widget_color_all_states (widget, FORGROUND_, r, g, b);
-  if (widget)
-    expose ();
-}
-
-void c_widget::move_resize (int x, int y, int w, int h) {
-  if (!widget)
-    return;
-
-  const int sx = x * widget->app->hdpi;
-  const int sy = y * widget->app->hdpi;
-  const int sw = std::max (1, (int) (w * widget->app->hdpi));
-  const int sh = std::max (1, (int) (h * widget->app->hdpi));
-
-  widget->x = sx;
-  widget->y = sy;
-  widget->scale.init_x = sx;
-  widget->scale.init_y = sy;
-  widget->scale.init_width = sw;
-  widget->scale.init_height = sh;
-
-  os_move_window (widget->app->dpy, widget, sx, sy);
-  os_resize_window (widget->app->dpy, widget, sw, sh);
-  widget->func.configure_callback (widget, NULL);
-  expose ();
-}
-
-void c_widget::move (int x, int y) {
-  if (!widget)
-    return;
-
-  const int sx = x * widget->app->hdpi;
-  const int sy = y * widget->app->hdpi;
-
-  widget->x = sx;
-  widget->y = sy;
-  widget->scale.init_x = sx;
-  widget->scale.init_y = sy;
-
-  os_move_window (widget->app->dpy, widget, sx, sy);
-  expose ();
-}
-
-void c_widget::resize (int w, int h) {
-  if (!widget)
-    return;
-
-  const int sw = std::max (1, (int) (w * widget->app->hdpi));
-  const int sh = std::max (1, (int) (h * widget->app->hdpi));
-
-  widget->scale.init_width = sw;
-  widget->scale.init_height = sh;
-
-  os_resize_window (widget->app->dpy, widget, sw, sh);
-  widget->func.configure_callback (widget, NULL);
-  expose ();
-}
-
-void c_frame::create (
-    c_neuralblender_ui *ui_,
-    Widget_t *parent,
-    const char *label_,
-    int x, int y, int w, int h) {
-  
-  widget = add_frame (parent, label_ ? label_ : "", x, y, w, h);
-  //widget->func.expose_callback = draw_gradient;
-  c_widget::create (ui_, parent, label_, x, y, w, h);
-  inherit_parent_bg_color (widget, parent);
-}
-
-void c_frame::set_bg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
-  set_widget_color_all_states (widget, FRAME_, r, g, b);
-  if (widget)
-    expose ();
-}
-
-void c_frame::set_fg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, TEXT_, r, g, b);
-  set_widget_color_all_states (widget, FRAME_, r, g, b);
-  if (widget)
-    expose ();
-}
-
-void c_meter::create (
-    c_neuralblender_ui *ui_,
-    Widget_t *parent,
-    const char *label_,
-    int x, int y, int w, int h) {
-
-  if (!parent || !parent->app)
-    return;
-
-  widget = create_widget (parent->app, parent, x, y, w, h);
-  c_widget::create (ui_, parent, label_, x, y, w, h);
-  meter.create (widget, label_, 0, 0, w, h);
-}
-
-void c_meter::move_resize (int x, int y, int w, int h) {
-  c_widget::move_resize (x, y, w, h);
-
-  Widget_t *child = meter.widget;
-  if (!child)
-    return;
-
-  const int sw = std::max (1, (int) (w * child->app->hdpi));
-  const int sh = std::max (1, (int) (h * child->app->hdpi));
-
-  child->x = 0;
-  child->y = 0;
-  child->scale.init_x = 0;
-  child->scale.init_y = 0;
-  child->scale.init_width = sw;
-  child->scale.init_height = sh;
-
-  os_move_window (child->app->dpy, child, 0, 0);
-  os_resize_window (child->app->dpy, child, sw, sh);
-  child->func.configure_callback (child, NULL);
-  expose_widget (child);
-}
-
-void c_meter::show () {
-  if (widget)
-    widget_show (widget);
-  if (meter.widget)
-    widget_show (meter.widget);
-  if (widget)
-    expose ();
-  if (meter.widget)
-    expose_widget (meter.widget);
-}
-
-void c_meter::hide () {
-  if (meter.widget)
-    widget_hide (meter.widget);
-  if (widget)
-    widget_hide (widget);
-}
-
-void c_container::create (
-    c_neuralblender_ui *ui_,
-    Widget_t *parent,
-    const char *label_,
-    int x, int y, int w, int h) {
-    
-  widget = create_widget (parent->app, parent, x, y, w, h);
-  c_widget::create (ui_, parent, label_, x, y, w, h);
-  inherit_parent_bg_color (widget, parent);
-}
-
-void c_container::set_bg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
-  if (widget)
-    expose ();
-}
-
-
-void c_label::create (
-    c_neuralblender_ui *ui_,
-    Widget_t *parent,
-    const char *label_,
-    int x, int y, int w, int h) {
-
-  role = ROLE_UNKNOWN;
-  widget = add_label (parent, label.c_str (), x, y, w, h);
-  widget->func.expose_callback = c_label::draw;
-  c_widget::create (ui_, parent, label_, x, y, w, h);
-  inherit_parent_bg_color (widget, parent);
-}
-
-void c_label::set_bg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
-  if (widget)
-    expose ();
-}
-
-void c_label::set_fg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, TEXT_, r, g, b);
-  if (widget)
-    expose ();
-}
-
-void c_image::create (
-    c_neuralblender_ui *ui,
-    Widget_t *parent,
-    const char *label,
-    int x, int y, int w, int h) {
-  widget = add_image (parent, label, x, y, w, h);
-  c_widget::create (ui, parent, label, x, y, w, h);
-}
-
-void c_image::set_png (const unsigned char *png) {
-  if (!widget || !png)
-    return;
-
-  widget_get_png (widget, png);
-  expose_widget (widget);
-}
-
-static cairo_surface_t *button_image_for_state (c_button *b, Widget_t *w) {
-  const bool on = w->adj && adj_get_value (w->adj) >= 0.5f;
-  const bool hover = (w->flags & HAS_FOCUS) || w->state == 1;
-  const bool down = w->state == 2;
-
-  if (down && hover && b->img_down_hover) return b->img_down_hover;
-  if (down && b->img_down) return b->img_down;
-  if (!on && hover && b->img_off_hover) return b->img_off_hover;
-  if (hover && b->img_hover) return b->img_hover;
-  if (on && b->img_on) return b->img_on;
-  return b->img_off;
-}
-
-static void draw_text (Widget_t *w) { CP
-  Metrics_t m;
-  os_get_window_metrics (w, &m);
-  if (!m.visible)
-    return;
-
-  use_bg_color_scheme (w, get_color_state (w));
-  cairo_rectangle (w->crb, 0, 0, m.width, m.height);
-  cairo_fill (w->crb);
-
-  use_text_color_scheme (w, get_color_state(w));
-  cairo_set_font_size (w->crb, w->app->normal_font / w->scale.ascale);
-
-  const char *label = w->label ? w->label : "";
-  cairo_text_extents_t ext;
-  cairo_text_extents (w->crb, label, &ext);
-
-  cairo_move_to (
-    w->crb,
-    (m.width - ext.width) * 0.5 - ext.x_bearing,
-    (m.height - ext.height) * 0.5 - ext.y_bearing
-  );
-  cairo_show_text (w->crb, label);
-}
-
-static void cb_draw_button (void *w_, void *) { CP
+static void combobox_selected_callback (void *w_, void *user_data) { CP
   Widget_t *w = (Widget_t *) w_;
-  if (!w || !w->parent_struct || !w->crb)
-    return;
 
-  c_button *b = (c_button *) w->parent_struct;
-  cairo_surface_t *img = button_image_for_state (b, w);
-  if (!img) {
-    draw_text (w);
-    return;
-  }
+  int index = (int) adj_get_value (w->adj);
 
-  Metrics_t m;
-  os_get_window_metrics (w, &m);
-  if (!m.visible)
-    return;
-  
-  if (cairo_surface_status (img) != CAIRO_STATUS_SUCCESS) {
-    // fall back to drawing text
-    draw_text (w);
+  Widget_t *menu = w->childlist->childs[1];
+  Widget_t *view_port = menu->childlist->childs[0];
+  ComboBox_t *list = (ComboBox_t *) view_port->parent_struct;
+
+  const char *label = NULL;
+  if (index >= 0 && index < (int) list->list_size)
+    label = list->list_names [index];
+
+  // index + label are selected item
+  c_combobox *cb = (c_combobox *) w->parent_struct;
+  if (!cb) {
+    debug ("!cb");
     return;
   }
-
-  const double iw = cairo_image_surface_get_width (img);
-  const double ih = cairo_image_surface_get_height (img);
-  if (iw <= 0 || ih <= 0)
+  cb->selected = index;
+  if (cb->updating_widget)
     return;
 
-  cairo_save(w->crb);
-
-  cairo_scale (w->crb, (double) m.width / iw, (double) m.height / ih);
-  cairo_set_source_surface (w->crb, img, 0, 0);
-  cairo_rectangle (w->crb, 0, 0, iw, ih);
-  cairo_fill (w->crb);
-
-  cairo_restore (w->crb);
-}
-
-
-c_button::c_button () { CP }
-
-c_button::~c_button () { CP
-  if (img_off)        cairo_surface_destroy (img_off);
-  if (img_on)         cairo_surface_destroy (img_on);
-  if (img_hover)      cairo_surface_destroy (img_hover);
-  if (img_down)       cairo_surface_destroy (img_down);
-  if (img_down_hover) cairo_surface_destroy (img_down_hover);
-  if (img_off_hover)  cairo_surface_destroy (img_off_hover);
-}
-
-void c_button::create (
-    c_neuralblender_ui *ui_,
-    Widget_t *parent,
-    const char *label_,
-    int x, int y, int w, int h,
-    _button_style style) {
-
-  switch (style) {
-    case BTN_CHECKBOX:
-      is_toggle = true;
-      widget = add_check_button (parent, label_ ? label_ : "", x, y, w, h);
-      widget->func.value_changed_callback = button_value_changed;
-    break;
-
-    case BTN_TOGGLE:
-      is_toggle = true;
-      widget = add_toggle_button (parent, label_ ? label_ : "", x, y, w, h);
-      widget->func.value_changed_callback = button_value_changed;
-    break;
-
-    case BTN_IMAGETOGGLE:
-      is_toggle = true;
-      widget = add_image_toggle_button (parent, label_ ? label_ : "", x, y, w, h);
-      widget->func.value_changed_callback = button_value_changed;
-    break;
-
-    case BTN_IMAGE:
-      is_toggle = false;
-      widget = add_image_button (parent, label_ ? label_ : "", x, y, w, h);
-      widget->func.double_click_callback = button_double_click;
-      widget->func.button_release_callback = button_mouse_up;
-    break;
-    
-    default:
-      is_toggle = false;
-      widget = add_button (parent, label_ ? label_ : "", x, y, w, h);
-      widget->func.double_click_callback = button_double_click;
-      widget->func.button_release_callback = button_mouse_up;
-    break;
-  }
-  
-  c_widget::create (ui_, parent, label_, x, y, w, h);
-  if (style == BTN_IMAGE || style == BTN_IMAGETOGGLE)
-    widget->func.expose_callback = cb_draw_button;
-}
-
-void c_button::set_image (const unsigned char *pngdata, _button_state which) {
-  cairo_surface_t **csp = nullptr;
-
-  switch (which) {
-    case BTN_OFF:        csp = &img_off; break;
-    case BTN_ON:         csp = &img_on; break;
-    case BTN_HOVER:      csp = &img_hover; break;
-    case BTN_DOWN:       csp = &img_down; break;
-    case BTN_DOWN_HOVER: csp = &img_down_hover; break;
-    case BTN_OFF_HOVER:  csp = &img_off_hover; break;
-    default: return;
-  }
-
-  if (*csp) {
-    cairo_surface_destroy(*csp);
-    *csp = nullptr;
-  }
-
-  if (!pngdata)
-    return;
-
-  *csp = cairo_image_surface_create_from_stream(pngdata);
-
-  if (cairo_surface_status(*csp) != CAIRO_STATUS_SUCCESS) {
-    cairo_surface_destroy(*csp);
-    *csp = nullptr;
-  }
+  cb->on_change (index);
 }
 
 // calibration default is written to config ONLY if all
@@ -571,7 +165,7 @@ void c_button::on_mouseup () {
     case ROLE_EXCL_USE:
       ui->on_excl_use (this, value);
     break;
-    
+
     case ROLE_ADV_TOGGLE:
       ui->on_advanced (this, value);
     break;
@@ -606,19 +200,6 @@ bool c_button::set_value (bool value_) {
   return true;
 }
 
-void c_button::set_bg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, LIGHT_, r, g, b);
-  if (widget)
-    expose ();
-}
-
-void c_button::set_fg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, TEXT_, r, g, b);
-  set_widget_color_all_states (widget, FORGROUND_, r, g, b);
-  if (widget)
-    expose ();
-}
-
 void c_knob::create (
     c_neuralblender_ui *ui_,
     Widget_t *parent,
@@ -630,19 +211,6 @@ void c_knob::create (
   widget->func.value_changed_callback = knob_value_changed;
   widget->func.double_click_callback = knob_double_click;
   c_widget::create (ui_, parent, label_, x, y, w, h);
-}
-
-void c_knob::set_bg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, BASE_, r, g, b);
-  if (widget)
-    expose ();
-}
-
-void c_knob::set_fg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, FORGROUND_, r, g, b);
-  set_widget_color_all_states (widget, TEXT_, r, g, b);
-  if (widget)
-    expose ();
 }
 
 void c_knob::set_min (float x) {
@@ -719,52 +287,6 @@ void c_combobox::create (
   combobox_set_menu_size (widget, 16);
 
   update_widget ();
-}
-
-void c_combobox::set_bg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, SHADOW_, r, g, b);
-  set_widget_color_all_states (widget, BASE_, r, g, b);
-  set_widget_color_all_states (widget, BACKGROUND_, r, g, b);
-
-  if (widget && widget->childlist && widget->childlist->elem > 0)
-    set_widget_color_all_states (widget->childlist->childs [0], LIGHT_, r, g, b);
-
-  if (widget && widget->childlist && widget->childlist->elem > 1) {
-    Widget_t *menu = widget->childlist->childs [1];
-    set_widget_color_all_states (menu, BACKGROUND_, r, g, b);
-    if (menu && menu->childlist && menu->childlist->elem > 0) {
-      Widget_t *view_port = menu->childlist->childs [0];
-      set_widget_color_all_states (view_port, BASE_, r, g, b);
-      set_widget_color_all_states (view_port, BACKGROUND_, r, g, b);
-    }
-  }
-
-  if (widget)
-    expose ();
-}
-
-void c_combobox::set_fg_color (const float r, const float g, const float b) {
-  set_widget_color_all_states (widget, TEXT_, r, g, b);
-  set_widget_color_all_states (widget, FRAME_, r, g, b);
-
-  if (widget && widget->childlist && widget->childlist->elem > 0) {
-    set_widget_color_all_states (widget->childlist->childs [0], TEXT_, r, g, b);
-    set_widget_color_all_states (widget->childlist->childs [0], FORGROUND_, r, g, b);
-  }
-
-  if (widget && widget->childlist && widget->childlist->elem > 1) {
-    Widget_t *menu = widget->childlist->childs [1];
-    set_widget_color_all_states (menu, TEXT_, r, g, b);
-    set_widget_color_all_states (menu, FRAME_, r, g, b);
-    if (menu && menu->childlist && menu->childlist->elem > 0) {
-      Widget_t *view_port = menu->childlist->childs [0];
-      set_widget_color_all_states (view_port, TEXT_, r, g, b);
-      set_widget_color_all_states (view_port, FRAME_, r, g, b);
-    }
-  }
-
-  if (widget)
-    expose ();
 }
 
 // work around xputty's weirdness
@@ -883,7 +405,7 @@ void c_combobox::update_widget () {
   expose ();
 }
 
-void c_label::draw (void *w_, void *ptr) {
+void c_label::cb_draw (void *w_, void *ptr) {
   (void) ptr;
   Widget_t *w = (Widget_t *) w_;
   if (!w)
@@ -900,14 +422,14 @@ void c_label::draw (void *w_, void *ptr) {
     return;
 
   use_bg_color_scheme (w, NORMAL_);
-  cairo_rectangle (w->crb, 0, 0, metrics.width, metrics.height);
-  cairo_fill (w->crb);
+  //cairo_rectangle (w->crb, 0, 0, metrics.width, metrics.height);
+  //cairo_fill (w->crb);
 
   cairo_text_extents_t extents;
   use_text_color_scheme (w, NORMAL_);
   cairo_set_font_size (w->crb, (w->app->normal_font * textsize) / w->scale.ascale);
   cairo_text_extents (w->crb, text, &extents);
-  
+
   const double padding = 2.0 * w->app->hdpi;
   double x = padding - extents.x_bearing;
   if (align == TEXT_CENTER)
@@ -923,430 +445,6 @@ void c_label::draw (void *w_, void *ptr) {
   cairo_new_path (w->crb);
 }
 
-static inline float db_to_bar_pos (float db, float min_db, float headroom_db) {
-  return std::clamp ((db - min_db) / (headroom_db - min_db), 0.0f, 1.0f);
-}
-
-//extern "C" void configure_event (void *, void *);
-
-static void main_notify_callback (void *w_, void *user_data) {
-  //configure_event (w, user_data);
-  
-  Widget_t *w = (Widget_t *) w_;
-  if (!w || !w->parent_struct)
-    return;
-    
-  c_neuralblender_ui *ui = (c_neuralblender_ui *) w->parent_struct;
-
-  Metrics_t metrics;
-  os_get_window_metrics (w, &metrics);
-  if (!metrics.visible)
-    return;
-
-  ui->on_window_resize (
-      metrics.width / w->app->hdpi,
-      metrics.height / w->app->hdpi);
-}
-
-static uint64_t get_unique_id () {
-  static uint64_t current = 1;
-  return current++;
-}
-
-static void draw_gradient (void *w_, void *) {
-  Widget_t *w = (Widget_t *) w_;
-  if (!w)
-    return;
-
-  Metrics_t m;
-  os_get_window_metrics (w, &m);
-  if (!m.visible)
-    return;
-
-  // Fill background first.
-  cairo_pattern_t *bg =
-      cairo_pattern_create_linear (0, 0, 0, m.height);
-
-  cairo_pattern_add_color_stop_rgba (bg, 0.0, 0.10, 0.10, 0.10, 1.0);
-  cairo_pattern_add_color_stop_rgba (bg, 1.0, 0.15, 0.15, 0.15, 1.0);
-
-  cairo_rectangle (w->crb, 0, 0, m.width, m.height);
-  cairo_set_source (w->crb, bg);
-  cairo_fill (w->crb);
-
-  cairo_pattern_destroy (bg);
-
-  const double inset = 1.5;
-  const double radius = 4.0;
-
-  cairo_new_path (w->crb);
-  cairo_arc (w->crb, inset + radius, inset + radius,
-             radius, M_PI, 3.0 * M_PI / 2.0);
-  cairo_arc (w->crb, m.width - inset - radius, inset + radius,
-             radius, 3.0 * M_PI / 2.0, 0.0);
-  cairo_arc (w->crb, m.width - inset - radius, m.height - inset - radius,
-             radius, 0.0, M_PI / 2.0);
-  cairo_arc (w->crb, inset + radius, m.height - inset - radius,
-             radius, M_PI / 2.0, M_PI);
-  cairo_close_path (w->crb);
-
-  cairo_pattern_t *pat =
-      cairo_pattern_create_linear (0, 0, m.width, m.height);
-
-  cairo_pattern_add_color_stop_rgba (pat, 0.0, 0.10, 0.55, 0.55, 1.0);
-  cairo_pattern_add_color_stop_rgba (pat, 0.5, 0.40, 0.40, 0.40, 1.0);
-  cairo_pattern_add_color_stop_rgba (pat, 1.0, 0.02, 0.18, 0.18, 1.0);
-
-  cairo_set_source (w->crb, pat);
-  cairo_set_line_width (w->crb, 2.0);
-  cairo_stroke (w->crb);
-
-  cairo_pattern_destroy (pat);
-}
-
-static void draw_main_window (void *w_, void *user_data) {
-  (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
-  if (!w)
-    return;
-
-  Metrics_t metrics;
-  os_get_window_metrics (w, &metrics);
-  if (!metrics.visible)
-    return;
-
-  use_bg_color_scheme (w, get_color_state (w));
-  //cairo_set_source_rgb (w->crb, NB_BG_R, NB_BG_G, NB_BG_B);
-  cairo_rectangle (w->crb, 0, 0, metrics.width, metrics.height);
-  cairo_fill (w->crb);
-}
-
-static void button_double_click (void *w_, void *event, void *user_data) {
-  (void) event;
-  (void) user_data;
-
-  Widget_t *w = (Widget_t *) w_;
-  if (!w)
-    return;
-
-  w->state = 0;
-  if (w->adj_y)
-    adj_set_value (w->adj_y, 0.0);
-  expose_widget (w);
-  auto *b = (c_button *) w->parent_struct;
-  b->on_mouseup ();
-}
-
-static void knob_double_click (void *w_, void *event, void *user_data) {
-  (void) event;
-  (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
-  if (!w)
-    return;
-  auto *k = (c_knob *) w->parent_struct;
-  k->on_doubleclick ();
-}
-
-static void button_mouse_up (void *w_, void *event, void *user_data) {
-  (void) event;
-  (void) user_data;
-
-  auto *w = (Widget_t *) w_;
-  if (!w) return;
-  w->state = 0;
-  if (w->adj_y) adj_set_value (w->adj_y, 0.0);
-  expose_widget (w);
-
-  auto *b = (c_button *) w->parent_struct;
-  b->on_mouseup ();
-}
-
-// here value_ points to a float
-static void button_value_changed (void *w_, void *value_) {
-  if (!value_)
-    return;
-
-  const float value = *(float *) value_;
-  //debug ("value=%f", value);
-  Widget_t *w = (Widget_t *) w_;
-  if (!w || !w->parent_struct) {
-    return;
-  }
-
-  c_button *b = (c_button *) w->parent_struct;
-  b->value = value >= 0.5f;
-  b->on_mouseup ();
-}
-
-static void knob_value_changed (void *w_, void *value_) {
-  if (!value_)
-    return;
-
-  const float value = *(float *) value_;
-  Widget_t *w = (Widget_t *) w_;
-  if (!w || !w->parent_struct) {
-    return;
-  }
-
-  c_knob *k = (c_knob *) w->parent_struct;
-  if (k->value != value) {
-    k->value = value;
-    k->on_change ();
-  }
-}
-
-static void filepicker_response (void *w_, void *user_data) { CP
-  Widget_t *w = (Widget_t *) w_;
-  if (!w || !w->parent_struct) {
-    debug("!w || !w->parent_struct");
-    return;
-  }
-
-  c_widget *cw = (c_widget *) w->parent_struct;
-  c_filepicker *fp = cw ? cw->filepicker : NULL;
-  if (!fp) {
-    debug("!fp");
-    return;
-  }
-
-  if (fp->dialog && fp->dialog->parent_struct) {
-    FileDialog *fd = (FileDialog *) fp->dialog->parent_struct;
-    if (fd->fp) {
-      if (fd->fp->path)
-        fp->current_dir = fd->fp->path;
-
-      fp->filelist.clear();
-      for (unsigned int i = 0; i < fd->fp->file_counter; i++) {
-        if (fd->fp->file_names [i])
-          fp->filelist.push_back (fd->fp->file_names[i]);
-      }
-    }
-  }
-
-  if (fp->ui && !fp->current_dir.empty ()) {
-    fp->ui->configfile.set_item (CONFIG_KEY_NAME_CWD, fp->current_dir);
-    fp->ui->configfile.write_file ();
-  }
-
-  fp->dialog = NULL;
-
-  if (!user_data) {
-    debug("!user_data");
-    return;
-  }
-
-  const char *filename = *(const char **) user_data;
-  if (!filename) {
-    debug ("!filename");
-    return;
-  }
-
-  c_neuralblender_ui *ui = fp->ui;
-  size_t lane = fp->lane;
-
-  //std::string selected (filename);
-  //fp->on_file_select(cw, selected);
-  debug ("lane %d", (int) lane);
-  if (!ui) {
-    debug ("!ui");
-    return;
-  }
-
-  if (!cw) {
-    debug ("!cw");
-    return;
-  }
-
-  debug ("current_dir: '%s'", ui->state.current_dir.c_str ());
-
-  //fp->selected_file = std::string (filename);
-  ui->state.lanes [lane].filename = std::string (filename);
-  ui->state.current_dir = path_dirname (ui->state.lanes [lane].filename);
-  fp->scan_current_dir ();
-  for (int i = 0; i < fp->filelist.size (); i++) {
-    debug ("filelist [%d]: '%s'", i, fp->filelist [i].c_str ());
-  }
-  ui->load_model (cw->lane, filename);
-
-  c_combobox *cb = &ui->lanes [lane].menu_list;
-  cb->clear ();
-  //cb->add (filename);
-  fp->add_files_from_dir (cb);
-  //ui->on_fileselected_pre (cw, filename);
-  ui->on_fileselected (cw, filename);
-}
-
-static void combobox_selected_callback (void *w_, void *user_data) { CP
-  Widget_t *w = (Widget_t *) w_;
-
-  int index = (int) adj_get_value (w->adj);
-
-  Widget_t *menu = w->childlist->childs[1];
-  Widget_t *view_port = menu->childlist->childs[0];
-  ComboBox_t *list = (ComboBox_t *) view_port->parent_struct;
-
-  const char *label = NULL;
-  if (index >= 0 && index < (int) list->list_size)
-    label = list->list_names [index];
-
-  // index + label are selected item
-  c_combobox *cb = (c_combobox *) w->parent_struct;
-  if (!cb) {
-    debug ("!cb");
-    return;
-  }
-  cb->selected = index;
-  if (cb->updating_widget)
-    return;
-
-  cb->on_change (index);
-}
-
-static void combobox_changed (void *w_, void *user_data) {
-  Widget_t *w = (Widget_t *) w_;
-  if (!w)
-    return;
-
-  _set_entry(w, user_data);
-
-  c_combobox *combo = (c_combobox *) w->parent_struct;
-  if (!combo)
-    return;
-
-  int index = (int) adj_get_value(w->adj);
-  combo->on_change (index);
-}
-
-void c_filepicker::create (
-    c_neuralblender_ui *ui_,
-    Widget_t *parent_,
-    size_t lane_,
-    const char *title_) {
-
-  CP
-  ui = ui_;
-  parent = parent_;
-  lane = lane_;
-  c_widget::create (ui, parent, title_, 0, 0, 220, 220);
-  //os_set_transient_for_hint (ui->main_widget, widget);
-  title = std::string (title_);
-}
-
-void c_filepicker::show () { CP
-  if (!parent) {
-    debug ("!parent");
-    return;
-  }
-  if (dialog) {
-    destroy_widget (dialog, dialog->app);
-    dialog = NULL;
-  }
-  parent->func.dialog_callback = filepicker_response;
-  if (ui) {
-    ui->configfile.read_file ();
-    current_dir = ui->configfile.get_item (CONFIG_KEY_NAME_CWD);
-  }
-  debug ("current_dir='%s'", current_dir.c_str ());
-  const char *path = current_dir.empty () ? CONFIG_DEFAULT_DIR : current_dir.c_str ();
-  dialog = open_file_dialog (parent, path, ".nam|.json|.aidax");
-}
-
-void c_filepicker::hide () { CP
-}
-
-void c_filepicker::on_file_select (c_widget *cw, const std::string &filename) { CP
-  debug ("current_dir='%s'", current_dir.c_str ());
-  if (!ui)
-    return;
-}
-
-std::string c_filepicker::get_current_dir () {
-  return current_dir;
-}
-
-void c_filepicker::set_current_dir (std::string str) {
-  current_dir = str;
-  scan_current_dir ();
-}
-
-static bool is_supported_model_filename (const std::string &path) {
-  std::string lower = path;
-  std::transform (lower.begin (), lower.end (), lower.begin (),
-                  [] (unsigned char c) { return (char) std::tolower (c); });
-
-  return (lower.size () >= 4 && lower.rfind (".nam") == lower.size () - 4) ||
-         (lower.size () >= 5 && lower.rfind (".json") == lower.size () - 5) ||
-         (lower.size () >= 6 && lower.rfind (".aidax") == lower.size () - 6);
-}
-
-void c_filepicker::scan_current_dir () {
-  filelist.clear ();
-
-  if (current_dir.empty ())
-    return;
-
-  DIR *dir = opendir (current_dir.c_str ());
-  if (!dir) {
-    debug ("failed to scan '%s'", current_dir.c_str ());
-    return;
-  }
-
-  struct dirent *entry = NULL;
-  while ((entry = readdir (dir))) {
-    const char *name = entry->d_name;
-    if (!name || !strcmp (name, ".") || !strcmp (name, ".."))
-      continue;
-
-    if (!is_supported_model_filename (name))
-      continue;
-
-    std::string full = current_dir;
-    if (!full.empty () && full.back () != '/')
-      full += '/';
-    full += name;
-
-    struct stat st;
-    if (stat (full.c_str (), &st) || !S_ISREG (st.st_mode))
-      continue;
-
-    filelist.push_back (name);
-  }
-  closedir (dir);
-
-  std::sort (filelist.begin (), filelist.end ());
-  debug ("scan '%s': %zu model files", current_dir.c_str (), filelist.size ());
-}
-
-void c_filepicker::add_files_from_dir (c_combobox *cb) {
-  if (!cb)
-    return;
-
-  cb->items.clear();
-
-  int sel = -1;
-  std::string selected_file = ui->state.lanes [lane].filename;
-
-  for (size_t i = 0; i < filelist.size (); i++) {
-    cb->items.push_back (filelist [i]);
-
-    std::string full = current_dir;
-    if (!full.empty () && full.back () != '/')
-      full += '/';
-    full += filelist [i];
-
-
-    if (full == selected_file || filelist [i] == selected_file) {
-      sel = (int) i;
-      debug ("found selected: %d", sel);
-    }
-  }
-
-  cb->selected = sel;
-  debug ("add_files_from_dir: dir='%s' selected='%s' files=%zu sel=%d",
-         current_dir.c_str (), selected_file.c_str (), filelist.size (), sel);
-  cb->update_widget();
-}
-
 void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   ui = ui_;
   if (!ui || !ui->ui_ready || w)
@@ -1356,12 +454,11 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   if (!w)
     return;
     
-  set_widget_color_all_states (w, BACKGROUND_, DEFAULT_BG_R, DEFAULT_BG_G, DEFAULT_BG_B);  
-  
   w->flags |= HIDE_ON_DELETE;
   os_set_transient_for_hint (ui->main_widget, w);
 
-  w->func.expose_callback = draw_main_window;
+  w->func.expose_callback = cb_draw_main_window;
+  set_x11_window_background (w, get_colortheme ()->window_bg);
   widget_set_title (w, "About NeuralBlender");
   btn_ok.create (ui, w, "OK", 160, 400, 80, 40);
   btn_ok.role = ROLE_ABOUTOK;
@@ -1473,8 +570,8 @@ void c_lane_widgets::create (
   
   btn_browse.create (ui, wreg, "Browse...", 0, 0, 100, 40);
   btn_clear.create  (ui, wreg, "Clear",     0, 0, 100, 40);
-  btn_excl.create   (ui, wreg, "Use",       0, 0, 100, 40, BTN_TOGGLE);
-  btn_mute.create   (ui, wreg, "Mute",      0, 0, 100, 40, BTN_TOGGLE);
+  btn_excl.create   (ui, wreg, "Use",       0, 0, 100, 40, WSTYLE_TOGGLE);
+  btn_mute.create   (ui, wreg, "Mute",      0, 0, 100, 40, WSTYLE_TOGGLE);
   btn_mute.set_value (false);
   btn_browse.lane = which;
   btn_clear.lane = which;
@@ -1495,8 +592,8 @@ void c_lane_widgets::create (
   delay.set_step (0.01);
   delay.role = ROLE_DELAY;
 
-  btn_flip.create   (ui, wadv, "DC flip", 0, 0, 32, 32, BTN_CHECKBOX);
-  btn_calib.create   (ui, wadv, "Calib", 0, 0, 32, 32, BTN_CHECKBOX);
+  btn_flip.create   (ui, wadv, "DC flip", 0, 0, 32, 32, WSTYLE_CHECKBOX);
+  btn_calib.create   (ui, wadv, "Calib", 0, 0, 32, 32, WSTYLE_CHECKBOX);
   btn_flip.role = ROLE_DCFLIP;
   btn_calib.role = ROLE_CALIBRATE;
   btn_flip.lane = which;
@@ -1632,47 +729,46 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   main_widget->parent_struct = this;
   main_widget->func.resize_notify_callback = main_notify_callback;
   main_widget->scale.gravity = NONE;
-  set_widget_color_all_states (main_widget, BACKGROUND_, 0.125, 0.125, 0.125);
-
   widget_set_icon_from_png (main_widget, data_neuralblender_logo_512_png);
 
   os_register_wm_delete_window (main_widget);
   widget_set_title (main_widget, "NeuralBlender");
-  main_widget->func.expose_callback = draw_main_window;
+  main_widget->func.expose_callback = cb_draw_main_window;
+  set_x11_window_background (main_widget, get_colortheme ()->window_bg);
   label_big.create (this, main_widget, "NeuralBlender", 120, 24, 400, 40);
   label_big.align = TEXT_CENTER;
   label_big.textsize = 1.5;
   
-  btn_enable.create (this, main_widget, "Enabled",  20, 12, 120, 40, BTN_TOGGLE);
-  /*btn_enable.set_image_on (data_xputty_approved_png);
+  btn_enable.create (this, main_widget, "Enabled",  20, 12, 120, 40, WSTYLE_TOGGLE);
+  btn_enable.set_image_on (data_xputty_approved_png);
   btn_enable.set_image_hover (data_xputty_exit_png);
   btn_enable.set_image_down_hover (data_xputty_eject_png);
   btn_enable.set_image_down (data_xputty_error_png);
   btn_enable.set_image_off (data_xputty_gear_png);
-  btn_enable.set_image_off_hover (data_xputty_question_png);*/
+  btn_enable.set_image_off_hover (data_xputty_question_png);
   btn_enable.set_value (true);
   btn_enable.role = ROLE_BYPASS;
   btn_about.create (this, main_widget, "About...", 520, 600, 100, 40);
   btn_about.role = ROLE_ABOUT;
-  btn_muteall.create (this, main_widget, "Mute all", 500, 12, 120, 40, BTN_TOGGLE);
+  btn_muteall.create (this, main_widget, "Mute all", 500, 12, 120, 40, WSTYLE_TOGGLE);
   btn_muteall.role = ROLE_MUTEALL;
   
   cont_checkboxes.create (this, main_widget, "", 8, 604, 500, 40);
   cont_checkboxes.widget->scale.gravity = NONE;
   
-  btn_vu.create (this, cont_checkboxes.widget, "VU", 0, 0, 32, 32, BTN_CHECKBOX);
+  btn_vu.create (this, cont_checkboxes.widget, "VU", 0, 0, 32, 32, WSTYLE_CHECKBOX);
   label_vu.create (this, cont_checkboxes.widget, "VU meters", 32, 0, 80, 32);
   btn_vu.role = ROLE_VUTOGGLE;
   btn_vu.set_value (state.do_vu);
   label_vu.widget->scale.gravity = WESTCENTER;
   
-  btn_advanced.create (this, cont_checkboxes.widget, "Adv.", 140, 0, 32, 32, BTN_CHECKBOX);
+  btn_advanced.create (this, cont_checkboxes.widget, "Adv.", 140, 0, 32, 32, WSTYLE_CHECKBOX);
   label_advanced.create (this, cont_checkboxes.widget, "Show advanced", 172, 0, 150, 32);
   btn_advanced.set_value (state.showadvanced);
   btn_advanced.role = ROLE_ADV_TOGGLE;
   label_advanced.widget->scale.gravity = WESTCENTER;
   
-  btn_exclmode.create (this, cont_checkboxes.widget, "Excl. mode", 320, 0, 32, 32, BTN_CHECKBOX);
+  btn_exclmode.create (this, cont_checkboxes.widget, "Excl. mode", 320, 0, 32, 32, WSTYLE_CHECKBOX);
   label_exclmode.create (this, cont_checkboxes.widget, "Excl. mode", 352, 0, 150, 32);
   btn_exclmode.set_value (state.do_excl);
   btn_exclmode.role = ROLE_EXCL_TOGGLE;
@@ -1701,7 +797,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   }
 
   widget_show_all (main_widget);
-  expose_widget (main_widget);
+  widget_draw (main_widget, NULL);
 
   window = main_widget->widget;
   ui_ready = true;
@@ -1771,7 +867,7 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     for (i = 0; i < NB_UI_MAX_LANES; i++) {
       lanes [i].move_resize (12, 60 + i * (lane_height + 5), lane_width, lane_height);
     }
-    meter_in.move_resize (6, 64, 5, (lane_height + 5) * i - 12);
+    meter_in.move_resize (4, 64, 5, (lane_height + 5) * i - 12);
     
     ui_resize_lock = false;
   }
@@ -1934,25 +1030,6 @@ void c_neuralblender_ui::clear_lane_model_ui (size_t which) {
   lanes [which].menu_list.clear ();
 }
 
-static std::string path_dirname (const std::string &path) {
-  const size_t pos = path.find_last_of ('/');
-  if (pos == std::string::npos)
-    return "";
-
-  if (pos == 0)
-    return "/";
-
-  return path.substr (0, pos);
-}
-
-static std::string path_basename (const std::string &path) {
-  const size_t pos = path.find_last_of ('/');
-  if (pos == std::string::npos)
-    return path;
-
-  return path.substr (pos + 1);
-}
-
 void c_neuralblender_ui::set_lane_mute (size_t which, bool b) {
   debug ("which=%d, b=%d", (int) which, (int) b);
   if (which >= NB_UI_MAX_LANES)
@@ -2032,7 +1109,11 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     lanes [i].btn_excl.set_value (selected);
 
     for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
-      lanes [i].lane_widget.set_fg_color (0, 0, 0);
+      //lanes [i].lane_widget.set_fg_color (0, 0, 0);
+      if (state.lanes [i].lane_mute)
+        lanes [i].lane_widget.set_state (WSTATE_DISABLED);
+      else
+        lanes [i].lane_widget.set_state (WSTATE_NORMAL);
     }
     if (exclusive_on) { CP
       widget_hide (lanes [i].btn_mute.widget);
@@ -2042,8 +1123,10 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
       widget_hide (lanes [i].btn_excl.widget);
     }
   }
-  if (exclusive_on)
-    lanes [state.exclusive_lane - 1].lane_widget.set_fg_color (0.1, 0.4, 0.4);
+  if (exclusive_on) {
+    //lanes [state.exclusive_lane - 1].lane_widget.set_fg_color (0.1, 0.4, 0.4);
+    lanes [state.exclusive_lane - 1].lane_widget.set_state (WSTATE_SELECTED);
+  }
 
   updating_from_state = false;
 }

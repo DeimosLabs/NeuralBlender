@@ -35,16 +35,7 @@ enum _ui_feedback_type {
   ATOM_UNKNOWN
 };
 
-static std::string path_dirname (const std::string &path) {
-  const size_t pos = path.find_last_of ('/');
-  if (pos == std::string::npos)
-    return "";
-
-  if (pos == 0)
-    return "/";
-
-  return path.substr (0, pos);
-}
+std::string path_dirname (const std::string &path);
 
 enum {
   PORT_AUDIO_IN = 0,
