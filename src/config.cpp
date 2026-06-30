@@ -9,8 +9,14 @@
 #include <vector>
 #include "config.h"
 
+#ifdef TRACE
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_YELLOW
 #include "cmdline/cmdline_debug.h"
+#else
+#define debug(...)
+#define CP
+#define BP
+#endif
 
 struct s_option {
   std::string name;

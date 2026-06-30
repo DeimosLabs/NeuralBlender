@@ -34,9 +34,15 @@
 #include "gzip.h"
 #include "data.h"
 
+#ifdef TRACE
 #define CMDLINE_IMPLEMENTATION
 #define CMDLINE_DEBUG_COLOR ANSI_RED
 #include "cmdline/cmdline_debug.h"
+#else
+#define debug(...)
+#define CP
+#define BP
+#endif
 
 extern const char *g_build_timestamp;
 

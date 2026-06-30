@@ -14,8 +14,14 @@
 
 #include "data/data.h"
 
+#ifdef TRACE
 #define CMDLINE_DEBUG_COLOR ANSI_MAGENTA
 #include "cmdline/cmdline_debug.h"
+#else
+#define debug(...)
+#define CP
+#define BP
+#endif
 
 extern const char *g_build_timestamp;
 

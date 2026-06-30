@@ -25,9 +25,15 @@
 
 #define NB_UI_URI "http://deimos.ca/neuralblender#ui"
 
+#ifdef TRACE
 #define CMDLINE_IMPLEMENTATION
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_MAGENTA
 #include "cmdline/cmdline_debug.h"
+#else
+#define debug(...)
+#define CP
+#define BP
+#endif
 
 enum _ui_feedback_type {
   ATOM_METERS,
