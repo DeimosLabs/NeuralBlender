@@ -276,12 +276,13 @@ public:
       Widget_t *parent,
       const char *label,
       int x, int y, int w, int h);
-
+  
   void set_value (float v);
   void set_defaultvalue (float v);
   void set_min (float min);
   void set_max (float max);
   void set_step (float max);
+  static void cb_draw (void *w, void *userdata);
   virtual void on_change ();
   virtual void on_doubleclick ();
   float min = 0;

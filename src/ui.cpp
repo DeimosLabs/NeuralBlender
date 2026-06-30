@@ -19,6 +19,8 @@
 
 extern const char *g_build_timestamp;
 
+void combobox_selected_callback (void *w_, void *user_data);
+
 std::string path_dirname (const std::string &path) {
   const size_t pos = path.find_last_of ('/');
   if (pos == std::string::npos)
@@ -46,32 +48,6 @@ bool is_supported_model_filename (const std::string &path) {
   return (lower.size () >= 4 && lower.rfind (".nam") == lower.size () - 4) ||
          (lower.size () >= 5 && lower.rfind (".json") == lower.size () - 5) ||
          (lower.size () >= 6 && lower.rfind (".aidax") == lower.size () - 6);
-}
-
-static void combobox_selected_callback (void *w_, void *user_data) { CP
-  Widget_t *w = (Widget_t *) w_;
-
-  int index = (int) adj_get_value (w->adj);
-
-  Widget_t *menu = w->childlist->childs[1];
-  Widget_t *view_port = menu->childlist->childs[0];
-  ComboBox_t *list = (ComboBox_t *) view_port->parent_struct;
-
-  const char *label = NULL;
-  if (index >= 0 && index < (int) list->list_size)
-    label = list->list_names [index];
-
-  // index + label are selected item
-  c_combobox *cb = (c_combobox *) w->parent_struct;
-  if (!cb) {
-    debug ("!cb");
-    return;
-  }
-  cb->selected = index;
-  if (cb->updating_widget)
-    return;
-
-  cb->on_change (index);
 }
 
 // calibration default is written to config ONLY if all
@@ -168,7 +144,7 @@ void c_lane_widgets::create (
     int x, int y, int w, int h) { CP
   
   move_resize (x, y, w, h);
-  knob_top = (h - knob_size) / 2;
+  //knob_top = (h - knob_size) / 2;
   
   char label [64];
   ui = ui_;
@@ -192,7 +168,7 @@ void c_lane_widgets::create (
   menu_list.lane = which;
 
   int knobs_right = w - 180;
-  gain_in.create (ui, wp, "Input", knobs_right + 6, knob_top, knob_size, knob_size);
+  gain_in.create (ui, wp, "Input", 0, 0, 64, 64);
   gain_in.lane = gain_out.lane = delay.lane = which;
   gain_in.set_min (-40);
   gain_in.set_max (40);
@@ -201,7 +177,7 @@ void c_lane_widgets::create (
   gain_in.set_step (1);
   gain_in.role = ROLE_GAIN_IN;
   
-  gain_out.create (ui, wp, "Output", knobs_right + 75, knob_top, knob_size, knob_size);
+  gain_out.create (ui, wp, "Output", 0, 0, 64, 64);
   gain_out.role = ROLE_GAIN_OUT;
   gain_out.set_min (-40);
   gain_out.set_max (40);
@@ -231,7 +207,7 @@ void c_lane_widgets::create (
   
   // advanced controls
   delay.role = ROLE_DELAY;
-  delay.create (ui, wp, "Delay", 0, 0, knob_size, knob_size);
+  delay.create (ui, wp, "Delay", 0, 0, 64, 64);
   delay.set_min (0);
   delay.set_max (30);
   delay.set_defaultvalue (0);
@@ -291,6 +267,92 @@ void c_lane_widgets::create (
   
 }
 
+void c_neuralblender_ui::on_button (c_button *btn, bool value) {
+  if (!btn || updating_from_state)
+    return;
+    
+  size_t lane = btn->lane;
+
+  switch (btn->role) {
+    case ROLE_BYPASS: CP
+      on_bypass (btn, value);
+      btn->set_label (value ? "Enabled" : "Bypass");
+    break;
+
+    case ROLE_MUTE: CP
+      on_mute (btn, value);
+      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
+        state.lanes [lane].lane_mute = value;
+      }
+    break;
+
+    case ROLE_DCFLIP: CP
+      on_dcflip (btn, value);
+      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
+        state.lanes [lane].dcflip = value;
+      }
+    break;
+
+    case ROLE_CALIBRATE: CP
+      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
+        state.lanes [lane].do_calib = value;
+      }
+      write_calib_state_if_consistent ();
+      on_calibrate (btn, value);
+    break;
+
+    case ROLE_MUTEALL: CP
+      on_muteall (btn, value);
+    break;
+
+    case ROLE_BROWSE: CP
+      on_filebrowse (btn);
+      if (btn->filepicker)
+        btn->filepicker->show ();
+      else
+        debug ("!filepicker");
+    break;
+
+    case ROLE_CLEAR: CP
+      on_fileclear (btn);
+    break;
+
+    case ROLE_ABOUT: CP
+      aboutwindow.show ();
+      on_about (btn);
+    break;
+
+    case ROLE_ABOUTOK: CP
+      aboutwindow.hide ();
+    break;
+
+    case ROLE_VUTOGGLE: CP
+      vu_on (value);
+    break;
+
+    case ROLE_EXCL_TOGGLE: CP
+      if (value) {
+        size_t exclusive_lane = choose_exclusive_lane ();
+        on_excl (btn, exclusive_lane); // this is 1-BASED, 0 = normal mode
+      } else {
+        on_excl (btn, 0);
+      }
+    break;
+
+    case ROLE_EXCL_USE:
+      on_excl_use (btn, value);
+    break;
+
+    //case ROLE_ADV_TOGGLE:
+    //  on_advanced (this, value);
+    //break;
+
+    default: CP
+    break;
+  }
+  sync_widgets_from_state (state);
+}
+
 void c_lane_widgets::move_resize (
     int x, int y, int w, int h) {
   
@@ -298,37 +360,27 @@ void c_lane_widgets::move_resize (
     return;
 
   lane_widget.move_resize (x, y, w, h);
-  knob_top = (h - knob_size) / 2;
 
   int split = 0;
   
-  /*if (ui && ui->state.showadvanced)
-    split = w * 15 / 64;*/
-  
-  //cont_advcontrols.move_resize (0, 0, split, h);
-  //cont_regcontrols.move_resize (split, 0, w - split, h);
   cont_regcontrols.move_resize (0, 0, w, h);
   
-  delay.move_resize (22, knob_top, knob_size, knob_size);
-  //if (ui && ui->state.showadvanced) {
-  //  widget_show_all (cont_advcontrols.widget);
-  //  expose_widget (cont_advcontrols.widget);
-  //} else {
-  //  widget_hide (cont_advcontrols.widget);
-  //}
-
   int button_padding = 4;
   
+  const int knob_size = 64;//std::max (64, h / 2);
+  const int knob_top = (h - knob_size) / 2 - 8;
+  const int knob_right = std::max (16, w - 160);
   const int reg_w = cont_regcontrols.w ();
-  knob_right = std::max (16, reg_w - 150);
-  const int menu_x = delay.x () + delay.w () + 8;
-  const int menu_width = std::max (64, w - menu_x - (w - knob_right) - button_padding) - 32;
+  const int menu_x = 16 + knob_size;//delay.x () + delay.w () + 8;
+  const int menu_width = std::max (64, w - menu_x - (w - knob_right) - button_padding);
   menu_list.move_resize (menu_x, 24, menu_width, 32);
   //int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
   int button_left = menu_list.x ();
   int button_top = menu_list.y () + menu_list.h () + 8;
   int button_width = std::min (h - 76, w / 10);
   
+  delay.move_resize (16, knob_top, knob_size, knob_size + 16);
+
   btn_browse.move_resize (button_left, button_top, button_width, button_width);
   btn_clear.move_resize (btn_browse.x () + btn_browse.w () + button_padding,
                          button_top, button_width, button_width);
@@ -343,14 +395,15 @@ void c_lane_widgets::move_resize (
                          button_top, mute_width, button_width);
   btn_excl.move_resize (btn_mute.x (), btn_mute.y (), btn_mute.w (), btn_mute.h ());
   
-  gain_in.move_resize (knob_right, knob_top, knob_size, knob_size);
-  gain_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size);
+  gain_in.move_resize (knob_right, knob_top, knob_size, knob_size + 16);
+  gain_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size + 16);
   meter_out.move_resize (knob_right + 130, 16, 5, h - 32);
   
   int adv_btn_x = 84;
   int adv_btn_y = h * 2 / 11;
   label_frames.move_resize (delay.x (), h - 25, delay.w (), 16);
   label_trim.move_resize (gain_in.x (), h - 25, gain_in.w (), 16);
+  //move_resize (x, y, w, h);
 }
 
 c_neuralblender_ui::c_neuralblender_ui () { CP
@@ -438,11 +491,9 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   cont_checkboxes.create (this, main_widget, "", 8, 604, 500, 40);
   cont_checkboxes.widget->scale.gravity = NONE;
   
-  btn_vu.create (this, cont_checkboxes.widget, "VU", 0, 0, 32, 32, WSTYLE_CHECKBOX);
-  label_vu.create (this, cont_checkboxes.widget, "VU meters", 32, 0, 80, 32);
+  btn_vu.create (this, cont_checkboxes.widget, "VU meters", 0, 0, 120, 32, WSTYLE_CHECKBOX);
   btn_vu.role = ROLE_VUTOGGLE;
   btn_vu.set_value (state.do_vu);
-  label_vu.widget->scale.gravity = WESTCENTER;
   
   //btn_advanced.create (this, cont_checkboxes.widget, "Adv.", 140, 0, 32, 32, WSTYLE_CHECKBOX);
   //label_advanced.create (this, cont_checkboxes.widget, "Show advanced", 172, 0, 150, 32);
@@ -450,11 +501,9 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   //btn_advanced.role = ROLE_ADV_TOGGLE;
   //label_advanced.widget->scale.gravity = WESTCENTER;
   
-  btn_exclmode.create (this, cont_checkboxes.widget, "Excl. mode", 140, 0, 32, 32, WSTYLE_CHECKBOX);
-  label_exclmode.create (this, cont_checkboxes.widget, "Exclusive mode", 172, 0, 150, 32);
+  btn_exclmode.create (this, cont_checkboxes.widget, "Exclusive mode", 140, 0, 170, 32, WSTYLE_CHECKBOX);
   btn_exclmode.set_value (state.do_excl);
   btn_exclmode.role = ROLE_EXCL_TOGGLE;
-  label_exclmode.widget->scale.gravity = WESTCENTER;
   
   aboutwindow.create (this);
   for (i = 0; i < NB_UI_MAX_LANES; i++) {
@@ -515,6 +564,10 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     int min_window_height = 640;
     int window_width = min_window_width;
     int window_height = min_window_height;
+    if (!snap_to_default && metrics.visible) {
+      window_width = std::max (min_window_width, (int) (metrics.width / main_widget->app->hdpi));
+      window_height = std::max (min_window_height, (int) (metrics.height / main_widget->app->hdpi));
+    }
     
     os_set_window_min_size (main_widget, min_window_width, min_window_height,
                             min_window_width, min_window_height);
@@ -562,7 +615,7 @@ void c_neuralblender_ui::update_stats () {
     if (trim == 1.00)
       snprintf (buf, 127, "");
     else
-      snprintf (buf, 127, "trim=%.02f", trim);
+      snprintf (buf, 127, "Trim: %.02f", trim);
     lanes [i].label_trim.set_label (buf);
     
   }

@@ -7,6 +7,7 @@
 #include "ui.h"
 
 #include "xdrawing_area.h"
+#include "widgets/xknob_private.h"
 #include "xpngloader.h"
 #include "widgets/xcombobox_private.h"
 
@@ -36,11 +37,25 @@ static constexpr t_statecolors sc (
   return { bg, fg };
 }
 
+static float knob_angle_from_value (float value, float min, float max) {
+  if (max <= min)
+    return 0.0f;
+
+  float t = (value - min) / (max - min);
+  t = std::clamp (t, 0.0f, 1.0f);
+
+  const float start = 3.0f * M_PI / 4.0f; // 135 deg, lower-left
+  const float sweep = 3.0f * M_PI / 2.0f; // 270 deg
+
+  return start + t * sweep;
+}
+
+
 // Floats galore. Bring a row boat.
 
 static t_colortheme g_default_colors = {
   // window_bg
-  grad  (0.090f, 0.090f, 0.095f, 1.0f, 0.130f, 0.130f, 0.140f, 1.0f),
+  solid  (0.10f, 0.105f, 0.11f, 1.0f),
 
   // button
   { // normal, hover, on, on_hover, down, disabled
@@ -305,6 +320,73 @@ static void draw_rounded_rect (
     return;
 
   draw_rounded_rect (w, x, y, width, height, radius, colors, line_width);
+}
+
+static void draw_check_mark (
+    Widget_t *w,
+    int x,
+    int y,
+    int width,
+    int height,
+    const t_gradientcolors &colors) {
+
+  if (!w || !w->crb || width <= 0 || height <= 0)
+    return;
+
+  cairo_save (w->crb);
+  cairo_set_source_rgba (w->crb, colors.r1, colors.g1, colors.b1, colors.a1);
+  cairo_set_line_width (w->crb, std::max (2.0, width * 0.16));
+  cairo_set_line_cap (w->crb, CAIRO_LINE_CAP_ROUND);
+  cairo_set_line_join (w->crb, CAIRO_LINE_JOIN_ROUND);
+
+  cairo_move_to (
+      w->crb,
+      x + width * 0.23,
+      y + height * 0.52);
+  cairo_line_to (
+      w->crb,
+      x + width * 0.43,
+      y + height * 0.72);
+  cairo_line_to (
+      w->crb,
+      x + width * 0.78,
+      y + height * 0.28);
+  cairo_stroke (w->crb);
+  cairo_restore (w->crb);
+}
+
+static void draw_checkbox (
+    Widget_t *w,
+    const t_statecolors &colors,
+    bool checked) {
+
+  int x = 0, y = 0, width = 0, height = 0;
+  if (!get_widget_size (w, &x, &y, &width, &height))
+    return;
+
+  const int size = std::max (4, height - 6);
+  const int cx = x + 3;
+  const int cy = y + (height - size) / 2;
+
+  fill_rounded_rect (w, x, y, width, height, 0.0f, g_colors->window_bg);
+  fill_rounded_rect (w, cx, cy, size, size, UI_CHECKBOX_RADIUS, colors.bg);
+  draw_rounded_rect (w, cx, cy, size, size, UI_CHECKBOX_RADIUS, colors.fg, 2.0f);
+
+  if (checked)
+    draw_check_mark (w, cx, cy, size, size, colors.fg);
+
+  const char *label = w->label ? w->label : "";
+  if (label [0] && width > size + 8) {
+    cairo_text_extents_t ext;
+    cairo_set_source_rgba (w->crb, colors.fg.r1, colors.fg.g1, colors.fg.b1, colors.fg.a1);
+    cairo_set_font_size (w->crb, w->app->normal_font / w->scale.ascale);
+    cairo_text_extents (w->crb, label, &ext);
+    cairo_move_to (
+        w->crb,
+        cx + size + 8 - ext.x_bearing,
+        y + (height - ext.height) * 0.5 - ext.y_bearing);
+    cairo_show_text (w->crb, label);
+  }
 }
 
 unsigned long x11_color_pixel (
@@ -857,8 +939,7 @@ void c_button::cb_draw (void *w, void *user_data) {
 
   switch (self->wstyle) {
     case WSTYLE_CHECKBOX:
-      fill_rounded_rect (widget, UI_BUTTON_RADIUS, colors.bg);
-      draw_rounded_rect (widget, UI_BUTTON_RADIUS, colors.fg, 2.0f);
+      draw_checkbox (widget, colors, self->value);
     break;
     
     case WSTYLE_IMAGE_TOGGLE_NOFRAME:
@@ -923,87 +1004,7 @@ void c_button::set_image (const unsigned char *pngdata, _widget_state which) {
 }
 
 void c_button::on_mouseup () {
-  if (!ui || ui->updating_from_state)
-    return;
-
-  switch (role) {
-    case ROLE_BYPASS: CP
-      ui->on_bypass (this, value);
-      set_label (value ? "Enabled" : "Bypass");
-    break;
-
-    case ROLE_MUTE: CP
-      ui->on_mute (this, value);
-      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
-        ui->state.lanes [lane].lane_mute = value;
-      }
-    break;
-
-    case ROLE_DCFLIP: CP
-      ui->on_dcflip (this, value);
-      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
-        ui->state.lanes [lane].dcflip = value;
-      }
-    break;
-
-    case ROLE_CALIBRATE: CP
-      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
-        ui->state.lanes [lane].do_calib = value;
-      }
-      ui->write_calib_state_if_consistent ();
-      ui->on_calibrate (this, value);
-    break;
-
-    case ROLE_MUTEALL: CP
-      ui->on_muteall (this, value);
-    break;
-
-    case ROLE_BROWSE: CP
-      ui->on_filebrowse (this);
-      if (filepicker)
-        filepicker->show ();
-      else
-        debug ("!filepicker");
-    break;
-
-    case ROLE_CLEAR: CP
-      ui->on_fileclear (this);
-    break;
-
-    case ROLE_ABOUT: CP
-      ui->aboutwindow.show ();
-      ui->on_about (this);
-    break;
-
-    case ROLE_ABOUTOK: CP
-      ui->aboutwindow.hide ();
-    break;
-
-    case ROLE_VUTOGGLE: CP
-      ui->vu_on (value);
-    break;
-
-    case ROLE_EXCL_TOGGLE: CP
-      if (value) {
-        size_t exclusive_lane = ui->choose_exclusive_lane ();
-        ui->on_excl (this, exclusive_lane); // this is 1-BASED, 0 = normal mode
-      } else {
-        ui->on_excl (this, 0);
-      }
-    break;
-
-    case ROLE_EXCL_USE:
-      ui->on_excl_use (this, value);
-    break;
-
-    //case ROLE_ADV_TOGGLE:
-    //  ui->on_advanced (this, value);
-    //break;
-
-    default: CP
-    break;
-  }
-  ui->sync_widgets_from_state (ui->state);
+  ui->on_button (this, value);
 }
 
 void xevfunc_dummy (void *a, void *b)          { }
@@ -1057,17 +1058,60 @@ void knob_value_changed (void *w_, void *value_) {
   }
 }
 
+Widget_t *g_knob_image = NULL;
+
 void c_knob::create (
     c_neuralblender_ui *ui_,
     Widget_t *parent,
     const char *label_,
     int x, int y, int w, int h) {
-
+  
+  if (!g_knob_image) {
+    g_knob_image = create_widget (parent->app, parent, 0, 0, 1, 1);
+    widget_get_png (g_knob_image, data_knob_png);
+    widget_hide (g_knob_image);
+  }
   label = label_;
   widget = add_knob (parent, label.c_str (), x, y, w, h);
+  widget->func.expose_callback = c_knob::cb_draw;
   widget->func.value_changed_callback = knob_value_changed;
   widget->func.double_click_callback = knob_double_click;
+
   c_widget::create (ui_, parent, label_, x, y, w, h);
+}
+
+void c_knob::cb_draw (void *w, void *user_data) {
+  Widget_t *widget = (Widget_t *) w;
+  if (!widget || !widget->parent_struct)
+    return;
+    
+  c_knob *knob = (c_knob *) widget->parent_struct;
+
+  if (g_knob_image && g_knob_image->image && widget->image != g_knob_image->image)
+    widget_get_surface_ptr (widget, g_knob_image);
+
+  _draw_knob (widget, user_data);
+  
+  if (widget->crb) {
+    // arc around knob - thanks to codex for help with the math!
+    int w, h;
+    float a0 = 3.0f * M_PI / 4.0f;
+    float a1 = knob_angle_from_value (knob->value, knob->min, knob->max);
+    get_widget_size (widget, NULL, NULL, &w, &h);
+    int cx = w / 2 - 2;
+    int cy = cx;//h / 2;
+    cairo_arc (widget->crb, cx, cy, cx - 2, a0, a1);
+    cairo_stroke (widget->crb);
+    
+    // little dot indicating value
+    float dot_r = std::max (2.0f, (float) (cx - 2) / 12);
+    float dot_dist = (cx / 2) * 0.95f;
+    float dot_x = cx + cosf (a1) * dot_dist;
+    float dot_y = cy + sinf (a1) * dot_dist;
+    cairo_arc (widget->crb, dot_x, dot_y, dot_r, 0.0, 2.0 * M_PI);
+    cairo_fill (widget->crb);
+  }
+ 
 }
 
 void c_knob::set_min (float x) {
@@ -1125,6 +1169,7 @@ void c_knob::on_change () {
       debug ("unknown knob set to %f", g);
     break;
   }
+  expose ();
 }
 
 void c_knob::on_doubleclick () { CP
@@ -1260,6 +1305,32 @@ void c_combobox::update_widget () {
   updating_widget = false;
 
   expose ();
+}
+
+void combobox_selected_callback (void *w_, void *user_data) { CP
+  Widget_t *w = (Widget_t *) w_;
+
+  int index = (int) adj_get_value (w->adj);
+
+  Widget_t *menu = w->childlist->childs[1];
+  Widget_t *view_port = menu->childlist->childs[0];
+  ComboBox_t *list = (ComboBox_t *) view_port->parent_struct;
+
+  const char *label = NULL;
+  if (index >= 0 && index < (int) list->list_size)
+    label = list->list_names [index];
+
+  // index + label are selected item
+  c_combobox *cb = (c_combobox *) w->parent_struct;
+  if (!cb) {
+    debug ("!cb");
+    return;
+  }
+  cb->selected = index;
+  if (cb->updating_widget)
+    return;
+
+  cb->on_change (index);
 }
 
 static void filepicker_response (void *w_, void *user_data) { CP

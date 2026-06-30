@@ -34,8 +34,9 @@
 #define NB_BG_B 0.10
 #define NB_BG_A 1.00
 
-#define UI_BUTTON_RADIUS   15.0
-#define UI_FRAME_RADIUS    5.0
+#define UI_BUTTON_RADIUS     12.0
+#define UI_CHECKBOX_RADIUS   8.0
+#define UI_FRAME_RADIUS      12.0
 
 
 class c_neuralblender;
@@ -51,6 +52,7 @@ public:
   void hide ();
 
   Widget_t *w = NULL;
+  c_frame frame;
   c_button btn_ok;
   c_label labels [16];
   c_image img_logo;
@@ -90,14 +92,14 @@ public:
   c_button btn_flip;
   c_button btn_calib;
   c_combobox menu_list;
-  c_label label_flip;
-  c_label label_calib;
+  //c_label label_flip;
+  //c_label label_calib;
   c_label label_frames;
   c_label label_trim;
   
-  int knob_size = 64;
-  int knob_top = 0;
-  int knob_right = 0;
+  //int knob_size = 64;
+  //int knob_top = 0;
+  //int knob_right = 0;
 
   //c_meterwidget meter_in; // we only have one input
   c_meter meter_out;
@@ -142,6 +144,7 @@ public:
   virtual void on_vu (c_widget *w, bool b)                     = 0;
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;
+          void on_button (c_button *btn, bool value)               ;
   virtual void on_window_resize (int w, int h)                    ;
   virtual bool request_window_size (int w, int h)                 ;
   //virtual void on_advanced (c_widget *w, bool b)                  ; 
@@ -163,9 +166,9 @@ public:
   c_button       btn_vu;
   c_button       btn_exclmode;
   c_button       btn_advanced;
-  c_label        label_vu;
-  c_label        label_exclmode;
-  c_label        label_advanced;
+  //c_label        label_vu;
+  //c_label        label_exclmode;
+  //c_label        label_advanced;
   c_lane_widgets lanes [NB_UI_MAX_LANES];
   c_filepicker   filepickers [NB_UI_MAX_LANES];
   c_meter        meter_in;
