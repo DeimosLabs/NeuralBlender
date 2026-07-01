@@ -302,6 +302,7 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     break;
 
     case ROLE_MUTEALL: CP
+      state.mute_all = value;
       on_muteall (btn, value);
     break;
 
@@ -838,14 +839,14 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     lanes [i].btn_mute.set_value (state.lanes [i].lane_mute);
     lanes [i].btn_excl.set_value (selected);
 
-    for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
-      //lanes [i].lane_widget.set_fg_color (0, 0, 0);
-      if (state.lanes [i].lane_mute)
-        lanes [i].lane_widget.set_state (WSTATE_DISABLED);
-      else
-        lanes [i].lane_widget.set_state (WSTATE_NORMAL);
+    if (state.lanes [i].lane_mute || state.mute_all) { CP
+      lanes [i].lane_widget.set_state (WSTATE_DISABLED);
+    } else {
+      lanes [i].lane_widget.set_state (WSTATE_NORMAL);
     }
+
     if (exclusive_on) { CP
+      lanes [i].lane_widget.set_state (WSTATE_DISABLED);
       widget_hide (lanes [i].btn_mute.widget);
       widget_show (lanes [i].btn_excl.widget);
     } else { CP
