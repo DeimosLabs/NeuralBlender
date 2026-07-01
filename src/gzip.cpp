@@ -9,14 +9,8 @@
 #include <arpa/inet.h>
 #include "gzip.h"
 
-#ifdef TRACE
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_GREEN
-#include "cmdline/cmdline_debug.h"
-#else
-#define debug(...)
-#define CP
-#define BP
-#endif
+#include "cmdline_debug.h"
 
 #define net_to_int16(x) ntohs(x)
 #define int16_to_net(x) htons(x)

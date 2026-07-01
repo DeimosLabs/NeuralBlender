@@ -40,15 +40,9 @@
 #define NB_URI "http://deimos.ca/neuralblender"
 #define LV2_METER_FPS 30.0
 
-#ifdef TRACE
 #define CMDLINE_IMPLEMENTATION
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_RED
-#include "cmdline/cmdline_debug.h"
-#else
-#define debug(...)
-#define CP
-#define BP
-#endif
+#include "cmdline_debug.h"
 
 enum {
   PORT_AUDIO_IN = 0,

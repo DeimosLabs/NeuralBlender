@@ -22,14 +22,8 @@
 #include "xputty_compat.h"
 #endif
 
-#ifdef TRACE
 #define CMDLINE_DEBUG_COLOR ANSI_CYAN
-#include "cmdline/cmdline_debug.h"
-#else
-#define debug(...)
-#define CP
-#define BP
-#endif
+#include "cmdline_debug.h"
 
 #ifdef METER_DATA_ONLY
 

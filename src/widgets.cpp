@@ -13,14 +13,8 @@
 
 #include "data/data.h"
 
-#ifdef TRACE
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_CYAN
-#include "cmdline/cmdline_debug.h"
-#else
-#define debug(...)
-#define CP
-#define BP
-#endif
+#include "cmdline_debug.h"
 
 static constexpr float DEFAULT_BG_R = 0.125f;
 static constexpr float DEFAULT_BG_G = 0.125f;
