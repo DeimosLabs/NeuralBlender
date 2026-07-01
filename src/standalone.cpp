@@ -101,12 +101,12 @@ public:
 bool c_standalone_ui::load_model (size_t which, const char *filename) {
   debug ("which=%d, filename='%s'", (int) which, filename);
   const bool loaded = blender->load_model (which, filename);
-  if (which < NB_MAX_MODELS) {
+  if (which < NB_NUM_MODELS) {
     state.lanes [which].loaded = loaded;
     state.lanes [which].filename = loaded && filename ? filename : "";
   }
   apply_effective_controls ();
-  if (which < NB_MAX_MODELS) {
+  if (which < NB_NUM_MODELS) {
     if (state.lanes [which].do_calib && loaded) {
       float *data = (float *) data_calib_f32;
       const size_t samples = data_calib_f32_len / sizeof (float);
@@ -134,7 +134,7 @@ void c_standalone_ui::on_gain_out (c_widget *w, float f) {
 void c_standalone_ui::on_delay (c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
   g_blender.set_delay_ms (w->lane, f);
-  if (w->lane < NB_MAX_MODELS)
+  if (w->lane < NB_NUM_MODELS)
     stats [w->lane * 2] = (float) g_blender.delays [w->lane].frames ();
   update_stats ();
 }
@@ -153,7 +153,7 @@ void c_standalone_ui::on_fileclear (c_widget *w) {
   debug ("lane %d", w->lane);
   g_blender.unload_model (w->lane);
   clear_lane_model_ui (w->lane);
-  if (w->lane >= 0 && w->lane < (int) NB_MAX_MODELS)
+  if (w->lane >= 0 && w->lane < (int) NB_NUM_MODELS)
     state.lanes [w->lane].loaded = false;
   apply_effective_controls ();
 }
@@ -184,7 +184,7 @@ void c_standalone_ui::on_calibrate (c_widget *w, bool b) { CP
   } else {
     g_blender.amps [which].calibrate (NULL, 0);
   }
-  for (size_t i = 0; i < NB_MAX_MODELS; i++) {
+  for (size_t i = 0; i < NB_NUM_MODELS; i++) {
     stats [i * 2 + 1] = g_blender.amps [i].trim;
   }
   update_stats ();
@@ -227,12 +227,12 @@ void c_standalone_ui::apply_effective_controls () {
   const size_t excl = exclusive_on ? (size_t) (state.exclusive_lane - 1) : 0;
   const bool exclusive_empty =
     exclusive_on &&
-    (excl >= NB_MAX_MODELS ||
+    (excl >= NB_NUM_MODELS ||
      (!state.lanes [excl].loaded && state.lanes [excl].filename.empty ()));
 
   blender->set_bypass (state.bypass || exclusive_empty);
 
-  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     const bool mute =
       exclusive_on && !exclusive_empty ? i != excl : state.lanes [i].lane_mute;
     blender->set_lane_mute (i, mute);
@@ -251,7 +251,7 @@ static void ui_main () {
   c_neuralblender_state state;
   g_blender.get_state (state);
   if (g_ui.calib_default) {
-    for (size_t i = 0; i < NB_MAX_MODELS; ++i)
+    for (size_t i = 0; i < NB_NUM_MODELS; ++i)
       state.lanes [i].do_calib = true;
   }
   g_ui.sync_widgets_from_state (state);

@@ -448,7 +448,7 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
 c_neuralblender::c_neuralblender () { CP
   meter_in = nullptr;
 
-  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     m_lane_mute [i].store (false, std::memory_order_relaxed);
     meters_out [i] = nullptr;
     amps [i].dcflip = false;
@@ -476,14 +476,14 @@ c_neuralblender::~c_neuralblender () { CP
 void c_neuralblender::set_samplerate (uint32_t sr) { CP
   debug ("start");
   m_samplerate = sr;
-  for (size_t i = 0; i < NB_MAX_MODELS; ++i)
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i)
     amps [i].set_samplerate (sr);
   debug ("end");
 }
 
 void c_neuralblender::set_blocksize (uint32_t bs) { CP
   //m_blocksize = bs;
-  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     amps [i].blocksize = bs;
     m_delay_bufs [i].resize (MAX_BLOCK_SIZE);
     m_model_bufs [i].resize (MAX_BLOCK_SIZE);
@@ -491,38 +491,38 @@ void c_neuralblender::set_blocksize (uint32_t bs) { CP
 }
 
 bool c_neuralblender::dcflip (size_t which, bool b) {
-  if (which >= NB_MAX_MODELS)
+  if (which >= NB_NUM_MODELS)
     return false;
   amps [which].dcflip = b;
   return true;
 }
 
 bool c_neuralblender::is_dcflipped (size_t which) {
-  if (which >= NB_MAX_MODELS) return false;
+  if (which >= NB_NUM_MODELS) return false;
   return amps [which].dcflip;
 }
 
 bool c_neuralblender::calib_on (size_t which, bool b) {
-  if (which >= NB_MAX_MODELS)
+  if (which >= NB_NUM_MODELS)
     return false;
   amps [which].do_calib = b;
   return true;
 }
 
 bool c_neuralblender::is_calib_on (size_t which) {
-  if (which >= NB_MAX_MODELS) return false;
+  if (which >= NB_NUM_MODELS) return false;
   return amps [which].do_calib;
 }
 
 bool c_neuralblender::set_delay_frames (size_t which, uint32_t frames) { CP
-  if (which >= NB_MAX_MODELS)
+  if (which >= NB_NUM_MODELS)
     return false;
 
   return delays [which].set_frames (frames);
 }
 
 bool c_neuralblender::set_gain_in (size_t which, float g) {
-  if (which >= NB_MAX_MODELS)
+  if (which >= NB_NUM_MODELS)
     return false;
 
   amps [which].gain_in = g;
@@ -530,7 +530,7 @@ bool c_neuralblender::set_gain_in (size_t which, float g) {
 }
 
 bool c_neuralblender::set_gain_out (size_t which, float g) {
-  if (which >= NB_MAX_MODELS)
+  if (which >= NB_NUM_MODELS)
     return false;
 
   amps [which].gain_out = g;
@@ -538,7 +538,7 @@ bool c_neuralblender::set_gain_out (size_t which, float g) {
 }
 
 bool c_neuralblender::set_lane_mute (size_t which, bool muted) {
-  if (which >= NB_MAX_MODELS)
+  if (which >= NB_NUM_MODELS)
     return false;
 
   m_lane_mute [which].store (muted, std::memory_order_relaxed);
@@ -550,7 +550,7 @@ void c_neuralblender::set_bypass (bool bypass) {
 }
 
 bool c_neuralblender::lane_mute (size_t which) const {
-  if (which >= NB_MAX_MODELS)
+  if (which >= NB_NUM_MODELS)
     return false;
 
   return m_lane_mute [which].load (std::memory_order_relaxed);
@@ -561,7 +561,7 @@ bool c_neuralblender::bypass () const {
 }
 
 float c_neuralblender::delay_ms (size_t which) const {
-  if (which >= NB_MAX_MODELS || !m_samplerate)
+  if (which >= NB_NUM_MODELS || !m_samplerate)
     return 0.0f;
 
   return (float) delays [which].frames () * 1000.0f / (float) m_samplerate;
@@ -577,7 +577,7 @@ bool c_neuralblender::consistent_calib_state (bool &enabled,
   bool all_on = true;
   bool all_off = true;
 
-  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     all_on  &= state.lanes[i].do_calib;
     all_off &= !state.lanes[i].do_calib;
   }
@@ -599,7 +599,7 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
   state.bypass = bypass ();
   state.do_vu = do_vu;
   state.mute_all = mute_all;
-  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     state.lanes [i].filename = amps [i].model_filename ();
     state.lanes [i].gain_in = amps [i].gain_in;
     state.lanes [i].gain_out = amps [i].gain_out;
@@ -620,7 +620,7 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
 void c_neuralblender::update_mutes () {
   bool any_loaded = false;
 
-  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     const bool loaded = amps [i].loaded ();
     amps [i].mute = !loaded;
     any_loaded |= loaded;
@@ -631,19 +631,19 @@ void c_neuralblender::update_mutes () {
 }
 
 bool c_neuralblender::load_model (size_t which, const char *fn) { CP
-  if (which >= NB_MAX_MODELS) {
-    debug ("which >= %d", NB_MAX_MODELS);
+  if (which >= NB_NUM_MODELS) {
+    debug ("which >= %d", NB_NUM_MODELS);
     return false;
   }
 
-  for (size_t i = 0; i < NB_MAX_MODELS; ++i)
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i)
     amps [i].mute = true;
 
   const bool ret = amps [which].load_model (fn);
   amps [which].warmup = 5;
 
   int bf = 0;
-  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     if (amps [i].loaded ())
       bf |= (1 << i);
   }
@@ -654,7 +654,7 @@ bool c_neuralblender::load_model (size_t which, const char *fn) { CP
 }
 
 bool c_neuralblender::unload_model (size_t which) { CP
-  if (which >= NB_MAX_MODELS)
+  if (which >= NB_NUM_MODELS)
     return false;
 
   amps [which].unload_model ();
@@ -678,7 +678,7 @@ static void update_loaded_output_meters (c_neuralblender *blender) {
   if (!blender->do_vu)
     return;
 
-  for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
+  for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
     if (blender->amps [lane].loaded () && blender->meters_out [lane])
       blender->meters_out [lane]->update ();
   }
@@ -721,7 +721,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     return;
   }
 
-  for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
+  for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
     if (m_delay_bufs [lane].size () < nframes)
       m_delay_bufs [lane].resize (nframes);
     if (m_model_bufs [lane].size () < nframes)
@@ -730,7 +730,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
 
   bool any_loaded = false;
   bool any_active = false;
-  for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
+  for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
     if (!amps [lane].loaded ())
       continue;
 
@@ -743,7 +743,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
 
   if (!any_loaded) {
     delays [0].process_block (process_in, out, nframes);
-    for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
+    for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
       if (do_vu && meters_out [lane])
         meters_out [lane]->update ();
     }
@@ -759,7 +759,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
 
   std::fill (out, out + nframes, 0.0f);
 
-  for (size_t lane = 0; lane < NB_MAX_MODELS; ++lane) {
+  for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
     if (!amps [lane].loaded ()) {
       if (meters_out [lane] && do_vu)
         meters_out [lane]->update ();

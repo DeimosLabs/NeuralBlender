@@ -94,7 +94,7 @@ public:
   LV2_URID urid_patch_Get = 0;
   LV2_URID urid_patch_property = 0;
   LV2_URID urid_patch_value = 0;
-  LV2_URID urid_model [NB_UI_MAX_LANES] = { 0 };
+  LV2_URID urid_model [NB_NUM_MODELS] = { 0 };
   LV2_URID urid_meters = 0;
   LV2_URID urid_stats = 0;
   LV2UI_Port_Subscribe *subscribe = NULL;
@@ -112,7 +112,7 @@ public:
   }
 
   bool write_model_path (size_t which, const char *filename) {
-    if (updating_from_host || !write || !map || which >= NB_UI_MAX_LANES)
+    if (updating_from_host || !write || !map || which >= NB_NUM_MODELS)
       return false;
 
     const char *path = filename ? filename : "";
@@ -172,7 +172,7 @@ public:
   void on_excl (c_widget *w, int n) {
     CP
     state.exclusive_lane = n;
-    if (n > 0 && n <= (int) NB_UI_MAX_LANES)
+    if (n > 0 && n <= (int) NB_NUM_MODELS)
       last_exclusive_lane = (size_t) n;
     write_control (PORT_EXCLUSIVE_LANE, (float) n);
     sync_widgets_from_state (state);
@@ -212,11 +212,11 @@ public:
       btn_vu.set_value (state.do_vu);
       if (state.do_vu) {
         meter_in.show ();
-        for (size_t i = 0; i < NB_UI_MAX_LANES; ++i)
+        for (size_t i = 0; i < NB_NUM_MODELS; ++i)
           lanes [i].meter_out.show ();
       } else {
         meter_in.hide ();
-        for (size_t i = 0; i < NB_UI_MAX_LANES; ++i)
+        for (size_t i = 0; i < NB_NUM_MODELS; ++i)
           lanes [i].meter_out.hide ();
       }
       updating_from_state = old_updating_from_state;
@@ -236,8 +236,8 @@ public:
       int n = (int) lrintf (value);
       if (n < 0)
         n = 0;
-      if (n > (int) NB_UI_MAX_LANES)
-        n = (int) NB_UI_MAX_LANES;
+      if (n > (int) NB_NUM_MODELS)
+        n = (int) NB_NUM_MODELS;
       state.exclusive_lane = n;
       updating_from_state = old_updating_from_state;
       sync_widgets_from_state (state);
@@ -245,7 +245,7 @@ public:
       return;
     }
 
-    for (size_t lane = 0; lane < NB_UI_MAX_LANES; lane++) {
+    for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
       const uint32_t base = PORT_A_GAIN_IN + (uint32_t) lane * 6;
       if (port == base) {
         state.lanes [lane].gain_in = db_to_gain (value);
@@ -291,7 +291,7 @@ public:
   }
 
   void set_model_path (size_t which, const char *path) {
-    if (which >= NB_UI_MAX_LANES)
+    if (which >= NB_NUM_MODELS)
       return;
 
     const char *p = path ? path : "";
@@ -316,7 +316,7 @@ public:
   }
 
   void set_model_property (LV2_URID property, const char *path) {
-    for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+    for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
       if (property == urid_model [i]) {
         set_model_path (i, path);
         return;
@@ -328,7 +328,7 @@ public:
     if (meter_in.needs_redraw () && meter_in.widget)
       transparent_draw (meter_in.widget, NULL);
 
-    for (size_t lane = 0; lane < NB_UI_MAX_LANES; lane++) {
+    for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
       if (lanes [lane].meter_out.needs_redraw () &&
           lanes [lane].meter_out.widget)
         transparent_draw (lanes [lane].meter_out.widget, NULL);
@@ -354,7 +354,7 @@ public:
 
     switch (type) {
       case ATOM_METERS: {
-        const uint32_t need = (1 + NB_UI_MAX_LANES) * 2;
+        const uint32_t need = (1 + NB_NUM_MODELS) * 2;
         if (count < need)
           return;
 
@@ -362,7 +362,7 @@ public:
         vudata_in.set_l (values [n], values [n + 1]);
         n += 2;
         
-        for (size_t lane = 0; lane < NB_UI_MAX_LANES; lane++) {
+        for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
           lanes [lane].vudata_out.set_l (values [n], values [n + 1]);
           n += 2;
         }
@@ -372,11 +372,11 @@ public:
       }
 
       case ATOM_STATS: { CP
-        const uint32_t need = NB_UI_MAX_LANES * 2;
+        const uint32_t need = NB_NUM_MODELS * 2;
         if (count < need)
           return;
 
-        for (size_t lane = 0; lane < NB_UI_MAX_LANES; lane++) {
+        for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
           const size_t n = lane * 2;
           stats [n] = values [n];
           stats [n + 1] = values [n + 1];

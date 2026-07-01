@@ -28,7 +28,6 @@
 #include "config.h"
 #include "widgets.h"
 
-#define NB_UI_MAX_LANES 4
 #define NB_BG_R 0.10
 #define NB_BG_G 0.10
 #define NB_BG_B 0.10
@@ -172,8 +171,8 @@ public:
   //c_label        label_vu;
   //c_label        label_exclmode;
   //c_label        label_advanced;
-  c_lane_widgets lanes [NB_UI_MAX_LANES];
-  c_filepicker   filepickers [NB_UI_MAX_LANES];
+  c_lane_widgets lanes [NB_NUM_MODELS];
+  c_filepicker   filepickers [NB_NUM_MODELS];
   c_meter        meter_in;
   
   c_vudata vudata_in;
@@ -192,6 +191,6 @@ public:
   bool config_file_written = false;
   //bool show_advanced = false;
   bool ui_resize_lock = false;
-  float stats [NB_UI_MAX_LANES * 2];
+  float stats [NB_NUM_MODELS * 2];
   //inline void reposition_widgets () { show_advanced_settings (show_advanced); }
 };

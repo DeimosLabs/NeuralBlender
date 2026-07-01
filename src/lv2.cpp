@@ -91,28 +91,28 @@ typedef struct {
   float *audio_out             = NULL;
   
   // controls
-  const float *gain_in_db  [NB_MAX_MODELS] = { NULL };
-  const float *gain_out_db [NB_MAX_MODELS] = { NULL };
-  const float *delay       [NB_MAX_MODELS] = { NULL };
-  const float *lane_mute   [NB_MAX_MODELS] = { NULL };
-  const float *dcflip      [NB_MAX_MODELS] = { NULL };
-  const float *calibrate   [NB_MAX_MODELS] = { NULL };
+  const float *gain_in_db  [NB_NUM_MODELS] = { NULL };
+  const float *gain_out_db [NB_NUM_MODELS] = { NULL };
+  const float *delay       [NB_NUM_MODELS] = { NULL };
+  const float *lane_mute   [NB_NUM_MODELS] = { NULL };
+  const float *dcflip      [NB_NUM_MODELS] = { NULL };
+  const float *calibrate   [NB_NUM_MODELS] = { NULL };
   const float *bypass      = NULL;
   const float *vu_enable   = NULL;
   const float *mute_all    = NULL;
   const float *exclusive_lane = NULL;
   
-  float last_delay         [NB_MAX_MODELS] = { 0.0 };
-  float last_gain_in_db    [NB_MAX_MODELS] = { 0.0 };
-  float last_gain_out_db   [NB_MAX_MODELS] = { 0.0 };
-  float last_lane_mute     [NB_MAX_MODELS] = { 0.0 };
-  float last_dcflip        [NB_MAX_MODELS] = { 0.0 };
-  float last_calibrate     [NB_MAX_MODELS] = { 0.0 };
+  float last_delay         [NB_NUM_MODELS] = { 0.0 };
+  float last_gain_in_db    [NB_NUM_MODELS] = { 0.0 };
+  float last_gain_out_db   [NB_NUM_MODELS] = { 0.0 };
+  float last_lane_mute     [NB_NUM_MODELS] = { 0.0 };
+  float last_dcflip        [NB_NUM_MODELS] = { 0.0 };
+  float last_calibrate     [NB_NUM_MODELS] = { 0.0 };
   float last_bypass        = 1.0;
   float last_vu_enable     = 1.0;
   float last_mute_all      = 0.0;
   float last_exclusive_lane = 0.0;
-  bool base_lane_mute [NB_MAX_MODELS] = { false };
+  bool base_lane_mute [NB_NUM_MODELS] = { false };
   bool host_bypass = false;
 
   // dsp
@@ -133,7 +133,7 @@ typedef struct {
   LV2_URID urid_atom_Float     = 0;
   LV2_URID urid_atom_Vector    = 0;
 
-  LV2_URID urid_model [NB_MAX_MODELS] = { 0 };
+  LV2_URID urid_model [NB_NUM_MODELS] = { 0 };
   LV2_URID urid_meters         = 0;
   LV2_URID urid_stats          = 0;
   LV2_URID urid_atom_URID      = 0;
@@ -149,21 +149,21 @@ typedef struct {
   std::atomic<bool> load_requested { false };
   
   // hehe what a mess
-  bool pending_calibrate[NB_MAX_MODELS] = { false };
-  std::atomic<bool> pending_calib_enabled[NB_MAX_MODELS] = {};
-  bool pending_load [NB_MAX_MODELS] = { false };
+  bool pending_calibrate[NB_NUM_MODELS] = { false };
+  std::atomic<bool> pending_calib_enabled[NB_NUM_MODELS] = {};
+  bool pending_load [NB_NUM_MODELS] = { false };
   //size_t pending_which         = 0;
-  std::string pending_path [NB_MAX_MODELS];
-  std::string current_model [NB_MAX_MODELS];
+  std::string pending_path [NB_NUM_MODELS];
+  std::string current_model [NB_NUM_MODELS];
   
   // to get notified back when model is loaded from session restore
   LV2_Atom_Forge forge;
   LV2_URID urid_atom_Sequence  = 0;
-  bool notify_path [NB_MAX_MODELS] = { false };
-  std::string current_path [NB_MAX_MODELS];
+  bool notify_path [NB_NUM_MODELS] = { false };
+  std::string current_path [NB_NUM_MODELS];
   
   c_vudata meter_in;
-  c_vudata meters_out [NB_MAX_MODELS];
+  c_vudata meters_out [NB_NUM_MODELS];
   uint32_t meter_notify_samples = 0;
   std::atomic<bool> stats_dirty { true };
   std::atomic<bool> controls_dirty { false };
@@ -176,14 +176,14 @@ static void apply_effective_controls (Plugin *self) {
 
   const int exclusive_lane = (int) lrintf (self->last_exclusive_lane);
   const bool exclusive_on =
-    exclusive_lane > 0 && exclusive_lane <= (int) NB_MAX_MODELS;
+    exclusive_lane > 0 && exclusive_lane <= (int) NB_NUM_MODELS;
   const size_t excl = exclusive_on ? (size_t) (exclusive_lane - 1) : 0;
   const bool exclusive_empty =
     exclusive_on && !self->blender.amps [excl].loaded ();
 
   self->blender.set_bypass (self->host_bypass || exclusive_empty);
 
-  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     const bool mute =
       exclusive_on && !exclusive_empty ? i != excl : self->base_lane_mute [i];
     self->blender.set_lane_mute (i, mute);
@@ -191,7 +191,7 @@ static void apply_effective_controls (Plugin *self) {
 }
 
 static void run_calibration (Plugin *self, size_t which, bool enabled) {
-  if (!self || which >= NB_MAX_MODELS)
+  if (!self || which >= NB_NUM_MODELS)
     return;
 
   self->blender.calib_on (which, enabled);
@@ -220,7 +220,7 @@ static void loader_main (Plugin *self) { CP
       std::unique_lock<std::mutex> lock (self->loader_mutex);
 
       self->loader_cv.wait(lock, [&] {
-        for (size_t i = 0; i < NB_MAX_MODELS; ++i)
+        for (size_t i = 0; i < NB_NUM_MODELS; ++i)
           if (self->pending_load [i] || self->pending_calibrate [i])
             return true;
         return !self->loader_running;
@@ -229,7 +229,7 @@ static void loader_main (Plugin *self) { CP
       if (!self->loader_running)
         break;
 
-      for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+      for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
         if (self->pending_load [i]) {
           which = i;
           path = self->pending_path[i];
@@ -240,7 +240,7 @@ static void loader_main (Plugin *self) { CP
       }
 
       if (!do_load) {
-        for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+        for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
           if (self->pending_calibrate [i]) {
             which = i;
             calib_enabled = self->pending_calib_enabled [i].load (std::memory_order_acquire);
@@ -289,7 +289,7 @@ static void loader_main (Plugin *self) { CP
 
 // THIS RUNS IN DSP THREAD
 static void request_load (Plugin *self, size_t which, const char *path) {
-  if (!self || !path || !path [0] || which >= NB_MAX_MODELS)
+  if (!self || !path || !path [0] || which >= NB_NUM_MODELS)
     return;
     
   std::lock_guard<std::mutex> lock (self->loader_mutex);
@@ -309,7 +309,7 @@ static void request_load (Plugin *self, size_t which, const char *path) {
 }
 
 static void clear_model_slot (Plugin *self, size_t which, bool notify) {
-  if (!self || which >= NB_MAX_MODELS)
+  if (!self || which >= NB_NUM_MODELS)
     return;
 
   { // scope
@@ -343,7 +343,7 @@ static void get_state_path_features (
 }
 
 static void request_calibrate (Plugin *self, size_t which, bool enabled) {
-  if (!self || which >= NB_MAX_MODELS)
+  if (!self || which >= NB_NUM_MODELS)
     return;
 
   {
@@ -367,7 +367,7 @@ static LV2_State_Status save (
 	    LV2_State_Free_Path *free_path = NULL;
 	    get_state_path_features (features, &map_path, &free_path);
 	    
-		    for (int i = 0; i < NB_MAX_MODELS; i++) {
+		    for (int i = 0; i < NB_NUM_MODELS; i++) {
 		      const std::string filename = self->blender.amps [i].model_filename ();
 		      const bool empty = filename.empty ();
 		      char *abstract_path = NULL;
@@ -406,7 +406,7 @@ static LV2_State_Status restore (
     uint32_t type;
     uint32_t valflags;
 
-    for (int i = 0; i < NB_MAX_MODELS; i++) {
+    for (int i = 0; i < NB_NUM_MODELS; i++) {
       const void *p =
           retrieve (handle,
                     self->urid_model [i],
@@ -456,13 +456,13 @@ static void forge_model_path_notify (Plugin *self,
 }
 
 static void forge_meter_notify (Plugin *self) {
-  float values [(1 + NB_MAX_MODELS) * 2];
+  float values [(1 + NB_NUM_MODELS) * 2];
   size_t n = 0;
 
   values [n++] = self->meter_in.linear_l ();
   values [n++] = self->meter_in.linear_peak_l ();
 
-  for (int i = 0; i < NB_MAX_MODELS; i++) {
+  for (int i = 0; i < NB_NUM_MODELS; i++) {
     values [n++] = self->meters_out [i].linear_l ();
     values [n++] = self->meters_out [i].linear_peak_l ();
   }
@@ -488,10 +488,10 @@ static void forge_meter_notify (Plugin *self) {
 }
 
 static void forge_stats_notify (Plugin *self) {
-  float values [NB_MAX_MODELS * 2];
+  float values [NB_NUM_MODELS * 2];
   size_t n = 0;
 
-  for (int i = 0; i < NB_MAX_MODELS; i++) {
+  for (int i = 0; i < NB_NUM_MODELS; i++) {
     values [n++] = (float) self->blender.delays [i].frames ();
     values [n++] = self->blender.amps [i].trim.load (std::memory_order_acquire);
   }
@@ -528,7 +528,7 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   self->blender.set_samplerate ((uint32_t)rate);
   self->meter_in.samplerate = (int) rate;
   self->meter_in.redraw_interval = 1.0f / LV2_METER_FPS;
-  for (int i = 0; i < NB_MAX_MODELS; i++) {
+  for (int i = 0; i < NB_NUM_MODELS; i++) {
     self->meters_out [i].samplerate = (int) rate;
     self->meters_out [i].redraw_interval = 1.0f / LV2_METER_FPS;
   }
@@ -584,7 +584,7 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
     self->map->map(self->map->handle, "http://deimos.ca/neuralblender#Stats");
 
   self->blender.meter_in = &self->meter_in;
-  for (int i = 0; i < NB_MAX_MODELS; i++)
+  for (int i = 0; i < NB_NUM_MODELS; i++)
     self->blender.meters_out [i] = &self->meters_out [i];
   
   // start loader thread LAST
@@ -731,7 +731,7 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
 static void activate (LV2_Handle instance) {
   Plugin *self = (Plugin *) instance;
 
-  for (size_t i = 0; i < NB_MAX_MODELS; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     self->blender.delays [i].clear();
     self->blender.amps [i].reset();
   }
@@ -754,7 +754,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     
     // model loaded from UI?
     bool sent_path_notify = false;
-    for (i = 0; i < NB_MAX_MODELS; i++) {
+    for (i = 0; i < NB_NUM_MODELS; i++) {
       if (self->notify_path [i]) {
         debug ("notify_path [%d]", i);
         forge_model_path_notify (
@@ -790,7 +790,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       const LV2_Atom_Object *obj = (const LV2_Atom_Object *)&ev->body;
       
       if (obj->body.otype == self->urid_patch_Get) {
-        for (i = 0; i < NB_MAX_MODELS; i++)
+        for (i = 0; i < NB_NUM_MODELS; i++)
           self->notify_path [i] = true;
         self->stats_dirty.store (true, std::memory_order_release);
 
@@ -825,7 +825,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       const char *path =
         (const char *) LV2_ATOM_BODY_CONST (value);
       
-      for (i = 0; i < NB_MAX_MODELS; i++) {
+      for (i = 0; i < NB_NUM_MODELS; i++) {
         if (prop == self->urid_model [i]) {
           if (path && path [0])
             request_load (self, i, path);
@@ -841,7 +841,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     self->blocksize = nframes;
     self->blender.set_blocksize(nframes);
     self->meter_in.bufsize = (int) nframes;
-    for (i = 0; i < NB_MAX_MODELS; i++)
+    for (i = 0; i < NB_NUM_MODELS; i++)
       self->meters_out [i].bufsize = (int) nframes;
   }
 
@@ -879,7 +879,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   }
   
   // check all parameters
-  for (i = 0; i < NB_MAX_MODELS; i++) {
+  for (i = 0; i < NB_NUM_MODELS; i++) {
     if (self->gain_in_db [i]) {
       const float v = *self->gain_in_db [i];
       if (v != self->last_gain_in_db [i]) { CP

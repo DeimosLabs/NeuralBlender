@@ -17,6 +17,11 @@
 #define CMDLINE_DEBUG_COLOR ANSI_MAGENTA
 #include "cmdline_debug.h"
 
+#define MIN_WINDOW_HEIGHT (52 + (150 * NB_NUM_MODELS))
+#define DEFAULT_WINDOW_HEIGHT (std::min (768, (52 + (180 * NB_NUM_MODELS))))
+#define MIN_WINDOW_WIDTH 512
+#define DEFAULT_WINDOW_WIDTH 640
+
 extern const char *g_build_timestamp;
 
 void combobox_selected_callback (void *w_, void *user_data);
@@ -56,7 +61,7 @@ void c_neuralblender_ui::write_calib_state_if_consistent () {
   bool all_on = true;
   bool all_off = true;
 
-  for (size_t i = 0; i < NB_UI_MAX_LANES && i < NB_MAX_MODELS; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS && i < NB_NUM_MODELS; ++i) {
     all_on  &= state.lanes [i].do_calib;
     all_off &= !state.lanes [i].do_calib;
   }
@@ -233,7 +238,7 @@ void c_lane_widgets::create (
   btn_calib.role = ROLE_CALIBRATE;
   btn_flip.lane = which;
   btn_calib.lane = which;
-  if (ui && which < NB_UI_MAX_LANES)
+  if (ui && which < NB_NUM_MODELS)
     btn_calib.set_value (ui->state.lanes [which].do_calib);
   //label_flip.create (ui, wp, "DC flip", 0, 0, 75, 32);
   //label_calib.create (ui, wp, "Calib.", 0, 0, 75, 32);
@@ -270,7 +275,7 @@ void c_lane_widgets::create (
   btn_flip.set_image_down_hover (data_icon_phase_small_png);
   btn_flip.set_image_off_hover (data_icon_phase_small_png);
   
-  if (ui && which < NB_UI_MAX_LANES) {
+  if (ui && which < NB_NUM_MODELS) {
     ui->filepickers [which].create (ui, btn_browse.widget, which, "Select file");
     btn_browse.filepicker = &ui->filepickers [which];
     btn_browse.lane = which;
@@ -281,7 +286,7 @@ void c_lane_widgets::create (
 
 c_neuralblender_ui::c_neuralblender_ui () { CP
   memset (&app, 0, sizeof (app));
-  for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     stats [i * 2] = 0.0f;
     stats [i * 2 + 1] = 1.0f;
   }
@@ -319,7 +324,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
 
   if (configfile.istrue (CONFIG_KEY_NAME_CALIB)) {
     calib_default = true;
-    for (i = 0; i < NB_UI_MAX_LANES && i < NB_MAX_MODELS; ++i)
+    for (i = 0; i < NB_NUM_MODELS && i < NB_NUM_MODELS; ++i)
       state.lanes [i].do_calib = true;
   }
 
@@ -327,7 +332,8 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   if (!parent)
     parent = DefaultRootWindow (display);
     
-  if (!mainwindow.create (this, parent, "NeuralBlender", 0, 0, 640, 640)) {
+  if (!mainwindow.create (this, parent, "NeuralBlender", 0, 0, 
+                          DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)) {
     fprintf (stderr, "Cant' create main window!\n");
     return false;
   }
@@ -358,8 +364,8 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_exclmode.role = ROLE_EXCL_TOGGLE;
   
   aboutwindow.create (this);
-  for (i = 0; i < NB_UI_MAX_LANES; i++) {
-    lanes [i].create (this, mainwindow.widget, i, 0, 0, 640, 130);
+  for (i = 0; i < NB_NUM_MODELS; i++) {
+    lanes [i].create (this, mainwindow.widget, i, 0, 0, DEFAULT_WINDOW_WIDTH, 130);
   }
   meter_in.create (this, mainwindow.widget, "", 6, 70, 5, 520);
   meter_in.set_vudata (&vudata_in);
@@ -367,7 +373,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   vudata_in.set_l (0.0, 0.0);
 
   if (blender) {
-    for (i = 0; i < NB_UI_MAX_LANES; i++) {
+    for (i = 0; i < NB_NUM_MODELS; i++) {
       blender->meters_out [i] = &lanes [i].vudata_out;
     }
     blender->meter_in = &vudata_in;
@@ -379,11 +385,9 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   //  hide_advanced_settings ();
   //}
   
-  reposition_widgets ();
-
   mainwindow.show ();
-
   ui_ready = true;
+  reposition_widgets ();
   CP
   XFlush (display);
   CP
@@ -416,20 +420,20 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
 
     case ROLE_MUTE: CP
       on_mute (btn, value);
-      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
+      if (lane >= 0 && lane < NB_NUM_MODELS) {
         state.lanes [lane].lane_mute = value;
       }
     break;
 
     case ROLE_DCFLIP: CP
       on_dcflip (btn, value);
-      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
+      if (lane >= 0 && lane < NB_NUM_MODELS) {
         state.lanes [lane].dcflip = value;
       }
     break;
 
     case ROLE_CALIBRATE: CP
-      if (lane >= 0 && lane < NB_UI_MAX_LANES) {
+      if (lane >= 0 && lane < NB_NUM_MODELS) {
         state.lanes [lane].do_calib = value;
       }
       write_calib_state_if_consistent ();
@@ -554,23 +558,26 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     os_get_window_metrics (mw, &metrics);
     ui_resize_lock = true;
     
-    int min_window_width = 640;
-    int min_window_height = 640;
-    int window_width = min_window_width;
-    int window_height = min_window_height;
+    int window_width = DEFAULT_WINDOW_WIDTH;
+    int window_height = DEFAULT_WINDOW_HEIGHT;
     if (!snap_to_default && metrics.visible) {
-      window_width = std::max (min_window_width, (int) (metrics.width / mw->app->hdpi));
-      window_height = std::max (min_window_height, (int) (metrics.height / mw->app->hdpi));
+      window_width = std::max (MIN_WINDOW_WIDTH, (int) (metrics.width / mw->app->hdpi));
+      window_height = std::max (MIN_WINDOW_HEIGHT, (int) (metrics.height / mw->app->hdpi));
     }
     
-    mainwindow.set_min_size (min_window_width, min_window_height);
+    mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
     int lane_width = window_width - 24;
-    //int lane_height = 130;
-    int lane_height = window_height / 5;
+    const int lane_top = 60;
+    const int lane_gap = 5;
+    const int bottom_reserve = 56;
+    const int lane_count = NB_NUM_MODELS;
+    const int total_gap = (lane_count > 1) ? (lane_count - 1) * lane_gap : 0;
+    const int lane_area = window_height - lane_top - bottom_reserve - total_gap;
+    int lane_height = std::max (1, lane_area / lane_count);
     
     debug ("window w/h %d,%d", window_width, window_height);
     
-    cont_checkboxes.move_resize (16, window_height - 44, 450, 40);
+    cont_checkboxes.move_resize (16, window_height - 44, 300, 40);
     
     btn_enable.move_resize (16, 12, 120, 40);
     btn_muteall.move_resize (window_width - 136, 12, 120, 40);
@@ -579,10 +586,12 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     label_big.move_resize (150, 8, window_width - 300, 48);
     
     size_t i;
-    for (i = 0; i < NB_UI_MAX_LANES; i++) {
-      lanes [i].move_resize (12, 60 + i * (lane_height + 5), lane_width, lane_height);
+    for (i = 0; i < NB_NUM_MODELS; i++) {
+      lanes [i].move_resize (12, lane_top + i * (lane_height + lane_gap), lane_width, lane_height);
     }
-    meter_in.move_resize (3, 64, 5, (lane_height + 5) * i - 12);
+    
+    const int lane_bottom = lane_top + lane_count * lane_height + total_gap;
+    meter_in.move_resize (3, lane_top + 4, 5, std::max (1, lane_bottom - lane_top - 8));
     
     ui_resize_lock = false;
   }
@@ -592,7 +601,7 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
 void c_neuralblender_ui::update_stats () {
   char buf [128];
   
-  for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
+  for (size_t i = 0; i < NB_NUM_MODELS; i++) {
     int nframes = stats [i * 2];
     float trim = stats [i * 2 + 1];
     
@@ -632,7 +641,7 @@ void c_neuralblender_ui::vu_on (bool b) { CP
   state.do_vu = true;
 
   meter_in.show ();
-  for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
+  for (size_t i = 0; i < NB_NUM_MODELS; i++) {
     lanes [i].meter_out.show ();
   }
   on_vu (&btn_vu, b);
@@ -642,7 +651,7 @@ void c_neuralblender_ui::vu_off () { CP
   state.do_vu = false;
 
   meter_in.hide ();
-  for (size_t i = 0; i < NB_UI_MAX_LANES; i++) {
+  for (size_t i = 0; i < NB_NUM_MODELS; i++) {
     lanes [i].meter_out.hide ();
   }
   on_vu (&btn_vu, false);
@@ -650,25 +659,25 @@ void c_neuralblender_ui::vu_off () { CP
 
 size_t c_neuralblender_ui::choose_exclusive_lane () const {
   if (state.exclusive_lane > 0 &&
-      state.exclusive_lane <= (int) NB_UI_MAX_LANES)
+      state.exclusive_lane <= (int) NB_NUM_MODELS)
     return (size_t) state.exclusive_lane;
 
-  if (last_exclusive_lane > 0 && last_exclusive_lane <= NB_UI_MAX_LANES)
+  if (last_exclusive_lane > 0 && last_exclusive_lane <= NB_NUM_MODELS)
     return last_exclusive_lane;
 
-  for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     if (!state.lanes [i].filename.empty () &&
         !state.lanes [i].lane_mute)
       return i + 1;
   }
 
-  for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     //if (!filepickers [i].selected_file.empty ())
     if (!state.lanes [i].filename.empty ())
       return i + 1;
   }
 
-  for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     if (!state.lanes [i].lane_mute)
       return i + 1;
   }
@@ -688,7 +697,7 @@ bool c_neuralblender_ui::request_window_size (int w, int h) {
 void c_neuralblender_ui::on_excl (c_widget *w, int n) {
   debug ("n=%d", n);
   state.exclusive_lane = n;
-  if (n > 0 && n <= (int) NB_UI_MAX_LANES)
+  if (n > 0 && n <= (int) NB_NUM_MODELS)
     last_exclusive_lane = (size_t) n;
   if (!w)
     return;
@@ -724,7 +733,7 @@ int c_neuralblender_ui::idle () {
 
   if (state.do_vu) {
     meter_in.on_ui_timer ();
-    for (int i = 0; i < NB_MAX_MODELS; i++) {
+    for (int i = 0; i < NB_NUM_MODELS; i++) {
       lanes [i].meter_out.on_ui_timer ();
     }
   }
@@ -740,7 +749,7 @@ void c_neuralblender_ui::draw () {
 }
 
 void c_neuralblender_ui::clear_lane_model_ui (size_t which) {
-  if (which >= NB_UI_MAX_LANES)
+  if (which >= NB_NUM_MODELS)
     return;
 
   //filepickers [which].selected_file.clear ();
@@ -750,7 +759,7 @@ void c_neuralblender_ui::clear_lane_model_ui (size_t which) {
 
 void c_neuralblender_ui::set_lane_mute (size_t which, bool b) {
   debug ("which=%d, b=%d", (int) which, (int) b);
-  if (which >= NB_UI_MAX_LANES)
+  if (which >= NB_NUM_MODELS)
     return;
 
   const bool old_updating = updating_from_state;
@@ -772,12 +781,12 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   this->state = state_;
   this->state.showadvanced = showadvanced;
   if (state.exclusive_lane > 0 &&
-      state.exclusive_lane <= (int) NB_UI_MAX_LANES)
+      state.exclusive_lane <= (int) NB_NUM_MODELS)
     last_exclusive_lane = (size_t) state.exclusive_lane;
 
   updating_from_state = true;
 
-  const size_t nlanes = NB_UI_MAX_LANES < NB_MAX_MODELS ? NB_UI_MAX_LANES : NB_MAX_MODELS;
+  const size_t nlanes = NB_NUM_MODELS < NB_NUM_MODELS ? NB_NUM_MODELS : NB_NUM_MODELS;
   for (size_t i = 0; i < nlanes; ++i) {
     const c_neuralblender_lane_state &lane = state.lanes [i];
 
@@ -808,18 +817,18 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   btn_vu.set_value (state.do_vu);
   if (state.do_vu) {
     meter_in.show ();
-    for (size_t i = 0; i < NB_UI_MAX_LANES; ++i)
+    for (size_t i = 0; i < NB_NUM_MODELS; ++i)
       lanes [i].meter_out.show ();
   } else {
     meter_in.hide ();
-    for (size_t i = 0; i < NB_UI_MAX_LANES; ++i)
+    for (size_t i = 0; i < NB_NUM_MODELS; ++i)
       lanes [i].meter_out.hide ();
   }
 
   btn_exclmode.set_value (state.exclusive_lane > 0);
 
   const bool exclusive_on = state.exclusive_lane > 0;
-  for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     const bool selected =
       exclusive_on && state.exclusive_lane == i + 1;
 

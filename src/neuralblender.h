@@ -42,10 +42,11 @@
 #undef min
 #endif
 
+#define NB_NUM_MODELS    4
+
 #define MAX_DELAY_MS     30
 #define MAX_DELAY_FRAMES (MAX_DELAY_MS * 192)
 #define MAX_BLOCK_SIZE   8192
-#define NB_MAX_MODELS    4
 #define DB_SILENCE       -120
 #define DB_CALIB_TARGET  -12
 
@@ -87,7 +88,7 @@ struct c_neuralblender_state {
   bool showadvanced = false;
   bool mute_all = false;
   int  exclusive_lane = 0;
-  c_neuralblender_lane_state lanes [NB_MAX_MODELS];
+  c_neuralblender_lane_state lanes [NB_NUM_MODELS];
 };
 
 class c_delayline {
@@ -175,10 +176,10 @@ public:
   
   static void get_calib_data (std::vector<float> &v);
 
-  c_delayline delays [NB_MAX_MODELS];
-  c_neuralamp amps [NB_MAX_MODELS];
+  c_delayline delays [NB_NUM_MODELS];
+  c_neuralamp amps [NB_NUM_MODELS];
   c_vudata *meter_in;
-  c_vudata *meters_out [NB_MAX_MODELS];
+  c_vudata *meters_out [NB_NUM_MODELS];
   bool do_vu = true;
   bool mute_all = false;
 
@@ -186,10 +187,10 @@ private:
   void update_mutes ();
   bool consistent_calib_state (bool &enabled,
       c_neuralblender_state &state) const;
-  std::vector <float> m_delay_bufs [NB_MAX_MODELS];
-  std::vector <float> m_model_bufs [NB_MAX_MODELS];
+  std::vector <float> m_delay_bufs [NB_NUM_MODELS];
+  std::vector <float> m_model_bufs [NB_NUM_MODELS];
   std::vector <float> m_input_buf;
-  std::atomic<bool> m_lane_mute [NB_MAX_MODELS];
+  std::atomic<bool> m_lane_mute [NB_NUM_MODELS];
   std::atomic<bool> m_bypass { false };
 
   bool       m_ready = false;
