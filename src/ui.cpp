@@ -510,7 +510,7 @@ void c_lane_widgets::move_resize (
   const int knob_right = w - knob_size * 2 - 12;
   const int reg_w = cont_regcontrols.w ();
   const int menu_x = 16 + knob_size;//delay.x () + delay.w () + 8;
-  const int menu_width = std::max (64, w - menu_x - (w - knob_right) - button_padding);
+  const int menu_width = std::max (64, w - menu_x - (w - knob_right) - button_padding - 10);
   menu_list.move_resize (menu_x, 24, menu_width, 32);
   //int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
   int button_left = menu_list.x ();
