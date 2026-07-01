@@ -426,23 +426,12 @@ void set_x11_window_background (
 
 void cb_dummy (void *w_, void* user_data) {}
 
-void main_notify_callback (void *w_, void *user_data) {
-  //configure_event (w, user_data);
-
+static c_toplevelwindow *toplevel_from_widget (void *w_) {
   Widget_t *w = (Widget_t *) w_;
   if (!w || !w->parent_struct)
-    return;
+    return NULL;
 
-  c_neuralblender_ui *ui = (c_neuralblender_ui *) w->parent_struct;
-
-  Metrics_t metrics;
-  os_get_window_metrics (w, &metrics);
-  if (!metrics.visible)
-    return;
-
-  ui->on_window_resize (
-      metrics.width / w->app->hdpi,
-      metrics.height / w->app->hdpi);
+  return (c_toplevelwindow *) w->parent_struct;
 }
 
 uint64_t get_unique_id () {
@@ -450,19 +439,34 @@ uint64_t get_unique_id () {
   return current++;
 }
 
-void cb_draw_main_window (void *w_, void *user_data) { CP
+void c_toplevelwindow::cb_expose (void *w_, void *user_data) {
   (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
-  if (!w)
+
+  c_toplevelwindow *window = toplevel_from_widget (w_);
+  if (!window)
     return;
 
-  Metrics_t metrics;
-  os_get_window_metrics (w, &metrics);
-  if (!metrics.visible)
+  window->on_expose ();
+}
+
+void c_toplevelwindow::cb_resize (void *w_, void *user_data) { CP
+  (void) user_data;
+
+  c_toplevelwindow *window = toplevel_from_widget (w_);
+  if (!window)
     return;
 
-  fill_rounded_rect (w, 0, 0, metrics.width, metrics.height,
-                     0.0f, g_colors->window_bg);
+  window->on_resize ();
+}
+
+void c_toplevelwindow::cb_close (void *w_, void *user_data) { CP
+  (void) user_data;
+
+  c_toplevelwindow *window = toplevel_from_widget (w_);
+  if (!window)
+    return;
+
+  window->on_close ();
 }
 
 // this one must be called AFTER add_* (Widget_t *, ...) in child create functions
@@ -535,6 +539,196 @@ void c_widget::draw_text_centered (Widget_t *w,
       (m.height - ext.height) * 0.5 - ext.y_bearing);
 
   cairo_show_text (w->crb, text);
+}
+
+int c_widget::x () {
+  if (!widget || !widget->app)
+    return 0;
+
+  Metrics_t metrics;
+  os_get_window_metrics (widget, &metrics);
+  if (metrics.visible)
+    return (int) (metrics.x / widget->app->hdpi);
+
+  return (int) (widget->scale.init_x / widget->app->hdpi);
+}
+
+int c_widget::y () {
+  if (!widget || !widget->app)
+    return 0;
+
+  Metrics_t metrics;
+  os_get_window_metrics (widget, &metrics);
+  if (metrics.visible)
+    return (int) (metrics.y / widget->app->hdpi);
+
+  return (int) (widget->scale.init_y / widget->app->hdpi);
+}
+
+int c_widget::w () {
+  if (!widget || !widget->app)
+    return 0;
+
+  Metrics_t metrics;
+  os_get_window_metrics (widget, &metrics);
+  if (metrics.visible)
+    return (int) (metrics.width / widget->app->hdpi);
+
+  return (int) (widget->scale.init_width / widget->app->hdpi);
+}
+
+int c_widget::h () {
+  if (!widget || !widget->app)
+    return 0;
+
+  Metrics_t metrics;
+  os_get_window_metrics (widget, &metrics);
+  if (metrics.visible)
+    return (int) (metrics.height / widget->app->hdpi);
+
+  return (int) (widget->scale.init_height / widget->app->hdpi);
+}
+
+bool c_toplevelwindow::create (
+    c_neuralblender_ui *ui_,
+    Window parent_,
+    const char *title_,
+    int x, int y, int w, int h) {
+
+  id = get_unique_id ();
+  label = title_ ? title_ : "";
+  ui = ui_;
+  parent = parent_;
+
+  if (!ui || !ui->display)
+    return false;
+
+  if (!parent)
+    parent = DefaultRootWindow (ui->display);
+
+  widget = create_window (&ui->app, parent, x, y, w, h);
+  if (!widget)
+    return false;
+
+  window = widget->widget;
+  widget->parent_struct = this;
+  widget->label = label.c_str ();
+  widget->scale.gravity = NONE;
+  widget->func.resize_notify_callback = c_toplevelwindow::cb_resize;
+  widget->func.expose_callback = c_toplevelwindow::cb_expose;
+  widget->func.unmap_notify_callback = c_toplevelwindow::cb_close;
+
+  os_register_wm_delete_window (widget);
+  set_title (title_);
+  set_x11_window_background (widget, get_colortheme ()->window_bg);
+
+  return true;
+}
+
+bool c_mainwindow::create (
+    c_neuralblender_ui *ui_,
+    Window parent_,
+    const char *title_,
+    int x, int y, int w, int h) {
+
+  if (!c_toplevelwindow::create (ui_, parent_, title_, x, y, w, h))
+    return false;
+
+  ui_->window = window;
+  return true;
+}
+
+void c_toplevelwindow::set_min_size_to_current () {
+  if (!widget)
+    return;
+
+  os_set_window_min_size (
+      widget,
+      widget->scale.init_width,
+      widget->scale.init_height,
+      widget->scale.init_width,
+      widget->scale.init_height);
+}
+
+void c_toplevelwindow::set_min_size (int w, int h) {
+  if (!widget)
+    return;
+
+  os_set_window_min_size (widget, w, h, w, h);
+}
+
+void c_toplevelwindow::show () {
+  if (!widget)
+    return;
+
+  widget_show_all (widget);
+  widget_draw (widget, NULL);
+  if (widget->app && widget->app->dpy)
+    XFlush (widget->app->dpy);
+}
+
+void c_toplevelwindow::hide () {
+  if (!widget)
+    return;
+
+  widget_hide (widget);
+}
+
+void c_toplevelwindow::set_title (const char *title_) {
+  label = title_ ? title_ : "";
+  if (!widget)
+    return;
+
+  widget->label = label.c_str ();
+  widget_set_title (widget, label.c_str ());
+}
+
+void c_toplevelwindow::set_icon_from_png (const unsigned char *png) {
+  if (!widget || !png)
+    return;
+
+  widget_set_icon_from_png (widget, png);
+}
+
+bool c_toplevelwindow::request_size (int w, int h) {
+  if (!widget || !widget->app || !widget->app->dpy)
+    return false;
+
+  const int sw = std::max (1, (int) (w * widget->app->hdpi));
+  const int sh = std::max (1, (int) (h * widget->app->hdpi));
+
+  os_resize_window (widget->app->dpy, widget, sw, sh);
+  return true;
+}
+
+void c_toplevelwindow::on_expose () {
+  if (!widget)
+    return;
+
+  Metrics_t metrics;
+  os_get_window_metrics (widget, &metrics);
+  if (!metrics.visible)
+    return;
+
+  fill_rounded_rect (widget, 0, 0, metrics.width, metrics.height,
+                     0.0f, g_colors->window_bg);
+}
+
+void c_toplevelwindow::on_resize () { CP
+}
+
+void c_mainwindow::on_resize () { CP
+  if (!widget || !ui)
+    return;
+
+  Metrics_t metrics;
+  os_get_window_metrics (widget, &metrics);
+  if (!metrics.visible)
+    return;
+
+  ui->on_window_resize (
+      metrics.width / widget->app->hdpi,
+      metrics.height / widget->app->hdpi);
 }
 
 
@@ -1425,7 +1619,7 @@ void c_filepicker::create (
   parent = parent_;
   lane = lane_;
   c_widget::create (ui, parent, title_, 0, 0, 220, 220);
-  //os_set_transient_for_hint (ui->main_widget, widget);
+  //os_set_transient_for_hint (ui->mainwindow.widget, widget);
   title = std::string (title_);
 }
 

@@ -44,14 +44,17 @@ struct c_neuralblender_state;
 class c_neuralblender_ui;
 class c_filepicker;
 
-class c_aboutwindow {
+class c_aboutwindow : public c_toplevelwindow {
 public:
   void create (c_neuralblender_ui *ui);
 
   void show ();
   void hide ();
 
-  Widget_t *w = NULL;
+  void on_resize ();  
+  void on_close ();
+
+  //Widget_t *w = NULL;
   c_frame frame;
   c_button btn_ok;
   c_label labels [16];
@@ -71,7 +74,7 @@ public:
       int x, int y, int w, int h);
       
   void move_resize (int x, int y, int w, int h);
-
+  
   //bool user_mute = false;
   size_t lane_id = -1;
   c_neuralblender_ui *ui = NULL;
@@ -100,7 +103,7 @@ public:
   //int knob_size = 64;
   //int knob_top = 0;
   //int knob_right = 0;
-
+  
   //c_meterwidget meter_in; // we only have one input
   c_meter meter_out;
   c_vudata vudata_out;
@@ -155,7 +158,7 @@ public:
   Window window;
   c_neuralblender *blender = NULL;
   Xputty app;
-  Widget_t *main_widget = NULL;
+  c_mainwindow mainwindow;
   Window parent;
   
   c_container    cont_checkboxes;

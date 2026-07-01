@@ -548,4 +548,3 @@ void quit(Widget_t *w) {
 void quit_widget(Widget_t *w) {
     os_quit(w);
 }
-

@@ -106,11 +106,9 @@ typedef struct {
 
 const t_colortheme *get_colortheme ();
 void set_x11_window_background (Widget_t *w, const t_gradientcolors &colors);
-void cb_draw_main_window (void *w_, void *user_data);
 
 void knob_double_click (void *w_, void *event, void *user_data);
 void knob_value_changed (void *w_, void *value);
-void main_notify_callback (void *w_, void *user_data);
 std::string path_dirname (const std::string &path);
 std::string path_basename (const std::string &path);
 bool is_supported_model_filename (const std::string &path);
@@ -154,10 +152,49 @@ public:
 
   inline void expose () { if (widget) expose_widget (widget); }
   
-  inline int x () { return widget && widget->app ? (int) (widget->scale.init_x / widget->app->hdpi) : 0; }
-  inline int y () { return widget && widget->app ? (int) (widget->scale.init_y / widget->app->hdpi) : 0; }
-  inline int w () { return widget && widget->app ? (int) (widget->scale.init_width / widget->app->hdpi) : 0; }
-  inline int h () { return widget && widget->app ? (int) (widget->scale.init_height / widget->app->hdpi) : 0; }
+  int x ();
+  int y ();
+  int w ();
+  int h ();
+};
+
+class c_toplevelwindow : public c_widget {
+public:
+  bool create (
+      c_neuralblender_ui *ui,
+      Window parent,
+      const char *title,
+      int x, int y, int w, int h);
+
+  void set_min_size_to_current ();
+  void set_min_size (int w, int h);
+  void show ();
+  void hide ();
+  void set_title (const char *title);
+  void set_icon_from_png (const unsigned char *png);
+  bool request_size (int w, int h);
+  
+  virtual void on_expose ();
+  virtual void on_resize ();
+  virtual void on_close ()  {};
+
+  static void cb_expose (void *w, void *user_data);
+  static void cb_resize (void *w, void *user_data);
+  static void cb_close (void *w, void *user_data);
+
+  Window window = 0;
+  Window parent = 0;
+};
+
+class c_mainwindow : public c_toplevelwindow {
+public:
+  bool create (
+      c_neuralblender_ui *ui,
+      Window parent,
+      const char *title,
+      int x, int y, int w, int h);
+
+  void on_resize () override;
 };
 
 #include "meter.h"

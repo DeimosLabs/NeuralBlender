@@ -57,35 +57,40 @@ void c_neuralblender_ui::write_calib_state_if_consistent () {
   bool all_off = true;
 
   for (size_t i = 0; i < NB_UI_MAX_LANES && i < NB_MAX_MODELS; ++i) {
-    all_on  &= state.lanes[i].do_calib;
-    all_off &= !state.lanes[i].do_calib;
+    all_on  &= state.lanes [i].do_calib;
+    all_off &= !state.lanes [i].do_calib;
   }
 
   if (!all_on && !all_off)
     return;
 
-  configfile.set_item(CONFIG_KEY_NAME_CALIB, all_on ? "1" : "0");
+  configfile.set_item (CONFIG_KEY_NAME_CALIB, all_on ? "1" : "0");
   configfile.write_file();
 }
 
 void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   ui = ui_;
-  if (!ui || !ui->ui_ready || w)
+  if (!ui || !ui->ui_ready || widget)
+    return;
+  
+  if (!c_toplevelwindow::create (
+      ui,
+      os_get_root_window (&ui->app, IS_WINDOW),
+      "About NeuralBlender",
+      0, 0, 420, 480))
     return;
 
-  w = create_window (&ui->app, os_get_root_window (&ui->app, IS_WINDOW), 0, 0, 400, 450);
-  if (!w)
-    return;
+  //widget = widget;
+  set_min_size_to_current ();
     
-  w->flags |= HIDE_ON_DELETE;
-  os_set_transient_for_hint (ui->main_widget, w);
-
-  w->func.expose_callback = cb_draw_main_window;
-  set_x11_window_background (w, get_colortheme ()->window_bg);
-  widget_set_title (w, "About NeuralBlender");
-  btn_ok.create (ui, w, "OK", 160, 400, 80, 40);
+  widget->flags |= HIDE_ON_DELETE;
+  os_set_transient_for_hint (ui->mainwindow.widget, widget);
+  
+  frame.create (ui, widget, "", 16, 16, w () - 32, h () - 32);
+  
+  btn_ok.create (ui, frame.widget, "OK", 160, 390, 80, 40);
   btn_ok.role = ROLE_ABOUTOK;
-
+  
   const char *text [] = {
     "NeuralBlender",
     "",
@@ -104,7 +109,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   int i;
   for (i = 0; text [i]; i++) {
     int h = (i == 0 ? 20 : (180 + i * 24));
-    labels [i].create (ui, w, text [i], 0, h, 400, 24);
+    labels [i].create (ui, frame.widget, text [i], 0, h, 400, 24);
     labels [i].align = TEXT_CENTER;
   }
 
@@ -112,29 +117,36 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   snprintf (buf, 63, "Build timestamp: %s", g_build_timestamp);
 
   labels [0].textsize = 1.5;
-  labels [i].create (ui, w, buf, 0, 360, 400, 20);
+  labels [i].create (ui, frame.widget, buf, 0, 360, 400, 20);
   labels [i].textsize = 0.75;
   labels [i].align = TEXT_CENTER;
 
-  img_logo.create (ui, w, "", (400-160)/2, 64, 160, 160);
+  img_logo.create (ui, frame.widget, "", (400-160)/2, 64, 160, 160);
   img_logo.set_png (data_neuralblender_logo_160_png);
 }
 
 void c_aboutwindow::show () { CP
-  if (!w)
+  if (!widget)
     create (ui);
-  if (!w)
+  if (!widget)
     return;
 
-  widget_show_all (w);
-  expose_widget (w);
+  widget_show_all (widget);
+  expose_widget (widget);
 }
 
 void c_aboutwindow::hide () { CP
-  if (!w)
+  if (!widget)
     return;
 
-  widget_hide (w);
+  widget_hide (widget);
+}
+
+void c_aboutwindow::on_resize () { CP
+  frame.move ((w () - frame.w ()) / 2, (h () - frame.h ()) / 2);
+}
+
+void c_aboutwindow::on_close () { CP
 }
 
 void c_lane_widgets::create (
@@ -265,6 +277,129 @@ void c_lane_widgets::create (
     ui->filepickers [which].lane = which;
   }
   
+}
+
+c_neuralblender_ui::c_neuralblender_ui () { CP
+  memset (&app, 0, sizeof (app));
+  for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
+    stats [i * 2] = 0.0f;
+    stats [i * 2 + 1] = 1.0f;
+  }
+  display = NULL;
+  window = 0;
+  ui_ready = false;
+}
+
+c_neuralblender_ui::~c_neuralblender_ui () { CP
+  destroy ();
+}
+
+void c_neuralblender_ui::update_cwd (std::string path) {
+  CP
+  debug ("path='%s'", path.c_str ());
+  configfile.set_item (CONFIG_KEY_NAME_CWD, path_dirname (path));
+}
+
+bool c_neuralblender_ui::create (Window parent_) { CP
+  size_t i;
+  destroy ();
+  
+  main_init (&app);
+  app.small_font = 12 * app.hdpi;
+  app.normal_font = 14 * app.hdpi;
+  app.big_font = 20 * app.hdpi;
+  display = app.dpy;
+  
+  configfile.read_file ();
+  
+  if (configfile.istrue (CONFIG_KEY_NAME_ADV)) {
+    CP
+    state.showadvanced = true;
+  }
+
+  if (configfile.istrue (CONFIG_KEY_NAME_CALIB)) {
+    calib_default = true;
+    for (i = 0; i < NB_UI_MAX_LANES && i < NB_MAX_MODELS; ++i)
+      state.lanes [i].do_calib = true;
+  }
+
+  parent = parent_;
+  if (!parent)
+    parent = DefaultRootWindow (display);
+    
+  if (!mainwindow.create (this, parent, "NeuralBlender", 0, 0, 640, 640)) {
+    fprintf (stderr, "Cant' create main window!\n");
+    return false;
+  }
+  
+  mainwindow.set_icon_from_png (data_neuralblender_logo_512_png);
+
+  label_big.create (this, mainwindow.widget, "NeuralBlender", 120, 24, 400, 40);
+  label_big.align = TEXT_CENTER;
+  label_big.textsize = 1.5;
+  
+  btn_enable.create (this, mainwindow.widget, "Enabled",  20, 12, 120, 40, WSTYLE_TOGGLE);
+  btn_enable.set_value (true);
+  btn_enable.role = ROLE_BYPASS;
+  btn_about.create (this, mainwindow.widget, "About...", 520, 600, 100, 40);
+  btn_about.role = ROLE_ABOUT;
+  btn_muteall.create (this, mainwindow.widget, "Mute all", 500, 12, 120, 40, WSTYLE_TOGGLE);
+  btn_muteall.role = ROLE_MUTEALL;
+  
+  cont_checkboxes.create (this, mainwindow.widget, "", 8, 604, 500, 40);
+  cont_checkboxes.widget->scale.gravity = NONE;
+  
+  btn_vu.create (this, cont_checkboxes.widget, "VU meters", 0, 0, 120, 32, WSTYLE_CHECKBOX);
+  btn_vu.role = ROLE_VUTOGGLE;
+  btn_vu.set_value (state.do_vu);
+  
+  btn_exclmode.create (this, cont_checkboxes.widget, "Exclusive mode", 140, 0, 170, 32, WSTYLE_CHECKBOX);
+  btn_exclmode.set_value (state.do_excl);
+  btn_exclmode.role = ROLE_EXCL_TOGGLE;
+  
+  aboutwindow.create (this);
+  for (i = 0; i < NB_UI_MAX_LANES; i++) {
+    lanes [i].create (this, mainwindow.widget, i, 0, 0, 640, 130);
+  }
+  meter_in.create (this, mainwindow.widget, "", 6, 70, 5, 520);
+  meter_in.set_vudata (&vudata_in);
+  meter_in.set_stereo (false);
+  vudata_in.set_l (0.0, 0.0);
+
+  if (blender) {
+    for (i = 0; i < NB_UI_MAX_LANES; i++) {
+      blender->meters_out [i] = &lanes [i].vudata_out;
+    }
+    blender->meter_in = &vudata_in;
+  }
+  
+  //if (state.showadvanced) {
+  //  show_advanced_settings ();
+  //} else {
+  //  hide_advanced_settings ();
+  //}
+  
+  reposition_widgets ();
+
+  mainwindow.show ();
+
+  ui_ready = true;
+  CP
+  XFlush (display);
+  CP
+  return true;
+}
+
+void c_neuralblender_ui::destroy () { CP
+  if (ui_ready)
+    main_quit (&app);
+
+  memset (&app, 0, sizeof (app));
+  display = NULL;
+  window = 0;
+  mainwindow.widget = NULL;
+  mainwindow.window = 0;
+  ui_ready = false;
 }
 
 void c_neuralblender_ui::on_button (c_button *btn, bool value) {
@@ -407,158 +542,14 @@ void c_lane_widgets::move_resize (
   //move_resize (x, y, w, h);
 }
 
-c_neuralblender_ui::c_neuralblender_ui () { CP
-  memset (&app, 0, sizeof (app));
-  for (size_t i = 0; i < NB_UI_MAX_LANES; ++i) {
-    stats [i * 2] = 0.0f;
-    stats [i * 2 + 1] = 1.0f;
-  }
-  display = NULL;
-  window = 0;
-  main_widget = NULL;
-  ui_ready = false;
-}
-
-c_neuralblender_ui::~c_neuralblender_ui () { CP
-  destroy ();
-}
-
-void c_neuralblender_ui::update_cwd (std::string path) {
-  CP
-  debug ("path='%s'", path.c_str ());
-  configfile.set_item (CONFIG_KEY_NAME_CWD, path_dirname (path));
-}
-
-bool c_neuralblender_ui::create (Window parent_) { CP
-  size_t i;
-  destroy ();
-  
-  main_init (&app);
-  app.small_font = 12 * app.hdpi;
-  app.normal_font = 14 * app.hdpi;
-  app.big_font = 20 * app.hdpi;
-  display = app.dpy;
-  
-  std::string configitem;
-  
-  configfile.read_file ();
-  
-  if (configfile.istrue (CONFIG_KEY_NAME_ADV)) {
-    CP
-    state.showadvanced = true;
-  }
-
-  if (configfile.istrue (CONFIG_KEY_NAME_CALIB)) {
-    calib_default = true;
-    for (i = 0; i < NB_UI_MAX_LANES && i < NB_MAX_MODELS; ++i)
-      state.lanes [i].do_calib = true;
-  }
-
-  parent = parent_;
-  if (!parent)
-    parent = DefaultRootWindow (display);
-
-  main_widget = create_window (&app, parent, 0, 0, 640, 640);
-  if (!main_widget)
-    return false;
-  
-  main_widget->parent_struct = this;
-  main_widget->func.resize_notify_callback = main_notify_callback;
-  main_widget->scale.gravity = NONE;
-  widget_set_icon_from_png (main_widget, data_neuralblender_logo_512_png);
-
-  os_register_wm_delete_window (main_widget);
-  widget_set_title (main_widget, "NeuralBlender");
-  main_widget->func.expose_callback = cb_draw_main_window;
-  set_x11_window_background (main_widget, get_colortheme ()->window_bg);
-  label_big.create (this, main_widget, "NeuralBlender", 120, 24, 400, 40);
-  label_big.align = TEXT_CENTER;
-  label_big.textsize = 1.5;
-  
-  btn_enable.create (this, main_widget, "Enabled",  20, 12, 120, 40, WSTYLE_TOGGLE);
-  btn_enable.set_image_on (data_xputty_approved_png);
-  btn_enable.set_image_hover (data_xputty_exit_png);
-  btn_enable.set_image_down_hover (data_xputty_eject_png);
-  btn_enable.set_image_down (data_xputty_error_png);
-  btn_enable.set_image_off (data_xputty_gear_png);
-  btn_enable.set_image_off_hover (data_xputty_question_png);
-  btn_enable.set_value (true);
-  btn_enable.role = ROLE_BYPASS;
-  btn_about.create (this, main_widget, "About...", 520, 600, 100, 40);
-  btn_about.role = ROLE_ABOUT;
-  btn_muteall.create (this, main_widget, "Mute all", 500, 12, 120, 40, WSTYLE_TOGGLE);
-  btn_muteall.role = ROLE_MUTEALL;
-  
-  cont_checkboxes.create (this, main_widget, "", 8, 604, 500, 40);
-  cont_checkboxes.widget->scale.gravity = NONE;
-  
-  btn_vu.create (this, cont_checkboxes.widget, "VU meters", 0, 0, 120, 32, WSTYLE_CHECKBOX);
-  btn_vu.role = ROLE_VUTOGGLE;
-  btn_vu.set_value (state.do_vu);
-  
-  //btn_advanced.create (this, cont_checkboxes.widget, "Adv.", 140, 0, 32, 32, WSTYLE_CHECKBOX);
-  //label_advanced.create (this, cont_checkboxes.widget, "Show advanced", 172, 0, 150, 32);
-  //btn_advanced.set_value (state.showadvanced);
-  //btn_advanced.role = ROLE_ADV_TOGGLE;
-  //label_advanced.widget->scale.gravity = WESTCENTER;
-  
-  btn_exclmode.create (this, cont_checkboxes.widget, "Exclusive mode", 140, 0, 170, 32, WSTYLE_CHECKBOX);
-  btn_exclmode.set_value (state.do_excl);
-  btn_exclmode.role = ROLE_EXCL_TOGGLE;
-  
-  aboutwindow.create (this);
-  for (i = 0; i < NB_UI_MAX_LANES; i++) {
-    lanes [i].create (this, main_widget, i, 0, 0, 640, 130);
-  }
-  meter_in.create (this, main_widget, "", 6, 70, 5, 520);
-  meter_in.set_vudata (&vudata_in);
-  meter_in.set_stereo (false);
-  vudata_in.set_l (0.0, 0.0);
-
-  if (blender) {
-    for (i = 0; i < NB_UI_MAX_LANES; i++) {
-      blender->meters_out [i] = &lanes [i].vudata_out;
-    }
-    blender->meter_in = &vudata_in;
-  }
-  
-  //if (state.showadvanced) {
-  //  show_advanced_settings ();
-  //} else {
-  //  hide_advanced_settings ();
-  //}
-  
-  reposition_widgets ();
-
-  widget_show_all (main_widget);
-  widget_draw (main_widget, NULL);
-
-  window = main_widget->widget;
-  ui_ready = true;
-  CP
-  XFlush (display);
-  CP
-  return true;
-}
-
-void c_neuralblender_ui::destroy () { CP
-  if (ui_ready)
-    main_quit (&app);
-
-  memset (&app, 0, sizeof (app));
-  display = NULL;
-  window = 0;
-  main_widget = NULL;
-  ui_ready = false;
-}
-
 void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
   CP
   //state.showadvanced = b;
   
-  if (!ui_resize_lock) {
+  if (!ui_resize_lock && mainwindow.widget) {
+    Widget_t *mw = mainwindow.widget;
     Metrics_t metrics;
-    os_get_window_metrics (main_widget, &metrics);
+    os_get_window_metrics (mw, &metrics);
     ui_resize_lock = true;
     
     int min_window_width = 640;
@@ -566,18 +557,16 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     int window_width = min_window_width;
     int window_height = min_window_height;
     if (!snap_to_default && metrics.visible) {
-      window_width = std::max (min_window_width, (int) (metrics.width / main_widget->app->hdpi));
-      window_height = std::max (min_window_height, (int) (metrics.height / main_widget->app->hdpi));
+      window_width = std::max (min_window_width, (int) (metrics.width / mw->app->hdpi));
+      window_height = std::max (min_window_height, (int) (metrics.height / mw->app->hdpi));
     }
     
-    os_set_window_min_size (main_widget, min_window_width, min_window_height,
-                            min_window_width, min_window_height);
+    mainwindow.set_min_size (min_window_width, min_window_height);
     int lane_width = window_width - 24;
     //int lane_height = 130;
     int lane_height = window_height / 5;
     
     debug ("window w/h %d,%d", window_width, window_height);
-    //main_widget->func.configure_callback (main_widget, NULL);
     
     cont_checkboxes.move_resize (16, window_height - 44, 450, 40);
     
@@ -691,11 +680,7 @@ void c_neuralblender_ui::on_window_resize (int w, int h) {
 }
 
 bool c_neuralblender_ui::request_window_size (int w, int h) {
-  if (!main_widget || !display)
-    return false;
-
-  os_resize_window (display, main_widget, w, h);
-  return true;
+  return mainwindow.request_size (w, h);
 }
 
 void c_neuralblender_ui::on_excl (c_widget *w, int n) {
@@ -746,10 +731,10 @@ int c_neuralblender_ui::idle () {
 }
 
 void c_neuralblender_ui::draw () {
-  if (!main_widget)
+  if (!mainwindow.widget)
     return;
 
-  widget_draw (main_widget, NULL);
+  widget_draw (mainwindow.widget, NULL);
 }
 
 void c_neuralblender_ui::clear_lane_model_ui (size_t which) {

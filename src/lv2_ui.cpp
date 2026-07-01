@@ -184,8 +184,8 @@ public:
   bool request_window_size (int w, int h) {
     if (resize && resize->ui_resize) {
       const bool ok = resize->ui_resize (resize->handle, w, h) == 0;
-      if (ok && main_widget && display)
-        os_resize_window (display, main_widget, w, h);
+      if (ok && mainwindow.widget && display)
+        os_resize_window (display, mainwindow.widget, w, h);
       return ok;
     }
 
