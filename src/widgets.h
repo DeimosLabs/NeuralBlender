@@ -177,11 +177,11 @@ public:
   virtual void on_expose ();
   virtual void on_resize ();
   virtual void on_close ()  {};
-
+  
   static void cb_expose (void *w, void *user_data);
   static void cb_resize (void *w, void *user_data);
   static void cb_close (void *w, void *user_data);
-
+  
   Window window = 0;
   Window parent = 0;
 };

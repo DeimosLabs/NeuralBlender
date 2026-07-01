@@ -51,6 +51,22 @@ add_custom_target(generate_inline_data ALL
 execute_process (COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh
                  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+add_library(neuralblender_cmdline_debug STATIC
+  external/cmdline/cmdline_debug.cpp
+)
+
+set_target_properties(neuralblender_cmdline_debug PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+)
+
+target_include_directories(neuralblender_cmdline_debug PUBLIC
+  ${PROJECT_SOURCE_DIR}/external/cmdline
+)
+
+if (TRACE)
+  target_compile_definitions(neuralblender_cmdline_debug PUBLIC CMDLINE_DEBUG_TIMESTAMPS)
+endif()
+
 add_library(neuralblender_data OBJECT
   ${CMAKE_CURRENT_BINARY_DIR}/data/data.cpp
 )
@@ -127,7 +143,7 @@ target_compile_definitions(neuralblender_meter_data PRIVATE
   METER_DATA_ONLY
 )
 
-target_link_libraries(neuralblender_core PUBLIC Eigen3::Eigen z)
+target_link_libraries(neuralblender_core PUBLIC Eigen3::Eigen z neuralblender_cmdline_debug)
 
 if (DEBUG)
   message(STATUS "Debug enabled")
@@ -163,7 +179,7 @@ if (STANDALONE)
     )
     
     target_include_directories(neuralblender PRIVATE ${JACK_INCLUDE_DIRS})
-    target_link_libraries(neuralblender PRIVATE neuralblender_core ${JACK_LIBRARIES})
+    target_link_libraries(neuralblender PRIVATE neuralblender_core neuralblender_cmdline_debug ${JACK_LIBRARIES})
 
     target_compile_definitions(neuralblender PRIVATE STANDALONE)
 
@@ -207,7 +223,7 @@ if (LV2)
     -fpermissive
   )
   
-  target_link_libraries(neuralblender_lv2 PRIVATE neuralblender_core)
+  target_link_libraries(neuralblender_lv2 PRIVATE neuralblender_core neuralblender_cmdline_debug)
   target_compile_definitions(neuralblender_lv2 PRIVATE LV2)
   add_dependencies(neuralblender_lv2 generate_ttl)
 
@@ -241,7 +257,7 @@ if (LV2)
       OUTPUT_NAME "neuralblender_ui"
     )
     
-    target_link_libraries(neuralblender_ui PRIVATE neuralblender_gui_lv2)
+    target_link_libraries(neuralblender_ui PRIVATE neuralblender_gui_lv2 neuralblender_cmdline_debug)
     target_compile_definitions(neuralblender_ui PRIVATE LV2 LV2_UI)
 
     install(TARGETS neuralblender_ui

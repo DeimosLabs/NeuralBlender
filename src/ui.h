@@ -61,6 +61,11 @@ public:
   c_neuralblender_ui *ui = NULL;
 };
 
+class c_prefswindow : public c_toplevelwindow {
+public:
+  
+};
+
 class c_lane_widgets {
 public:
   //c_lane_widgets ();
