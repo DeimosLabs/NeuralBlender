@@ -582,7 +582,7 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     for (i = 0; i < NB_UI_MAX_LANES; i++) {
       lanes [i].move_resize (12, 60 + i * (lane_height + 5), lane_width, lane_height);
     }
-    meter_in.move_resize (4, 64, 5, (lane_height + 5) * i - 12);
+    meter_in.move_resize (3, 64, 5, (lane_height + 5) * i - 12);
     
     ui_resize_lock = false;
   }
