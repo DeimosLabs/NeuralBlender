@@ -1294,7 +1294,7 @@ void c_knob::cb_draw (void *w, void *user_data) {
     get_widget_size (widget, NULL, NULL, &w, &h);
     int cx = w / 2 - 2;
     int cy = cx;//h / 2;
-    cairo_arc (widget->crb, cx, cy, cx - 2, a0, a1);
+    cairo_arc (widget->crb, cx, cy, cx - cx / 16, a0, a1);
     cairo_stroke (widget->crb);
     
     // little dot indicating value

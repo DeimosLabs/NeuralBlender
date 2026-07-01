@@ -86,9 +86,9 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   widget->flags |= HIDE_ON_DELETE;
   os_set_transient_for_hint (ui->mainwindow.widget, widget);
   
-  frame.create (ui, widget, "", 16, 16, w () - 32, h () - 32);
+  frame.create (ui, widget, "", 12, 12, w () - 24, h () - 24);
   
-  btn_ok.create (ui, frame.widget, "OK", 160, 390, 80, 40);
+  btn_ok.create (ui, frame.widget, "OK", 160, 395, 80, 40);
   btn_ok.role = ROLE_ABOUTOK;
   
   const char *text [] = {
@@ -503,9 +503,11 @@ void c_lane_widgets::move_resize (
   
   int button_padding = 4;
   
-  const int knob_size = 64;//std::max (64, h / 2);
+  //const int knob_size = 64;//std::max (64, h / 2);
+  int knob_size = std::max (64, w / 10);
+  knob_size = std::min (knob_size, h / 2);
   const int knob_top = (h - knob_size) / 2 - 8;
-  const int knob_right = std::max (16, w - 160);
+  const int knob_right = w - knob_size * 2 - 12;
   const int reg_w = cont_regcontrols.w ();
   const int menu_x = 16 + knob_size;//delay.x () + delay.w () + 8;
   const int menu_width = std::max (64, w - menu_x - (w - knob_right) - button_padding);
@@ -533,7 +535,7 @@ void c_lane_widgets::move_resize (
   
   gain_in.move_resize (knob_right, knob_top, knob_size, knob_size + 16);
   gain_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size + 16);
-  meter_out.move_resize (knob_right + 130, 16, 5, h - 32);
+  meter_out.move_resize (w - 12, 16, 5, h - 32);
   
   int adv_btn_x = 84;
   int adv_btn_y = h * 2 / 11;
