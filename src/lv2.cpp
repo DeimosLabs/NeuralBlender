@@ -166,9 +166,10 @@ typedef struct {
   // to get notified back when model is loaded from session restore
   LV2_Atom_Forge forge;
   LV2_URID urid_atom_Sequence  = 0;
-	  bool notify_path [NB_NUM_MODELS] = { false };
-	  bool notify_calib_bass = false;
-	  std::string current_path [NB_NUM_MODELS];
+  bool notify_path [NB_NUM_MODELS] = { false };
+  bool notify_calib_bass = false;
+  std::string current_path [NB_NUM_MODELS];
+  bool restored_from_state = false;
   
   c_vudata meter_in;
   c_vudata meters_out [NB_NUM_MODELS];
@@ -473,6 +474,7 @@ static LV2_State_Status restore (
 	      self->blender.calib_bass =
 	        (*(const int32_t *) calib_bass) != 0;
 	    }
+	    self->restored_from_state = true;
 
 		    for (int i = 0; i < NB_NUM_MODELS; i++) {
 		      const void *p =
@@ -900,7 +902,9 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	      if (obj->body.otype == self->urid_patch_Get) {
 	        for (i = 0; i < NB_NUM_MODELS; i++)
 	          self->notify_path [i] = true;
-	        self->notify_calib_bass = true;
+	        if (!self->restored_from_state)
+	          self->notify_calib_bass = true;
+	        self->restored_from_state = false;
 	        self->stats_dirty.store (true, std::memory_order_release);
 	
 	        continue;
@@ -929,25 +933,25 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 
 	      if (prop == self->urid_calib_target_db) {
 	        if (value->type == self->urid_atom_Float) {
-          const float db = ((const LV2_Atom_Float *) value)->body;
-          const float old_db = self->blender.amps [0].calib_target_db;
-          self->blender.set_calib_target_db (db);
-          const bool changed =
-            self->blender.amps [0].calib_target_db != old_db;
-
-	          if (changed) {
-	            if (self->blender.linked_calib) {
-	              request_calibrate_linked (self);
-	            } else {
-	              for (i = 0; i < NB_NUM_MODELS; i++) {
-	                const bool enabled =
-	                  self->calibrate [i] && *self->calibrate [i] >= 0.5f;
-	                if (enabled)
-	                  request_calibrate (self, i, true);
-	              }
-	            }
+	          const float db = ((const LV2_Atom_Float *) value)->body;
+	          const float old_db = self->blender.amps [0].calib_target_db;
+	          self->blender.set_calib_target_db (db);
+	          const bool changed =
+	            self->blender.amps [0].calib_target_db != old_db;
+	          if (!changed)
+	            continue;
+	
+	          if (self->blender.linked_calib) {
+	            request_calibrate_linked (self);
+	          } else {
+	            for (i = 0; i < NB_NUM_MODELS; i++) {
+	              const bool enabled =
+	                self->calibrate [i] && *self->calibrate [i] >= 0.5f;
+	              if (enabled)
+	                request_calibrate (self, i, true);
 	          }
-        }
+	        }
+	        }
 	        continue;
 	      }
 
@@ -956,19 +960,20 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	          const bool bass =
 	            ((const LV2_Atom_Int *) value)->body != 0;
 	          const bool changed = self->blender.calib_bass != bass;
+	          if (!changed)
+	            continue;
+
 	          self->blender.calib_bass = bass;
 	          self->notify_calib_bass = true;
-
-	          if (changed) {
-	            if (self->blender.linked_calib) {
-	              request_calibrate_linked (self);
-	            } else {
-	              for (i = 0; i < NB_NUM_MODELS; i++) {
-	                const bool enabled =
-	                  self->calibrate [i] && *self->calibrate [i] >= 0.5f;
-	                if (enabled)
-	                  request_calibrate (self, i, true);
-	              }
+	
+	          if (self->blender.linked_calib) {
+	            request_calibrate_linked (self);
+	          } else {
+	            for (i = 0; i < NB_NUM_MODELS; i++) {
+	              const bool enabled =
+	                self->calibrate [i] && *self->calibrate [i] >= 0.5f;
+	              if (enabled)
+	                request_calibrate (self, i, true);
 	            }
 	          }
 	        }

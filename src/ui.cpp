@@ -148,7 +148,7 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   label_vuscale.create (ui, frame1.widget, "VU meter scale dB:", 0, 0, 120, 32);
   label_vuheadroom.create (ui, frame1.widget, "VU meter headroom dB:", 0, 0, 120, 32);
   label_spacer1.create (ui, frame1.widget, "", 0, 0, 12, 12);
-  label_linkexplain.create (ui, frame1.widget, "(calibrate follows loudest model)", 0, 0, 320, 36);
+  label_linkexplain.create (ui, frame1.widget, "(trim follows loudest model)", 0, 0, 320, 36);
 
   btn_vu.create (ui, frame1.widget, "VU meters", 0, 0, 300, 32, WSTYLE_CHECKBOX);
   btn_linkcalib.create (ui, frame1.widget, "Linked calibration",
