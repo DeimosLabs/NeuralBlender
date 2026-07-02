@@ -39,7 +39,12 @@ nb:CalibTargetDb
     a lv2:Parameter ;
     rdfs:label "Calibration target dB" ;
     rdfs:range atom:Float .
-	    
+
+nb:CalibBass
+    a lv2:Parameter ;
+    rdfs:label "Bass calibration" ;
+    rdfs:range atom:Int .
+		    
 <http://deimos.ca/neuralblender>
     a lv2:Plugin ,
       lv2:AmplifierPlugin ;
@@ -49,13 +54,17 @@ nb:CalibTargetDb
     ui:ui <http://deimos.ca/neuralblender#ui> ;
 
     patch:readable nb:ModelA ,
-                   nb:ModelB ,
-                   nb:ModelC ,
-                   nb:ModelD ;
-    patch:writable nb:ModelA ,
-                   nb:ModelB ,
-                   nb:ModelC ,
-                   nb:ModelD ;
+	                   nb:ModelB ,
+	                   nb:ModelC ,
+	                   nb:ModelD ,
+	                   nb:CalibTargetDb ,
+	                   nb:CalibBass ;
+	    patch:writable nb:ModelA ,
+	                   nb:ModelB ,
+	                   nb:ModelC ,
+	                   nb:ModelD ,
+	                   nb:CalibTargetDb ,
+	                   nb:CalibBass ;
     
     doap:name "NeuralBlender" ;
     doap:developer [

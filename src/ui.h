@@ -48,6 +48,7 @@ typedef struct {
   float vu_headroom_db  = 6.0f;
   bool vu_on = true;
   bool linked_calib = false;
+  bool calib_bass = false;
 } t_prefs;
 
 bool read_prefs_from_config  (c_configfile &configfile, t_prefs &prefs);
@@ -72,13 +73,14 @@ public:
   c_label label_vuscale;
   c_label label_vuheadroom;
   c_label label_spacer1;
-  //c_label label_linkexplain;
+  c_label label_linkexplain;
   
   c_textbox text_calibdb;
   c_textbox text_vuscale;
   c_textbox text_vuheadroom;
   c_button btn_vu;
   c_button btn_linkcalib;
+  c_button btn_bass;
 };
 
 class c_aboutwindow : public c_toplevelwindow {

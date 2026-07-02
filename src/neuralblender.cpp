@@ -506,24 +506,38 @@ c_neuralblender::c_neuralblender () { CP
 c_neuralblender::~c_neuralblender () { CP
 }
 
-/*static*/ void c_neuralblender::get_calib_data (std::vector<float> &v) {
+/*static*/ void c_neuralblender::get_calib_data (std::vector<float> &v, bool bass) {
+  debug ("bass=%d", (int) bass);
   unsigned char *scan = data_calib_f32;
   const int sf = sizeof (float);
+  size_t len = data_calib_f32_len;
   
-  for (size_t i = 0; i < data_calib_f32_len / sf; i += sf) {
+  if (bass) {
+    scan = data_calib_bass_f32;
+    len = data_calib_bass_f32_len;
+  }
+  
+  for (size_t i = 0; i < len / sf; i++) {
     float *f = (float *) scan;
     scan += sizeof (float);
     v.push_back (*f);
   }
 }
 
-bool c_neuralblender::calibrate (size_t which) {
+bool c_neuralblender::calibrate (size_t which, bool bass) {
+  debug ("bass=%d", (int) bass);
   if (which >= NB_NUM_MODELS)
     return false;
-
+    
+  float *data = (float *) data_calib_f32;
+  size_t samples = data_calib_f32_len / sizeof (float);
+  
+  if (bass) {
+    data = (float *) data_calib_bass_f32;
+    samples = data_calib_bass_f32_len / sizeof (float);
+  }
+  
   if (amps [which].do_calib && amps [which].loaded ()) {
-    float *data = (float *) data_calib_f32;
-    const size_t samples = data_calib_f32_len / sizeof (float);
     amps [which].calibrate (data, samples);
   } else {
     amps [which].calibrate (NULL, 0);
@@ -532,11 +546,17 @@ bool c_neuralblender::calibrate (size_t which) {
   return true;
 }
 
-bool c_neuralblender::calibrate_linked () {
+bool c_neuralblender::calibrate_linked (bool bass) {
+  debug ("bass=%d", (int) bass);
   float linked_trim = INFINITY;
   bool any_linked = false;
   float *data = (float *) data_calib_f32;
-  const size_t samples = data_calib_f32_len / sizeof (float);
+  size_t samples = data_calib_f32_len / sizeof (float);
+
+  if (bass) {
+    data = (float *) data_calib_bass_f32;
+    samples = data_calib_bass_f32_len / sizeof (float);
+  }
 
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     if (amps [i].do_calib && amps [i].loaded ()) {

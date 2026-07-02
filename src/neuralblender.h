@@ -179,10 +179,10 @@ public:
   bool is_dcflipped (size_t which);
   bool is_calib_on (size_t which);
   bool set_calib_target_db (float f);
-  bool calibrate (size_t which);
-  bool calibrate_linked ();
+  bool calibrate (size_t which, bool bass);
+  bool calibrate_linked (bool bass);
   
-  static void get_calib_data (std::vector<float> &v);
+  static void get_calib_data (std::vector<float> &v, bool bass);
 
   c_delayline delays [NB_NUM_MODELS];
   c_neuralamp amps [NB_NUM_MODELS];
@@ -191,6 +191,7 @@ public:
   bool do_vu = true;
   bool mute_all = false;
   bool linked_calib = false;
+  bool calib_bass = false;
 
 private:
   void update_mutes ();

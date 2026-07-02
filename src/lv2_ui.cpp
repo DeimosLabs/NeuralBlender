@@ -88,17 +88,19 @@ public:
   LV2_URID urid_atom_eventTransfer = 0;
   LV2_URID urid_atom_Path = 0;
   LV2_URID urid_atom_String = 0;
-  LV2_URID urid_atom_URID = 0;
-  LV2_URID urid_atom_Float = 0;
-  LV2_URID urid_atom_Vector = 0;
+	  LV2_URID urid_atom_URID = 0;
+	  LV2_URID urid_atom_Float = 0;
+	  LV2_URID urid_atom_Int = 0;
+	  LV2_URID urid_atom_Vector = 0;
   LV2_URID urid_patch_Set = 0;
   LV2_URID urid_patch_Get = 0;
   LV2_URID urid_patch_property = 0;
   LV2_URID urid_patch_value = 0;
   LV2_URID urid_model [NB_NUM_MODELS] = { 0 };
   LV2_URID urid_meters = 0;
-  LV2_URID urid_stats = 0;
-  LV2_URID urid_calib_target_db = 0;
+	  LV2_URID urid_stats = 0;
+	  LV2_URID urid_calib_target_db = 0;
+	  LV2_URID urid_calib_bass = 0;
   LV2UI_Port_Subscribe *subscribe = NULL;
   LV2UI_Resize *resize = NULL;
   bool updating_from_host = false;
@@ -141,7 +143,7 @@ public:
     return path [0] != '\0';
 	  }
 
-  bool write_float_property (LV2_URID property, float value) {
+	  bool write_float_property (LV2_URID property, float value) {
     if (updating_from_host || !write || !map || !property)
       return false;
 
@@ -162,8 +164,32 @@ public:
            lv2_atom_total_size (atom),
            urid_atom_eventTransfer,
            atom);
-    return true;
-  }
+	    return true;
+	  }
+
+	  bool write_int_property (LV2_URID property, int32_t value) {
+	    if (updating_from_host || !write || !map || !property)
+	      return false;
+
+	    uint8_t buf [256];
+	    LV2_Atom_Forge_Frame frame;
+
+	    lv2_atom_forge_set_buffer (&forge, buf, sizeof (buf));
+	    lv2_atom_forge_object (&forge, &frame, 0, urid_patch_Set);
+	    lv2_atom_forge_key (&forge, urid_patch_property);
+	    lv2_atom_forge_urid (&forge, property);
+	    lv2_atom_forge_key (&forge, urid_patch_value);
+	    lv2_atom_forge_int (&forge, value);
+	    lv2_atom_forge_pop (&forge, &frame);
+
+	    const LV2_Atom *atom = (const LV2_Atom *) buf;
+	    write (controller,
+	           PORT_CONTROL,
+	           lv2_atom_total_size (atom),
+	           urid_atom_eventTransfer,
+	           atom);
+	    return true;
+	  }
 
   void request_current_state () {
     if (!write || !map)
@@ -208,11 +234,12 @@ public:
   void on_vu (c_widget *w, bool b)                     { CP; write_control (PORT_VU_ENABLE, b ? 1.0f : 0.0f); }
   void on_linked_calib (c_widget *w, bool b)           { CP; write_control (PORT_LINKED_CALIB, b ? 1.0f : 0.0f); }
 
-  void apply_prefs (t_prefs &p) override {
-    c_neuralblender_ui::apply_prefs (p);
-    write_control (PORT_LINKED_CALIB, p.linked_calib ? 1.0f : 0.0f);
-    write_float_property (urid_calib_target_db, p.calib_target_db);
-  }
+	  void apply_prefs (t_prefs &p) override {
+	    c_neuralblender_ui::apply_prefs (p);
+	    write_control (PORT_LINKED_CALIB, p.linked_calib ? 1.0f : 0.0f);
+	    write_float_property (urid_calib_target_db, p.calib_target_db);
+	    write_int_property (urid_calib_bass, p.calib_bass ? 1 : 0);
+	  }
 
   bool request_window_size (int w, int h) {
     if (resize && resize->ui_resize) {
@@ -460,12 +487,21 @@ public:
       set_ui_values (value, ATOM_METERS);
       return;
     }
-    if (prop == urid_stats) {
-      set_ui_values (value, ATOM_STATS);
-      return;
-    }
+	    if (prop == urid_stats) {
+	      set_ui_values (value, ATOM_STATS);
+	      return;
+	    }
 
-    if (value->type != urid_atom_Path &&
+	    if (prop == urid_calib_bass) {
+	      if (value->type == urid_atom_Int) {
+	        prefs.calib_bass = ((const LV2_Atom_Int *) value)->body != 0;
+	        if (prefswindow.widget)
+	          prefswindow.btn_bass.set_value (prefs.calib_bass);
+	      }
+	      return;
+	    }
+	
+	    if (value->type != urid_atom_Path &&
         value->type != urid_atom_String)
       return;
 
@@ -522,9 +558,10 @@ static LV2UI_Handle instantiate (
     ui->urid_atom_eventTransfer = ui->map->map (ui->map->handle, LV2_ATOM__eventTransfer);
     ui->urid_atom_Path = ui->map->map (ui->map->handle, LV2_ATOM__Path);
     ui->urid_atom_String = ui->map->map (ui->map->handle, LV2_ATOM__String);
-    ui->urid_atom_URID = ui->map->map (ui->map->handle, LV2_ATOM__URID);
-    ui->urid_atom_Float = ui->map->map (ui->map->handle, LV2_ATOM__Float);
-    ui->urid_atom_Vector = ui->map->map (ui->map->handle, LV2_ATOM__Vector);
+	    ui->urid_atom_URID = ui->map->map (ui->map->handle, LV2_ATOM__URID);
+	    ui->urid_atom_Float = ui->map->map (ui->map->handle, LV2_ATOM__Float);
+	    ui->urid_atom_Int = ui->map->map (ui->map->handle, LV2_ATOM__Int);
+	    ui->urid_atom_Vector = ui->map->map (ui->map->handle, LV2_ATOM__Vector);
     ui->urid_patch_Set = ui->map->map (ui->map->handle, LV2_PATCH__Set);
     ui->urid_patch_Get = ui->map->map (ui->map->handle, LV2_PATCH__Get);
     ui->urid_patch_property = ui->map->map (ui->map->handle, LV2_PATCH__property);
@@ -535,9 +572,11 @@ static LV2UI_Handle instantiate (
     ui->urid_model [3] = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#ModelD");
 	    ui->urid_meters = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#Meters");
 	    ui->urid_stats = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#Stats");
-    ui->urid_calib_target_db =
-      ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#CalibTargetDb");
-	  }
+	    ui->urid_calib_target_db =
+	      ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#CalibTargetDb");
+	    ui->urid_calib_bass =
+	      ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#CalibBass");
+		  }
 
   if (!ui->create (parent)) {
     delete ui;

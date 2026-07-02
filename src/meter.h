@@ -24,7 +24,7 @@
 #undef max
 #endif
 
-#define DEFAULT_VU_DB       -36.0f
+#define DEFAULT_VU_DB       -40.0f
 #define DEFAULT_VU_HEADROOM 3.0f
 #define VU_REDRAW_EVERY     0.033333333f
 #define VU_PEAK_HOLD        1.000000000f

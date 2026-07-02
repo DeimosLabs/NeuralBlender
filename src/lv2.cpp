@@ -134,12 +134,14 @@ typedef struct {
   LV2_URID urid_atom_String    = 0;
   LV2_URID urid_atom_Blank     = 0;
   LV2_URID urid_atom_Float     = 0;
+  LV2_URID urid_atom_Int       = 0;
   LV2_URID urid_atom_Vector    = 0;
 
   LV2_URID urid_model [NB_NUM_MODELS] = { 0 };
   LV2_URID urid_meters         = 0;
   LV2_URID urid_stats          = 0;
   LV2_URID urid_calib_target_db = 0;
+  LV2_URID urid_calib_bass     = 0;
   LV2_URID urid_atom_URID      = 0;
   const LV2_Atom_Sequence *control = NULL;
   LV2_Atom_Sequence *notify    = NULL;
@@ -164,8 +166,9 @@ typedef struct {
   // to get notified back when model is loaded from session restore
   LV2_Atom_Forge forge;
   LV2_URID urid_atom_Sequence  = 0;
-  bool notify_path [NB_NUM_MODELS] = { false };
-  std::string current_path [NB_NUM_MODELS];
+	  bool notify_path [NB_NUM_MODELS] = { false };
+	  bool notify_calib_bass = false;
+	  std::string current_path [NB_NUM_MODELS];
   
   c_vudata meter_in;
   c_vudata meters_out [NB_NUM_MODELS];
@@ -202,9 +205,9 @@ static void run_calibration (Plugin *self, size_t which, bool enabled) {
   self->blender.calib_on (which, enabled);
 
   if (self->blender.linked_calib)
-    self->blender.calibrate_linked ();
+    self->blender.calibrate_linked (self->blender.calib_bass);
   else
-    self->blender.calibrate (which);
+    self->blender.calibrate (which, self->blender.calib_bass);
 
   self->stats_dirty.store (true, std::memory_order_release);
 }
@@ -213,7 +216,7 @@ static void run_linked_calibration (Plugin *self) {
   if (!self)
     return;
 
-  self->blender.calibrate_linked ();
+  self->blender.calibrate_linked (self->blender.calib_bass);
   self->stats_dirty.store (true, std::memory_order_release);
 }
 
@@ -430,9 +433,18 @@ static LV2_State_Status save (
 
 	      if (abstract_path && free_path && free_path->free_path)
 	        free_path->free_path (free_path->handle, abstract_path);
-		    }
-    return LV2_STATE_SUCCESS;
-}
+			    }
+	    {
+	      const int32_t calib_bass = self->blender.calib_bass ? 1 : 0;
+	      store (handle,
+	             self->urid_calib_bass,
+	             &calib_bass,
+	             sizeof (calib_bass),
+	             self->urid_atom_Int,
+	             LV2_STATE_IS_POD);
+	    }
+	    return LV2_STATE_SUCCESS;
+	}
 
 static LV2_State_Status restore (
     LV2_Handle instance,
@@ -446,13 +458,25 @@ static LV2_State_Status restore (
     LV2_State_Free_Path *free_path = NULL;
     get_state_path_features (features, &map_path, &free_path);
 
-    size_t size;
-    uint32_t type;
-    uint32_t valflags;
+	    size_t size;
+	    uint32_t type;
+	    uint32_t valflags;
 
-    for (int i = 0; i < NB_NUM_MODELS; i++) {
-      const void *p =
-          retrieve (handle,
+	    const void *calib_bass =
+	      retrieve (handle,
+	                self->urid_calib_bass,
+	                &size,
+	                &type,
+	                &valflags);
+	    if (calib_bass && type == self->urid_atom_Int &&
+	        size >= sizeof (int32_t)) {
+	      self->blender.calib_bass =
+	        (*(const int32_t *) calib_bass) != 0;
+	    }
+
+		    for (int i = 0; i < NB_NUM_MODELS; i++) {
+		      const void *p =
+	          retrieve (handle,
                     self->urid_model [i],
                     &size,
                     &type,
@@ -470,11 +494,12 @@ static LV2_State_Status restore (
 		        if (absolute_path && free_path && free_path->free_path)
 		          free_path->free_path (free_path->handle, absolute_path);
 		      } else {
-		        clear_model_slot (self, i, true);
-		      }
-		    }
-    return LV2_STATE_SUCCESS;
-}
+			        clear_model_slot (self, i, true);
+			      }
+			    }
+
+		    return LV2_STATE_SUCCESS;
+		}
 
 static void forge_model_path_notify (Plugin *self,
                                      LV2_URID property,
@@ -495,6 +520,24 @@ static void forge_model_path_notify (Plugin *self,
 
   lv2_atom_forge_key (&self->forge, self->urid_patch_value);
   lv2_atom_forge_path (&self->forge, path, strlen(path) + 1);
+
+  lv2_atom_forge_pop (&self->forge, &frame);
+}
+
+static void forge_int_notify (Plugin *self, LV2_URID property, int32_t value) {
+  LV2_Atom_Forge_Frame frame;
+
+  lv2_atom_forge_frame_time (&self->forge, 0);
+  lv2_atom_forge_object (&self->forge,
+                         &frame,
+                         0,
+                         self->urid_patch_Set);
+
+  lv2_atom_forge_key (&self->forge, self->urid_patch_property);
+  lv2_atom_forge_urid (&self->forge, property);
+
+  lv2_atom_forge_key (&self->forge, self->urid_patch_value);
+  lv2_atom_forge_int (&self->forge, value);
 
   lv2_atom_forge_pop (&self->forge, &frame);
 }
@@ -605,9 +648,10 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   self->urid_atom_Path      = self->map->map (self->map->handle, LV2_ATOM__Path);
   self->urid_atom_String    = self->map->map (self->map->handle, LV2_ATOM__String);
   self->urid_atom_URID      = self->map->map (self->map->handle, LV2_ATOM__URID);
-  self->urid_atom_Blank     = self->map->map (self->map->handle, LV2_ATOM__Blank);
-  self->urid_atom_Float     = self->map->map (self->map->handle, LV2_ATOM__Float);
-  self->urid_atom_Vector    = self->map->map (self->map->handle, LV2_ATOM__Vector);
+	  self->urid_atom_Blank     = self->map->map (self->map->handle, LV2_ATOM__Blank);
+	  self->urid_atom_Float     = self->map->map (self->map->handle, LV2_ATOM__Float);
+	  self->urid_atom_Int       = self->map->map (self->map->handle, LV2_ATOM__Int);
+	  self->urid_atom_Vector    = self->map->map (self->map->handle, LV2_ATOM__Vector);
   
   self->urid_model [0] =
     self->map->map(self->map->handle, "http://deimos.ca/neuralblender#ModelA");
@@ -627,8 +671,11 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   self->urid_stats =
     self->map->map(self->map->handle, "http://deimos.ca/neuralblender#Stats");
 
-  self->urid_calib_target_db =
-    self->map->map(self->map->handle, "http://deimos.ca/neuralblender#CalibTargetDb");
+	  self->urid_calib_target_db =
+	    self->map->map(self->map->handle, "http://deimos.ca/neuralblender#CalibTargetDb");
+
+	  self->urid_calib_bass =
+	    self->map->map(self->map->handle, "http://deimos.ca/neuralblender#CalibBass");
 
   self->blender.meter_in = &self->meter_in;
   for (int i = 0; i < NB_NUM_MODELS; i++)
@@ -819,15 +866,25 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       }
     }
 
-    const bool sent_stats_notify =
-      self->stats_dirty.exchange (false, std::memory_order_acq_rel);
-    if (sent_stats_notify)
-      forge_stats_notify (self);
+	    const bool sent_stats_notify =
+	      self->stats_dirty.exchange (false, std::memory_order_acq_rel);
+	    if (sent_stats_notify)
+	      forge_stats_notify (self);
 
-    const uint32_t meter_interval =
-      (uint32_t) (self->samplerate > 0.0 ? self->samplerate / LV2_METER_FPS : 1600.0);
-    if (!sent_path_notify && !sent_stats_notify &&
-        self->meter_notify_samples >= meter_interval) {
+	    bool sent_calib_bass_notify = false;
+	    if (!sent_path_notify && !sent_stats_notify && self->notify_calib_bass) {
+	      forge_int_notify (
+	        self,
+	        self->urid_calib_bass,
+	        self->blender.calib_bass ? 1 : 0);
+	      self->notify_calib_bass = false;
+	      sent_calib_bass_notify = true;
+	    }
+	
+	    const uint32_t meter_interval =
+	      (uint32_t) (self->samplerate > 0.0 ? self->samplerate / LV2_METER_FPS : 1600.0);
+	    if (!sent_path_notify && !sent_stats_notify && !sent_calib_bass_notify &&
+	        self->meter_notify_samples >= meter_interval) {
       forge_meter_notify (self);
       self->meter_notify_samples = 0;
     }
@@ -840,12 +897,13 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     LV2_ATOM_SEQUENCE_FOREACH (self->control, ev) {
       const LV2_Atom_Object *obj = (const LV2_Atom_Object *)&ev->body;
       
-      if (obj->body.otype == self->urid_patch_Get) {
-        for (i = 0; i < NB_NUM_MODELS; i++)
-          self->notify_path [i] = true;
-        self->stats_dirty.store (true, std::memory_order_release);
-
-        continue;
+	      if (obj->body.otype == self->urid_patch_Get) {
+	        for (i = 0; i < NB_NUM_MODELS; i++)
+	          self->notify_path [i] = true;
+	        self->notify_calib_bass = true;
+	        self->stats_dirty.store (true, std::memory_order_release);
+	
+	        continue;
       }
 
       if (obj->body.otype != self->urid_patch_Set)
@@ -869,8 +927,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       LV2_URID prop =
         ((const LV2_Atom_URID *) property)->body;
 
-      if (prop == self->urid_calib_target_db) {
-        if (value->type == self->urid_atom_Float) {
+	      if (prop == self->urid_calib_target_db) {
+	        if (value->type == self->urid_atom_Float) {
           const float db = ((const LV2_Atom_Float *) value)->body;
           const float old_db = self->blender.amps [0].calib_target_db;
           self->blender.set_calib_target_db (db);
@@ -890,10 +948,34 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	            }
 	          }
         }
-        continue;
-      }
+	        continue;
+	      }
 
-      if (value->type != self->urid_atom_Path &&
+	      if (prop == self->urid_calib_bass) {
+	        if (value->type == self->urid_atom_Int) {
+	          const bool bass =
+	            ((const LV2_Atom_Int *) value)->body != 0;
+	          const bool changed = self->blender.calib_bass != bass;
+	          self->blender.calib_bass = bass;
+	          self->notify_calib_bass = true;
+
+	          if (changed) {
+	            if (self->blender.linked_calib) {
+	              request_calibrate_linked (self);
+	            } else {
+	              for (i = 0; i < NB_NUM_MODELS; i++) {
+	                const bool enabled =
+	                  self->calibrate [i] && *self->calibrate [i] >= 0.5f;
+	                if (enabled)
+	                  request_calibrate (self, i, true);
+	              }
+	            }
+	          }
+	        }
+	        continue;
+	      }
+
+	      if (value->type != self->urid_atom_Path &&
           value->type != self->urid_atom_String)
         continue;
 

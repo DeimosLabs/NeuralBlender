@@ -377,12 +377,12 @@ static void draw_checkbox (
   if (checked)
     draw_check_mark (w, cx, cy, size, size, colors.fg);
 
-  const char *label = w->label ? w->label : "";
-  if (label [0] && width > size + 8) {
-    cairo_text_extents_t ext;
-    cairo_set_source_rgba (w->crb, colors.fg.r1, colors.fg.g1, colors.fg.b1, colors.fg.a1);
-    cairo_set_font_size (w->crb, w->app->normal_font / w->scale.ascale);
-    cairo_text_extents (w->crb, label, &ext);
+	  const char *label = w->label ? w->label : "";
+	  if (label [0] && width > size + 8) {
+	    cairo_text_extents_t ext;
+	    use_text_color_scheme (w, NORMAL_);
+	    cairo_set_font_size (w->crb, w->app->normal_font / w->scale.ascale);
+	    cairo_text_extents (w->crb, label, &ext);
     cairo_move_to (
         w->crb,
         cx + size + 8 - ext.x_bearing,

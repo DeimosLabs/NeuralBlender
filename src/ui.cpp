@@ -148,11 +148,12 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   label_vuscale.create (ui, frame1.widget, "VU meter scale dB:", 0, 0, 120, 32);
   label_vuheadroom.create (ui, frame1.widget, "VU meter headroom dB:", 0, 0, 120, 32);
   label_spacer1.create (ui, frame1.widget, "", 0, 0, 12, 12);
-  //label_linkexplain.create (ui, frame1.widget, "(calibrate follows loudest model)", 0, 0, 12, 12);
+  label_linkexplain.create (ui, frame1.widget, "(calibrate follows loudest model)", 0, 0, 320, 36);
 
-  btn_vu.create (ui, frame1.widget, "VU meters", 16, 104, 300, 32, WSTYLE_CHECKBOX);
-  btn_linkcalib.create (ui, frame1.widget, "Linked calibration (follows loudest model)",
-                        16, 104, 300, 32, WSTYLE_CHECKBOX);
+  btn_vu.create (ui, frame1.widget, "VU meters", 0, 0, 300, 32, WSTYLE_CHECKBOX);
+  btn_linkcalib.create (ui, frame1.widget, "Linked calibration",
+                        0, 0, 300, 32, WSTYLE_CHECKBOX);
+  btn_bass.create (ui, frame1.widget, "Calibrate for bass", 0, 0, 300, 32, WSTYLE_CHECKBOX);
   
   text_calibdb.create (ui, frame1.widget, "", 0, 0, 128, 32);
   text_vuscale.create (ui, frame1.widget, "", 0, 0, 128, 32);
@@ -172,34 +173,35 @@ void c_prefswindow::on_resize () {
   int labels_x = 16;
   int controls_x = 0;
   
-  std::vector<c_widget *> labels = {
+  std::vector<c_widget *> leftcontrols = {
     &label_calibdb,
     &label_vuscale,
     &label_vuheadroom,
     &label_spacer1,
-    &btn_vu,         // yeah let's pretend these 2 are labels for now
-    &btn_linkcalib
-    //&label_linkexplain
+    &btn_vu,
+    &btn_linkcalib,
+    &btn_bass
   };
-  for (int i = 0; i < labels.size (); i++) {
+  for (int i = 0; i < leftcontrols.size (); i++) {
     int w = 0;
-    labels [i]->resize_to_label ();
-    labels [i]->get_label_size (&w, NULL);
+    leftcontrols [i]->resize_to_label ();
+    leftcontrols [i]->get_label_size (&w, NULL);
     debug ("w=%d", w);
     if (w > controls_x)
       controls_x = w;
     
-    labels [i]->move (labels_x, 32 + i * 40);
+    leftcontrols [i]->move (labels_x, 32 + i * 40);
   }
   controls_x += 36;
   
-  btn_vu.resize (btn_vu.w () + 36, btn_vu.h ());
-  btn_linkcalib.resize (btn_linkcalib.w () + 36, btn_linkcalib.h ());
+  btn_vu.resize (btn_vu.w () + 30, btn_vu.h ());
+  btn_linkcalib.resize (btn_linkcalib.w () + 30, btn_linkcalib.h ());
+  btn_bass.resize (btn_bass.w () + 30, btn_bass.h ());
   debug ("controls_x=%d, label_calibdb: %d", controls_x, label_calibdb.y ());
   text_calibdb.move_resize    (controls_x, label_calibdb.y () - 4, 120, 36);
   text_vuscale.move_resize    (controls_x, label_vuscale.y () - 4, 120, 36);
   text_vuheadroom.move_resize (controls_x, label_vuheadroom.y () - 4, 120, 36);
-  //label_linkexplain.move (btn_linkcalib.x () + btn_linkcalib.w (), btn_linkcalib.y ());
+  label_linkexplain.move (btn_linkcalib.x () + btn_linkcalib.w (), btn_linkcalib.y ());
 }
 
 void c_prefswindow::show () { CP
@@ -229,6 +231,7 @@ void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
 
   btn_vu.set_value (prefs.vu_on);
   btn_linkcalib.set_value (prefs.linked_calib);
+  btn_bass.set_value (prefs.calib_bass);
 }
 
 void c_prefswindow::set_prefs_to (t_prefs &prefs) {
@@ -247,6 +250,7 @@ void c_prefswindow::set_prefs_to (t_prefs &prefs) {
 
   prefs.vu_on = btn_vu.value;
   prefs.linked_calib = btn_linkcalib.value;
+  prefs.calib_bass = btn_bass.value;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
