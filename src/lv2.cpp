@@ -82,7 +82,8 @@ enum {
   PORT_NOTIFY,
   PORT_VU_ENABLE,
   PORT_MUTE_ALL,
-  PORT_EXCLUSIVE_LANE
+  PORT_EXCLUSIVE_LANE,
+  PORT_LINKED_CALIB
 };
 
 typedef struct {
@@ -101,6 +102,7 @@ typedef struct {
   const float *vu_enable    = NULL;
   const float *mute_all     = NULL;
   const float *exclusive_lane = NULL;
+  const float *linked_calib = NULL;
   
   float last_delay          [NB_NUM_MODELS] = { 0.0 };
   float last_gain_in_db     [NB_NUM_MODELS] = { 0.0 };
@@ -112,6 +114,7 @@ typedef struct {
   float last_vu_enable      = 1.0;
   float last_mute_all       = 0.0;
   float last_exclusive_lane = 0.0;
+  float last_linked_calib   = 0.0;
   bool base_lane_mute [NB_NUM_MODELS] = { false };
   bool host_bypass = false;
 
@@ -151,6 +154,7 @@ typedef struct {
   
   // hehe what a mess
   bool pending_calibrate [NB_NUM_MODELS] = { false };
+  bool pending_calibrate_all = false;
   std::atomic<bool> pending_calib_enabled [NB_NUM_MODELS] = {};
   bool pending_load [NB_NUM_MODELS] = { false };
   //size_t pending_which         = 0;
@@ -197,14 +201,19 @@ static void run_calibration (Plugin *self, size_t which, bool enabled) {
 
   self->blender.calib_on (which, enabled);
 
-  if (enabled && self->blender.amps [which].loaded ()) {
-    float *data = (float *) data_calib_f32;
-    const size_t samples = data_calib_f32_len / sizeof (float);
-    self->blender.amps [which].calibrate (data, samples);
-  } else {
-    self->blender.amps [which].calibrate (NULL, 0);
-  }
+  if (self->blender.linked_calib)
+    self->blender.calibrate_linked ();
+  else
+    self->blender.calibrate (which);
 
+  self->stats_dirty.store (true, std::memory_order_release);
+}
+
+static void run_linked_calibration (Plugin *self) {
+  if (!self)
+    return;
+
+  self->blender.calibrate_linked ();
   self->stats_dirty.store (true, std::memory_order_release);
 }
 
@@ -215,6 +224,7 @@ static void loader_main (Plugin *self) { CP
     size_t which = 0;
     bool do_load = false;
     bool do_calib = false;
+    bool do_calib_all = false;
     bool calib_enabled = false;
     std::string path;
     { // scope: only hold this lock while moving pending jobs into locals
@@ -224,6 +234,8 @@ static void loader_main (Plugin *self) { CP
         for (size_t i = 0; i < NB_NUM_MODELS; ++i)
           if (self->pending_load [i] || self->pending_calibrate [i])
             return true;
+        if (self->pending_calibrate_all)
+          return true;
         return !self->loader_running;
       });
 
@@ -241,6 +253,13 @@ static void loader_main (Plugin *self) { CP
       }
 
       if (!do_load) {
+        if (self->pending_calibrate_all) {
+          self->pending_calibrate_all = false;
+          do_calib_all = true;
+        }
+      }
+
+      if (!do_load && !do_calib_all) {
         for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
           if (self->pending_calibrate [i]) {
             which = i;
@@ -285,6 +304,11 @@ static void loader_main (Plugin *self) { CP
       run_calibration (self, which, calib_enabled);
       self->controls_dirty.store (true, std::memory_order_release);
     }
+
+    if (do_calib_all) {
+      run_linked_calibration (self);
+      self->controls_dirty.store (true, std::memory_order_release);
+    }
   }
 }
 
@@ -305,9 +329,12 @@ static void request_load (Plugin *self, size_t which, const char *path) {
 
   self->pending_load [which] = true;
   self->pending_path [which] = path;
+  self->pending_calibrate_all = false;
 
 	self->loader_cv.notify_one();
 }
+
+static void request_calibrate_linked (Plugin *self);
 
 static void clear_model_slot (Plugin *self, size_t which, bool notify) {
   if (!self || which >= NB_NUM_MODELS)
@@ -317,6 +344,8 @@ static void clear_model_slot (Plugin *self, size_t which, bool notify) {
     std::lock_guard<std::mutex> lock (self->loader_mutex);
     self->pending_load [which] = false;
     self->pending_path [which].clear ();
+    self->pending_calibrate [which] = false;
+    self->pending_calibrate_all = false;
   }
 
   self->blender.unload_model (which);
@@ -324,6 +353,8 @@ static void clear_model_slot (Plugin *self, size_t which, bool notify) {
   self->notify_path [which] = notify;
   self->stats_dirty.store (true, std::memory_order_release);
   apply_effective_controls (self);
+  if (self->blender.linked_calib)
+    request_calibrate_linked (self);
 }
 
 static void get_state_path_features (
@@ -352,6 +383,18 @@ static void request_calibrate (Plugin *self, size_t which, bool enabled) {
     std::lock_guard<std::mutex> lock (self->loader_mutex);
     self->pending_calibrate [which] = true;
     self->pending_calib_enabled [which].store (enabled, std::memory_order_release);
+  }
+
+  self->loader_cv.notify_one ();
+}
+
+static void request_calibrate_linked (Plugin *self) {
+  if (!self)
+    return;
+
+  {
+    std::lock_guard<std::mutex> lock (self->loader_mutex);
+    self->pending_calibrate_all = true;
   }
 
   self->loader_cv.notify_one ();
@@ -729,6 +772,10 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
     case PORT_EXCLUSIVE_LANE:
       self->exclusive_lane = (const float *) data;
     break;
+
+    case PORT_LINKED_CALIB:
+      self->linked_calib = (const float *) data;
+    break;
   }
 }
 
@@ -830,14 +877,18 @@ static void run (LV2_Handle instance, uint32_t nframes) {
           const bool changed =
             self->blender.amps [0].calib_target_db != old_db;
 
-          if (changed) {
-            for (i = 0; i < NB_NUM_MODELS; i++) {
-              const bool enabled =
-                self->calibrate [i] && *self->calibrate [i] >= 0.5f;
-              if (enabled)
-                request_calibrate (self, i, true);
-            }
-          }
+	          if (changed) {
+	            if (self->blender.linked_calib) {
+	              request_calibrate_linked (self);
+	            } else {
+	              for (i = 0; i < NB_NUM_MODELS; i++) {
+	                const bool enabled =
+	                  self->calibrate [i] && *self->calibrate [i] >= 0.5f;
+	                if (enabled)
+	                  request_calibrate (self, i, true);
+	              }
+	            }
+	          }
         }
         continue;
       }
@@ -901,6 +952,24 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       apply_effective_controls (self);
     }
   }
+
+	  if (self->linked_calib) {
+	    const float v = *self->linked_calib;
+	    if (v != self->last_linked_calib) { CP
+	      self->last_linked_calib = v;
+	      self->blender.linked_calib = v >= 0.5f;
+	      if (self->blender.linked_calib) {
+	        request_calibrate_linked (self);
+	      } else {
+	        for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+	          const bool enabled =
+	            self->calibrate [i] && *self->calibrate [i] >= 0.5f;
+	          if (enabled)
+	            request_calibrate (self, i, true);
+	        }
+	      }
+	    }
+	  }
   
   // check all parameters
   for (i = 0; i < NB_NUM_MODELS; i++) {

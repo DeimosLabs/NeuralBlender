@@ -92,6 +92,7 @@ public:
   void on_calibrate (c_widget *w, bool b);
   void on_muteall (c_widget *w, bool b);
   void on_vu (c_widget *w, bool);
+  void on_linked_calib (c_widget *w, bool b);
   //void on_excl (c_widget *w, int which);
   void on_bypass (c_widget *w, bool b);
   void on_about (c_widget *w);
@@ -109,15 +110,13 @@ bool c_standalone_ui::load_model (size_t which, const char *filename) {
   }
   apply_effective_controls ();
   if (which < NB_NUM_MODELS) {
-    if (state.lanes [which].do_calib && loaded) {
-      float *data = (float *) data_calib_f32;
-      const size_t samples = data_calib_f32_len / sizeof (float);
-      blender->amps [which].calibrate (data, samples);
-    } else {
-      blender->amps [which].calibrate (NULL, 0);
-    }
+    if (blender->linked_calib)
+      blender->calibrate_linked ();
+    else
+      blender->calibrate (which);
     stats [which * 2] = (float) blender->delays [which].frames ();
-    stats [which * 2 + 1] = blender->amps [which].trim;
+    for (size_t i = 0; i < NB_NUM_MODELS; ++i)
+      stats [i * 2 + 1] = blender->amps [i].trim;
   }
   sync_widgets_from_state (state);
   return loaded;
@@ -179,13 +178,10 @@ void c_standalone_ui::on_calibrate (c_widget *w, bool b) { CP
   state.lanes [which].do_calib = b;
   apply_effective_controls ();
   
-  if (b) {
-    float *data = (float *) data_calib_f32;
-    const size_t samples = data_calib_f32_len / sizeof (float);
-    g_blender.amps [which].calibrate (data, samples);
-  } else {
-    g_blender.amps [which].calibrate (NULL, 0);
-  }
+  if (g_blender.linked_calib)
+    g_blender.calibrate_linked ();
+  else
+    g_blender.calibrate (which);
   for (size_t i = 0; i < NB_NUM_MODELS; i++) {
     stats [i * 2 + 1] = g_blender.amps [i].trim;
   }
@@ -200,6 +196,12 @@ void c_standalone_ui::on_muteall (c_widget *w, bool b) {
 void c_standalone_ui::on_vu (c_widget *w, bool b) {
   debug ("b=%d", (int) b);
   g_blender.do_vu = b;
+}
+
+void c_standalone_ui::on_linked_calib (c_widget *w, bool b) {
+  (void) w;
+  prefs.linked_calib = b;
+  g_blender.linked_calib = b;
 }
 
 /* these are UI only
@@ -229,6 +231,8 @@ void c_standalone_ui::apply_prefs (t_prefs &p) {
 
   if (blender)
     blender->do_vu = p.vu_on;
+  if (blender)
+    blender->linked_calib = p.linked_calib;
 }
 
 void c_standalone_ui::write_prefs_to (t_prefs &p) {
@@ -236,6 +240,8 @@ void c_standalone_ui::write_prefs_to (t_prefs &p) {
 
   if (blender)
     p.calib_target_db = blender->amps [0].calib_target_db;
+  if (blender)
+    p.linked_calib = blender->linked_calib;
 }
 
 void c_standalone_ui::apply_effective_controls () {

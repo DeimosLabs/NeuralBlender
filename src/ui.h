@@ -47,6 +47,7 @@ typedef struct {
   float vu_scale_db     = -36.0f;
   float vu_headroom_db  = 6.0f;
   bool vu_on = true;
+  bool linked_calib = false;
 } t_prefs;
 
 bool read_prefs_from_config  (c_configfile &configfile, t_prefs &prefs);
@@ -71,11 +72,13 @@ public:
   c_label label_vuscale;
   c_label label_vuheadroom;
   c_label label_spacer1;
+  //c_label label_linkexplain;
   
   c_textbox text_calibdb;
   c_textbox text_vuscale;
   c_textbox text_vuheadroom;
   c_button btn_vu;
+  c_button btn_linkcalib;
 };
 
 class c_aboutwindow : public c_toplevelwindow {
@@ -178,6 +181,7 @@ public:
   virtual void on_dcflip (c_widget *w, bool b)                 = 0;
   virtual void on_calibrate (c_widget *w, bool b)              = 0;
   virtual void on_vu (c_widget *w, bool b)                     = 0;
+  virtual void on_linked_calib (c_widget *w, bool b)           = 0;
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;
           void on_button (c_button *btn, bool value)              ;
@@ -187,9 +191,9 @@ public:
           void on_about ()                                        ;
           void on_prefs ()                                        ;
           void on_prefs_ok ()                                     ;
-  virtual void apply_prefs (t_prefs &p)                            ;
-  virtual void write_prefs_to (t_prefs &p)                          ;
-          void apply_ui_prefs (t_prefs &p)                          ;
+  virtual void apply_prefs (t_prefs &p)                           ;
+  virtual void write_prefs_to (t_prefs &p)                        ;
+          void apply_ui_prefs (t_prefs &p)                        ;
 	  
   Display *display = NULL;
   Window window;

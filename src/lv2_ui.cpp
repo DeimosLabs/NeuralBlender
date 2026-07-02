@@ -75,7 +75,8 @@ enum {
   PORT_NOTIFY,
   PORT_VU_ENABLE,
   PORT_MUTE_ALL,
-  PORT_EXCLUSIVE_LANE
+  PORT_EXCLUSIVE_LANE,
+  PORT_LINKED_CALIB
 };
 
 class c_lv2_ui : public c_neuralblender_ui {
@@ -205,9 +206,11 @@ public:
   void on_bypass (c_widget *w, bool b)                 { CP; write_control (PORT_BYPASS, b ? 1.0f : 0.0f); }
   void on_about (c_widget *w)                          { CP }
   void on_vu (c_widget *w, bool b)                     { CP; write_control (PORT_VU_ENABLE, b ? 1.0f : 0.0f); }
+  void on_linked_calib (c_widget *w, bool b)           { CP; write_control (PORT_LINKED_CALIB, b ? 1.0f : 0.0f); }
 
   void apply_prefs (t_prefs &p) override {
     c_neuralblender_ui::apply_prefs (p);
+    write_control (PORT_LINKED_CALIB, p.linked_calib ? 1.0f : 0.0f);
     write_float_property (urid_calib_target_db, p.calib_target_db);
   }
 
@@ -239,7 +242,9 @@ public:
 
     if (port == PORT_VU_ENABLE) {
       state.do_vu = value >= 0.5f;
-      btn_vu.set_value (state.do_vu);
+      prefs.vu_on = state.do_vu;
+      if (prefswindow.widget)
+        prefswindow.btn_vu.set_value (state.do_vu);
       if (state.do_vu) {
         meter_in.show ();
         for (size_t i = 0; i < NB_NUM_MODELS; ++i)
@@ -271,6 +276,16 @@ public:
       state.exclusive_lane = n;
       updating_from_state = old_updating_from_state;
       sync_widgets_from_state (state);
+      updating_from_host = false;
+      return;
+    }
+
+    if (port == PORT_LINKED_CALIB) {
+      prefs.linked_calib = value >= 0.5f;
+      btn_vu.set_value (prefs.linked_calib);
+      if (prefswindow.widget)
+        prefswindow.btn_linkcalib.set_value (prefs.linked_calib);
+      updating_from_state = old_updating_from_state;
       updating_from_host = false;
       return;
     }
@@ -467,6 +482,7 @@ public:
     subscribe->subscribe (subscribe->handle, PORT_VU_ENABLE, 0, NULL);
     subscribe->subscribe (subscribe->handle, PORT_MUTE_ALL, 0, NULL);
     subscribe->subscribe (subscribe->handle, PORT_EXCLUSIVE_LANE, 0, NULL);
+    subscribe->subscribe (subscribe->handle, PORT_LINKED_CALIB, 0, NULL);
   }
 };
 

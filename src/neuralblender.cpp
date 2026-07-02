@@ -517,6 +517,51 @@ c_neuralblender::~c_neuralblender () { CP
   }
 }
 
+bool c_neuralblender::calibrate (size_t which) {
+  if (which >= NB_NUM_MODELS)
+    return false;
+
+  if (amps [which].do_calib && amps [which].loaded ()) {
+    float *data = (float *) data_calib_f32;
+    const size_t samples = data_calib_f32_len / sizeof (float);
+    amps [which].calibrate (data, samples);
+  } else {
+    amps [which].calibrate (NULL, 0);
+  }
+
+  return true;
+}
+
+bool c_neuralblender::calibrate_linked () {
+  float linked_trim = INFINITY;
+  bool any_linked = false;
+  float *data = (float *) data_calib_f32;
+  const size_t samples = data_calib_f32_len / sizeof (float);
+
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+    if (amps [i].do_calib && amps [i].loaded ()) {
+      amps [i].calibrate (data, samples);
+      const float trim = amps [i].trim.load (std::memory_order_acquire);
+      if (std::isfinite (trim) && trim > 0.0f) {
+        linked_trim = std::min (linked_trim, trim);
+        any_linked = true;
+      }
+    } else {
+      amps [i].calibrate (NULL, 0);
+    }
+  }
+
+  if (!any_linked)
+    return true;
+
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+    if (amps [i].do_calib && amps [i].loaded ())
+      amps [i].trim.store (linked_trim, std::memory_order_release);
+  }
+
+  return true;
+}
+
 void c_neuralblender::set_samplerate (uint32_t sr) { CP
   debug ("start");
   m_samplerate = sr;

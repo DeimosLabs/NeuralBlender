@@ -179,6 +179,8 @@ public:
   bool is_dcflipped (size_t which);
   bool is_calib_on (size_t which);
   bool set_calib_target_db (float f);
+  bool calibrate (size_t which);
+  bool calibrate_linked ();
   
   static void get_calib_data (std::vector<float> &v);
 
@@ -188,6 +190,7 @@ public:
   c_vudata *meters_out [NB_NUM_MODELS];
   bool do_vu = true;
   bool mute_all = false;
+  bool linked_calib = false;
 
 private:
   void update_mutes ();

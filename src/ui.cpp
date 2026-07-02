@@ -148,6 +148,11 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   label_vuscale.create (ui, frame1.widget, "VU meter scale dB:", 0, 0, 120, 32);
   label_vuheadroom.create (ui, frame1.widget, "VU meter headroom dB:", 0, 0, 120, 32);
   label_spacer1.create (ui, frame1.widget, "", 0, 0, 12, 12);
+  //label_linkexplain.create (ui, frame1.widget, "(calibrate follows loudest model)", 0, 0, 12, 12);
+
+  btn_vu.create (ui, frame1.widget, "VU meters", 16, 104, 300, 32, WSTYLE_CHECKBOX);
+  btn_linkcalib.create (ui, frame1.widget, "Linked calibration (follows loudest model)",
+                        16, 104, 300, 32, WSTYLE_CHECKBOX);
   
   text_calibdb.create (ui, frame1.widget, "", 0, 0, 128, 32);
   text_vuscale.create (ui, frame1.widget, "", 0, 0, 128, 32);
@@ -163,7 +168,6 @@ void c_prefswindow::on_resize () {
   btn_ok.move_resize (w () - 140, h () - 56, 128, 40);
   btn_cancel.move_resize (w () - 280, h () - 56, 128, 40);
   btn_about.move_resize (12, h () - 56, 128, 40);
-  btn_vu.create (ui, frame1.widget, "VU meters on by default", 16, 104, 300, 32, WSTYLE_CHECKBOX);
   
   int labels_x = 16;
   int controls_x = 0;
@@ -173,7 +177,9 @@ void c_prefswindow::on_resize () {
     &label_vuscale,
     &label_vuheadroom,
     &label_spacer1,
-    &btn_vu // yeah let's pretend this is a label
+    &btn_vu,         // yeah let's pretend these 2 are labels for now
+    &btn_linkcalib
+    //&label_linkexplain
   };
   for (int i = 0; i < labels.size (); i++) {
     int w = 0;
@@ -188,10 +194,12 @@ void c_prefswindow::on_resize () {
   controls_x += 36;
   
   btn_vu.resize (btn_vu.w () + 36, btn_vu.h ());
+  btn_linkcalib.resize (btn_linkcalib.w () + 36, btn_linkcalib.h ());
   debug ("controls_x=%d, label_calibdb: %d", controls_x, label_calibdb.y ());
   text_calibdb.move_resize    (controls_x, label_calibdb.y () - 4, 120, 36);
   text_vuscale.move_resize    (controls_x, label_vuscale.y () - 4, 120, 36);
   text_vuheadroom.move_resize (controls_x, label_vuheadroom.y () - 4, 120, 36);
+  //label_linkexplain.move (btn_linkcalib.x () + btn_linkcalib.w (), btn_linkcalib.y ());
 }
 
 void c_prefswindow::show () { CP
@@ -220,6 +228,7 @@ void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
   text_vuheadroom.set_text (buf);
 
   btn_vu.set_value (prefs.vu_on);
+  btn_linkcalib.set_value (prefs.linked_calib);
 }
 
 void c_prefswindow::set_prefs_to (t_prefs &prefs) {
@@ -237,6 +246,7 @@ void c_prefswindow::set_prefs_to (t_prefs &prefs) {
     prefs.vu_headroom_db = vu_headroom_db;
 
   prefs.vu_on = btn_vu.value;
+  prefs.linked_calib = btn_linkcalib.value;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -585,14 +595,14 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_muteall.create (this, mainwindow.widget, "Mute all", 500, 12, 120, 40, WSTYLE_TOGGLE);
   btn_muteall.role = ROLE_MUTEALL;
   
-  cont_checkboxes.create (this, mainwindow.widget, "", 8, 604, 500, 40);
+  cont_checkboxes.create (this, mainwindow.widget, "", 8, 604, 550, 40);
   cont_checkboxes.widget->scale.gravity = NONE;
   
-  btn_vu.create (this, cont_checkboxes.widget, "VU meters", 0, 0, 120, 32, WSTYLE_CHECKBOX);
-  btn_vu.role = ROLE_VUTOGGLE;
-  btn_vu.set_value (state.do_vu);
+  btn_vu.create (this, cont_checkboxes.widget, "Linked calibration", 0, 0, 180, 32, WSTYLE_CHECKBOX);
+  btn_vu.role = ROLE_LINKED_CALIB;
+  btn_vu.set_value (prefs.linked_calib);
   
-  btn_exclmode.create (this, cont_checkboxes.widget, "Exclusive mode", 140, 0, 170, 32, WSTYLE_CHECKBOX);
+  btn_exclmode.create (this, cont_checkboxes.widget, "Exclusive mode", 180, 0, 180, 32, WSTYLE_CHECKBOX);
   btn_exclmode.set_value (state.do_excl);
   btn_exclmode.role = ROLE_EXCL_TOGGLE;
   
@@ -727,6 +737,11 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
       vu_on (value);
     break;
 
+    case ROLE_LINKED_CALIB: CP
+      prefs.linked_calib = value;
+      on_linked_calib (btn, value);
+    break;
+
     case ROLE_EXCL_TOGGLE: CP
       if (value) {
         size_t exclusive_lane = choose_exclusive_lane ();
@@ -817,7 +832,7 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     
     debug ("window w/h %d,%d", window_width, window_height);
     
-    cont_checkboxes.move_resize (16, window_height - 44, 300, 40);
+    cont_checkboxes.move_resize (16, window_height - 44, 350, 40);
     
     btn_enable.move_resize (16, 12, 120, 40);
     btn_muteall.move_resize (window_width - 136, 12, 120, 40);
@@ -1073,7 +1088,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   /*btn_advanced.set_value (state.showadvanced);
   show_advanced_settings (state.showadvanced);*/
 
-  btn_vu.set_value (state.do_vu);
+  btn_vu.set_value (prefs.linked_calib);
   if (state.do_vu) {
     meter_in.show ();
     for (size_t i = 0; i < NB_NUM_MODELS; ++i)
