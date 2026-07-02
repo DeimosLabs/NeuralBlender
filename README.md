@@ -9,6 +9,7 @@ Features:
   - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
   - VU meters can be disabled to save (a tiny bit of) DSP load
   - Calibration target dB is now a user setting
+  - "Linked" calibration mode follows loudest model which has calib. enabled
   - Each model slot / lane has:
     - input gain
     - output gain
