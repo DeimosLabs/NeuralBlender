@@ -199,6 +199,7 @@ public:
   c_aboutwindow aboutwindow;
   c_prefswindow prefswindow;
   Window parent;
+  bool do_set_min_size = false; // ugly hack for ardour's window size shenanigans
   
   c_container    cont_checkboxes;
   c_label        label_big;

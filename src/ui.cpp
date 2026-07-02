@@ -20,9 +20,9 @@
 #define CMDLINE_DEBUG_COLOR ANSI_MAGENTA
 #include "cmdline_debug.h"
 
-#define MIN_WINDOW_HEIGHT (52 + (150 * NB_NUM_MODELS))
-#define DEFAULT_WINDOW_HEIGHT (std::min (640, (52 + (180 * NB_NUM_MODELS))))
-#define MIN_WINDOW_WIDTH 512
+#define MIN_WINDOW_HEIGHT (64 + (150 * NB_NUM_MODELS))
+#define DEFAULT_WINDOW_HEIGHT (12 + std::min (640, (52 + (180 * NB_NUM_MODELS))))
+#define MIN_WINDOW_WIDTH 600
 #define DEFAULT_WINDOW_WIDTH 640
 
 extern const char *g_build_timestamp;
@@ -415,8 +415,10 @@ void c_lane_widgets::create (
   //label_calib.create (ui, wp, "Calib.", 0, 0, 75, 32);
   label_frames.create (ui, wp, "(not loaded)", 0, 0, 75, 24);
   label_frames.textsize = 0.75;
+  label_frames.align = TEXT_CENTER;
   label_trim.create (ui, wp, "1.0", 0, 0, 75, 24);
   label_trim.textsize = 0.75;
+  label_trim.align = TEXT_CENTER;
 
   btn_browse.set_image_on (data_icon_folder_small_png);
   btn_browse.set_image_off (data_icon_folder_small_png);
@@ -626,6 +628,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   CP
   XFlush (display);
   CP
+  //do_set_min_size = true;
   return true;
 }
 
@@ -800,7 +803,9 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
       window_height = std::max (MIN_WINDOW_HEIGHT, (int) (metrics.height / mw->app->hdpi));
     }
     
+    //if (do_set_min_size)
     mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
+    
     int lane_width = window_width - 24;
     const int lane_top = 60;
     const int lane_gap = 5;

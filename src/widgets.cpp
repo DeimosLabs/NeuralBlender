@@ -52,6 +52,7 @@ static float knob_angle_from_value (float value, float min, float max) {
 
 
 // Floats galore. Bring a row boat.
+// (Codex generated most of this table)
 
 static t_colortheme g_default_colors = {
   // window_bg
