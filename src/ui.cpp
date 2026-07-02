@@ -79,6 +79,21 @@ bool read_prefs_from_config (c_configfile &configfile, t_prefs &prefs) {
       calib_target_db))
     prefs.calib_target_db = calib_target_db;
 
+  float vu_scale_db = prefs.vu_scale_db;
+  if (parse_config_float (
+      configfile.get_item (CONFIG_KEY_NAME_VU_SCALE),
+      vu_scale_db) &&
+      vu_scale_db <= 0.0f)
+    prefs.vu_scale_db = vu_scale_db;
+
+  float vu_headroom_db = prefs.vu_headroom_db;
+  if (parse_config_float (
+      configfile.get_item (CONFIG_KEY_NAME_VU_HEADROOM),
+      vu_headroom_db) &&
+      vu_headroom_db >= 0.0f &&
+      vu_headroom_db <= 12.0f)
+    prefs.vu_headroom_db = vu_headroom_db;
+
   const std::string vu = configfile.get_item (CONFIG_KEY_NAME_VU);
   if (!vu.empty ())
     prefs.vu_on = configfile.istrue (CONFIG_KEY_NAME_VU);
@@ -89,8 +104,14 @@ bool read_prefs_from_config (c_configfile &configfile, t_prefs &prefs) {
 bool write_prefs_to_config (c_configfile &configfile, const t_prefs &prefs) {
   char buf [128];
   snprintf (buf, sizeof (buf), "%.6g", prefs.calib_target_db);
-
   configfile.set_item (CONFIG_KEY_NAME_CALIB_TARGET, buf);
+
+  snprintf (buf, sizeof (buf), "%.6g", prefs.vu_scale_db);
+  configfile.set_item (CONFIG_KEY_NAME_VU_SCALE, buf);
+
+  snprintf (buf, sizeof (buf), "%.6g", prefs.vu_headroom_db);
+  configfile.set_item (CONFIG_KEY_NAME_VU_HEADROOM, buf);
+
   configfile.set_item (CONFIG_KEY_NAME_VU, prefs.vu_on ? "1" : "0");
   return configfile.write_file ();
 }
@@ -123,13 +144,36 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   btn_about.create (ui, widget, "About...", 0, 0, 128, 40);
   btn_about.role = ROLE_ABOUT;
   
-  label_calibdb.create (ui, frame1.widget, "Calibration target dB:", 16, 60, 120, 40);
+  label_calibdb.create (ui, frame1.widget, "Calibration target dB:", 0, 0, 120, 32);
+  label_vuscale.create (ui, frame1.widget, "VU meter scale dB:", 0, 0, 120, 32);
+  label_vuheadroom.create (ui, frame1.widget, "VU meter headroom dB:", 0, 0, 120, 32);
+  label_spacer1.create (ui, frame1.widget, "", 0, 0, 12, 12);
   
-  int controls_x = 1;
-  std::vector<c_label *> labels = {
+  text_calibdb.create (ui, frame1.widget, "", 0, 0, 128, 32);
+  text_vuscale.create (ui, frame1.widget, "", 0, 0, 128, 32);
+  text_vuheadroom.create (ui, frame1.widget, "", 0, 0, 128, 32);
+  
+  on_resize ();
+}
+
+void c_prefswindow::on_resize () {
+  frame1.move ((w () - frame1.w ()) / 2, (h () - frame1.h ()) / 2 - 24);
+  
+  // bottom about/ok/cancel buttons
+  btn_ok.move_resize (w () - 140, h () - 56, 128, 40);
+  btn_cancel.move_resize (w () - 280, h () - 56, 128, 40);
+  btn_about.move_resize (12, h () - 56, 128, 40);
+  btn_vu.create (ui, frame1.widget, "VU meters on by default", 16, 104, 300, 32, WSTYLE_CHECKBOX);
+  
+  int labels_x = 16;
+  int controls_x = 0;
+  
+  std::vector<c_widget *> labels = {
     &label_calibdb,
-    &label_test1,
-    &label_test2,
+    &label_vuscale,
+    &label_vuheadroom,
+    &label_spacer1,
+    &btn_vu // yeah let's pretend this is a label
   };
   for (int i = 0; i < labels.size (); i++) {
     int w = 0;
@@ -138,21 +182,16 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
     debug ("w=%d", w);
     if (w > controls_x)
       controls_x = w;
+    
+    labels [i]->move (labels_x, 32 + i * 40);
   }
-  controls_x += 48;
+  controls_x += 36;
   
-  text_calibdb.create  (ui, frame1.widget, "", controls_x , 60, 120, 40);
-  btn_vu.create (ui, frame1.widget, "VU meters on by default", 16, 104, 300, 32, WSTYLE_CHECKBOX);
-  
-  on_resize ();
-}
-
-void c_prefswindow::on_resize () {
-  frame1.move ((w () - frame1.w ()) / 2, (h () - frame1.h ()) / 2 - 24);
-  
-  btn_ok.move_resize (w () - 140, h () - 56, 128, 40);
-  btn_cancel.move_resize (w () - 280, h () - 56, 128, 40);
-  btn_about.move_resize (12, h () - 56, 128, 40);
+  btn_vu.resize (btn_vu.w () + 36, btn_vu.h ());
+  debug ("controls_x=%d, label_calibdb: %d", controls_x, label_calibdb.y ());
+  text_calibdb.move_resize    (controls_x, label_calibdb.y () - 4, 120, 36);
+  text_vuscale.move_resize    (controls_x, label_vuscale.y () - 4, 120, 36);
+  text_vuheadroom.move_resize (controls_x, label_vuheadroom.y () - 4, 120, 36);
 }
 
 void c_prefswindow::show () { CP
@@ -173,12 +212,30 @@ void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
   char buf [128];
   snprintf (buf, 127, "%.6g", prefs.calib_target_db);
   text_calibdb.set_text (buf);
+
+  snprintf (buf, 127, "%.6g", prefs.vu_scale_db);
+  text_vuscale.set_text (buf);
+
+  snprintf (buf, 127, "%.6g", prefs.vu_headroom_db);
+  text_vuheadroom.set_text (buf);
+
   btn_vu.set_value (prefs.vu_on);
 }
 
 void c_prefswindow::set_prefs_to (t_prefs &prefs) {
-  double db = std::strtod (text_calibdb.value.c_str (), NULL);
-  prefs.calib_target_db = db;
+  prefs.calib_target_db = std::strtof (text_calibdb.value.c_str (), NULL);
+
+  float vu_scale_db = 0.0f;
+  if (parse_config_float (text_vuscale.value, vu_scale_db) &&
+      vu_scale_db <= 0.0f)
+    prefs.vu_scale_db = vu_scale_db;
+
+  float vu_headroom_db = 0.0f;
+  if (parse_config_float (text_vuheadroom.value, vu_headroom_db) &&
+      vu_headroom_db >= 0.0f &&
+      vu_headroom_db <= 12.0f)
+    prefs.vu_headroom_db = vu_headroom_db;
+
   prefs.vu_on = btn_vu.value;
 }
 
@@ -554,6 +611,8 @@ bool c_neuralblender_ui::create (Window parent_) { CP
     }
     blender->meter_in = &vudata_in;
   }
+
+  apply_prefs (prefs);
   
   //if (state.showadvanced) {
   //  show_advanced_settings ();
@@ -697,6 +756,21 @@ void c_neuralblender_ui::on_prefs_ok () {
 }
 
 void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
+  const float scale_db = p.vu_scale_db <= 0.0f ? p.vu_scale_db : DEFAULT_VU_DB;
+  const float headroom_db = std::clamp (p.vu_headroom_db, 0.0f, 12.0f);
+
+  meter_in.set_db_scale (scale_db);
+  meter_in.set_headroom (headroom_db);
+  vudata_in.set_db_scale (scale_db);
+  vudata_in.set_headroom (headroom_db);
+
+  for (size_t i = 0; i < NB_NUM_MODELS; i++) {
+    lanes [i].meter_out.set_db_scale (scale_db);
+    lanes [i].meter_out.set_headroom (headroom_db);
+    lanes [i].vudata_out.set_db_scale (scale_db);
+    lanes [i].vudata_out.set_headroom (headroom_db);
+  }
+
   vu_on (p.vu_on);
   write_prefs_to_config (configfile, p);
 }

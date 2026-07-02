@@ -43,7 +43,9 @@ class c_neuralblender_ui;
 class c_filepicker;
 
 typedef struct {
-  float calib_target_db = -12;
+  float calib_target_db = -12.0f;
+  float vu_scale_db     = -60.0f;
+  float vu_headroom_db  = 6.0f;
   bool vu_on = true;
 } t_prefs;
 
@@ -66,10 +68,13 @@ public:
   c_button btn_ok;
   
   c_label label_calibdb;
-  c_label label_test1;
-  c_label label_test2;
+  c_label label_vuscale;
+  c_label label_vuheadroom;
+  c_label label_spacer1;
   
   c_textbox text_calibdb;
+  c_textbox text_vuscale;
+  c_textbox text_vuheadroom;
   c_button btn_vu;
 };
 

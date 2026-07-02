@@ -16,6 +16,8 @@
 #define CONFIG_KEY_NAME_EXCL   "excldefault"
 #define CONFIG_KEY_NAME_CALIB  "calibdefault"
 #define CONFIG_KEY_NAME_CALIB_TARGET "calibtargetdb"
+#define CONFIG_KEY_NAME_VU_SCALE "vuscaledb"
+#define CONFIG_KEY_NAME_VU_HEADROOM "vuheadroomdb"
 #define CONFIG_KEY_NAME_VU     "vuon"
 #define CONFIG_DEFAULT_DIR     "/"
 

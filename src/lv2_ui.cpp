@@ -202,9 +202,9 @@ public:
     write_control (PORT_EXCLUSIVE_LANE, (float) n);
     sync_widgets_from_state (state);
   }
-	  void on_bypass (c_widget *w, bool b)                 { CP; write_control (PORT_BYPASS, b ? 1.0f : 0.0f); }
-	  void on_about (c_widget *w)                          { CP }
-	  void on_vu (c_widget *w, bool b)                     { CP; write_control (PORT_VU_ENABLE, b ? 1.0f : 0.0f); }
+  void on_bypass (c_widget *w, bool b)                 { CP; write_control (PORT_BYPASS, b ? 1.0f : 0.0f); }
+  void on_about (c_widget *w)                          { CP }
+  void on_vu (c_widget *w, bool b)                     { CP; write_control (PORT_VU_ENABLE, b ? 1.0f : 0.0f); }
 
   void apply_prefs (t_prefs &p) override {
     c_neuralblender_ui::apply_prefs (p);

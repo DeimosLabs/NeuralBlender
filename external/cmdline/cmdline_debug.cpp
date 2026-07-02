@@ -1,3 +1,10 @@
+
+/* Loosely based on my old cmdline library that worked but
+ * honestly wasn't very well written. Hopefully this version is better =)
+ *
+ *   - delt.
+ */
+
 #include "cmdline_debug.h"
 
 #include <cstdarg>

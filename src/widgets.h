@@ -151,6 +151,9 @@ public:
   float text_g             = 1.0;
   float text_b             = 1.0;
   Widget_t *widget         = NULL;
+  
+  void *userdata1          = NULL;
+  void *userdata2          = NULL;
 
   // backpointers to parent/related objects
   Widget_t *parent         = NULL;
@@ -256,6 +259,8 @@ public:
   inline void on_ui_timer () { meter.on_ui_timer (); }
   inline void set_vudata (c_vudata *p) {meter.set_vudata (p); }
   inline void set_stereo (bool b) { meter.set_stereo (b); }
+  inline void set_db_scale (float f) { meter.set_db_scale (f); }
+  inline void set_headroom (float f) { meter.set_headroom (f); }
   inline bool needs_redraw () { return meter.needs_redraw (); }
 };
 

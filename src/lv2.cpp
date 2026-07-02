@@ -87,30 +87,30 @@ enum {
 
 typedef struct {
   // audio buffers
-  const float *audio_in        = NULL;
-  float *audio_out             = NULL;
+  const float *audio_in     = NULL;
+  float *audio_out          = NULL;
   
   // controls
-  const float *gain_in_db  [NB_NUM_MODELS] = { NULL };
-  const float *gain_out_db [NB_NUM_MODELS] = { NULL };
-  const float *delay       [NB_NUM_MODELS] = { NULL };
-  const float *lane_mute   [NB_NUM_MODELS] = { NULL };
-  const float *dcflip      [NB_NUM_MODELS] = { NULL };
-  const float *calibrate   [NB_NUM_MODELS] = { NULL };
-  const float *bypass      = NULL;
-  const float *vu_enable   = NULL;
-  const float *mute_all    = NULL;
+  const float *gain_in_db   [NB_NUM_MODELS] = { NULL };
+  const float *gain_out_db  [NB_NUM_MODELS] = { NULL };
+  const float *delay        [NB_NUM_MODELS] = { NULL };
+  const float *lane_mute    [NB_NUM_MODELS] = { NULL };
+  const float *dcflip       [NB_NUM_MODELS] = { NULL };
+  const float *calibrate    [NB_NUM_MODELS] = { NULL };
+  const float *bypass       = NULL;
+  const float *vu_enable    = NULL;
+  const float *mute_all     = NULL;
   const float *exclusive_lane = NULL;
   
-  float last_delay         [NB_NUM_MODELS] = { 0.0 };
-  float last_gain_in_db    [NB_NUM_MODELS] = { 0.0 };
-  float last_gain_out_db   [NB_NUM_MODELS] = { 0.0 };
-  float last_lane_mute     [NB_NUM_MODELS] = { 0.0 };
-  float last_dcflip        [NB_NUM_MODELS] = { 0.0 };
-  float last_calibrate     [NB_NUM_MODELS] = { 0.0 };
-  float last_bypass        = 1.0;
-  float last_vu_enable     = 1.0;
-  float last_mute_all      = 0.0;
+  float last_delay          [NB_NUM_MODELS] = { 0.0 };
+  float last_gain_in_db     [NB_NUM_MODELS] = { 0.0 };
+  float last_gain_out_db    [NB_NUM_MODELS] = { 0.0 };
+  float last_lane_mute      [NB_NUM_MODELS] = { 0.0 };
+  float last_dcflip         [NB_NUM_MODELS] = { 0.0 };
+  float last_calibrate      [NB_NUM_MODELS] = { 0.0 };
+  float last_bypass         = 1.0;
+  float last_vu_enable      = 1.0;
+  float last_mute_all       = 0.0;
   float last_exclusive_lane = 0.0;
   bool base_lane_mute [NB_NUM_MODELS] = { false };
   bool host_bypass = false;
@@ -150,8 +150,8 @@ typedef struct {
   std::atomic<bool> load_requested { false };
   
   // hehe what a mess
-  bool pending_calibrate[NB_NUM_MODELS] = { false };
-  std::atomic<bool> pending_calib_enabled[NB_NUM_MODELS] = {};
+  bool pending_calibrate [NB_NUM_MODELS] = { false };
+  std::atomic<bool> pending_calib_enabled [NB_NUM_MODELS] = {};
   bool pending_load [NB_NUM_MODELS] = { false };
   //size_t pending_which         = 0;
   std::string pending_path [NB_NUM_MODELS];

@@ -1,3 +1,10 @@
+
+/* Loosely based on my old cmdline library that worked but
+ * honestly wasn't very well written. Hopefully this version is better =)
+ *
+ *   - delt.
+ */
+
 #ifndef NEURALBLENDER_CMDLINE_DEBUG_H
 #define NEURALBLENDER_CMDLINE_DEBUG_H
 
