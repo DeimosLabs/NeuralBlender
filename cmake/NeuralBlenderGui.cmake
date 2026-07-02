@@ -108,6 +108,7 @@ function(add_neuralblender_gui_library target_name)
   target_link_libraries(${target_name} PUBLIC
     Eigen3::Eigen
     neuralblender_cmdline_debug
+    neuralblender_config
     xputty
   )
 

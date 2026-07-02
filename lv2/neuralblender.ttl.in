@@ -34,7 +34,12 @@ nb:ModelD
     mod:fileTypes "nam,aidax,json" ;
     rdfs:label "Model D" ;
     rdfs:range atom:Path .
-    
+
+nb:CalibTargetDb
+    a lv2:Parameter ;
+    rdfs:label "Calibration target dB" ;
+    rdfs:range atom:Float .
+	    
 <http://deimos.ca/neuralblender>
     a lv2:Plugin ,
       lv2:AmplifierPlugin ;

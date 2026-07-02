@@ -55,12 +55,28 @@ add_library(neuralblender_cmdline_debug STATIC
   external/cmdline/cmdline_debug.cpp
 )
 
+add_library(neuralblender_config STATIC
+  src/config.cpp
+)
+
 set_target_properties(neuralblender_cmdline_debug PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+)
+
+set_target_properties(neuralblender_config PROPERTIES
   POSITION_INDEPENDENT_CODE ON
 )
 
 target_include_directories(neuralblender_cmdline_debug PUBLIC
   ${PROJECT_SOURCE_DIR}/external/cmdline
+)
+
+target_include_directories(neuralblender_config PUBLIC
+  ${PROJECT_SOURCE_DIR}/src
+)
+
+target_link_libraries(neuralblender_config PUBLIC
+  neuralblender_cmdline_debug
 )
 
 if (TRACE)
@@ -143,7 +159,7 @@ target_compile_definitions(neuralblender_meter_data PRIVATE
   METER_DATA_ONLY
 )
 
-target_link_libraries(neuralblender_core PUBLIC Eigen3::Eigen z neuralblender_cmdline_debug)
+target_link_libraries(neuralblender_core PUBLIC Eigen3::Eigen z neuralblender_cmdline_debug neuralblender_config)
 
 if (DEBUG)
   message(STATUS "Debug enabled")
@@ -172,7 +188,6 @@ if (STANDALONE)
 
     add_executable(neuralblender
       src/standalone.cpp
-      src/config.cpp
       src/timestamp.cpp
       $<TARGET_OBJECTS:neuralblender_data>
       $<TARGET_OBJECTS:neuralblender_meter_data>
@@ -247,7 +262,6 @@ if (LV2)
 
     add_library(neuralblender_ui MODULE
       src/lv2_ui.cpp
-      src/config.cpp
       $<TARGET_OBJECTS:neuralblender_data>
       $<TARGET_OBJECTS:neuralblender_meter_data>
     )
@@ -257,7 +271,7 @@ if (LV2)
       OUTPUT_NAME "neuralblender_ui"
     )
     
-    target_link_libraries(neuralblender_ui PRIVATE neuralblender_gui_lv2 neuralblender_cmdline_debug)
+    target_link_libraries(neuralblender_ui PRIVATE neuralblender_gui_lv2 neuralblender_cmdline_debug neuralblender_config)
     target_compile_definitions(neuralblender_ui PRIVATE LV2 LV2_UI)
 
     install(TARGETS neuralblender_ui

@@ -20,6 +20,8 @@
 */
 
 #include <filesystem>
+#include <cerrno>
+#include <cstdlib>
 #include "neuralblender.h"
 #include "data.h"
 #include "config.h"
@@ -64,6 +66,20 @@ static bool is_supported_model_path (const std::string &path) {
   return ends_with (path, ".nam") ||
          ends_with (path, ".json") ||
          ends_with (path, ".aidax");
+}
+
+static bool parse_float (const std::string &s, float &value) {
+  if (s.empty ())
+    return false;
+
+  char *end = NULL;
+  errno = 0;
+  const float parsed = std::strtof (s.c_str (), &end);
+  if (errno || end == s.c_str () || *end != '\0' || !std::isfinite (parsed))
+    return false;
+
+  value = parsed;
+  return true;
 }
 
 static float clamp_gain_multiplier (float gain) {
@@ -471,6 +487,15 @@ c_neuralblender::c_neuralblender () { CP
     m_lane_mute [i].store (false, std::memory_order_relaxed);
     meters_out [i] = nullptr;
     amps [i].dcflip = false;
+  }
+
+  c_configfile configfile;
+  if (configfile.read_file ()) {
+    float calib_target_db = DB_CALIB_TARGET_DEFAULT;
+    if (parse_float (
+        configfile.get_item (CONFIG_KEY_NAME_CALIB_TARGET),
+        calib_target_db))
+      set_calib_target_db (calib_target_db);
   }
 
   m_bypass.store (false, std::memory_order_relaxed);

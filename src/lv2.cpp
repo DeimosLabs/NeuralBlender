@@ -136,6 +136,7 @@ typedef struct {
   LV2_URID urid_model [NB_NUM_MODELS] = { 0 };
   LV2_URID urid_meters         = 0;
   LV2_URID urid_stats          = 0;
+  LV2_URID urid_calib_target_db = 0;
   LV2_URID urid_atom_URID      = 0;
   const LV2_Atom_Sequence *control = NULL;
   LV2_Atom_Sequence *notify    = NULL;
@@ -583,6 +584,9 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   self->urid_stats =
     self->map->map(self->map->handle, "http://deimos.ca/neuralblender#Stats");
 
+  self->urid_calib_target_db =
+    self->map->map(self->map->handle, "http://deimos.ca/neuralblender#CalibTargetDb");
+
   self->blender.meter_in = &self->meter_in;
   for (int i = 0; i < NB_NUM_MODELS; i++)
     self->blender.meters_out [i] = &self->meters_out [i];
@@ -817,6 +821,21 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 
       LV2_URID prop =
         ((const LV2_Atom_URID *) property)->body;
+
+      if (prop == self->urid_calib_target_db) {
+        if (value->type == self->urid_atom_Float) {
+          const float db = ((const LV2_Atom_Float *) value)->body;
+          self->blender.set_calib_target_db (db);
+
+          for (i = 0; i < NB_NUM_MODELS; i++) {
+            const bool enabled =
+              self->calibrate [i] && *self->calibrate [i] >= 0.5f;
+            if (enabled)
+              request_calibrate (self, i, true);
+          }
+        }
+        continue;
+      }
 
       if (value->type != self->urid_atom_Path &&
           value->type != self->urid_atom_String)
