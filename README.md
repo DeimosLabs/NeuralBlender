@@ -8,6 +8,8 @@ Features:
   - Can load up to 4 models simultaneously 
   - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
   - VU meters can be disabled to save (a tiny bit of) DSP load
+  - Model calibration
+  - Calibration target dB is now a user setting
   - Each model slot / lane has:
     - input gain
     - output gain
@@ -17,7 +19,7 @@ Features:
 
 On my Intel Core7 ultra, it loads 4 models in the middle of a busy live session, 64 sample buffers / 3 periods, and DSP load typically stays below 50%, no xruns. (with DSP threads pinned to p-cores)
 
-Features considered for future versions: VST plugin, series mode(s), user-defined calibration target dB, optionally more than 4 lanes, impulse response / convolution, etc...
+Features considered for future versions: VST plugin, series mode(s), optionally more than 4 lanes, impulse response / convolution, etc...
 
 ![NeuralBlender custom UI](data/screenshot-ui.png)
 ![NeuralBlender in Ardour](data/screenshot-ardour.png)
