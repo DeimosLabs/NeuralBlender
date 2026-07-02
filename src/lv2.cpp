@@ -825,13 +825,18 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       if (prop == self->urid_calib_target_db) {
         if (value->type == self->urid_atom_Float) {
           const float db = ((const LV2_Atom_Float *) value)->body;
+          const float old_db = self->blender.amps [0].calib_target_db;
           self->blender.set_calib_target_db (db);
+          const bool changed =
+            self->blender.amps [0].calib_target_db != old_db;
 
-          for (i = 0; i < NB_NUM_MODELS; i++) {
-            const bool enabled =
-              self->calibrate [i] && *self->calibrate [i] >= 0.5f;
-            if (enabled)
-              request_calibrate (self, i, true);
+          if (changed) {
+            for (i = 0; i < NB_NUM_MODELS; i++) {
+              const bool enabled =
+                self->calibrate [i] && *self->calibrate [i] >= 0.5f;
+              if (enabled)
+                request_calibrate (self, i, true);
+            }
           }
         }
         continue;
