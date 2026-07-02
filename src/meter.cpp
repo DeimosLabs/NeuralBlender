@@ -149,10 +149,10 @@ bool c_vudata::update () {
     const float abs_l = std::max (std::fabs (plus_l), std::fabs (minus_l));
     const float abs_r = std::max (std::fabs (plus_r), std::fabs (minus_r));
 
-    const float old_l = m_l.load ();
-    const float old_r = m_r.load ();
-    const float shown_l = db_scaled (old_l);
-    const float shown_r = db_scaled (old_r);
+    const float old_l = m_display_l.load ();
+    const float old_r = m_display_r.load ();
+    const float shown_l = old_l;
+    const float shown_r = old_r;
     const float target_l = db_scaled (abs_l);
     const float target_r = db_scaled (abs_r);
     const float next_l = target_l >= shown_l
@@ -161,14 +161,14 @@ bool c_vudata::update () {
     const float next_r = target_r >= shown_r
       ? target_r
       : std::max (target_r, shown_r - VU_FALL_SPEED);
-    const float level_l = display_to_linear (next_l);
-    const float level_r = display_to_linear (next_r);
 
-    if (level_l != old_l || level_r != old_r)
+    if (next_l != old_l || next_r != old_r)
       changed = true;
 
-    m_l.store (level_l);
-    m_r.store (level_r);
+    m_l.store (abs_l);
+    m_r.store (abs_r);
+    m_display_l.store (next_l);
+    m_display_r.store (next_r);
 
     if (now - m_timestamp_hold_l > peak_hold_frames)
       m_peak_l.store (0.0f);
@@ -226,6 +226,7 @@ void c_vudata::set_db_scale (float db) {
 
 void c_vudata::set_l (float level, float hold, bool clip, bool xrun) {
   m_l.store (std::max (0.0f, level));
+  m_display_l.store (db_scaled (level));
   m_peak_l.store (std::max (0.0f, hold));
   clip_l.store (clip);
   xrun_l.store (xrun);
@@ -234,6 +235,7 @@ void c_vudata::set_l (float level, float hold, bool clip, bool xrun) {
 
 void c_vudata::set_r (float level, float hold, bool clip, bool xrun) {
   m_r.store (std::max (0.0f, level));
+  m_display_r.store (db_scaled (level));
   m_peak_r.store (std::max (0.0f, hold));
   clip_r.store (clip);
   xrun_r.store (xrun);
@@ -241,11 +243,11 @@ void c_vudata::set_r (float level, float hold, bool clip, bool xrun) {
 }
 
 float c_vudata::l () const {
-  return db_scaled (m_l.load ());
+  return m_display_l.load ();
 }
 
 float c_vudata::r () const {
-  return db_scaled (m_r.load ());
+  return m_display_r.load ();
 }
 
 float c_vudata::peak_l () const {

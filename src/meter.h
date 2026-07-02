@@ -80,6 +80,8 @@ private:
 
   std::atomic<float> m_l { 0.0f };
   std::atomic<float> m_r { 0.0f };
+  std::atomic<float> m_display_l { 0.0f };
+  std::atomic<float> m_display_r { 0.0f };
   std::atomic<float> m_peak_l { 0.0f };
   std::atomic<float> m_peak_r { 0.0f };
   std::atomic<float> m_db_scale { DEFAULT_VU_DB };
