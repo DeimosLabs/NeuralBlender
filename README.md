@@ -10,6 +10,7 @@ Features:
   - VU meters can be disabled to save (a tiny bit of) DSP load
   - Calibration target dB is now a user setting
   - "Linked" calibration mode follows loudest model which has calib. enabled
+  - Calibration can be tuned for guitar or bass
   - Each model slot / lane has:
     - input gain
     - output gain
