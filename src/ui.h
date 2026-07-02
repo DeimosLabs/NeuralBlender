@@ -189,6 +189,7 @@ public:
           void on_prefs_ok ()                                     ;
   virtual void apply_prefs (t_prefs &p)                            ;
   virtual void write_prefs_to (t_prefs &p)                          ;
+          void apply_ui_prefs (t_prefs &p)                          ;
 	  
   Display *display = NULL;
   Window window;

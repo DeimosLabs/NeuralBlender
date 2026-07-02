@@ -612,7 +612,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
     blender->meter_in = &vudata_in;
   }
 
-  apply_prefs (prefs);
+  apply_ui_prefs (prefs);
   
   //if (state.showadvanced) {
   //  show_advanced_settings ();
@@ -755,7 +755,7 @@ void c_neuralblender_ui::on_prefs () {
 void c_neuralblender_ui::on_prefs_ok () {
 }
 
-void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
+void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
   const float scale_db = p.vu_scale_db <= 0.0f ? p.vu_scale_db : DEFAULT_VU_DB;
   const float headroom_db = std::clamp (p.vu_headroom_db, 0.0f, 12.0f);
 
@@ -772,6 +772,10 @@ void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
   }
 
   vu_on (p.vu_on);
+}
+
+void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
+  apply_ui_prefs (p);
   write_prefs_to_config (configfile, p);
 }
 
