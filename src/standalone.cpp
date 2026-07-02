@@ -95,6 +95,8 @@ public:
   //void on_excl (c_widget *w, int which);
   void on_bypass (c_widget *w, bool b);
   void on_about (c_widget *w);
+  void apply_prefs (t_prefs &p) override;
+  void write_prefs_to (t_prefs &p) override;
   void apply_effective_controls () override;
 };
 
@@ -219,6 +221,23 @@ void c_standalone_ui::on_about (c_widget *w) {
   debug ("lane %d", w->lane);
 }
 
+void c_standalone_ui::apply_prefs (t_prefs &p) {
+  if (blender)
+    blender->set_calib_target_db (p.calib_target_db);
+
+  c_neuralblender_ui::apply_prefs (p);
+
+  if (blender)
+    blender->do_vu = p.vu_on;
+}
+
+void c_standalone_ui::write_prefs_to (t_prefs &p) {
+  c_neuralblender_ui::write_prefs_to (p);
+
+  if (blender)
+    p.calib_target_db = blender->amps [0].calib_target_db;
+}
+
 void c_standalone_ui::apply_effective_controls () {
   if (!blender)
     return;
@@ -248,6 +267,7 @@ static c_standalone_ui g_ui (&g_blender);
 static void ui_main () {
   fprintf (stderr, "Creating UI...\n");
   g_ui.create (0);        // no LV2 parent, so root/toplevel
+  g_ui.apply_prefs (g_ui.prefs);
   c_neuralblender_state state;
   g_blender.get_state (state);
   if (g_ui.calib_default) {

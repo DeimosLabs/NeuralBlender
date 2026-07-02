@@ -490,8 +490,6 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   configfile.read_file ();
   read_prefs_from_config (configfile, prefs);
   state.do_vu = prefs.vu_on;
-  if (blender)
-    blender->set_calib_target_db (prefs.calib_target_db);
   
   if (configfile.istrue (CONFIG_KEY_NAME_ADV)) {
     CP
@@ -699,17 +697,11 @@ void c_neuralblender_ui::on_prefs_ok () {
 }
 
 void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
-  if (blender)
-    blender->set_calib_target_db (p.calib_target_db);
-
   vu_on (p.vu_on);
   write_prefs_to_config (configfile, p);
 }
 
 void c_neuralblender_ui::write_prefs_to (t_prefs &p) { CP
-  if (blender)
-    p.calib_target_db = blender->amps [0].calib_target_db;
-
   p.vu_on = state.do_vu;
 }
 

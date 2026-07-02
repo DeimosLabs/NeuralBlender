@@ -182,8 +182,8 @@ public:
           void on_about ()                                        ;
           void on_prefs ()                                        ;
           void on_prefs_ok ()                                     ;
-          void apply_prefs (t_prefs &p)                           ;
-          void write_prefs_to (t_prefs &p)                         ;
+  virtual void apply_prefs (t_prefs &p)                            ;
+  virtual void write_prefs_to (t_prefs &p)                          ;
 	  
   Display *display = NULL;
   Window window;
