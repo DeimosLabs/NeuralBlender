@@ -1245,12 +1245,12 @@ bool c_textbox::on_keydown (XKeyEvent *key) { CP
   bool changed = false;
 
   switch (key_mapping (widget->app->dpy, key)) {
-    case 10: // Return
+    case 10: // return
       on_change (value);
       expose_widget (widget);
       return true;
-
-    case 11: { // Backspace
+    
+    case 11: { // backspace
       const size_t prev = utf8_prev_pos (value, cursor);
       if (prev < cursor) {
         value.erase (prev, cursor - prev);
@@ -1260,12 +1260,16 @@ bool c_textbox::on_keydown (XKeyEvent *key) { CP
     } break;
 
     default: {
+      
       char buf [32] = {};
       if (os_get_keyboard_input (widget, key, buf, sizeof (buf) - 1) && buf [0]) {
-        cursor = std::min (cursor, value.size ());
-        value.insert (cursor, buf);
-        cursor += strlen (buf);
-        changed = true;
+        //debug ("buf [0]=%d", (int) buf [0]);
+        if (buf [0] >= 32) {
+          cursor = std::min (cursor, value.size ());
+          value.insert (cursor, buf);
+          cursor += strlen (buf);
+          changed = true;
+        }
       }
     } break;
   }

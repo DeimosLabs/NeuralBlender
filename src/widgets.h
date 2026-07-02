@@ -286,7 +286,7 @@ public:
   bool set_text (const char *s);
   const std::string &text () const;
 
-  virtual void on_change(const std::string &s);
+  virtual void on_change (const std::string &s);
   bool on_keydown (XKeyEvent *key) override;
 
   static void cb_draw (void *w, void *user_data);
