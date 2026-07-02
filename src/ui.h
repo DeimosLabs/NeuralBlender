@@ -48,7 +48,7 @@ typedef struct {
   float vu_headroom_db  = 6.0f;
   bool vu_on = true;
   bool linked_calib = false;
-  bool calib_bass = false;
+  int calib_source = 0; // 0=guitar, 1=bass
 } t_prefs;
 
 bool read_prefs_from_config  (c_configfile &configfile, t_prefs &prefs);

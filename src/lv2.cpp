@@ -79,11 +79,12 @@ enum {
   PORT_D_CALIBRATE,
 
   PORT_CONTROL,
-  PORT_NOTIFY,
-  PORT_VU_ENABLE,
-  PORT_MUTE_ALL,
-  PORT_EXCLUSIVE_LANE,
-  PORT_LINKED_CALIB
+	  PORT_NOTIFY,
+	  PORT_VU_ENABLE,
+	  PORT_MUTE_ALL,
+	  PORT_EXCLUSIVE_LANE,
+	  PORT_LINKED_CALIB,
+	  PORT_CALIB_SOURCE
 };
 
 typedef struct {
@@ -100,9 +101,10 @@ typedef struct {
   const float *calibrate    [NB_NUM_MODELS] = { NULL };
   const float *bypass       = NULL;
   const float *vu_enable    = NULL;
-  const float *mute_all     = NULL;
-  const float *exclusive_lane = NULL;
-  const float *linked_calib = NULL;
+	  const float *mute_all     = NULL;
+	  const float *exclusive_lane = NULL;
+	  const float *linked_calib = NULL;
+	  const float *calib_source = NULL;
   
   float last_delay          [NB_NUM_MODELS] = { 0.0 };
   float last_gain_in_db     [NB_NUM_MODELS] = { 0.0 };
@@ -112,9 +114,10 @@ typedef struct {
   float last_calibrate      [NB_NUM_MODELS] = { 0.0 };
   float last_bypass         = 1.0;
   float last_vu_enable      = 1.0;
-  float last_mute_all       = 0.0;
-  float last_exclusive_lane = 0.0;
-  float last_linked_calib   = 0.0;
+	  float last_mute_all       = 0.0;
+	  float last_exclusive_lane = 0.0;
+	  float last_linked_calib   = 0.0;
+	  float last_calib_source   = 0.0;
   bool base_lane_mute [NB_NUM_MODELS] = { false };
   bool host_bypass = false;
 
@@ -141,7 +144,7 @@ typedef struct {
   LV2_URID urid_meters         = 0;
   LV2_URID urid_stats          = 0;
   LV2_URID urid_calib_target_db = 0;
-  LV2_URID urid_calib_bass     = 0;
+	  LV2_URID urid_calib_bass     = 0; // legacy restore compatibility
   LV2_URID urid_atom_URID      = 0;
   const LV2_Atom_Sequence *control = NULL;
   LV2_Atom_Sequence *notify    = NULL;
@@ -167,7 +170,6 @@ typedef struct {
   LV2_Atom_Forge forge;
   LV2_URID urid_atom_Sequence  = 0;
   bool notify_path [NB_NUM_MODELS] = { false };
-  bool notify_calib_bass = false;
   std::string current_path [NB_NUM_MODELS];
   bool restored_from_state = false;
   
@@ -206,9 +208,9 @@ static void run_calibration (Plugin *self, size_t which, bool enabled) {
   self->blender.calib_on (which, enabled);
 
   if (self->blender.linked_calib)
-    self->blender.calibrate_linked (self->blender.calib_bass);
+    self->blender.calibrate_linked (self->blender.calib_source == 1);
   else
-    self->blender.calibrate (which, self->blender.calib_bass);
+    self->blender.calibrate (which, self->blender.calib_source == 1);
 
   self->stats_dirty.store (true, std::memory_order_release);
 }
@@ -217,7 +219,7 @@ static void run_linked_calibration (Plugin *self) {
   if (!self)
     return;
 
-  self->blender.calibrate_linked (self->blender.calib_bass);
+  self->blender.calibrate_linked (self->blender.calib_source == 1);
   self->stats_dirty.store (true, std::memory_order_release);
 }
 
@@ -435,15 +437,6 @@ static LV2_State_Status save (
 	      if (abstract_path && free_path && free_path->free_path)
 	        free_path->free_path (free_path->handle, abstract_path);
 			    }
-	    {
-	      const int32_t calib_bass = self->blender.calib_bass ? 1 : 0;
-	      store (handle,
-	             self->urid_calib_bass,
-	             &calib_bass,
-	             sizeof (calib_bass),
-	             self->urid_atom_Int,
-	             LV2_STATE_IS_POD);
-	    }
 	    return LV2_STATE_SUCCESS;
 	}
 
@@ -470,10 +463,9 @@ static LV2_State_Status restore (
 	                &type,
 	                &valflags);
 	    if (calib_bass && type == self->urid_atom_Int &&
-	        size >= sizeof (int32_t)) {
-	      self->blender.calib_bass =
-	        (*(const int32_t *) calib_bass) != 0;
-	    }
+	        size >= sizeof (int32_t))
+	      self->blender.calib_source =
+	        (*(const int32_t *) calib_bass) != 0 ? 1 : 0;
 	    self->restored_from_state = true;
 
 		    for (int i = 0; i < NB_NUM_MODELS; i++) {
@@ -822,11 +814,15 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
       self->exclusive_lane = (const float *) data;
     break;
 
-    case PORT_LINKED_CALIB:
-      self->linked_calib = (const float *) data;
-    break;
-  }
-}
+	    case PORT_LINKED_CALIB:
+	      self->linked_calib = (const float *) data;
+	    break;
+
+	    case PORT_CALIB_SOURCE:
+	      self->calib_source = (const float *) data;
+	    break;
+	  }
+	}
 
 static void activate (LV2_Handle instance) {
   Plugin *self = (Plugin *) instance;
@@ -873,19 +869,9 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	    if (sent_stats_notify)
 	      forge_stats_notify (self);
 
-	    bool sent_calib_bass_notify = false;
-	    if (!sent_path_notify && !sent_stats_notify && self->notify_calib_bass) {
-	      forge_int_notify (
-	        self,
-	        self->urid_calib_bass,
-	        self->blender.calib_bass ? 1 : 0);
-	      self->notify_calib_bass = false;
-	      sent_calib_bass_notify = true;
-	    }
-	
 	    const uint32_t meter_interval =
 	      (uint32_t) (self->samplerate > 0.0 ? self->samplerate / LV2_METER_FPS : 1600.0);
-	    if (!sent_path_notify && !sent_stats_notify && !sent_calib_bass_notify &&
+	    if (!sent_path_notify && !sent_stats_notify &&
 	        self->meter_notify_samples >= meter_interval) {
       forge_meter_notify (self);
       self->meter_notify_samples = 0;
@@ -902,8 +888,6 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	      if (obj->body.otype == self->urid_patch_Get) {
 	        for (i = 0; i < NB_NUM_MODELS; i++)
 	          self->notify_path [i] = true;
-	        if (!self->restored_from_state)
-	          self->notify_calib_bass = true;
 	        self->restored_from_state = false;
 	        self->stats_dirty.store (true, std::memory_order_release);
 	
@@ -951,31 +935,6 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	                request_calibrate (self, i, true);
 	          }
 	        }
-	        }
-	        continue;
-	      }
-
-	      if (prop == self->urid_calib_bass) {
-	        if (value->type == self->urid_atom_Int) {
-	          const bool bass =
-	            ((const LV2_Atom_Int *) value)->body != 0;
-	          const bool changed = self->blender.calib_bass != bass;
-	          if (!changed)
-	            continue;
-
-	          self->blender.calib_bass = bass;
-	          self->notify_calib_bass = true;
-	
-	          if (self->blender.linked_calib) {
-	            request_calibrate_linked (self);
-	          } else {
-	            for (i = 0; i < NB_NUM_MODELS; i++) {
-	              const bool enabled =
-	                self->calibrate [i] && *self->calibrate [i] >= 0.5f;
-	              if (enabled)
-	                request_calibrate (self, i, true);
-	            }
-	          }
 	        }
 	        continue;
 	      }
@@ -1057,8 +1016,28 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	      }
 	    }
 	  }
-  
-  // check all parameters
+
+	  if (self->calib_source) {
+	    float v = *self->calib_source;
+	    if (v < 0.0f)
+	      v = 0.0f;
+	    if (v != self->last_calib_source) { CP
+	      self->last_calib_source = v;
+	      self->blender.calib_source = (int) lrintf (v);
+	      if (self->blender.linked_calib) {
+	        request_calibrate_linked (self);
+	      } else {
+	        for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+	          const bool enabled =
+	            self->calibrate [i] && *self->calibrate [i] >= 0.5f;
+	          if (enabled)
+	            request_calibrate (self, i, true);
+	        }
+	      }
+	    }
+	  }
+	  
+	  // check all parameters
   for (i = 0; i < NB_NUM_MODELS; i++) {
     if (self->gain_in_db [i]) {
       const float v = *self->gain_in_db [i];

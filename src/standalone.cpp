@@ -111,9 +111,9 @@ bool c_standalone_ui::load_model (size_t which, const char *filename) {
   apply_effective_controls ();
   if (which < NB_NUM_MODELS) {
     if (blender->linked_calib)
-      blender->calibrate_linked (blender->calib_bass);
+      blender->calibrate_linked (blender->calib_source == 1);
     else
-      blender->calibrate (which, blender->calib_bass);
+      blender->calibrate (which, blender->calib_source == 1);
     stats [which * 2] = (float) blender->delays [which].frames ();
     for (size_t i = 0; i < NB_NUM_MODELS; ++i)
       stats [i * 2 + 1] = blender->amps [i].trim;
@@ -179,9 +179,9 @@ void c_standalone_ui::on_calibrate (c_widget *w, bool b) { CP
   apply_effective_controls ();
   
   if (g_blender.linked_calib)
-    g_blender.calibrate_linked (g_blender.calib_bass);
+    g_blender.calibrate_linked (g_blender.calib_source == 1);
   else
-    g_blender.calibrate (which, g_blender.calib_bass);
+    g_blender.calibrate (which, g_blender.calib_source == 1);
   for (size_t i = 0; i < NB_NUM_MODELS; i++) {
     stats [i * 2 + 1] = g_blender.amps [i].trim;
   }
@@ -234,7 +234,7 @@ void c_standalone_ui::apply_prefs (t_prefs &p) {
   if (blender)
     blender->linked_calib = p.linked_calib;
   if (blender)
-    blender->calib_bass = p.calib_bass;
+    blender->calib_source = p.calib_source;
 }
 
 void c_standalone_ui::write_prefs_to (t_prefs &p) {
@@ -245,7 +245,7 @@ void c_standalone_ui::write_prefs_to (t_prefs &p) {
   if (blender)
     p.linked_calib = blender->linked_calib;
   if (blender)
-    p.calib_bass = blender->calib_bass;
+    p.calib_source = blender->calib_source;
 }
 
 void c_standalone_ui::apply_effective_controls () {

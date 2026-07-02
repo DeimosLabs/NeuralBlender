@@ -7,8 +7,8 @@ Features:
   - Standalone app and LV2 plugin
   - Can load up to 4 models simultaneously 
   - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
-  - VU meters can be disabled to save (a tiny bit of) DSP load
-  - Calibration target dB is now a user setting
+  - VU meters can be disabled (global setting) to save a tiny bit of DSP load
+  - Calibration target dB is now a user (global) setting
   - "Linked" calibration mode follows loudest model which has calib. enabled
   - Calibration can be tuned for guitar or bass
   - Each model slot / lane has:

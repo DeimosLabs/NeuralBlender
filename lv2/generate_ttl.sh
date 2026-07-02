@@ -24,8 +24,8 @@ echo -n "$0 cwd:"; pwd -P
 for file in *.ttl.in; do
   echo "$file -> $destdir/lv2/${file%.in}"
   if [ "$include_ui" = 1 ]; then
-    cat "$file" | sed 's,^@@UI,,' > "$destdir/lv2/${file%.in}"
+    sed 's,^[[:space:]]*@@UI,,' "$file" > "$destdir/lv2/${file%.in}"
   else
-    cat "$file" | grep -v '^@@UI' > "$destdir/lv2/${file%.in}"
+    grep -v '^[[:space:]]*@@UI' "$file" > "$destdir/lv2/${file%.in}"
   fi
 done

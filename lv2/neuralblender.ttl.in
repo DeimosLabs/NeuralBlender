@@ -40,11 +40,6 @@ nb:CalibTargetDb
     rdfs:label "Calibration target dB" ;
     rdfs:range atom:Float .
 
-nb:CalibBass
-    a lv2:Parameter ;
-    rdfs:label "Bass calibration" ;
-    rdfs:range atom:Int .
-		    
 <http://deimos.ca/neuralblender>
     a lv2:Plugin ,
       lv2:AmplifierPlugin ;
@@ -57,14 +52,12 @@ nb:CalibBass
 	                   nb:ModelB ,
 	                   nb:ModelC ,
 	                   nb:ModelD ,
-	                   nb:CalibTargetDb ,
-	                   nb:CalibBass ;
+	                   nb:CalibTargetDb ;
 	    patch:writable nb:ModelA ,
 	                   nb:ModelB ,
 	                   nb:ModelC ,
 	                   nb:ModelD ,
-	                   nb:CalibTargetDb ,
-	                   nb:CalibBass ;
+	                   nb:CalibTargetDb ;
     
     doap:name "NeuralBlender" ;
     doap:developer [
@@ -380,9 +373,19 @@ nb:CalibBass
           lv2:ControlPort ;
         lv2:index 32 ;
         lv2:symbol "linked_calib" ;
-        lv2:name "Linked Calibration" ;
-        lv2:default 0 ;
-        lv2:minimum 0 ;
-        lv2:maximum 1 ;
-        lv2:portProperty lv2:toggled
-    ].
+	        lv2:name "Linked Calibration" ;
+	        lv2:default 0 ;
+	        lv2:minimum 0 ;
+	        lv2:maximum 1 ;
+	        lv2:portProperty lv2:toggled
+	    ] , [
+	        a lv2:InputPort ,
+	          lv2:ControlPort ;
+	        lv2:index 33 ;
+	        lv2:symbol "calib_source" ;
+	        lv2:name "Calibration Source" ;
+	        lv2:default 0 ;
+	        lv2:minimum 0 ;
+	        lv2:maximum 1 ;
+	        lv2:portProperty lv2:integer
+	    ].

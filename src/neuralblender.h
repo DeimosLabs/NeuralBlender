@@ -191,7 +191,7 @@ public:
   bool do_vu = true;
   bool mute_all = false;
   bool linked_calib = false;
-  bool calib_bass = false;
+  int calib_source = 0; // 0=guitar, 1=bass
 
 private:
   void update_mutes ();

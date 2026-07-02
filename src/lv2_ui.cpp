@@ -74,9 +74,10 @@ enum {
   PORT_CONTROL,
   PORT_NOTIFY,
   PORT_VU_ENABLE,
-  PORT_MUTE_ALL,
-  PORT_EXCLUSIVE_LANE,
-  PORT_LINKED_CALIB
+	  PORT_MUTE_ALL,
+	  PORT_EXCLUSIVE_LANE,
+	  PORT_LINKED_CALIB,
+	  PORT_CALIB_SOURCE
 };
 
 class c_lv2_ui : public c_neuralblender_ui {
@@ -100,7 +101,6 @@ public:
   LV2_URID urid_meters = 0;
 	  LV2_URID urid_stats = 0;
 	  LV2_URID urid_calib_target_db = 0;
-	  LV2_URID urid_calib_bass = 0;
   LV2UI_Port_Subscribe *subscribe = NULL;
   LV2UI_Resize *resize = NULL;
   bool updating_from_host = false;
@@ -238,7 +238,7 @@ public:
 	    c_neuralblender_ui::apply_prefs (p);
 	    write_control (PORT_LINKED_CALIB, p.linked_calib ? 1.0f : 0.0f);
 	    write_float_property (urid_calib_target_db, p.calib_target_db);
-	    write_int_property (urid_calib_bass, p.calib_bass ? 1 : 0);
+	    write_control (PORT_CALIB_SOURCE, (float) p.calib_source);
 	  }
 
   bool request_window_size (int w, int h) {
@@ -307,15 +307,27 @@ public:
       return;
     }
 
-    if (port == PORT_LINKED_CALIB) {
-      prefs.linked_calib = value >= 0.5f;
-      btn_vu.set_value (prefs.linked_calib);
-      if (prefswindow.widget)
-        prefswindow.btn_linkcalib.set_value (prefs.linked_calib);
-      updating_from_state = old_updating_from_state;
-      updating_from_host = false;
-      return;
-    }
+	    if (port == PORT_LINKED_CALIB) {
+	      prefs.linked_calib = value >= 0.5f;
+	      btn_vu.set_value (prefs.linked_calib);
+	      if (prefswindow.widget)
+	        prefswindow.btn_linkcalib.set_value (prefs.linked_calib);
+	      updating_from_state = old_updating_from_state;
+	      updating_from_host = false;
+	      return;
+	    }
+
+	    if (port == PORT_CALIB_SOURCE) {
+	      int source = (int) lrintf (value);
+	      if (source < 0)
+	        source = 0;
+	      prefs.calib_source = source;
+	      if (prefswindow.widget)
+	        prefswindow.btn_bass.set_value (prefs.calib_source == 1);
+	      updating_from_state = old_updating_from_state;
+	      updating_from_host = false;
+	      return;
+	    }
 
     for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
       const uint32_t base = PORT_A_GAIN_IN + (uint32_t) lane * 6;
@@ -492,15 +504,6 @@ public:
 	      return;
 	    }
 
-	    if (prop == urid_calib_bass) {
-	      if (value->type == urid_atom_Int) {
-	        prefs.calib_bass = ((const LV2_Atom_Int *) value)->body != 0;
-	        if (prefswindow.widget)
-	          prefswindow.btn_bass.set_value (prefs.calib_bass);
-	      }
-	      return;
-	    }
-	
 	    if (value->type != urid_atom_Path &&
         value->type != urid_atom_String)
       return;
@@ -517,9 +520,10 @@ public:
       subscribe->subscribe (subscribe->handle, port, 0, NULL);
     subscribe->subscribe (subscribe->handle, PORT_VU_ENABLE, 0, NULL);
     subscribe->subscribe (subscribe->handle, PORT_MUTE_ALL, 0, NULL);
-    subscribe->subscribe (subscribe->handle, PORT_EXCLUSIVE_LANE, 0, NULL);
-    subscribe->subscribe (subscribe->handle, PORT_LINKED_CALIB, 0, NULL);
-  }
+	    subscribe->subscribe (subscribe->handle, PORT_EXCLUSIVE_LANE, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_LINKED_CALIB, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_CALIB_SOURCE, 0, NULL);
+	  }
 };
 
 static LV2UI_Handle instantiate (
@@ -574,8 +578,6 @@ static LV2UI_Handle instantiate (
 	    ui->urid_stats = ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#Stats");
 	    ui->urid_calib_target_db =
 	      ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#CalibTargetDb");
-	    ui->urid_calib_bass =
-	      ui->map->map (ui->map->handle, "http://deimos.ca/neuralblender#CalibBass");
 		  }
 
   if (!ui->create (parent)) {

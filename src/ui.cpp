@@ -125,7 +125,7 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
     return;
   
   int default_w = 550;
-  int default_h = 400;
+  int default_h = 450;
   
   if (!c_toplevelwindow::create (
       ui,
@@ -231,7 +231,7 @@ void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
 
   btn_vu.set_value (prefs.vu_on);
   btn_linkcalib.set_value (prefs.linked_calib);
-  btn_bass.set_value (prefs.calib_bass);
+  btn_bass.set_value (prefs.calib_source == 1);
 }
 
 void c_prefswindow::set_prefs_to (t_prefs &prefs) {
@@ -250,7 +250,7 @@ void c_prefswindow::set_prefs_to (t_prefs &prefs) {
 
   prefs.vu_on = btn_vu.value;
   prefs.linked_calib = btn_linkcalib.value;
-  prefs.calib_bass = btn_bass.value;
+  prefs.calib_source = btn_bass.value ? 1 : 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1128,7 +1128,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
       widget_hide (lanes [i].btn_excl.widget);
     }
   }
-  if (exclusive_on) {
+  if (exclusive_on && !state.mute_all) {
     //lanes [state.exclusive_lane - 1].lane_widget.set_fg_color (0.1, 0.4, 0.4);
     lanes [state.exclusive_lane - 1].lane_widget.set_state (WSTATE_SELECTED);
   }
