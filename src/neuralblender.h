@@ -42,13 +42,17 @@
 #undef min
 #endif
 
-#define NB_NUM_MODELS    4
+#define NB_NUM_MODELS            4
 
-#define MAX_DELAY_MS     30
-#define MAX_DELAY_FRAMES (MAX_DELAY_MS * 192)
-#define MAX_BLOCK_SIZE   8192
-#define DB_SILENCE       -120
-#define DB_CALIB_TARGET  -12
+#define MAX_DELAY_MS             30
+#define MAX_DELAY_FRAMES         (MAX_DELAY_MS * 192)
+#define MAX_BLOCK_SIZE           8192
+#define DB_SILENCE               -120.0f
+#define DB_CALIB_TARGET_DEFAULT  -12.0f
+#define GAIN_DB_MIN              -40.0f
+#define GAIN_DB_MAX              40.0f
+#define CALIB_TARGET_DB_MIN      -40.0f
+#define CALIB_TARGET_DB_MAX      0.0f
 
 enum _engine_mode {
   ENGINE_NONE,
@@ -126,15 +130,16 @@ public:
   std::string model_filename () const;
   std::atomic<float> trim { 1.0f };
 
-  std::string filename     = "";
-  float       gain_in      = 1.0f;
-  float       gain_out     = 1.0f;
-  uint32_t    samplerate   = 48000;
-  uint32_t    blocksize    = -1;
-  std::atomic<bool> mute   { false };
-  int         warmup       = 5;
-  bool        dcflip       = false;
-  bool        do_calib     = false;
+  std::string filename        = "";
+  float       gain_in         = 1.0f;
+  float       gain_out        = 1.0f;
+  float       calib_target_db = DB_CALIB_TARGET_DEFAULT;
+  uint32_t    samplerate      = 48000;
+  uint32_t    blocksize       = -1;
+  std::atomic<bool> mute      { false };
+  int         warmup          = 5;
+  bool        dcflip          = false;
+  bool        do_calib        = false;
 
 private:
   void reset_unlocked ();
@@ -173,6 +178,7 @@ public:
   bool calib_on (size_t which, bool b);
   bool is_dcflipped (size_t which);
   bool is_calib_on (size_t which);
+  bool set_calib_target_db (float f);
   
   static void get_calib_data (std::vector<float> &v);
 

@@ -19,7 +19,9 @@ enum _widget_role {
   ROLE_NONE,
   ROLE_ABOUT,
   ROLE_ABOUTOK,
-  ROLE_UNKNOWN,
+  ROLE_PREFS,
+  ROLE_PREFSOK,
+  ROLE_PREFSCANCEL,
   ROLE_MUTE,
   ROLE_MUTEALL,
   ROLE_BROWSE,
@@ -35,7 +37,8 @@ enum _widget_role {
   ROLE_ADV_TOGGLE,
   ROLE_EXCL_USE,
   ROLE_BYPASS,
-  ROLE_MASTER
+  ROLE_MASTER,
+  ROLE_UNKNOWN
 };
 
 enum _widget_style {
@@ -125,6 +128,11 @@ public:
   virtual void move (int x, int y);
   virtual void resize (int w, int h);
   virtual bool set_label (const char *label);
+  // TODO: complete key event propagation/dispatch, widget focus etc.
+  virtual bool on_keydown (XKeyEvent *key);
+  virtual bool on_keyup (XKeyEvent *key);
+  void focus ();
+  void clear_focus ();
   
   void set_state (_widget_state state);
   static void draw_text_centered (Widget_t *w, 
@@ -152,6 +160,10 @@ public:
 
   inline void expose () { if (widget) expose_widget (widget); }
   
+  bool get_label_size (int *w, int *h, const char *text = NULL);
+  
+  // -1 for padding x/y means stay at that size
+  void resize_to_label (int padding_x = 16, int padding_y = -1);
   int x ();
   int y ();
   int w ();
@@ -164,26 +176,33 @@ public:
       c_neuralblender_ui *ui,
       Window parent,
       const char *title,
-      int x, int y, int w, int h);
+      int x, int y, int w, int h,
+      Widget_t *owner = NULL);
 
   void set_min_size_to_current ();
   void set_min_size (int w, int h);
   void show ();
   void hide ();
+  void auto_close (bool b = true);
   void set_title (const char *title);
   void set_icon_from_png (const unsigned char *png);
   bool request_size (int w, int h);
+  void set_focused_widget (c_widget *w);
+  void clear_focus ();
   
   virtual void on_expose ();
   virtual void on_resize ();
+  bool on_keydown (XKeyEvent *key) override;
   virtual void on_close ()  {};
   
   static void cb_expose (void *w, void *user_data);
   static void cb_resize (void *w, void *user_data);
+  static void cb_key_press (void *w, void *event, void *user_data);
   static void cb_close (void *w, void *user_data);
   
   Window window = 0;
   Window parent = 0;
+  c_widget *focused_widget = NULL;
 };
 
 class c_mainwindow : public c_toplevelwindow {
@@ -192,7 +211,8 @@ public:
       c_neuralblender_ui *ui,
       Window parent,
       const char *title,
-      int x, int y, int w, int h);
+      int x, int y, int w, int h,
+      Widget_t *owner = NULL);
 
   void on_resize () override;
 };
@@ -251,6 +271,26 @@ public:
 
   float textsize = 1.0;
   _textalign align = TEXT_LEFT;
+};
+
+class c_textbox : public c_widget {
+public:
+  void create (c_neuralblender_ui *ui, Widget_t *parent,
+              const char *label, int x, int y, int w, int h);
+
+  bool set_text (const char *s);
+  const std::string &text () const;
+
+  virtual void on_change(const std::string &s);
+  bool on_keydown (XKeyEvent *key) override;
+
+  static void cb_draw (void *w, void *user_data);
+  static void cb_button_press (void *w, void *event, void *user_data);
+  static void cb_key_press (void *w, void *event, void *user_data);
+
+  std::string value;
+  size_t cursor = 0;
+  bool focused = false;
 };
 
 class c_image : public c_widget {

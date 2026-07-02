@@ -236,13 +236,14 @@ static void path_rounded_rect (
   if (!cr || w <= 0.0 || h <= 0.0)
     return;
 
+  cairo_new_path (cr);
+
   r = std::clamp (r, 0.0, std::min (w, h) * 0.5);
   if (r <= 0.0) {
     cairo_rectangle (cr, x, y, w, h);
     return;
   }
 
-  cairo_new_path (cr);
   cairo_arc (cr, x + r,     y + r,     r, M_PI, 1.5 * M_PI);
   cairo_arc (cr, x + w - r, y + r,     r, 1.5 * M_PI, 0.0);
   cairo_arc (cr, x + w - r, y + h - r, r, 0.0, 0.5 * M_PI);
@@ -368,7 +369,7 @@ static void draw_checkbox (
   const int cx = x + 3;
   const int cy = y + (height - size) / 2;
 
-  fill_rounded_rect (w, x, y, width, height, 0.0f, g_colors->window_bg);
+  //fill_rounded_rect (w, x, y, width, height, 0.0f, g_colors->window_bg);
   fill_rounded_rect (w, cx, cy, size, size, UI_CHECKBOX_RADIUS, colors.bg);
   draw_rounded_rect (w, cx, cy, size, size, UI_CHECKBOX_RADIUS, colors.fg, 2.0f);
 
@@ -434,6 +435,18 @@ static c_toplevelwindow *toplevel_from_widget (void *w_) {
   return (c_toplevelwindow *) w->parent_struct;
 }
 
+static c_toplevelwindow *toplevel_from_child_widget (Widget_t *w) {
+  while (w && w->parent) {
+    Widget_t *parent_widget = (Widget_t *) w->parent;
+    if ((parent_widget->flags & IS_WINDOW) && parent_widget->parent_struct)
+      return (c_toplevelwindow *) parent_widget->parent_struct;
+
+    w = parent_widget;
+  }
+
+  return NULL;
+}
+
 uint64_t get_unique_id () {
   static uint64_t current = 1;
   return current++;
@@ -449,7 +462,7 @@ void c_toplevelwindow::cb_expose (void *w_, void *user_data) {
   window->on_expose ();
 }
 
-void c_toplevelwindow::cb_resize (void *w_, void *user_data) { CP
+void c_toplevelwindow::cb_resize (void *w_, void *user_data) {
   (void) user_data;
 
   c_toplevelwindow *window = toplevel_from_widget (w_);
@@ -457,6 +470,16 @@ void c_toplevelwindow::cb_resize (void *w_, void *user_data) { CP
     return;
 
   window->on_resize ();
+}
+
+void c_toplevelwindow::cb_key_press (void *w_, void *event, void *user_data) {
+  (void) user_data;
+
+  c_toplevelwindow *window = toplevel_from_widget (w_);
+  if (!window)
+    return;
+
+  window->on_keydown ((XKeyEvent *) event);
 }
 
 void c_toplevelwindow::cb_close (void *w_, void *user_data) { CP
@@ -486,6 +509,7 @@ void c_widget::create (
     return;
   }
   set_x11_window_background (widget, g_colors->window_bg);
+  widget->flags |= USE_TRANSPARENCY;
 
   // no callback func because it would overwrite the ones from
   // child widget classes if they call this func. after their own
@@ -503,6 +527,28 @@ bool c_widget::set_label (const char *label_) {
   widget->label = label.c_str ();
   expose ();
   return true;
+}
+
+bool c_widget::on_keydown (XKeyEvent *key) { CP
+  (void) key;
+  return false;
+}
+
+bool c_widget::on_keyup (XKeyEvent *key) { CP
+  (void) key;
+  return false;
+}
+
+void c_widget::focus () {
+  c_toplevelwindow *top = toplevel_from_child_widget (widget);
+  if (top)
+    top->set_focused_widget (this);
+}
+
+void c_widget::clear_focus () {
+  c_toplevelwindow *top = toplevel_from_child_widget (widget);
+  if (top)
+    top->clear_focus ();
 }
 
 void c_widget::set_state (_widget_state state_) {
@@ -539,6 +585,48 @@ void c_widget::draw_text_centered (Widget_t *w,
       (m.height - ext.height) * 0.5 - ext.y_bearing);
 
   cairo_show_text (w->crb, text);
+}
+
+bool c_widget::get_label_size (int *rw, int *rh, const char *text) {
+  if (rw) *rw = 0;
+  if (rh) *rh = 0;
+
+  if (!widget || !widget->crb || !widget->app)
+    return false;
+
+  const char *s = text ? text : label.c_str ();
+  if (!s)
+    s = "";
+
+  float fontsize = widget->app->normal_font / widget->scale.ascale;
+  fontsize *= text_size;
+
+  cairo_save (widget->crb);
+  cairo_set_font_size (widget->crb, fontsize);
+
+  cairo_text_extents_t ext;
+  cairo_text_extents (widget->crb, s, &ext);
+  cairo_restore (widget->crb);
+
+  if (rw)
+    *rw = (int) std::ceil (ext.width);
+  if (rh)
+    *rh = (int) std::ceil (ext.height);
+
+  return true;
+}
+
+// -1 for padding x/y means stay at that size
+void c_widget::resize_to_label (int padding_x, int padding_y) {
+  int lw, lh;
+  if (get_label_size (&lw, &lh)) {
+    if (padding_x < 0)
+      lw = w ();
+    if (padding_y < 0)
+      lh = h ();
+    
+    resize (lw + padding_x + 1, lh + padding_y + 1);
+  }
 }
 
 int c_widget::x () {
@@ -593,7 +681,8 @@ bool c_toplevelwindow::create (
     c_neuralblender_ui *ui_,
     Window parent_,
     const char *title_,
-    int x, int y, int w, int h) {
+    int x, int y, int w, int h,
+    Widget_t *owner) {
 
   id = get_unique_id ();
   label = title_ ? title_ : "";
@@ -616,9 +705,13 @@ bool c_toplevelwindow::create (
   widget->scale.gravity = NONE;
   widget->func.resize_notify_callback = c_toplevelwindow::cb_resize;
   widget->func.expose_callback = c_toplevelwindow::cb_expose;
+  widget->func.key_press_callback = c_toplevelwindow::cb_key_press;
   widget->func.unmap_notify_callback = c_toplevelwindow::cb_close;
 
   os_register_wm_delete_window (widget);
+  auto_close (true);
+  if (owner)
+    os_set_transient_for_hint (owner, widget);
   set_title (title_);
   set_x11_window_background (widget, get_colortheme ()->window_bg);
 
@@ -629,11 +722,13 @@ bool c_mainwindow::create (
     c_neuralblender_ui *ui_,
     Window parent_,
     const char *title_,
-    int x, int y, int w, int h) {
+    int x, int y, int w, int h,
+    Widget_t *owner) {
 
-  if (!c_toplevelwindow::create (ui_, parent_, title_, x, y, w, h))
+  if (!c_toplevelwindow::create (ui_, parent_, title_, x, y, w, h, owner))
     return false;
 
+  auto_close (false);
   ui_->window = window;
   return true;
 }
@@ -671,7 +766,18 @@ void c_toplevelwindow::hide () {
   if (!widget)
     return;
 
+  clear_focus ();
   widget_hide (widget);
+}
+
+void c_toplevelwindow::auto_close (bool b) {
+  if (!widget)
+    return;
+
+  if (b)
+    widget->flags |= HIDE_ON_DELETE;
+  else
+    widget->flags &= ~HIDE_ON_DELETE;
 }
 
 void c_toplevelwindow::set_title (const char *title_) {
@@ -701,6 +807,30 @@ bool c_toplevelwindow::request_size (int w, int h) {
   return true;
 }
 
+void c_toplevelwindow::set_focused_widget (c_widget *w) {
+  if (focused_widget == w)
+    return;
+
+  c_widget *old = focused_widget;
+  focused_widget = w;
+
+  if (widget && widget->app) {
+    if (focused_widget)
+      widget->app->key_snooper = widget;
+    else if (widget->app->key_snooper == widget)
+      widget->app->key_snooper = NULL;
+  }
+
+  if (old)
+    old->set_state (WSTATE_NORMAL);
+  if (focused_widget)
+    focused_widget->set_state (WSTATE_SELECTED);
+}
+
+void c_toplevelwindow::clear_focus () {
+  set_focused_widget (NULL);
+}
+
 void c_toplevelwindow::on_expose () {
   if (!widget)
     return;
@@ -715,6 +845,16 @@ void c_toplevelwindow::on_expose () {
 }
 
 void c_toplevelwindow::on_resize () { CP
+}
+
+bool c_toplevelwindow::on_keydown (XKeyEvent *key) { CP
+  if (!widget || !key)
+    return false;
+
+  if (!focused_widget)
+    return false;
+
+  return focused_widget->on_keydown (key);
 }
 
 void c_mainwindow::on_resize () { CP
@@ -938,6 +1078,211 @@ void c_label::cb_draw (void *w_, void *ptr) {
   cairo_new_path (w->crb);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// c_textbox
+
+static size_t utf8_prev_pos (const std::string &s, size_t pos) {
+  pos = std::min (pos, s.size ());
+  if (pos == 0)
+    return 0;
+
+  --pos;
+  while (pos > 0 && ((unsigned char) s [pos] & 0xC0) == 0x80)
+    --pos;
+
+  return pos;
+}
+
+void c_textbox::create (
+    c_neuralblender_ui *ui_,
+    Widget_t *parent,
+    const char *label_,
+    int x, int y, int w, int h) {
+
+  role = ROLE_UNKNOWN;
+  widget = create_widget (parent->app, parent, x, y, w, h);
+  if (!widget)
+    return;
+
+  widget->func.expose_callback = c_textbox::cb_draw;
+  widget->func.button_press_callback = c_textbox::cb_button_press;
+  //widget->flags |= USE_TRANSPARENCY;
+  widget->scale.gravity = NONE;
+  os_set_input_mask (widget);
+
+  wstyle = WSTYLE_BUTTON;
+  wstate = WSTATE_NORMAL;
+  c_widget::create (ui_, parent, label_, x, y, w, h);
+  set_text (label_);
+}
+
+bool c_textbox::set_text (const char *s) {
+  value = s ? s : "";
+  cursor = value.size ();
+  label = value;
+
+  if (widget) {
+    widget->label = label.c_str ();
+    expose ();
+  }
+
+  return true;
+}
+
+const std::string &c_textbox::text () const {
+  return value;
+}
+
+void c_textbox::on_change (const std::string &s) { CP
+  (void) s;
+  if (!widget)
+    return;
+  expose_widget (widget);
+}
+
+void c_textbox::cb_draw (void *w_, void *user_data) {
+  (void) user_data;
+
+  Widget_t *w = (Widget_t *) w_;
+  if (!w || !w->crb)
+    return;
+
+  c_textbox *self = (c_textbox *) w->parent_struct;
+  if (!self)
+    return;
+
+  Metrics_t metrics;
+  os_get_window_metrics (w, &metrics);
+  if (!metrics.visible)
+    return;
+    
+  // background and outline
+  const bool selected = self->wstate == WSTATE_SELECTED;
+  const t_statecolors &normal_colors = colors_for (WSTYLE_BUTTON, WSTATE_NORMAL);
+  const t_statecolors &textbox_colors = colors_for (WSTYLE_FRAME, WSTATE_NORMAL);
+  const t_statecolors &focus_colors = colors_for (WSTYLE_FRAME, WSTATE_SELECTED);
+
+  fill_rounded_rect (w, UI_BUTTON_RADIUS, textbox_colors.bg);
+  draw_rounded_rect (w, UI_BUTTON_RADIUS,
+                     selected ? focus_colors.fg : normal_colors.fg,
+                     selected ? 2.5f : 2.0f);
+
+  cairo_save (w->crb);
+  
+  const double pad = 8.0 * w->app->hdpi;
+  cairo_rectangle (
+      w->crb,
+      pad,
+      2.0 * w->app->hdpi,
+      std::max (0.0, metrics.width - pad * 2.0),
+      std::max (0.0, metrics.height - 4.0 * w->app->hdpi));
+  cairo_clip (w->crb);
+
+  cairo_set_source_rgba (
+      w->crb,
+      normal_colors.fg.r1,
+      normal_colors.fg.g1,
+      normal_colors.fg.b1,
+      normal_colors.fg.a1);
+  cairo_set_font_size (w->crb, w->app->normal_font / w->scale.ascale);
+
+  cairo_text_extents_t extents;
+  cairo_text_extents (w->crb, self->value.c_str (), &extents);
+
+  const double x = pad;
+  const double y = (metrics.height - extents.height) * 0.5 - extents.y_bearing;
+
+  cairo_move_to (w->crb, x, y);
+  cairo_show_text (w->crb, self->value.c_str ());
+  
+  // cursor/caret
+  if (selected) {
+    const std::string before_cursor = self->value.substr (
+        0, std::min (self->cursor, self->value.size ()));
+    cairo_text_extents_t cursor_extents;
+    cairo_text_extents (w->crb, before_cursor.c_str (), &cursor_extents);
+
+    const double cx = x + cursor_extents.x_advance + 1.0;
+    cairo_set_line_width (w->crb, 1.0);
+    //cairo_move_to (w->crb, cx, y + extents.y_bearing - 4);
+    //cairo_line_to (w->crb, cx, y + extents.y_bearing + extents.height + 5);
+    cairo_move_to (w->crb, cx, 10);
+    cairo_line_to (w->crb, cx, metrics.height - 10);
+    cairo_stroke (w->crb);
+  }
+
+  cairo_restore (w->crb);
+}
+
+void c_textbox::cb_button_press (void *w_, void *event, void *user_data) {
+  (void) event;
+  (void) user_data;
+
+  Widget_t *w = (Widget_t *) w_;
+  if (!w || !w->parent_struct)
+    return;
+
+  c_textbox *self = (c_textbox *) w->parent_struct;
+  self->focus ();
+}
+
+void c_textbox::cb_key_press (void *w_, void *event, void *user_data) {
+  (void) user_data;
+
+  Widget_t *w = (Widget_t *) w_;
+  XKeyEvent *key = (XKeyEvent *) event;
+  if (!w || !key || !w->parent_struct)
+    return;
+
+  c_textbox *self = (c_textbox *) w->parent_struct;
+  self->on_keydown (key);
+}
+
+bool c_textbox::on_keydown (XKeyEvent *key) { CP
+  if (!widget || !key)
+    return false;
+
+  bool changed = false;
+
+  switch (key_mapping (widget->app->dpy, key)) {
+    case 10: // Return
+      on_change (value);
+      expose_widget (widget);
+      return true;
+
+    case 11: { // Backspace
+      const size_t prev = utf8_prev_pos (value, cursor);
+      if (prev < cursor) {
+        value.erase (prev, cursor - prev);
+        cursor = prev;
+        changed = true;
+      }
+    } break;
+
+    default: {
+      char buf [32] = {};
+      if (os_get_keyboard_input (widget, key, buf, sizeof (buf) - 1) && buf [0]) {
+        cursor = std::min (cursor, value.size ());
+        value.insert (cursor, buf);
+        cursor += strlen (buf);
+        changed = true;
+      }
+    } break;
+  }
+
+  if (changed) {
+    label = value;
+    widget->label = label.c_str ();
+    on_change (value);
+  }
+
+  expose_widget (widget);
+  return changed;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// c_image
+
 void c_image::create (
     c_neuralblender_ui *ui,
     Widget_t *parent,
@@ -998,7 +1343,20 @@ static void button_double_click (void *w_, void *event, void *user_data) {
     adj_set_value (w->adj_y, 0.0);
   expose_widget (w);
   auto *b = (c_button *) w->parent_struct;
+  b->clear_focus ();
   b->on_mouseup ();
+}
+
+static void button_mouse_down (void *w_, void *event, void *user_data) {
+  (void) event;
+  (void) user_data;
+
+  auto *w = (Widget_t *) w_;
+  if (!w || !w->parent_struct)
+    return;
+
+  auto *b = (c_button *) w->parent_struct;
+  b->clear_focus ();
 }
 
 static void button_mouse_up (void *w_, void *event, void *user_data) {
@@ -1012,6 +1370,7 @@ static void button_mouse_up (void *w_, void *event, void *user_data) {
   expose_widget (w);
 
   auto *b = (c_button *) w->parent_struct;
+  b->clear_focus ();
   b->on_mouseup ();
 }
 
@@ -1032,9 +1391,9 @@ static void button_value_changed (void *w_, void *value_) {
   b->on_mouseup ();
 }
 
-c_button::c_button () { CP }
+c_button::c_button () { }
 
-c_button::~c_button () { CP
+c_button::~c_button () {
   if (img_off)        cairo_surface_destroy (img_off);
   if (img_on)         cairo_surface_destroy (img_on);
   if (img_hover)      cairo_surface_destroy (img_hover);
@@ -1084,7 +1443,8 @@ void c_button::create (
     break;
   }
 
-  widget->func.expose_callback = c_button::cb_draw;
+	  widget->func.expose_callback = c_button::cb_draw;
+  widget->func.button_press_callback = button_mouse_down;
   wstyle = style;
   
   c_widget::create (ui_, parent, label_, x, y, w, h);

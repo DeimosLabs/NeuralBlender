@@ -6,6 +6,9 @@
 
 #include <string.h>
 #include <algorithm>
+#include <cerrno>
+#include <cmath>
+#include <cstdlib>
 #include <dirent.h>
 #include <sys/stat.h>
 
@@ -55,23 +58,132 @@ bool is_supported_model_filename (const std::string &path) {
          (lower.size () >= 6 && lower.rfind (".aidax") == lower.size () - 6);
 }
 
-// calibration default is written to config ONLY if all
-// calib check boxes are on/off
-void c_neuralblender_ui::write_calib_state_if_consistent () {
-  bool all_on = true;
-  bool all_off = true;
+static bool parse_config_float (const std::string &s, float &value) {
+  if (s.empty ())
+    return false;
 
-  for (size_t i = 0; i < NB_NUM_MODELS && i < NB_NUM_MODELS; ++i) {
-    all_on  &= state.lanes [i].do_calib;
-    all_off &= !state.lanes [i].do_calib;
-  }
+  char *end = NULL;
+  errno = 0;
+  const float parsed = std::strtof (s.c_str (), &end);
+  if (errno || end == s.c_str () || *end != '\0' || !std::isfinite (parsed))
+    return false;
 
-  if (!all_on && !all_off)
-    return;
-
-  configfile.set_item (CONFIG_KEY_NAME_CALIB, all_on ? "1" : "0");
-  configfile.write_file();
+  value = parsed;
+  return true;
 }
+
+bool read_prefs_from_config (c_configfile &configfile, t_prefs &prefs) {
+  float calib_target_db = prefs.calib_target_db;
+  if (parse_config_float (
+      configfile.get_item (CONFIG_KEY_NAME_CALIB_TARGET),
+      calib_target_db))
+    prefs.calib_target_db = calib_target_db;
+
+  const std::string vu = configfile.get_item (CONFIG_KEY_NAME_VU);
+  if (!vu.empty ())
+    prefs.vu_on = configfile.istrue (CONFIG_KEY_NAME_VU);
+
+  return true;
+}
+
+bool write_prefs_to_config (c_configfile &configfile, const t_prefs &prefs) {
+  char buf [128];
+  snprintf (buf, sizeof (buf), "%.6g", prefs.calib_target_db);
+
+  configfile.set_item (CONFIG_KEY_NAME_CALIB_TARGET, buf);
+  configfile.set_item (CONFIG_KEY_NAME_VU, prefs.vu_on ? "1" : "0");
+  return configfile.write_file ();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// c_prefswindow
+
+void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
+  ui = ui_;
+  if (!ui || !ui->ui_ready || widget)
+    return;
+  
+  int default_w = 550;
+  int default_h = 400;
+  
+  if (!c_toplevelwindow::create (
+      ui,
+      os_get_root_window (&ui->app, IS_WINDOW),
+      "NeuralBlender settings",
+      0, 0, default_w, default_h,
+      ui->mainwindow.widget))
+    return;
+  set_min_size_to_current ();
+  
+  frame1.create (ui, widget, "", 12, 12, w () - 24, h () - 80);
+  btn_ok.create (ui, widget, "OK", 0, 0, 128, 40);
+  btn_ok.role = ROLE_PREFSOK;
+  btn_cancel.create (ui, widget, "Cancel", 0, 0, 128, 40);
+  btn_cancel.role = ROLE_PREFSCANCEL;
+  btn_about.create (ui, widget, "About...", 0, 0, 128, 40);
+  btn_about.role = ROLE_ABOUT;
+  
+  label_calibdb.create (ui, frame1.widget, "Calibration target dB:", 16, 60, 120, 40);
+  
+  int controls_x = 1;
+  std::vector<c_label *> labels = {
+    &label_calibdb,
+    &label_test1,
+    &label_test2,
+  };
+  for (int i = 0; i < labels.size (); i++) {
+    int w = 0;
+    labels [i]->resize_to_label ();
+    labels [i]->get_label_size (&w, NULL);
+    debug ("w=%d", w);
+    if (w > controls_x)
+      controls_x = w;
+  }
+  controls_x += 48;
+  
+  text_calibdb.create  (ui, frame1.widget, "", controls_x , 60, 120, 40);
+  btn_vu.create (ui, frame1.widget, "VU meters on by default", 16, 104, 300, 32, WSTYLE_CHECKBOX);
+  
+  on_resize ();
+}
+
+void c_prefswindow::on_resize () {
+  frame1.move ((w () - frame1.w ()) / 2, (h () - frame1.h ()) / 2 - 24);
+  
+  btn_ok.move_resize (w () - 140, h () - 56, 128, 40);
+  btn_cancel.move_resize (w () - 280, h () - 56, 128, 40);
+  btn_about.move_resize (12, h () - 56, 128, 40);
+}
+
+void c_prefswindow::show () { CP
+  if (!widget)
+    create (ui);
+  
+  c_toplevelwindow::show ();
+}
+
+void c_prefswindow::hide () { CP
+  c_toplevelwindow::hide ();
+}
+
+void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
+  if (!widget)
+    create (ui);
+
+  char buf [128];
+  snprintf (buf, 127, "%.6g", prefs.calib_target_db);
+  text_calibdb.set_text (buf);
+  btn_vu.set_value (prefs.vu_on);
+}
+
+void c_prefswindow::set_prefs_to (t_prefs &prefs) {
+  double db = std::strtod (text_calibdb.value.c_str (), NULL);
+  prefs.calib_target_db = db;
+  prefs.vu_on = btn_vu.value;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// c_aboutwindow
 
 void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   ui = ui_;
@@ -82,18 +194,17 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
       ui,
       os_get_root_window (&ui->app, IS_WINDOW),
       "About NeuralBlender",
-      0, 0, 420, 480))
+      0, 0, 420, 480,
+      ui->mainwindow.widget))
     return;
 
   //widget = widget;
   set_min_size_to_current ();
-    
-  widget->flags |= HIDE_ON_DELETE;
-  os_set_transient_for_hint (ui->mainwindow.widget, widget);
   
-  frame.create (ui, widget, "", 12, 12, w () - 24, h () - 24);
+  frame.create (ui, widget, "", 12, 12, w () - 24, h () - 80);
   
-  btn_ok.create (ui, frame.widget, "OK", 160, 395, 80, 40);
+  //btn_ok.create (ui, frame.widget, "OK", 160, 395, 80, 40);
+  btn_ok.create (ui, widget, "OK", 0, 0, 120, 40);
   btn_ok.role = ROLE_ABOUTOK;
   
   const char *text [] = {
@@ -128,6 +239,8 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
 
   img_logo.create (ui, frame.widget, "", (400-160)/2, 64, 160, 160);
   img_logo.set_png (data_neuralblender_logo_160_png);
+  
+  on_resize ();
 }
 
 void c_aboutwindow::show () { CP
@@ -148,11 +261,12 @@ void c_aboutwindow::hide () { CP
 }
 
 void c_aboutwindow::on_resize () { CP
-  frame.move ((w () - frame.w ()) / 2, (h () - frame.h ()) / 2);
+  frame.move ((w () - frame.w ()) / 2, (h () - frame.h ()) / 2 - 24);
+  btn_ok.move_resize (w () - 140, h () - 56, 128, 40);
 }
 
-void c_aboutwindow::on_close () { CP
-}
+////////////////////////////////////////////////////////////////////////////////
+// c_lane_widgets
 
 void c_lane_widgets::create (
     c_neuralblender_ui *ui_,
@@ -284,6 +398,64 @@ void c_lane_widgets::create (
   
 }
 
+void c_lane_widgets::move_resize (
+    int x, int y, int w, int h) {
+  
+  if (!main_widget)
+    return;
+
+  lane_widget.move_resize (x, y, w, h);
+
+  int split = 0;
+  
+  cont_regcontrols.move_resize (0, 0, w, h);
+  
+  int button_padding = 4;
+  
+  //const int knob_size = 64;//std::max (64, h / 2);
+  int knob_size = std::max (64, w / 10);
+  knob_size = std::min (knob_size, h / 2);
+  const int knob_top = (h - knob_size) / 2 - 8;
+  const int knob_right = w - knob_size * 2 - 12;
+  const int reg_w = cont_regcontrols.w ();
+  const int menu_x = 16 + knob_size;//delay.x () + delay.w () + 8;
+  const int menu_width = std::max (64, w - menu_x - (w - knob_right) - button_padding - 10);
+  menu_list.move_resize (menu_x, 24, menu_width, 32);
+  //int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
+  int button_left = menu_list.x ();
+  int button_top = menu_list.y () + menu_list.h () + 8;
+  int button_width = std::min (h - 76, w / 10);
+  
+  delay.move_resize (16, knob_top, knob_size, knob_size + 16);
+
+  btn_browse.move_resize (button_left, button_top, button_width, button_width);
+  btn_clear.move_resize (btn_browse.x () + btn_browse.w () + button_padding,
+                         button_top, button_width, button_width);
+  btn_flip.move_resize (btn_clear.x () + btn_browse.w () + button_padding,
+                         button_top, button_width, button_width);
+  btn_calib.move_resize (btn_flip.x () + btn_browse.w () + button_padding,
+                         button_top, button_width, button_width);
+                         
+  int mute_x = btn_calib.x () + btn_calib.w () + button_padding;
+  int mute_width = menu_list.x () + menu_list.w () - mute_x;
+  btn_mute.move_resize (mute_x,
+                         button_top, mute_width, button_width);
+  btn_excl.move_resize (btn_mute.x (), btn_mute.y (), btn_mute.w (), btn_mute.h ());
+  
+  gain_in.move_resize (knob_right, knob_top, knob_size, knob_size + 16);
+  gain_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size + 16);
+  meter_out.move_resize (w - 12, 16, 5, h - 32);
+  
+  int adv_btn_x = 84;
+  int adv_btn_y = h * 2 / 11;
+  label_frames.move_resize (delay.x (), h - 25, delay.w (), 16);
+  label_trim.move_resize (gain_in.x (), h - 25, gain_in.w (), 16);
+  //move_resize (x, y, w, h);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// c_neuralblender_ui
+
 c_neuralblender_ui::c_neuralblender_ui () { CP
   memset (&app, 0, sizeof (app));
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
@@ -316,6 +488,10 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   display = app.dpy;
   
   configfile.read_file ();
+  read_prefs_from_config (configfile, prefs);
+  state.do_vu = prefs.vu_on;
+  if (blender)
+    blender->set_calib_target_db (prefs.calib_target_db);
   
   if (configfile.istrue (CONFIG_KEY_NAME_ADV)) {
     CP
@@ -347,8 +523,8 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_enable.create (this, mainwindow.widget, "Enabled",  20, 12, 120, 40, WSTYLE_TOGGLE);
   btn_enable.set_value (true);
   btn_enable.role = ROLE_BYPASS;
-  btn_about.create (this, mainwindow.widget, "About...", 520, 600, 100, 40);
-  btn_about.role = ROLE_ABOUT;
+  btn_prefs.create (this, mainwindow.widget, "Settings", 520, 600, 100, 40);
+  btn_prefs.role = ROLE_PREFS;
   btn_muteall.create (this, mainwindow.widget, "Mute all", 500, 12, 120, 40, WSTYLE_TOGGLE);
   btn_muteall.role = ROLE_MUTEALL;
   
@@ -364,6 +540,8 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_exclmode.role = ROLE_EXCL_TOGGLE;
   
   aboutwindow.create (this);
+  prefswindow.create (this);
+  
   for (i = 0; i < NB_NUM_MODELS; i++) {
     lanes [i].create (this, mainwindow.widget, i, 0, 0, DEFAULT_WINDOW_WIDTH, 130);
   }
@@ -459,11 +637,30 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
 
     case ROLE_ABOUT: CP
       aboutwindow.show ();
-      on_about (btn);
+      //aboutwindow.show ();
+      on_about ();
     break;
 
     case ROLE_ABOUTOK: CP
       aboutwindow.hide ();
+    break;
+    
+    case ROLE_PREFS: CP
+      write_prefs_to (prefs);
+      prefswindow.get_prefs_from (prefs);
+      prefswindow.show ();
+      on_prefs ();
+    break;
+
+    case ROLE_PREFSOK: CP
+      prefswindow.set_prefs_to (prefs);
+      apply_prefs (prefs);
+      on_prefs_ok ();
+      prefswindow.hide ();
+    break;
+
+    case ROLE_PREFSCANCEL: CP
+      prefswindow.hide ();
     break;
 
     case ROLE_VUTOGGLE: CP
@@ -493,59 +690,27 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
   sync_widgets_from_state (state);
 }
 
-void c_lane_widgets::move_resize (
-    int x, int y, int w, int h) {
-  
-  if (!main_widget)
-    return;
+void c_neuralblender_ui::on_about () { CP }
 
-  lane_widget.move_resize (x, y, w, h);
+void c_neuralblender_ui::on_prefs () {
+}
 
-  int split = 0;
-  
-  cont_regcontrols.move_resize (0, 0, w, h);
-  
-  int button_padding = 4;
-  
-  //const int knob_size = 64;//std::max (64, h / 2);
-  int knob_size = std::max (64, w / 10);
-  knob_size = std::min (knob_size, h / 2);
-  const int knob_top = (h - knob_size) / 2 - 8;
-  const int knob_right = w - knob_size * 2 - 12;
-  const int reg_w = cont_regcontrols.w ();
-  const int menu_x = 16 + knob_size;//delay.x () + delay.w () + 8;
-  const int menu_width = std::max (64, w - menu_x - (w - knob_right) - button_padding - 10);
-  menu_list.move_resize (menu_x, 24, menu_width, 32);
-  //int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
-  int button_left = menu_list.x ();
-  int button_top = menu_list.y () + menu_list.h () + 8;
-  int button_width = std::min (h - 76, w / 10);
-  
-  delay.move_resize (16, knob_top, knob_size, knob_size + 16);
+void c_neuralblender_ui::on_prefs_ok () {
+}
 
-  btn_browse.move_resize (button_left, button_top, button_width, button_width);
-  btn_clear.move_resize (btn_browse.x () + btn_browse.w () + button_padding,
-                         button_top, button_width, button_width);
-  btn_flip.move_resize (btn_clear.x () + btn_browse.w () + button_padding,
-                         button_top, button_width, button_width);
-  btn_calib.move_resize (btn_flip.x () + btn_browse.w () + button_padding,
-                         button_top, button_width, button_width);
-                         
-  int mute_x = btn_calib.x () + btn_calib.w () + button_padding;
-  int mute_width = menu_list.x () + menu_list.w () - mute_x;
-  btn_mute.move_resize (mute_x,
-                         button_top, mute_width, button_width);
-  btn_excl.move_resize (btn_mute.x (), btn_mute.y (), btn_mute.w (), btn_mute.h ());
-  
-  gain_in.move_resize (knob_right, knob_top, knob_size, knob_size + 16);
-  gain_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size + 16);
-  meter_out.move_resize (w - 12, 16, 5, h - 32);
-  
-  int adv_btn_x = 84;
-  int adv_btn_y = h * 2 / 11;
-  label_frames.move_resize (delay.x (), h - 25, delay.w (), 16);
-  label_trim.move_resize (gain_in.x (), h - 25, gain_in.w (), 16);
-  //move_resize (x, y, w, h);
+void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
+  if (blender)
+    blender->set_calib_target_db (p.calib_target_db);
+
+  vu_on (p.vu_on);
+  write_prefs_to_config (configfile, p);
+}
+
+void c_neuralblender_ui::write_prefs_to (t_prefs &p) { CP
+  if (blender)
+    p.calib_target_db = blender->amps [0].calib_target_db;
+
+  p.vu_on = state.do_vu;
 }
 
 void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
@@ -581,7 +746,7 @@ void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
     
     btn_enable.move_resize (16, 12, 120, 40);
     btn_muteall.move_resize (window_width - 136, 12, 120, 40);
-    btn_about.move_resize (btn_muteall.x (), window_height - 48, 120, 40);
+    btn_prefs.move_resize (btn_muteall.x (), window_height - 48, 120, 40);
     //label_exclmode.set_label ("Exclusive mode");
     label_big.move_resize (150, 8, window_width - 300, 48);
     
@@ -773,6 +938,24 @@ void c_neuralblender_ui::set_lane_mute (size_t which, bool b) {
 }
 
 void c_neuralblender_ui::apply_effective_controls () {
+}
+
+// calibration default is written to config ONLY if all
+// calib check boxes are on/off
+void c_neuralblender_ui::write_calib_state_if_consistent () {
+  bool all_on = true;
+  bool all_off = true;
+
+  for (size_t i = 0; i < NB_NUM_MODELS && i < NB_NUM_MODELS; ++i) {
+    all_on  &= state.lanes [i].do_calib;
+    all_off &= !state.lanes [i].do_calib;
+  }
+
+  if (!all_on && !all_off)
+    return;
+
+  configfile.set_item (CONFIG_KEY_NAME_CALIB, all_on ? "1" : "0");
+  configfile.write_file();
 }
 
 void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &state_) {

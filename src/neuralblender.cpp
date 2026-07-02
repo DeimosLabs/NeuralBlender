@@ -66,6 +66,20 @@ static bool is_supported_model_path (const std::string &path) {
          ends_with (path, ".aidax");
 }
 
+static float clamp_gain_multiplier (float gain) {
+  if (!std::isfinite (gain))
+    return 1.0f;
+
+  return std::clamp (gain, db_to_gain (GAIN_DB_MIN), db_to_gain (GAIN_DB_MAX));
+}
+
+static float clamp_calib_target_db (float db) {
+  if (!std::isfinite (db))
+    return DB_CALIB_TARGET_DEFAULT;
+
+  return std::clamp (db, CALIB_TARGET_DB_MIN, CALIB_TARGET_DB_MAX);
+}
+
 /******************************************************************************
  * c_delayline
  */
@@ -299,6 +313,8 @@ float c_neuralamp::calibrate (float *data, size_t size) {
   std::lock_guard<std::mutex> lock (model_mutex);
   float ret = 0.0f;
   
+  calib_target_db = clamp_calib_target_db (calib_target_db);
+
   size_t i;
   size_t blocksize = 128;
   
@@ -319,7 +335,7 @@ float c_neuralamp::calibrate (float *data, size_t size) {
     }
   }
   
-  const float target = db_to_gain (DB_CALIB_TARGET);
+  const float target = db_to_gain (calib_target_db);
   if (ret > db_to_gain (DB_SILENCE) && std::isfinite (ret))
     trim = target / ret;
   else
@@ -363,7 +379,10 @@ static void copy_with_gain (float *in, float *out, uint32_t nframes, float gain)
 
 void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
   if (!out) return;
-
+  
+  const float input_gain = clamp_gain_multiplier (gain_in);
+  const float output_gain = clamp_gain_multiplier (gain_out);
+  
   if (mute.load (std::memory_order_relaxed) || !model_mutex.try_lock ()) {
     memset (out, 0, nframes * sizeof (float));
     return;
@@ -388,20 +407,20 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
 
   switch (m_engine_mode) {
     case ENGINE_NONE:
-      copy_with_gain (in, out, nframes, gain_in * gain_out);
+      copy_with_gain (in, out, nframes, input_gain * output_gain);
       return;
     break;
 
     case ENGINE_JSON:
       if (!m_rtneural_model) {
-        copy_with_gain (in, out, nframes, gain_in * gain_out);
+        copy_with_gain (in, out, nframes, input_gain * output_gain);
         return;
       }
 
       {
-        const float out_gain = gain_out * trim;
+        const float out_gain = output_gain * trim;
         for (uint32_t i = 0; i < nframes; ++i) {
-          float input [1] = { in [i] * gain_in };
+          float input [1] = { in [i] * input_gain };
           float y = m_rtneural_model->forward (input);
           if (dcflip)
             out[i] = -1.0f * std::clamp (y * out_gain, -1.0f, 1.0f);
@@ -414,7 +433,7 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
 
     case ENGINE_NAM:
       if (!m_nam_model) {
-        copy_with_gain (in, out, nframes, gain_in * gain_out);
+        copy_with_gain (in, out, nframes, input_gain * output_gain);
         return;
       }
 
@@ -422,14 +441,14 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
         NAM_SAMPLE *inputs [1]  = { in };
         NAM_SAMPLE *outputs [1] = { out };
 
-        if (gain_in != 1.0f) {
+        if (input_gain != 1.0f) {
           for (uint32_t i = 0; i < nframes; ++i)
-            in[i] *= gain_in;
+            in[i] *= input_gain;
         }
 
         m_nam_model->process (inputs, outputs, (int) nframes);
 
-        const float out_gain = gain_out * trim;
+        const float out_gain = output_gain * trim;
         for (uint32_t i = 0; i < nframes; ++i)
           if (dcflip)
             out [i] = -1.0f * std::clamp (out [i] * out_gain, -1.0f, 1.0f);
@@ -525,7 +544,7 @@ bool c_neuralblender::set_gain_in (size_t which, float g) {
   if (which >= NB_NUM_MODELS)
     return false;
 
-  amps [which].gain_in = g;
+  amps [which].gain_in = clamp_gain_multiplier (g);
   return true;
 }
 
@@ -533,7 +552,7 @@ bool c_neuralblender::set_gain_out (size_t which, float g) {
   if (which >= NB_NUM_MODELS)
     return false;
 
-  amps [which].gain_out = g;
+  amps [which].gain_out = clamp_gain_multiplier (g);
   return true;
 }
 
@@ -628,6 +647,22 @@ void c_neuralblender::update_mutes () {
 
   if (!any_loaded)
     amps [0].mute = false;
+}
+
+bool c_neuralblender::set_calib_target_db (float f) { CP
+  bool ret = true;
+  
+  if (!std::isfinite (f))
+    return false;
+    
+  f = clamp_calib_target_db (f);
+  
+  for (int i = 0; i < NB_NUM_MODELS; i++) {
+    amps [i].calib_target_db = f;
+    // TODO: should we recalibrate models that are loaded AND have calib enabled?
+  }
+  
+  return ret;
 }
 
 bool c_neuralblender::load_model (size_t which, const char *fn) { CP

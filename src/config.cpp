@@ -19,6 +19,8 @@ struct s_option {
   { CONFIG_KEY_NAME_CWD, "" },
   { CONFIG_KEY_NAME_ADV, "" },
   { CONFIG_KEY_NAME_CALIB, "" },
+  { CONFIG_KEY_NAME_CALIB_TARGET, "" },
+  { CONFIG_KEY_NAME_VU, "" },
   { "", "" }
 };
 

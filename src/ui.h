@@ -37,11 +37,41 @@
 #define UI_CHECKBOX_RADIUS   8.0
 #define UI_FRAME_RADIUS      12.0
 
-
 class c_neuralblender;
 struct c_neuralblender_state;
 class c_neuralblender_ui;
 class c_filepicker;
+
+typedef struct {
+  float calib_target_db = -12;
+  bool vu_on = true;
+} t_prefs;
+
+bool read_prefs_from_config  (c_configfile &configfile, t_prefs &prefs);
+bool write_prefs_to_config   (c_configfile &configfile, const t_prefs &prefs);
+
+class c_prefswindow : public c_toplevelwindow {
+public:
+  void create (c_neuralblender_ui *ui);
+  void show ();
+  void hide ();
+  
+  void on_resize ();
+  void get_prefs_from (t_prefs &prefs);
+  void set_prefs_to   (t_prefs &prefs);
+  
+  c_frame frame1;
+  c_button btn_about;
+  c_button btn_cancel;
+  c_button btn_ok;
+  
+  c_label label_calibdb;
+  c_label label_test1;
+  c_label label_test2;
+  
+  c_textbox text_calibdb;
+  c_button btn_vu;
+};
 
 class c_aboutwindow : public c_toplevelwindow {
 public:
@@ -49,9 +79,8 @@ public:
 
   void show ();
   void hide ();
-
+  
   void on_resize ();  
-  void on_close ();
 
   //Widget_t *w = NULL;
   c_frame frame;
@@ -59,11 +88,6 @@ public:
   c_label labels [16];
   c_image img_logo;
   c_neuralblender_ui *ui = NULL;
-};
-
-class c_prefswindow : public c_toplevelwindow {
-public:
-  
 };
 
 class c_lane_widgets {
@@ -151,25 +175,30 @@ public:
   virtual void on_vu (c_widget *w, bool b)                     = 0;
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;
-          void on_button (c_button *btn, bool value)               ;
+          void on_button (c_button *btn, bool value)              ;
   virtual void on_window_resize (int w, int h)                    ;
   virtual bool request_window_size (int w, int h)                 ;
-  //virtual void on_advanced (c_widget *w, bool b)                  ; 
   virtual void on_bypass (c_widget *w, bool b)                 = 0;
-  virtual void on_about (c_widget *w)                          = 0;
-
+          void on_about ()                                        ;
+          void on_prefs ()                                        ;
+          void on_prefs_ok ()                                     ;
+          void apply_prefs (t_prefs &p)                           ;
+          void write_prefs_to (t_prefs &p)                         ;
+	  
   Display *display = NULL;
   Window window;
   c_neuralblender *blender = NULL;
   Xputty app;
   c_mainwindow mainwindow;
+  c_aboutwindow aboutwindow;
+  c_prefswindow prefswindow;
   Window parent;
   
   c_container    cont_checkboxes;
   c_label        label_big;
   c_button       btn_enable;
   c_button       btn_muteall;
-  c_button       btn_about;
+  c_button       btn_prefs;
   c_button       btn_vu;
   c_button       btn_exclmode;
   c_button       btn_advanced;
@@ -180,8 +209,9 @@ public:
   c_filepicker   filepickers [NB_NUM_MODELS];
   c_meter        meter_in;
   
+  t_prefs        prefs;
+  
   c_vudata vudata_in;
-  c_aboutwindow aboutwindow;
   c_configfile configfile;
   //size_t exclusive_lane = 0; // 0: normal mode, 1-4: exclusive mode with lane [n - 1]
   //bool user_bypass = false;
