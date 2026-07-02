@@ -44,7 +44,7 @@ class c_filepicker;
 
 typedef struct {
   float calib_target_db = -12.0f;
-  float vu_scale_db     = -60.0f;
+  float vu_scale_db     = -36.0f;
   float vu_headroom_db  = 6.0f;
   bool vu_on = true;
 } t_prefs;
