@@ -45,9 +45,12 @@ For standalone version, see --help text for more info/options
 
 ## Supported systems
 
-Should compile and work fine on any POSIX compliant OS including Linux, MacOS, FreeBSD, etc.
+Should compile and work fine on any POSIX compliant OS including Linux, MacOS (to be fixed), FreeBSD, etc.
 
-Tested on: As of now, only Void Linux and Linux Mint.
+Tested on:
+  - Void Linux
+  - Linux Mint
+  - FreeBSD
 
 Compiling/running this on w**dows: Short answer, don't do microsuck malware. It's bad for you (and for everyone else)
 
