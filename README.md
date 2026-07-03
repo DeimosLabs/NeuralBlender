@@ -56,7 +56,7 @@ MacOS: Expected to work soon, currently needs to be fixed.
 
 Compiling/running this on w**dows: Short answer, don't do microsuck malware. It's bad for you (and for everyone else).
 
-Seriously, i don't think many people would run a live rig that just randomly stops working right in the middle of a gig - because its manufacturer just decided you need yet another "update". Also definitely not worth all the headaches of porting to that joke of an API.
+Rationale: Seriously, i don't think many people would run a live rig that just randomly stops working right in the middle of a show - because its manufacturer just decided you need yet another "update". Also definitely not worth all the headaches and $$$ cost of porting to that joke of an API.
 
 ## License
 
