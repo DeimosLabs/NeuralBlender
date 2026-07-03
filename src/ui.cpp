@@ -872,12 +872,13 @@ void c_neuralblender_ui::update_stats () {
     
     snprintf (buf, 127, "%d frames", nframes);
     lanes [i].label_frames.set_label (buf);
-    if (trim == 1.00)
-      //snprintf (buf, 127, "");
-      buf [0] = 0;
-    else
-      snprintf (buf, 127, "Trim: %.02f", trim);
-    lanes [i].label_trim.set_label (buf);
+    if (trim == 1.00) {
+      lanes [i].label_trim.set_label ("");
+    } else {
+      float db = gain_to_db (trim);
+      snprintf (buf, 127, "Trim: %s%.02fdB", db > 0.0 ? "+" : "", db);
+      lanes [i].label_trim.set_label (buf);
+    }
     
   }
 }
