@@ -181,7 +181,7 @@ else()
 endif()
 
 if (STANDALONE)
-  pkg_check_modules(JACK jack)
+  pkg_check_modules(JACK IMPORTED_TARGET jack)
 
   if (JACK_FOUND)
     message(STATUS "JACK: found")
@@ -193,8 +193,11 @@ if (STANDALONE)
       $<TARGET_OBJECTS:neuralblender_meter_data>
     )
     
-    target_include_directories(neuralblender PRIVATE ${JACK_INCLUDE_DIRS})
-    target_link_libraries(neuralblender PRIVATE neuralblender_core neuralblender_cmdline_debug ${JACK_LIBRARIES})
+    target_link_libraries(neuralblender PRIVATE
+      neuralblender_core
+      neuralblender_cmdline_debug
+      PkgConfig::JACK
+    )
 
     target_compile_definitions(neuralblender PRIVATE STANDALONE)
 
@@ -205,8 +208,8 @@ if (STANDALONE)
 endif()
 
 if (GUI)
-  pkg_check_modules(X11 REQUIRED x11)
-  pkg_check_modules(CAIRO REQUIRED cairo)
+  pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11)
+  pkg_check_modules(CAIRO REQUIRED IMPORTED_TARGET cairo)
   message(STATUS "X11: found")
   message(STATUS "Cairo: found")
 

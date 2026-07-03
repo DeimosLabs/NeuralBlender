@@ -70,21 +70,14 @@ function(add_neuralblender_xputty)
     ${PROJECT_SOURCE_DIR}/external
     ${PROJECT_SOURCE_DIR}/external/RTNeural
     ${PROJECT_SOURCE_DIR}/external/NAM
-    ${PROJECT_SOURCE_DIR}/external/nlohmann
-    ${X11_INCLUDE_DIRS}
-    ${CAIRO_INCLUDE_DIRS}
-  )
-
-  target_compile_options(xputty PUBLIC
-    ${X11_CFLAGS_OTHER}
-    ${CAIRO_CFLAGS_OTHER}
-  )
-
-  target_link_libraries(xputty PUBLIC
-    ${X11_LIBRARIES}
-    ${CAIRO_LIBRARIES}
-  )
-endfunction()
+	    ${PROJECT_SOURCE_DIR}/external/nlohmann
+	  )
+	
+	  target_link_libraries(xputty PUBLIC
+	    PkgConfig::X11
+	    PkgConfig::CAIRO
+	  )
+	endfunction()
 
 function(add_neuralblender_gui_library target_name)
   add_library(${target_name} STATIC
