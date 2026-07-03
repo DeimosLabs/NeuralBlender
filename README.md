@@ -54,9 +54,9 @@ Tested on:
 
 MacOS: Expected to work soon, currently needs to be fixed.
 
-Compiling/running this on w**dows: Short answer, don't do microsuck malware. It's bad for you (and for everyone else).
+Android: Not really interested in supporting it, but if there's enough demand i'll make an effort.
 
-Rationale: Seriously, i don't think many people would run a live rig that just randomly stops working right in the middle of a show - because its manufacturer just decided you need yet another "update". Also definitely not worth all the headaches and $$$ cost of porting to that joke of an API.
+W**dows: Don't do microsuck malware. It's bad for you (and for everyone else).
 
 ## License
 
