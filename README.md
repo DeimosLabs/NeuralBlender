@@ -51,7 +51,7 @@ Tested on: As of now, only Void Linux and Linux Mint.
 
 Compiling/running this on w**dows: Short answer, don't do microsuck malware. It's bad for you (and for everyone else)
 
-Seriously, i don't think many people would run a live rig that just randomly stops working right in the middle of a gig because its manuracturer decides you need yet another "update". Definitely not worth all the headaches of porting to this joke of an API.
+Seriously, i don't think many people would run a live rig that just randomly stops working right in the middle of a gig because its manufacturer decides you need yet another "update". Definitely not worth all the headaches of porting to this joke of an API.
 
 ## License
 
