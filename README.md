@@ -45,18 +45,18 @@ For standalone version, see --help text for more info/options
 
 ## Supported systems
 
-Should compile and work fine on any POSIX compliant OS including Linux, MacOS (to be fixed), FreeBSD, etc.
+Should compile and work fine on any POSIX-compliant OS including Linux, MacOS (to be fixed), FreeBSD, etc.
 
 Tested on:
   - Void Linux
   - Linux Mint
   - FreeBSD
 
-MacOS: Expected to work soon, currently needs to be fixed.
+MacOS: Expected to work soon, currently needs to be fixed. The only Mac i have is from 1986.
 
 Android: Not really interested in supporting it, but if there's enough demand i'll make an effort.
 
-W**dows: Don't do microsuck malware. It's bad for you (and for everyone else).
+W**dows: Don't do microsuck malware. It's bad for you, and for everyone else.
 
 ## License
 
