@@ -225,6 +225,9 @@ if (TARGET neuralblender AND GUI)
 endif()
   
 if (LV2)
+  pkg_check_modules(LV2_DEPS REQUIRED IMPORTED_TARGET lv2)
+  message(STATUS "LV2: found")
+
   add_custom_target(generate_ttl ALL
     COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/lv2/generate_ttl.sh" "$<BOOL:${GUI}>"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
@@ -247,6 +250,7 @@ if (LV2)
     neuralblender_core
     neuralblender_cmdline_debug
     Threads::Threads
+    PkgConfig::LV2_DEPS
   )
   target_compile_definitions(neuralblender_lv2 PRIVATE LV2)
   add_dependencies(neuralblender_lv2 generate_ttl)
@@ -280,7 +284,12 @@ if (LV2)
       OUTPUT_NAME "neuralblender_ui"
     )
     
-    target_link_libraries(neuralblender_ui PRIVATE neuralblender_gui_lv2 neuralblender_cmdline_debug neuralblender_config)
+    target_link_libraries(neuralblender_ui PRIVATE
+      neuralblender_gui_lv2
+      neuralblender_cmdline_debug
+      neuralblender_config
+      PkgConfig::LV2_DEPS
+    )
     target_compile_definitions(neuralblender_ui PRIVATE LV2 LV2_UI)
 
     install(TARGETS neuralblender_ui
