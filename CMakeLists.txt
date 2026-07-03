@@ -18,6 +18,7 @@ option(NOASAN         "Disable asan on debug build" ON)
 
 find_package(PkgConfig REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(Threads REQUIRED)
 
 include(cmake/NeuralBlenderGui.cmake)
 
@@ -196,6 +197,7 @@ if (STANDALONE)
     target_link_libraries(neuralblender PRIVATE
       neuralblender_core
       neuralblender_cmdline_debug
+      Threads::Threads
       PkgConfig::JACK
     )
 
@@ -241,7 +243,11 @@ if (LV2)
     -fpermissive
   )
   
-  target_link_libraries(neuralblender_lv2 PRIVATE neuralblender_core neuralblender_cmdline_debug)
+  target_link_libraries(neuralblender_lv2 PRIVATE
+    neuralblender_core
+    neuralblender_cmdline_debug
+    Threads::Threads
+  )
   target_compile_definitions(neuralblender_lv2 PRIVATE LV2)
   add_dependencies(neuralblender_lv2 generate_ttl)
 
