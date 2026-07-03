@@ -33,6 +33,9 @@ endif()
 # Timestamp header
 set(TIMESTAMP_FILE ${CMAKE_CURRENT_BINARY_DIR}/timestamp.h)
 set_source_files_properties(${TIMESTAMP_FILE} PROPERTIES GENERATED TRUE)
+set(INLINE_DATA_CPP ${CMAKE_CURRENT_BINARY_DIR}/data/data.cpp)
+set(INLINE_DATA_H ${CMAKE_CURRENT_BINARY_DIR}/data/data.h)
+set_source_files_properties(${INLINE_DATA_CPP} ${INLINE_DATA_H} PROPERTIES GENERATED TRUE)
 
 add_custom_target(generate_timestamp ALL
   COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/timestamp.sh" "${TIMESTAMP_FILE}"
@@ -43,14 +46,38 @@ add_custom_target(generate_timestamp ALL
 execute_process (COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/timestamp.sh
                  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
-add_custom_target(generate_inline_data ALL
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.list" INLINE_DATA_LIST_LINES)
+set(INLINE_DATA_INPUTS
+  "${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh"
+  "${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.list"
+)
+foreach(INLINE_DATA_LINE ${INLINE_DATA_LIST_LINES})
+  string(REGEX REPLACE "#.*$" "" INLINE_DATA_LINE "${INLINE_DATA_LINE}")
+  string(STRIP "${INLINE_DATA_LINE}" INLINE_DATA_LINE)
+  if (INLINE_DATA_LINE)
+    string(REGEX REPLACE "[ \t]+" ";" INLINE_DATA_FILES "${INLINE_DATA_LINE}")
+    foreach(INLINE_DATA_FILE ${INLINE_DATA_FILES})
+      if (IS_ABSOLUTE "${INLINE_DATA_FILE}")
+        list(APPEND INLINE_DATA_INPUTS "${INLINE_DATA_FILE}")
+      else()
+        list(APPEND INLINE_DATA_INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/data/${INLINE_DATA_FILE}")
+      endif()
+    endforeach()
+  endif()
+endforeach()
+
+add_custom_command(
+  OUTPUT ${INLINE_DATA_CPP} ${INLINE_DATA_H}
   COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh"
+  DEPENDS ${INLINE_DATA_INPUTS}
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
   COMMENT "Generating inline data"
+  VERBATIM
 )
 
-execute_process (COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh
-                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_custom_target(generate_inline_data
+  DEPENDS ${INLINE_DATA_CPP} ${INLINE_DATA_H}
+)
 
 add_library(neuralblender_cmdline_debug STATIC
   external/cmdline/cmdline_debug.cpp
@@ -85,7 +112,7 @@ if (TRACE)
 endif()
 
 add_library(neuralblender_data OBJECT
-  ${CMAKE_CURRENT_BINARY_DIR}/data/data.cpp
+  ${INLINE_DATA_CPP}
 )
 
 add_dependencies(neuralblender_data generate_inline_data)

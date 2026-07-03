@@ -800,6 +800,11 @@ void os_get_dpi(Xputty *main) {
     XrmValue ret;
     char *resource_string;
     char *type;
+    
+    if (!main->hdpi)
+      main->hdpi = 96;
+    
+    return;
 
     XrmInitialize();
     resource_string = XResourceManagerString(main->dpy);
