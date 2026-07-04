@@ -56,7 +56,7 @@ static float knob_angle_from_value (float value, float min, float max) {
 
 static t_colortheme g_default_colors = {
   // window_bg
-  solid  (0.10f, 0.105f, 0.11f, 1.0f),
+  solid  (0.08f, 0.085f, 0.09f, 1.0f),
 
   // button
   { // normal, hover, on, on_hover, down, disabled

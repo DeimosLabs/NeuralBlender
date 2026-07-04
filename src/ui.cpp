@@ -493,15 +493,15 @@ void c_lane_widgets::move_resize (
   
   //const int knob_size = 64;//std::max (64, h / 2);
   int knob_size = std::max (64, w / 10);
-  knob_size = std::min (knob_size, h / 2);
+  knob_size = std::min (knob_size, (h * 2) / 3);
   const int knob_top = (h - knob_size) / 2 - 16;
   const int knob_right = w - knob_size * 2 - 12;
   const int menu_x = 16 + knob_size;//delay.x () + delay.w () + 8;
   const int menu_width = std::max (64, w - menu_x - (w - knob_right) - button_padding - 10);
-  menu_list.move_resize (menu_x, 12, menu_width, 32);
+  menu_list.move_resize (menu_x, 16, menu_width, 32);
   //int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
   int button_left = menu_list.x ();
-  int button_top = menu_list.y () + menu_list.h () + 8;
+  int button_top = menu_list.y () + menu_list.h () + 12;
   int button_width = std::min (h - 76, w / 10);
   
   delay.move_resize (12, knob_top, knob_size, knob_size + 16);
@@ -523,12 +523,12 @@ void c_lane_widgets::move_resize (
   
   gain_in.move_resize (knob_right, knob_top, knob_size, knob_size + 16);
   gain_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size + 16);
-  meter_out.move_resize (w - 12, 16, 5, h - 32);
+  meter_out.move_resize (w - 12, 16, 5, h - 28);
   
   int adv_btn_x = 84;
   int adv_btn_y = h * 2 / 11;
-  label_frames.move_resize (delay.x (), h - 32, delay.w (), 16);
-  label_trim.move_resize (gain_in.x (), h - 32, gain_in.w () + gain_out.w (), 16);
+  label_frames.move_resize (delay.x (), h - 28, delay.w (), 16);
+  label_trim.move_resize (gain_in.x (), h - 28, gain_in.w () + gain_out.w (), 16);
   //move_resize (x, y, w, h);
 }
 
@@ -837,9 +837,9 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     //if (do_set_min_size)
     mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
     
-    int lane_width = window_width - 24;
+    int lane_width = window_width - 32;
     const int lane_top = 60;
-    const int lane_gap = 5;
+    const int lane_gap = 12;
     const int bottom_reserve = 56;
     const int lane_count = NB_NUM_MODELS;
     const int total_gap = (lane_count > 1) ? (lane_count - 1) * lane_gap : 0;
@@ -858,11 +858,11 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     
     size_t i;
     for (i = 0; i < NB_NUM_MODELS; i++) {
-      lanes [i].move_resize (12, lane_top + i * (lane_height + lane_gap), lane_width, lane_height);
+      lanes [i].move_resize (16, lane_top + i * (lane_height + lane_gap), lane_width, lane_height);
     }
     
     const int lane_bottom = lane_top + lane_count * lane_height + total_gap;
-    meter_in.move_resize (3, lane_top + 4, 5, std::max (1, lane_bottom - lane_top - 8));
+    meter_in.move_resize (5, lane_top + 4, 5, std::max (1, lane_bottom - lane_top - 8));
     
     ui_resize_lock = false;
   }
