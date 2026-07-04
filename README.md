@@ -41,7 +41,7 @@ cmake wherver/is/src/neuralblender
 make -j `nproc`
 sudo make install
 ```
-For standalone version, see --help text for more info/options
+For the standalone version, see --help text for more info/options
 
 ## Supported systems
 

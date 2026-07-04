@@ -170,7 +170,6 @@ static const t_statecolors &colors_for (
     case WSTYLE_IMAGE_BUTTON_NOFRAME:
     case WSTYLE_IMAGE_TOGGLE:
     case WSTYLE_IMAGE_TOGGLE_NOFRAME:
-    case WSTYLE_DISABLED:
     default:
       return control_colors_for_state (g_colors->button, state);
   }
@@ -1309,12 +1308,14 @@ static cairo_surface_t *button_image_for_state (c_button *b, Widget_t *w) {
   const bool on = w->adj && adj_get_value (w->adj) >= 0.5f;
   const bool hover = (w->flags & HAS_FOCUS) || w->state == 1;
   const bool down = w->state == 2;
-
+  
+  //if (b->img_all) return b->img_all;
   if (down && hover && b->img_down_hover) return b->img_down_hover;
   if (down && b->img_down) return b->img_down;
   if (!on && hover && b->img_off_hover) return b->img_off_hover;
   if (hover && b->img_hover) return b->img_hover;
   if (on && b->img_on) return b->img_on;
+  if (b->img_all) return b->img_all;
   return b->img_off;
 }
 
@@ -1468,7 +1469,7 @@ bool c_button::draw_button_image (Widget_t *w, c_button *b) {
   Metrics_t m;
   os_get_window_metrics (w, &m);
   if (!m.visible)
-    return true; // no fallback needed, just invisible
+    return true; // not shown
 
   const double iw = cairo_image_surface_get_width (img);
   const double ih = cairo_image_surface_get_height (img);
@@ -1482,6 +1483,100 @@ bool c_button::draw_button_image (Widget_t *w, c_button *b) {
   cairo_fill (w->crb);
   cairo_restore (w->crb);
 
+  return true;
+}
+
+static bool draw_button_image_and_text (Widget_t *w, c_button *b) {
+  if (!w || !b || !w->crb)
+    return false;
+
+  cairo_surface_t *img = button_image_for_state (b, w);
+  const bool have_img = img && cairo_surface_status (img) == CAIRO_STATUS_SUCCESS;
+  const bool have_text = !b->label.empty ();
+
+  if (!have_img && !have_text)
+    return false;
+
+  Metrics_t m;
+  os_get_window_metrics (w, &m);
+  if (!m.visible)
+    return true;
+
+  if (!have_img) {
+    c_widget::draw_text_centered (
+        w,
+        b->label.c_str (),
+        b->text_r,
+        b->text_g,
+        b->text_b);
+    return true;
+  }
+
+  const double iw = cairo_image_surface_get_width (img);
+  const double ih = cairo_image_surface_get_height (img);
+  if (iw <= 0 || ih <= 0)
+    return false;
+  
+  const double pad = b->padding;
+  /*if (b->padding < 0)
+    pad = std::max (4.0, (double) m.height * 0.2);*/
+  
+  const double gap = have_text ? std::max (4.0, (double) m.height * 0.14) : 0.0;
+  const double max_img_h = std::max (1.0, (double) m.height - pad * 2.0);
+  double img_h = max_img_h;
+  double img_w = img_h * iw / ih;
+
+  const double max_img_w = std::max (1.0, (double) m.width - pad * 2.0);
+  if (!have_text && img_w > max_img_w) {
+    img_w = max_img_w;
+    img_h = img_w * ih / iw;
+  }
+  
+  cairo_save (w->crb);
+  
+  float fontsize = w->app->normal_font / w->scale.ascale;
+  fontsize *= b->text_size;
+  cairo_set_font_size (w->crb, fontsize);
+
+  cairo_text_extents_t ext {};
+  if (have_text)
+    cairo_text_extents (w->crb, b->label.c_str (), &ext);
+
+  double text_w = have_text ? ext.width : 0.0;
+  double total_w = img_w + gap + text_w;
+  const double max_total_w = std::max (1.0, (double) m.width - pad * 2.0);
+  if (have_text && total_w > max_total_w) {
+    const double excess = total_w - max_total_w;
+    const double min_img_h = std::max (1.0, (double) m.height * 0.35);
+    img_h = std::max (min_img_h, img_h - excess);
+    img_w = img_h * iw / ih;
+    total_w = img_w + gap + text_w;
+  }
+
+  double x = ((double) m.width - total_w) * 0.5;
+  if (x < pad)
+    x = pad;
+
+  const double y = ((double) m.height - img_h) * 0.5;
+
+  cairo_save (w->crb);
+  cairo_translate (w->crb, x, y);
+  cairo_scale (w->crb, img_w / iw, img_h / ih);
+  cairo_set_source_surface (w->crb, img, 0, 0);
+  cairo_rectangle (w->crb, 0, 0, iw, ih);
+  cairo_fill (w->crb);
+  cairo_restore (w->crb);
+
+  if (have_text) {
+    cairo_set_source_rgba (w->crb, b->text_r, b->text_g, b->text_b, 1.0);
+    cairo_move_to (
+        w->crb,
+        x + img_w + gap - ext.x_bearing,
+        ((double) m.height - ext.height) * 0.5 - ext.y_bearing);
+    cairo_show_text (w->crb, b->label.c_str ());
+  }
+
+  cairo_restore (w->crb);
   return true;
 }
 
@@ -1505,22 +1600,19 @@ void c_button::cb_draw (void *w, void *user_data) {
     case WSTYLE_IMAGE_BUTTON_NOFRAME:
       // xputty takes care of images for us, if we set them
       // using set_image_* methods.
-      if (draw_button_image (widget, self))
-        return;
-
-      // didn't draw? fall back to normal frame/text
-      fill_rounded_rect (widget, UI_BUTTON_RADIUS, colors.bg);
-      draw_rounded_rect (widget, UI_BUTTON_RADIUS, colors.fg, 2.0f);
-      draw_text_centered (widget, self->label.c_str (),
-                          self->text_r, self->text_g, self->text_b);
+      draw_button_image (widget, self);
     break;
 
     case WSTYLE_IMAGE_TOGGLE:
     case WSTYLE_IMAGE_BUTTON:
-      // didn't draw? fall back to normal frame/text
       fill_rounded_rect (widget, UI_BUTTON_RADIUS, colors.bg);
       draw_rounded_rect (widget, UI_BUTTON_RADIUS, colors.fg, 2.0f);
-      draw_button_image (widget, self);
+      if (draw_button_image_and_text (widget, self))
+        return;
+
+      // didn't draw? fall back to normal frame/text
+      draw_text_centered (widget, self->label.c_str (),
+                          self->text_r, self->text_g, self->text_b);
 
     break;
     
@@ -1543,9 +1635,12 @@ void c_button::set_image (const unsigned char *pngdata, _widget_state which) {
     case WSTATE_DOWN:       csp = &img_down; break;
     case WSTATE_DOWN_HOVER: csp = &img_down_hover; break;
     case WSTATE_OFF_HOVER:  csp = &img_off_hover; break;
+    case WSTATE_ALL:        csp = &img_all; break;
+      return;
+    break;
     default: return;
   }
-
+  CP
   if (*csp) {
     cairo_surface_destroy(*csp);
     *csp = nullptr;

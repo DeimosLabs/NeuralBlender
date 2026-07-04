@@ -52,7 +52,6 @@ enum _widget_style {
   WSTYLE_IMAGE_BUTTON_NOFRAME,
   WSTYLE_IMAGE_TOGGLE,
   WSTYLE_IMAGE_TOGGLE_NOFRAME,
-  WSTYLE_DISABLED,
   WSTYLE_FRAME,
   WSTYLE_FRAME_HIGHLIGHT,
   WSTYLE_FRAME_DISABLED,
@@ -70,6 +69,7 @@ enum _widget_state {
   WSTATE_NORMAL,
   WSTATE_SELECTED,
   WSTATE_DISABLED,
+  WSTATE_ALL,
   WSTATE_UNKNOWN
 };
 
@@ -151,6 +151,7 @@ public:
   float text_r             = 1.0;
   float text_g             = 1.0;
   float text_b             = 1.0;
+  float padding            = 8.0;
   Widget_t *widget         = NULL;
   
   void *userdata1          = NULL;
@@ -319,14 +320,14 @@ public:
       Widget_t *parent,
       const char *label,
       int x, int y, int w, int h,
-      _widget_style s = WSTYLE_BUTTON);
+      _widget_style s = WSTYLE_IMAGE_BUTTON);
 
   bool set_value (bool value);
   virtual void on_mouseup ();
   
   static void cb_draw (void *w, void *userdata);
   static bool draw_button_image (Widget_t *w, c_button *b);
-  void set_image (const unsigned char *png, _widget_state which);
+  void set_image (const unsigned char *png, _widget_state which = WSTATE_ALL);
   
   inline void set_image_on (const unsigned char *png)
     { set_image (png, WSTATE_ON); }
@@ -340,6 +341,8 @@ public:
     { set_image (png, WSTATE_DOWN_HOVER); }
   inline void set_image_off_hover (const unsigned char *png)
     { set_image (png, WSTATE_OFF_HOVER); }
+  inline void set_image_all (const unsigned char *png)
+    { set_image (png, WSTATE_ALL); }
   
   bool is_toggle = false;
   bool value = false;
@@ -350,6 +353,7 @@ public:
   cairo_surface_t *img_down = NULL;
   cairo_surface_t *img_down_hover = NULL;
   cairo_surface_t *img_off_hover = NULL;
+  cairo_surface_t *img_all = NULL;
 };
 
 class c_knob : public c_widget {

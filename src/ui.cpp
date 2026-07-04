@@ -139,10 +139,13 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   frame1.create (ui, widget, "", 12, 12, w () - 24, h () - 80);
   btn_ok.create (ui, widget, "OK", 0, 0, 128, 40);
   btn_ok.role = ROLE_PREFSOK;
+  btn_ok.set_image (data_xputty_approved_png);
   btn_cancel.create (ui, widget, "Cancel", 0, 0, 128, 40);
   btn_cancel.role = ROLE_PREFSCANCEL;
+  btn_cancel.set_image (data_xputty_cancel_png);
   btn_about.create (ui, widget, "About...", 0, 0, 128, 40);
   btn_about.role = ROLE_ABOUT;
+  btn_about.set_image (data_xputty_info_png);
   
   label_calibdb.create (ui, frame1.widget, "Calibration target dB:", 0, 0, 120, 32);
   label_vuscale.create (ui, frame1.widget, "VU meter scale dB:", 0, 0, 120, 32);
@@ -277,6 +280,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   //btn_ok.create (ui, frame.widget, "OK", 160, 395, 80, 40);
   btn_ok.create (ui, widget, "OK", 0, 0, 120, 40);
   btn_ok.role = ROLE_ABOUTOK;
+  btn_ok.set_image (data_xputty_approved_png);
   
   const char *text [] = {
     "NeuralBlender",
@@ -393,10 +397,10 @@ void c_lane_widgets::create (
   meter_out.set_stereo (false);
   vudata_out.set_l (0.0, 0.0);
   
-  btn_browse.create (ui, wp, "Load", 0, 0, 100, 40, WSTYLE_IMAGE_BUTTON);
-  btn_clear.create  (ui, wp, "Clear",     0, 0, 100, 40, WSTYLE_IMAGE_BUTTON);
+  btn_browse.create (ui, wp, "", 0, 0, 100, 40, WSTYLE_IMAGE_BUTTON);
+  btn_clear.create  (ui, wp, "",     0, 0, 100, 40, WSTYLE_IMAGE_BUTTON);
   btn_excl.create   (ui, wp, "Use",       0, 0, 100, 40, WSTYLE_TOGGLE);
-  btn_mute.create   (ui, wp, "Mute",      0, 0, 100, 40, WSTYLE_TOGGLE);
+  btn_mute.create   (ui, wp, "Mute",      0, 0, 100, 40, WSTYLE_IMAGE_TOGGLE);
   btn_mute.set_value (false);
   btn_browse.lane = which;
   btn_clear.lane = which;
@@ -406,6 +410,9 @@ void c_lane_widgets::create (
   btn_mute.role = ROLE_MUTE;
   btn_excl.role = ROLE_EXCL_USE;
   btn_excl.lane = which;
+  btn_mute.set_image (data_icon_speaker_off_png, WSTATE_ON);
+  btn_mute.set_image (data_icon_speaker_on_png, WSTATE_OFF);
+  btn_mute.padding = 16;
   
   // advanced controls
   delay.role = ROLE_DELAY;
@@ -417,8 +424,8 @@ void c_lane_widgets::create (
   delay.set_step (0.01);
   delay.role = ROLE_DELAY;
 
-  btn_flip.create   (ui, wp, "DC flip", 0, 0, 32, 32, WSTYLE_IMAGE_TOGGLE);
-  btn_calib.create   (ui, wp, "Calib", 0, 0, 32, 32, WSTYLE_IMAGE_TOGGLE);
+  btn_flip.create   (ui, wp, "", 0, 0, 32, 32, WSTYLE_IMAGE_TOGGLE);
+  btn_calib.create   (ui, wp, "", 0, 0, 32, 32, WSTYLE_IMAGE_TOGGLE);
   btn_flip.role = ROLE_DCFLIP;
   btn_calib.role = ROLE_CALIBRATE;
   btn_flip.lane = which;
@@ -514,6 +521,7 @@ void c_lane_widgets::move_resize (
   btn_mute.move_resize (mute_x,
                          button_top, mute_width, button_width);
   btn_excl.move_resize (btn_mute.x (), btn_mute.y (), btn_mute.w (), btn_mute.h ());
+  btn_mute.padding = btn_mute.h () / 4;
   
   gain_in.move_resize (knob_right, knob_top, knob_size, knob_size + 16);
   gain_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size + 16);
@@ -591,13 +599,18 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   label_big.align = TEXT_CENTER;
   label_big.textsize = 1.5;
   
-  btn_enable.create (this, mainwindow.widget, "Enabled",  20, 12, 120, 40, WSTYLE_TOGGLE);
+  btn_enable.create (this, mainwindow.widget, "ON/OFF",  20, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
   btn_enable.set_value (true);
   btn_enable.role = ROLE_BYPASS;
+  btn_enable.set_image (data_icon_power_on_png, WSTATE_ON);
+  btn_enable.set_image (data_icon_power_grey_png, WSTATE_OFF);
   btn_prefs.create (this, mainwindow.widget, "Settings", 520, 600, 100, 40);
   btn_prefs.role = ROLE_PREFS;
-  btn_muteall.create (this, mainwindow.widget, "Mute all", 500, 12, 120, 40, WSTYLE_TOGGLE);
+  btn_prefs.set_image (data_xputty_gear_png);
+  btn_muteall.create (this, mainwindow.widget, "Mute all", 500, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
   btn_muteall.role = ROLE_MUTEALL;
+  btn_muteall.set_image (data_icon_speaker_off_png, WSTATE_ON);
+  btn_muteall.set_image (data_icon_speaker_on_png, WSTATE_OFF);
   
   cont_checkboxes.create (this, mainwindow.widget, "", 8, 604, 550, 40);
   cont_checkboxes.widget->scale.gravity = NONE;
@@ -667,7 +680,6 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
   switch (btn->role) {
     case ROLE_BYPASS: CP
       on_bypass (btn, value);
-      btn->set_label (value ? "Enabled" : "Bypass");
     break;
 
     case ROLE_MUTE: CP
@@ -1088,7 +1100,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
 
   const bool enabled = !state.bypass;
   btn_enable.set_value (enabled);
-  btn_enable.set_label (enabled ? "Enabled" : "Bypass");
+  //btn_enable.set_label (enabled ? "Enabled" : " Bypass ");
 
   /*btn_advanced.set_value (state.showadvanced);
   show_advanced_settings (state.showadvanced);*/
