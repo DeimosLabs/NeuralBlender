@@ -21,8 +21,9 @@
 #include "cmdline_debug.h"
 
 #define MIN_WINDOW_HEIGHT (64 + (150 * NB_NUM_MODELS))
-#define DEFAULT_WINDOW_HEIGHT (12 + std::min (640, (52 + (180 * NB_NUM_MODELS))))
-#define MIN_WINDOW_WIDTH 600
+//#define DEFAULT_WINDOW_HEIGHT (12 + std::min (640, (52 + (180 * NB_NUM_MODELS))))
+#define DEFAULT_WINDOW_HEIGHT MIN_WINDOW_HEIGHT
+#define MIN_WINDOW_WIDTH 640
 #define DEFAULT_WINDOW_WIDTH 640
 
 extern const char *g_build_timestamp;
