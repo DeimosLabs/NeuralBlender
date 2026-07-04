@@ -487,8 +487,6 @@ void c_lane_widgets::move_resize (
 
   lane_widget.move_resize (x, y, w, h);
 
-  int split = 0;
-  
   cont_regcontrols.move_resize (0, 0, w, h);
   
   int button_padding = 4;
@@ -496,18 +494,17 @@ void c_lane_widgets::move_resize (
   //const int knob_size = 64;//std::max (64, h / 2);
   int knob_size = std::max (64, w / 10);
   knob_size = std::min (knob_size, h / 2);
-  const int knob_top = (h - knob_size) / 2 - 8;
+  const int knob_top = (h - knob_size) / 2 - 16;
   const int knob_right = w - knob_size * 2 - 12;
-  const int reg_w = cont_regcontrols.w ();
   const int menu_x = 16 + knob_size;//delay.x () + delay.w () + 8;
   const int menu_width = std::max (64, w - menu_x - (w - knob_right) - button_padding - 10);
-  menu_list.move_resize (menu_x, 24, menu_width, 32);
+  menu_list.move_resize (menu_x, 12, menu_width, 32);
   //int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
   int button_left = menu_list.x ();
   int button_top = menu_list.y () + menu_list.h () + 8;
   int button_width = std::min (h - 76, w / 10);
   
-  delay.move_resize (16, knob_top, knob_size, knob_size + 16);
+  delay.move_resize (12, knob_top, knob_size, knob_size + 16);
 
   btn_browse.move_resize (button_left, button_top, button_width, button_width);
   btn_clear.move_resize (btn_browse.x () + btn_browse.w () + button_padding,
@@ -530,8 +527,8 @@ void c_lane_widgets::move_resize (
   
   int adv_btn_x = 84;
   int adv_btn_y = h * 2 / 11;
-  label_frames.move_resize (delay.x (), h - 25, delay.w (), 16);
-  label_trim.move_resize (gain_in.x () - 12, h - 25, gain_in.w () + gain_out.w () + 24, 16);
+  label_frames.move_resize (delay.x (), h - 32, delay.w (), 16);
+  label_trim.move_resize (gain_in.x (), h - 32, gain_in.w () + gain_out.w (), 16);
   //move_resize (x, y, w, h);
 }
 
@@ -652,7 +649,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   
   mainwindow.show ();
   ui_ready = true;
-  reposition_widgets ();
+  move_resize ();
   CP
   XFlush (display);
   CP
@@ -820,7 +817,7 @@ void c_neuralblender_ui::write_prefs_to (t_prefs &p) { CP
   p.vu_on = state.do_vu;
 }
 
-void c_neuralblender_ui::reposition_widgets (bool snap_to_default) {
+void c_neuralblender_ui::move_resize (bool snap_to_default) {
   CP
   //state.showadvanced = b;
   
@@ -901,7 +898,7 @@ void c_neuralblender_ui::update_stats () {
 /*void c_neuralblender_ui::show_advanced_settings (bool b) {
   //show_advanced = b;
   state.showadvanced = b;
-  reposition_widgets (true);
+  move_resize (true);
 }
 
 void c_neuralblender_ui::hide_advanced_settings () {
@@ -963,7 +960,7 @@ size_t c_neuralblender_ui::choose_exclusive_lane () const {
 
 void c_neuralblender_ui::on_window_resize (int w, int h) {
   if (ui_ready && !ui_resize_lock)
-    reposition_widgets ();
+    move_resize ();
 }
 
 bool c_neuralblender_ui::request_window_size (int w, int h) {

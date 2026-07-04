@@ -163,7 +163,7 @@ public:
   void vu_off ();
   //void show_advanced_settings (bool b = true);
   //void hide_advanced_settings ();
-  void reposition_widgets (bool default_size = false);
+  void move_resize (bool default_size = false);
   size_t choose_exclusive_lane () const;
   void update_stats ();
   //void excl_select (size_t which);
@@ -240,5 +240,5 @@ public:
   //bool show_advanced = false;
   bool ui_resize_lock = false;
   float stats [NB_NUM_MODELS * 2];
-  //inline void reposition_widgets () { show_advanced_settings (show_advanced); }
+  //inline void move_resize () { show_advanced_settings (show_advanced); }
 };
