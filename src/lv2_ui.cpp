@@ -261,7 +261,7 @@ public:
       state.bypass = value < 0.5f;
       const bool enabled = !state.bypass;
       btn_enable.set_value (enabled);
-      btn_enable.set_label (enabled ? "Enabled" : "Bypass");
+      //btn_enable.set_label (enabled ? "Enabled" : "Bypass");
       updating_from_state = old_updating_from_state;
       updating_from_host = false;
       return;
