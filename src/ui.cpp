@@ -680,7 +680,9 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
 
   switch (btn->role) {
     case ROLE_BYPASS: CP
+      state.bypass = !value;
       on_bypass (btn, value);
+      sync_widgets_from_state (state);
     break;
 
     case ROLE_MUTE: CP
@@ -1127,7 +1129,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     lanes [i].btn_mute.set_value (state.lanes [i].lane_mute);
     lanes [i].btn_excl.set_value (selected);
 
-    if (state.lanes [i].lane_mute || state.mute_all) { CP
+    if (state.lanes [i].lane_mute || state.mute_all || !enabled) { CP
       lanes [i].lane_widget.set_state (WSTATE_DISABLED);
     } else {
       lanes [i].lane_widget.set_state (WSTATE_NORMAL);
@@ -1142,7 +1144,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
       widget_hide (lanes [i].btn_excl.widget);
     }
   }
-  if (exclusive_on && !state.mute_all) {
+  if (exclusive_on && !state.mute_all && enabled) {
     //lanes [state.exclusive_lane - 1].lane_widget.set_fg_color (0.1, 0.4, 0.4);
     lanes [state.exclusive_lane - 1].lane_widget.set_state (WSTATE_SELECTED);
   }

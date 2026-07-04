@@ -259,10 +259,8 @@ public:
 
     if (port == PORT_BYPASS) {
       state.bypass = value < 0.5f;
-      const bool enabled = !state.bypass;
-      btn_enable.set_value (enabled);
-      //btn_enable.set_label (enabled ? "Enabled" : "Bypass");
       updating_from_state = old_updating_from_state;
+      sync_widgets_from_state (state);
       updating_from_host = false;
       return;
     }
