@@ -169,7 +169,7 @@ public:
   size_t choose_exclusive_lane () const;
   void update_stats ();
   //void excl_select (size_t which);
-  void sync_widgets_from_state (const c_neuralblender_state &state);
+  void sync_widgets_from_state (const c_neuralblender_state &state, bool scan_dirs = false);
   void write_calib_state_if_consistent ();
   virtual void apply_effective_controls ();
 

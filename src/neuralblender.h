@@ -161,6 +161,7 @@ public:
   ~c_neuralblender ();
   void set_samplerate (uint32_t sr);
   void set_blocksize (uint32_t bs);
+  void process_block_main (float *in, float *out, uint32_t nframes);
   void process_block (float *in, float *out, uint32_t count);
   bool load_model (size_t which, const char *filename);
   bool unload_model (size_t which);
@@ -192,6 +193,9 @@ public:
   bool mute_all = false;
   bool linked_calib = false;
   int calib_source = 0; // 0=guitar, 1=bass
+
+  std::atomic<bool> ramp = false;
+  std::atomic<bool> ramp_back = false;
 
 private:
   void update_mutes ();

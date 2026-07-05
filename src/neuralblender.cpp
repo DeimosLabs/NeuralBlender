@@ -37,6 +37,38 @@ extern c_neuralblender g_blender;
 
 // a few helper functions
 
+static void fade_block_in_out (float *f, size_t nframes) {
+  if (!f || nframes < 3)
+    return;
+
+  const float mid = (float) (nframes - 1) * 0.5f;
+
+  for (size_t i = 0; i < nframes; ++i) {
+    float g = fabsf ((float) i - mid) / mid;
+    f [i] *= g;
+  }
+}
+
+static void fade_block_in (float *f, size_t nframes) {
+  if (!f || nframes < 2)
+    return;
+
+  const float denom = (float) (nframes - 1);
+  for (size_t i = 0; i < nframes; ++i) {
+    f [i] *= (float) i / denom;
+  }
+}
+
+static void fade_block_out (float *f, size_t nframes) {
+  if (!f || nframes < 2)
+    return;
+
+  const float denom = (float) (nframes - 1);
+  for (size_t i = 0; i < nframes; ++i) {
+    f [i] *= 1.0f - ((float) i / denom);
+  }
+}
+
 static bool ends_with (const std::string &a, const std::string &b, bool casesens = false) {
   bool ret = true;
   size_t len_a = a.length ();
@@ -394,6 +426,7 @@ static void copy_with_gain (float *in, float *out, uint32_t nframes, float gain)
 }
 
 void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
+  bool do_ramp = false;
   if (!out) return;
   
   const float input_gain = clamp_gain_multiplier (gain_in);
@@ -407,20 +440,19 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
   // releases when it goes out of scope
   std::lock_guard<std::mutex> lock (model_mutex, std::adopt_lock);
 
-  // output gain at minimum (-40dB) -> silence
-  /*if (gain_out <= 0.01) {
-    memset (out, 0, nframes * sizeof (float));
-    return;
-  }*/
-
-  if (warmup > 0) {
+  if (warmup >= 0) {
     debug ("skipping block, warmup=%d", warmup);
     warmup--;
     if (in != out)
       memcpy (out, in, nframes * sizeof (float));
-    return;
+    if (warmup == 0) {
+      warmup--;
+      do_ramp = true;
+    } else {
+      return;
+    }
   }
-
+  
   switch (m_engine_mode) {
     case ENGINE_NONE:
       copy_with_gain (in, out, nframes, input_gain * output_gain);
@@ -444,7 +476,7 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
             out[i] = std::clamp (y * out_gain, -1.0f, 1.0f);
         }
       }
-      return;
+      //return;
     break;
 
     case ENGINE_NAM:
@@ -471,8 +503,14 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
           else
             out [i] = std::clamp (out [i] * out_gain, -1.0f, 1.0f);
       }
-      return;
+      //return;
     break;
+  }
+  // TODO: figure out why this isn't working
+  if (do_ramp) {
+    debug ("do_ramp && in != out");
+    const float denom = nframes > 1 ? (float) (nframes - 1) : 1.0f;
+    fade_block_in (out, nframes);
   }
 }
 
@@ -526,6 +564,7 @@ c_neuralblender::~c_neuralblender () { CP
 
 bool c_neuralblender::calibrate (size_t which, bool bass) {
   debug ("bass=%d", (int) bass);
+  ramp = true;
   if (which >= NB_NUM_MODELS)
     return false;
     
@@ -548,6 +587,7 @@ bool c_neuralblender::calibrate (size_t which, bool bass) {
 
 bool c_neuralblender::calibrate_linked (bool bass) {
   debug ("bass=%d", (int) bass);
+  ramp = true;
   float linked_trim = INFINITY;
   bool any_linked = false;
   float *data = (float *) data_calib_f32;
@@ -585,6 +625,7 @@ bool c_neuralblender::calibrate_linked (bool bass) {
 void c_neuralblender::set_samplerate (uint32_t sr) { CP
   debug ("start");
   m_samplerate = sr;
+  ramp = true;
   for (size_t i = 0; i < NB_NUM_MODELS; ++i)
     amps [i].set_samplerate (sr);
   debug ("end");
@@ -592,6 +633,7 @@ void c_neuralblender::set_samplerate (uint32_t sr) { CP
 
 void c_neuralblender::set_blocksize (uint32_t bs) { CP
   //m_blocksize = bs;
+  ramp = true;
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     amps [i].blocksize = bs;
     m_delay_bufs [i].resize (MAX_BLOCK_SIZE);
@@ -603,6 +645,7 @@ bool c_neuralblender::dcflip (size_t which, bool b) {
   if (which >= NB_NUM_MODELS)
     return false;
   amps [which].dcflip = b;
+  ramp = true;
   return true;
 }
 
@@ -615,6 +658,7 @@ bool c_neuralblender::calib_on (size_t which, bool b) {
   if (which >= NB_NUM_MODELS)
     return false;
   amps [which].do_calib = b;
+  ramp = true;
   return true;
 }
 
@@ -626,7 +670,8 @@ bool c_neuralblender::is_calib_on (size_t which) {
 bool c_neuralblender::set_delay_frames (size_t which, uint32_t frames) { CP
   if (which >= NB_NUM_MODELS)
     return false;
-
+  
+  ramp = true;
   return delays [which].set_frames (frames);
 }
 
@@ -651,11 +696,13 @@ bool c_neuralblender::set_lane_mute (size_t which, bool muted) {
     return false;
 
   m_lane_mute [which].store (muted, std::memory_order_relaxed);
+  ramp = true;
   return true;
 }
 
 void c_neuralblender::set_bypass (bool bypass) {
   m_bypass.store (bypass, std::memory_order_relaxed);
+  ramp = true;
 }
 
 bool c_neuralblender::lane_mute (size_t which) const {
@@ -756,6 +803,7 @@ bool c_neuralblender::set_calib_target_db (float f) { CP
 }
 
 bool c_neuralblender::load_model (size_t which, const char *fn) { CP
+  ramp = true;
   if (which >= NB_NUM_MODELS) {
     debug ("which >= %d", NB_NUM_MODELS);
     return false;
@@ -779,6 +827,7 @@ bool c_neuralblender::load_model (size_t which, const char *fn) { CP
 }
 
 bool c_neuralblender::unload_model (size_t which) { CP
+  ramp = true;
   if (which >= NB_NUM_MODELS)
     return false;
 
@@ -793,6 +842,7 @@ bool c_neuralblender::set_delay_ms (size_t which, float ms) {
   const uint32_t frames =
     (uint32_t) ((ms * m_samplerate) / 1000.0f + 0.5f); // round to nearest int
 
+  ramp = true;
   return set_delay_frames (which, frames);
 }
 
@@ -809,7 +859,7 @@ static void update_loaded_output_meters (c_neuralblender *blender) {
   }
 }
 
-void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
+void c_neuralblender::process_block_main (float *in, float *out, uint32_t nframes) {
   if (!in || !out || !nframes)
     return;
 
@@ -913,4 +963,18 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
 
   for (uint32_t i = 0; i < nframes; ++i)
     out [i] = std::clamp (out [i], -1.0f, 1.0f);
+}
+
+void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
+  process_block_main (in, out, nframes);
+  if (ramp) {
+    debug ("ramp");
+    ramp_back = true;
+    ramp = false;
+    fade_block_out (out, nframes);
+  } else if (ramp_back) {
+    debug ("ramp_back");
+    ramp_back = false;
+    fade_block_in (out, nframes);
+  }
 }

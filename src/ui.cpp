@@ -691,7 +691,6 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     case ROLE_BYPASS: CP
       state.bypass = !value;
       on_bypass (btn, value);
-      sync_widgets_from_state (state);
     break;
 
     case ROLE_MUTE: CP
@@ -993,7 +992,7 @@ void c_neuralblender_ui::on_excl (c_widget *w, int n) {
 
   btn_exclmode.set_value (state.exclusive_lane != 0);
   apply_effective_controls();
-  sync_widgets_from_state (state);
+  //sync_widgets_from_state (state);
 }
 
 void c_neuralblender_ui::on_excl_use (c_widget *w, bool b) {
@@ -1081,7 +1080,8 @@ void c_neuralblender_ui::write_calib_state_if_consistent () {
   configfile.write_file();
 }
 
-void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &state_) {
+void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &state_,
+                                                  bool scan_dirs) {
   if (!ui_ready)
     return;
   const bool showadvanced = state.showadvanced;
@@ -1104,12 +1104,14 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     lanes [i].btn_calib.set_value (lane.do_calib);
 
     //filepickers [i].selected_file = lane.filename;
-    if (state.lanes [i].filename.empty ()) {
-      lanes [i].menu_list.clear ();
-    } else {
-      filepickers [i].current_dir = path_dirname (state.lanes [i].filename);
-      filepickers [i].scan_current_dir ();
-      filepickers [i].add_files_from_dir (&lanes [i].menu_list);
+    if (scan_dirs) {
+      if (state.lanes [i].filename.empty ()) {
+        lanes [i].menu_list.clear ();
+      } else {
+        filepickers [i].current_dir = path_dirname (state.lanes [i].filename);
+        filepickers [i].scan_current_dir ();
+        filepickers [i].add_files_from_dir (&lanes [i].menu_list);
+      }
     }
     update_stats ();
   }
