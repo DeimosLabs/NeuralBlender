@@ -84,7 +84,8 @@ enum {
 	  PORT_MUTE_ALL,
 	  PORT_EXCLUSIVE_LANE,
 	  PORT_LINKED_CALIB,
-	  PORT_CALIB_SOURCE
+	  PORT_CALIB_SOURCE,
+	  PORT_CALIB_TARGET_DB
 };
 
 typedef struct {
@@ -105,6 +106,7 @@ typedef struct {
 	  const float *exclusive_lane = NULL;
 	  const float *linked_calib = NULL;
 	  const float *calib_source = NULL;
+	  const float *calib_target_db = NULL;
   
   float last_delay          [NB_NUM_MODELS] = { 0.0 };
   float last_gain_in_db     [NB_NUM_MODELS] = { 0.0 };
@@ -118,6 +120,7 @@ typedef struct {
 	  float last_exclusive_lane = 0.0;
 	  float last_linked_calib   = 0.0;
 	  float last_calib_source   = 0.0;
+	  float last_calib_target_db = DB_CALIB_TARGET_DEFAULT;
   bool base_lane_mute [NB_NUM_MODELS] = { false };
   bool host_bypass = false;
 
@@ -406,6 +409,30 @@ static void request_calibrate_linked (Plugin *self) {
   self->loader_cv.notify_one ();
 }
 
+static void set_calib_target_db (Plugin *self, float db) {
+  if (!self)
+    return;
+
+  const float old_db = self->blender.amps [0].calib_target_db;
+  self->blender.set_calib_target_db (db);
+  const bool changed = self->blender.amps [0].calib_target_db != old_db;
+  if (!changed)
+    return;
+
+  self->last_calib_target_db = self->blender.amps [0].calib_target_db;
+
+  if (self->blender.linked_calib) {
+    request_calibrate_linked (self);
+  } else {
+    for (size_t i = 0; i < NB_NUM_MODELS; i++) {
+      const bool enabled =
+        self->calibrate [i] && *self->calibrate [i] >= 0.5f;
+      if (enabled)
+        request_calibrate (self, i, true);
+    }
+  }
+}
+
 static LV2_State_Status save (
     LV2_Handle instance,
     LV2_State_Store_Function store,
@@ -607,6 +634,7 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   self->blocksize = 0;
   
   self->blender.set_samplerate ((uint32_t)rate);
+  self->last_calib_target_db = self->blender.amps [0].calib_target_db;
   self->meter_in.samplerate = (int) rate;
   self->meter_in.redraw_interval = 1.0f / LV2_METER_FPS;
   for (int i = 0; i < NB_NUM_MODELS; i++) {
@@ -821,6 +849,10 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
 	    case PORT_CALIB_SOURCE:
 	      self->calib_source = (const float *) data;
 	    break;
+
+	    case PORT_CALIB_TARGET_DB:
+	      self->calib_target_db = (const float *) data;
+	    break;
 	  }
 	}
 
@@ -916,26 +948,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         ((const LV2_Atom_URID *) property)->body;
 
 	      if (prop == self->urid_calib_target_db) {
-	        if (value->type == self->urid_atom_Float) {
-	          const float db = ((const LV2_Atom_Float *) value)->body;
-	          const float old_db = self->blender.amps [0].calib_target_db;
-	          self->blender.set_calib_target_db (db);
-	          const bool changed =
-	            self->blender.amps [0].calib_target_db != old_db;
-	          if (!changed)
-	            continue;
-	
-	          if (self->blender.linked_calib) {
-	            request_calibrate_linked (self);
-	          } else {
-	            for (i = 0; i < NB_NUM_MODELS; i++) {
-	              const bool enabled =
-	                self->calibrate [i] && *self->calibrate [i] >= 0.5f;
-	              if (enabled)
-	                request_calibrate (self, i, true);
-	          }
-	        }
-	        }
+	        if (value->type == self->urid_atom_Float)
+	          set_calib_target_db (self, ((const LV2_Atom_Float *) value)->body);
 	        continue;
 	      }
 
@@ -1035,6 +1049,12 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	        }
 	      }
 	    }
+	  }
+
+	  if (self->calib_target_db) {
+	    const float v = *self->calib_target_db;
+	    if (v != self->last_calib_target_db)
+	      set_calib_target_db (self, v);
 	  }
 	  
 	  // check all parameters

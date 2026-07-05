@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <math.h>
 
@@ -77,7 +78,8 @@ enum {
 	  PORT_MUTE_ALL,
 	  PORT_EXCLUSIVE_LANE,
 	  PORT_LINKED_CALIB,
-	  PORT_CALIB_SOURCE
+	  PORT_CALIB_SOURCE,
+	  PORT_CALIB_TARGET_DB
 };
 
 class c_lv2_ui : public c_neuralblender_ui {
@@ -237,8 +239,8 @@ public:
 	  void apply_prefs (t_prefs &p) override {
 	    c_neuralblender_ui::apply_prefs (p);
 	    write_control (PORT_LINKED_CALIB, p.linked_calib ? 1.0f : 0.0f);
-	    write_float_property (urid_calib_target_db, p.calib_target_db);
 	    write_control (PORT_CALIB_SOURCE, (float) p.calib_source);
+	    write_control (PORT_CALIB_TARGET_DB, p.calib_target_db);
 	  }
 
   bool request_window_size (int w, int h) {
@@ -322,6 +324,18 @@ public:
 	      prefs.calib_source = source;
 	      if (prefswindow.widget)
 	        prefswindow.btn_bass.set_value (prefs.calib_source == 1);
+	      updating_from_state = old_updating_from_state;
+	      updating_from_host = false;
+	      return;
+	    }
+
+	    if (port == PORT_CALIB_TARGET_DB) {
+	      prefs.calib_target_db = value;
+	      if (prefswindow.widget) {
+	        char buf [64];
+	        snprintf (buf, sizeof (buf), "%.6g", prefs.calib_target_db);
+	        prefswindow.text_calibdb.set_text (buf);
+	      }
 	      updating_from_state = old_updating_from_state;
 	      updating_from_host = false;
 	      return;
@@ -441,11 +455,11 @@ public:
           return;
 
         size_t n = 0;
-        vudata_in.set_l (values [n], values [n + 1]);
+        vudata_in.set_l_smooth (values [n], values [n + 1]);
         n += 2;
-        
+
         for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
-          lanes [lane].vudata_out.set_l (values [n], values [n + 1]);
+          lanes [lane].vudata_out.set_l_smooth (values [n], values [n + 1]);
           n += 2;
         }
 
@@ -521,6 +535,7 @@ public:
 	    subscribe->subscribe (subscribe->handle, PORT_EXCLUSIVE_LANE, 0, NULL);
 	    subscribe->subscribe (subscribe->handle, PORT_LINKED_CALIB, 0, NULL);
 	    subscribe->subscribe (subscribe->handle, PORT_CALIB_SOURCE, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_CALIB_TARGET_DB, 0, NULL);
 	  }
 };
 

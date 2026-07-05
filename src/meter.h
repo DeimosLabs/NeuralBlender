@@ -30,7 +30,7 @@
 #define VU_PEAK_HOLD        1.000000000f
 #define VU_CLIP_HOLD        1.000000000f
 #define VU_XRUN_HOLD        1.000000000f
-#define VU_FALL_SPEED       0.030000000f
+#define VU_FALL_SPEED       0.020000000f
 
 typedef struct _cairo cairo_t;
 //struct cairo_t;
@@ -50,12 +50,20 @@ public:
   void set_db_scale (float db);
   void set_l (float level, float hold, bool clip = false, bool xrun = false);
   void set_r (float level, float hold, bool clip = false, bool xrun = false);
+  void set_l_smooth (float level, float hold, bool clip = false, bool xrun = false);
+  void set_r_smooth (float level, float hold, bool clip = false, bool xrun = false);
+  void set_display_l (float level, float hold, bool clip = false, bool xrun = false);
+  void set_display_r (float level, float hold, bool clip = false, bool xrun = false);
   void set_headroom (float db);
 
   float l () const;
   float r () const;
   float peak_l () const;
   float peak_r () const;
+  float display_l () const { return m_display_l.load (); }
+  float display_r () const { return m_display_r.load (); }
+  float display_peak_l () const { return db_scaled (m_peak_l.load ()); }
+  float display_peak_r () const { return db_scaled (m_peak_r.load ()); }
   float linear_l () const { return m_l.load (); }
   float linear_r () const { return m_r.load (); }
   float linear_peak_l () const { return m_peak_l.load (); }

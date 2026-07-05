@@ -97,6 +97,9 @@ float c_vudata::display_to_linear (float f) const {
   const float min_db = m_db_scale.load ();
   f = clamp01 (f);
 
+  if (f <= 0.0f)
+    return 0.0f;
+
   if (min_db >= 0.0f)
     return f;
 
@@ -237,6 +240,60 @@ void c_vudata::set_r (float level, float hold, bool clip, bool xrun) {
   m_r.store (std::max (0.0f, level));
   m_display_r.store (db_scaled (level));
   m_peak_r.store (std::max (0.0f, hold));
+  clip_r.store (clip);
+  xrun_r.store (xrun);
+  needs_redraw.store (true);
+}
+
+void c_vudata::set_l_smooth (float level, float hold, bool clip, bool xrun) {
+  const float linear = std::max (0.0f, level);
+  const float old = m_display_l.load ();
+  const float target = db_scaled (linear);
+  const float next = target >= old
+    ? target
+    : std::max (target, old - VU_FALL_SPEED);
+
+  m_l.store (linear);
+  m_display_l.store (next);
+  m_peak_l.store (std::max (0.0f, hold));
+  clip_l.store (clip);
+  xrun_l.store (xrun);
+  needs_redraw.store (true);
+}
+
+void c_vudata::set_r_smooth (float level, float hold, bool clip, bool xrun) {
+  const float linear = std::max (0.0f, level);
+  const float old = m_display_r.load ();
+  const float target = db_scaled (linear);
+  const float next = target >= old
+    ? target
+    : std::max (target, old - VU_FALL_SPEED);
+
+  m_r.store (linear);
+  m_display_r.store (next);
+  m_peak_r.store (std::max (0.0f, hold));
+  clip_r.store (clip);
+  xrun_r.store (xrun);
+  needs_redraw.store (true);
+}
+
+void c_vudata::set_display_l (float level, float hold, bool clip, bool xrun) {
+  const float display = clamp01 (level);
+  const float display_hold = clamp01 (hold);
+  m_l.store (display_to_linear (display));
+  m_display_l.store (display);
+  m_peak_l.store (display_to_linear (display_hold));
+  clip_l.store (clip);
+  xrun_l.store (xrun);
+  needs_redraw.store (true);
+}
+
+void c_vudata::set_display_r (float level, float hold, bool clip, bool xrun) {
+  const float display = clamp01 (level);
+  const float display_hold = clamp01 (hold);
+  m_r.store (display_to_linear (display));
+  m_display_r.store (display);
+  m_peak_r.store (display_to_linear (display_hold));
   clip_r.store (clip);
   xrun_r.store (xrun);
   needs_redraw.store (true);
