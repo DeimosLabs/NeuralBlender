@@ -63,11 +63,13 @@ public:
   void on_resize ();
   void get_prefs_from (t_prefs &prefs);
   void set_prefs_to   (t_prefs &prefs);
+  void load_defaults ();
   
   c_frame frame1;
   c_button btn_about;
   c_button btn_cancel;
   c_button btn_ok;
+  c_button btn_defaults;
   
   c_label label_calibdb;
   c_label label_vuscale;

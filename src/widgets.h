@@ -16,10 +16,11 @@ enum _textalign {
 };
 
 enum _widget_role {
-  ROLE_NONE,
+  ROLE_NONE = 0,
   ROLE_ABOUT,
   ROLE_ABOUTOK,
   ROLE_PREFS,
+  ROLE_PREFSDEFAULTS,
   ROLE_PREFSOK,
   ROLE_PREFSCANCEL,
   ROLE_MUTE,

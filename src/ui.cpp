@@ -126,7 +126,7 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
     return;
   
   int default_w = 550;
-  int default_h = 450;
+  int default_h = 550;
   
   if (!c_toplevelwindow::create (
       ui,
@@ -158,6 +158,8 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   btn_linkcalib.create (ui, frame1.widget, "Linked calibration",
                         0, 0, 300, 32, WSTYLE_CHECKBOX);
   btn_bass.create (ui, frame1.widget, "Calibrate for bass", 0, 0, 300, 32, WSTYLE_CHECKBOX);
+  btn_defaults.create (ui, frame1.widget, "Reset to defaults", 0, 0, 400, 32);
+  btn_defaults.role = ROLE_PREFSDEFAULTS;
   
   text_calibdb.create (ui, frame1.widget, "", 0, 0, 128, 32);
   text_vuscale.create (ui, frame1.widget, "", 0, 0, 128, 32);
@@ -173,6 +175,7 @@ void c_prefswindow::on_resize () {
   btn_ok.move_resize (w () - 140, h () - 56, 128, 40);
   btn_cancel.move_resize (w () - 280, h () - 56, 128, 40);
   btn_about.move_resize (12, h () - 56, 128, 40);
+  btn_defaults.move_resize (12, frame1.h () - 50, frame1.w () - 24, 40);
   
   int labels_x = 16;
   int controls_x = 0;
@@ -217,6 +220,15 @@ void c_prefswindow::show () { CP
 
 void c_prefswindow::hide () { CP
   c_toplevelwindow::hide ();
+}
+
+void c_prefswindow::load_defaults () {
+  text_calibdb.set_text ("-18");
+  text_vuscale.set_text ("-48");
+  text_vuheadroom.set_text ("6");
+  btn_vu.set_value (true);
+  btn_linkcalib.set_value (false);
+  btn_bass.set_value (false);
 }
 
 void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
@@ -743,6 +755,10 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
       apply_prefs (prefs);
       on_prefs_ok ();
       prefswindow.hide ();
+    break;
+    
+    case ROLE_PREFSDEFAULTS: CP
+      prefswindow.load_defaults ();
     break;
 
     case ROLE_PREFSCANCEL: CP
