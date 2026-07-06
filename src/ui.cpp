@@ -423,8 +423,8 @@ void c_lane_widgets::create (
   btn_mute.role = ROLE_MUTE;
   btn_excl.role = ROLE_EXCL_USE;
   btn_excl.lane = which;
-  btn_mute.set_image (data_icon_speaker_off_png, WSTATE_ON);
-  btn_mute.set_image (data_icon_speaker_on_png, WSTATE_OFF);
+  btn_mute.set_image (data_icon_speaker_off_big_png, WSTATE_ON);
+  btn_mute.set_image (data_icon_speaker_on_big_png, WSTATE_OFF);
   btn_mute.padding = 16;
   
   // advanced controls
@@ -453,34 +453,11 @@ void c_lane_widgets::create (
   label_trim.create (ui, wp, "1.0", 0, 0, 75, 24);
   label_trim.textsize = 0.75;
   label_trim.align = TEXT_CENTER;
-
-  btn_browse.set_image_on (data_icon_folder_small_png);
-  btn_browse.set_image_off (data_icon_folder_small_png);
-  btn_browse.set_image_hover (data_icon_folder_small_png);
-  btn_browse.set_image_down (data_icon_folder_small_png);
-  btn_browse.set_image_down_hover (data_icon_folder_small_png);
-  btn_browse.set_image_off_hover (data_icon_folder_small_png);
   
-  btn_clear.set_image_on (data_icon_x_small_png);
-  btn_clear.set_image_off (data_icon_x_small_png);
-  btn_clear.set_image_hover (data_icon_x_small_png);
-  btn_clear.set_image_down (data_icon_x_small_png);
-  btn_clear.set_image_down_hover (data_icon_x_small_png);
-  btn_clear.set_image_off_hover (data_icon_x_small_png);
-  
-  btn_calib.set_image_on (data_icon_calib_small_png);
-  btn_calib.set_image_off (data_icon_calib_small_png);
-  btn_calib.set_image_hover (data_icon_calib_small_png);
-  btn_calib.set_image_down (data_icon_calib_small_png);
-  btn_calib.set_image_down_hover (data_icon_calib_small_png);
-  btn_calib.set_image_off_hover (data_icon_calib_small_png);
-  
-  btn_flip.set_image_on (data_icon_phase_small_png);
-  btn_flip.set_image_off (data_icon_phase_small_png);
-  btn_flip.set_image_hover (data_icon_phase_small_png);
-  btn_flip.set_image_down (data_icon_phase_small_png);
-  btn_flip.set_image_down_hover (data_icon_phase_small_png);
-  btn_flip.set_image_off_hover (data_icon_phase_small_png);
+  btn_browse.set_image_default (data_icon_folder_big_png);
+  btn_clear.set_image_default (data_icon_x_big_png);
+  btn_calib.set_image_default (data_icon_calib_big_png);
+  btn_flip.set_image_default (data_icon_phase_big_png);
   
   if (ui && which < NB_NUM_MODELS) {
     ui->filepickers [which].create (ui, btn_browse.widget, which, "Select file");
@@ -619,8 +596,8 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_prefs.set_image (data_xputty_gear_png);
   btn_muteall.create (this, mainwindow.widget, "Mute all", 500, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
   btn_muteall.role = ROLE_MUTEALL;
-  btn_muteall.set_image (data_icon_speaker_off_png, WSTATE_ON);
-  btn_muteall.set_image (data_icon_speaker_on_png, WSTATE_OFF);
+  btn_muteall.set_image (data_icon_speaker_off_big_png, WSTATE_ON);
+  btn_muteall.set_image (data_icon_speaker_on_big_png, WSTATE_OFF);
   
   cont_checkboxes.create (this, mainwindow.widget, "", 8, 604, 550, 40);
   cont_checkboxes.widget->scale.gravity = NONE;

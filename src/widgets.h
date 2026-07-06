@@ -60,6 +60,7 @@ enum _widget_style {
 };
 
 enum _widget_state {
+  WSTATE_DEFAULT,
   WSTATE_OFF,
   WSTATE_ON,
   WSTATE_HOVER,
@@ -342,19 +343,22 @@ public:
     { set_image (png, WSTATE_DOWN_HOVER); }
   inline void set_image_off_hover (const unsigned char *png)
     { set_image (png, WSTATE_OFF_HOVER); }
+  inline void set_image_default (const unsigned char *png)
+    { set_image (png, WSTATE_DEFAULT); }
   inline void set_image_all (const unsigned char *png)
     { set_image (png, WSTATE_ALL); }
   
   bool is_toggle = false;
   bool value = false;
   
-  cairo_surface_t *img_off = NULL;
-  cairo_surface_t *img_on = NULL;
-  cairo_surface_t *img_hover = NULL;
-  cairo_surface_t *img_down = NULL;
-  cairo_surface_t *img_down_hover = NULL;
-  cairo_surface_t *img_off_hover = NULL;
-  cairo_surface_t *img_all = NULL;
+  cairo_surface_t *img_off          = NULL;
+  cairo_surface_t *img_on           = NULL;
+  cairo_surface_t *img_hover        = NULL;
+  cairo_surface_t *img_down         = NULL;
+  cairo_surface_t *img_down_hover   = NULL;
+  cairo_surface_t *img_off_hover    = NULL;
+  cairo_surface_t *img_all          = NULL;
+  cairo_surface_t *img_default      = NULL;
 };
 
 class c_knob : public c_widget {

@@ -1309,13 +1309,14 @@ static cairo_surface_t *button_image_for_state (c_button *b, Widget_t *w) {
   const bool hover = (w->flags & HAS_FOCUS) || w->state == 1;
   const bool down = w->state == 2;
   
-  //if (b->img_all) return b->img_all;
+  //if (b->img_default) return b->img_default;
   if (down && hover && b->img_down_hover) return b->img_down_hover;
-  if (down && b->img_down) return b->img_down;
-  if (!on && hover && b->img_off_hover) return b->img_off_hover;
-  if (hover && b->img_hover) return b->img_hover;
-  if (on && b->img_on) return b->img_on;
-  if (b->img_all) return b->img_all;
+  else if (down && b->img_down) return b->img_down;
+  else if (!on && hover && b->img_off_hover) return b->img_off_hover;
+  else if (hover && b->img_hover) return b->img_hover;
+  else if (on && b->img_on) return b->img_on;
+  
+  if (b->img_default) return b->img_default;
   return b->img_off;
 }
 
@@ -1635,7 +1636,17 @@ void c_button::set_image (const unsigned char *pngdata, _widget_state which) {
     case WSTATE_DOWN:       csp = &img_down; break;
     case WSTATE_DOWN_HOVER: csp = &img_down_hover; break;
     case WSTATE_OFF_HOVER:  csp = &img_off_hover; break;
-    case WSTATE_ALL:        csp = &img_all; break;
+    case WSTATE_DEFAULT:    csp = &img_default; break;
+    case WSTATE_ALL:
+      set_image (pngdata, WSTATE_OFF);
+      set_image (pngdata, WSTATE_ON);
+      set_image (pngdata, WSTATE_HOVER);
+      set_image (pngdata, WSTATE_DOWN);
+      set_image (pngdata, WSTATE_DOWN_HOVER);
+      set_image (pngdata, WSTATE_OFF_HOVER);
+      set_image (pngdata, WSTATE_DEFAULT);
+      return;
+    break;
       return;
     break;
     default: return;
