@@ -11,6 +11,7 @@ Features:
   - Calibration target dB is now a user (global) setting
   - "Linked" calibration mode follows loudest model which has calib. enabled
   - Calibration can be tuned for guitar or bass
+  - Volume ramping/crossfade when loading, switching etc. to avoid clicks
   - Each model slot / lane has:
     - input gain
     - output gain
