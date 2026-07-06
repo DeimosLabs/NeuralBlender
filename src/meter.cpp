@@ -30,7 +30,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // c_vudata
 
-float c_vudata::clamp01 (float f) {
+inline float c_vudata::clamp01 (float f) {
   if (f < 0.0f)
     return 0.0f;
   if (f > 1.0f)

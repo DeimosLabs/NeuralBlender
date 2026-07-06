@@ -54,6 +54,8 @@
 #define CALIB_TARGET_DB_MIN      -40.0f
 #define CALIB_TARGET_DB_MAX      0.0f
 #define WARMUP_BLOCKS            5
+#define NB_XFADE_MS              10.0f
+#define NB_LANE_XFADE_MS         NB_XFADE_MS
 
 enum _engine_mode {
   ENGINE_NONE,
@@ -161,10 +163,13 @@ public:
   uint32_t    blocksize       = -1;
   std::atomic<bool> mute      { false };
   std::atomic<_ramp_state> ramp = RAMP_PLAYING;
+  uint32_t    ramp_pos       = 0;
+  uint32_t    ramp_len       = 0;
   int         warmup          = 5;
   bool        dcflip          = false;
   bool        do_calib        = false;
-
+  
+  // for debugging
   size_t      block_counter   = 0;
 
 private:
@@ -184,6 +189,7 @@ private:
   _engine_mode m_engine_mode = ENGINE_NONE;
 };
 
+// creates NB_NUM_MODELS instances of c_delayline and c_neuralamp
 class c_neuralblender {
 public:
   c_neuralblender ();
@@ -195,7 +201,8 @@ public:
   float *prepare_input_buffer (float *in, float *out, uint32_t nframes);
   void render_lane (size_t lane, float *in, uint32_t nframes);
   void render_mix (float *in, float *out, uint32_t nframes,
-                   uint32_t old_mask, uint32_t new_mask);
+                   uint32_t old_mask, uint32_t new_mask,
+                   uint32_t xfade_pos, uint32_t xfade_len);
   void process_block (float *in, float *out, uint32_t nframes);
   bool load_model (size_t which, const char *filename);
   bool unload_model (size_t which);
@@ -240,9 +247,15 @@ private:
   std::vector <float> m_input_buf;
   std::atomic<bool> m_lane_mute [NB_NUM_MODELS];
   std::atomic<bool> m_bypass { false };
-  std::atomic<bool> transition_pending { false };
+  std::atomic<bool> xfade_pending { false };
   std::atomic<uint32_t> active_lane_mask { 0 };
   std::atomic<uint32_t> pending_lane_mask { 0 };
+  std::atomic<uint32_t> loaded_lane_mask { 0 };
+  bool xfade_active = false;
+  uint32_t xfade_old_mask = 0;
+  uint32_t xfade_new_mask = 0;
+  uint32_t xfade_pos = 0;
+  uint32_t xfade_len = 0;
 
   bool       m_ready = false;
   uint32_t   m_samplerate = 48000;
