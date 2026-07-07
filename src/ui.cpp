@@ -414,7 +414,7 @@ void c_lane_widgets::create (
   btn_clear.create  (ui, wp, "",     0, 0, 100, 40, WSTYLE_IMAGE_BUTTON);
   btn_excl.create   (ui, wp, "Use",       0, 0, 100, 40, WSTYLE_TOGGLE);
   btn_mute.create   (ui, wp, "Mute",      0, 0, 100, 40, WSTYLE_IMAGE_TOGGLE);
-  btn_browse.set_tooltip ("Load a model from disk");
+  btn_browse.set_tooltip ("Load a model capture file");
   btn_clear.set_tooltip ("Clear this model");
   btn_mute.set_value (false);
   btn_browse.lane = which;
@@ -438,11 +438,12 @@ void c_lane_widgets::create (
   delay.set_value (0);
   delay.set_step (0.01);
   delay.role = ROLE_DELAY;
+  //delay.set_tooltip ("Micro delay applied to this amp's output");
 
   btn_flip.create   (ui, wp, "", 0, 0, 32, 32, WSTYLE_IMAGE_TOGGLE);
   btn_calib.create   (ui, wp, "", 0, 0, 32, 32, WSTYLE_IMAGE_TOGGLE);
   btn_flip.set_tooltip ("DC flip (phase invert)");
-  btn_calib.set_tooltip ("Calibrate (normalize) level");
+  btn_calib.set_tooltip ("Calibrate (normalize) output level");
   btn_flip.role = ROLE_DCFLIP;
   btn_calib.role = ROLE_CALIBRATE;
   btn_flip.lane = which;
@@ -494,25 +495,31 @@ void c_lane_widgets::move_resize (
   menu_list.move_resize (menu_x, 16, menu_width, 32);
   //int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
   int button_left = menu_list.x ();
-  int button_top = menu_list.y () + menu_list.h () + 12;
-  int button_width = std::min (h - 76, w / 10);
+  int button_top = menu_list.y () + menu_list.h () + 8;
+  int button_width = std::min (h - 68, w / 10);
   
   delay.move_resize (12, knob_top, knob_size, knob_size + 16);
 
   btn_browse.move_resize (button_left, button_top, button_width, button_width);
   btn_clear.move_resize (btn_browse.x () + btn_browse.w () + button_padding,
                          button_top, button_width, button_width);
-  btn_flip.move_resize (btn_clear.x () + btn_browse.w () + button_padding,
+  btn_calib.move_resize (btn_clear.x () + btn_browse.w () + button_padding,
                          button_top, button_width, button_width);
-  btn_calib.move_resize (btn_flip.x () + btn_browse.w () + button_padding,
+  btn_flip.move_resize (btn_calib.x () + btn_browse.w () + button_padding,
                          button_top, button_width, button_width);
                          
-  int mute_x = btn_calib.x () + btn_calib.w () + button_padding;
+  int mute_x = btn_flip.x () + btn_calib.w () + button_padding;
   int mute_width = menu_list.x () + menu_list.w () - mute_x;
   btn_mute.move_resize (mute_x,
                          button_top, mute_width, button_width);
   btn_excl.move_resize (btn_mute.x (), btn_mute.y (), btn_mute.w (), btn_mute.h ());
   btn_mute.padding = btn_mute.h () / 4;
+  
+  int btnpadding = button_width / 5;
+  btn_browse.padding = btnpadding;
+  btn_clear.padding = btnpadding;
+  btn_flip.padding = btnpadding;
+  btn_calib.padding = btnpadding;
   
   gain_in.move_resize (knob_right, knob_top, knob_size, knob_size + 16);
   gain_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size + 16);
@@ -520,8 +527,8 @@ void c_lane_widgets::move_resize (
   
   int adv_btn_x = 84;
   int adv_btn_y = h * 2 / 11;
-  label_frames.move_resize (delay.x (), h - 28, delay.w (), 16);
-  label_trim.move_resize (gain_in.x (), h - 28, gain_in.w () + gain_out.w (), 16);
+  label_frames.move_resize (delay.x (), h - 24, delay.w (), 16);
+  label_trim.move_resize (gain_in.x (), h - 24, gain_in.w () + gain_out.w (), 16);
   //move_resize (x, y, w, h);
 }
 
@@ -595,6 +602,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_enable.role = ROLE_BYPASS;
   btn_enable.set_image (data_icon_power_on_png, WSTATE_ON);
   btn_enable.set_image (data_icon_power_grey_png, WSTATE_OFF);
+  //btn_enable.set_tooltip ("BYPASS SWITCH");
   btn_prefs.create (this, mainwindow.widget, "Settings", 520, 600, 100, 40);
   btn_prefs.role = ROLE_PREFS;
   btn_prefs.set_image (data_xputty_gear_png);
@@ -611,12 +619,12 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_linkcalib.set_value (prefs.linked_calib);
   btn_linkcalib.set_tooltip ("Calibrate all models by same amount (loudest model / lowest trim)");
 
-  btn_exclmode.create (this, cont_checkboxes.widget, "Exclusive mode", 150, 0, 180, 32, WSTYLE_CHECKBOX);
+  btn_exclmode.create (this, cont_checkboxes.widget, "Exclusive mode", 160, 0, 180, 32, WSTYLE_CHECKBOX);
   btn_exclmode.set_value (state.do_excl);
   btn_exclmode.role = ROLE_EXCL_TOGGLE;
   btn_exclmode.set_tooltip ("Allow only one model active, seamlessly switch between them");
 
-  btn_bass.create (this, cont_checkboxes.widget, "Bass", 330, 0, 180, 32, WSTYLE_CHECKBOX);
+  btn_bass.create (this, cont_checkboxes.widget, "Bass", 350, 0, 180, 32, WSTYLE_CHECKBOX);
   btn_bass.role = ROLE_CALIBBASS;
   btn_bass.set_tooltip ("Calibrate trim levels for bass guitar");
   

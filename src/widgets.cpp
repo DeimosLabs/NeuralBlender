@@ -1055,6 +1055,7 @@ void c_label::create (
   widget = add_label (parent, label.c_str (), x, y, w, h);
   widget->func.expose_callback = c_label::cb_draw;
   c_widget::create (ui_, parent, label_, x, y, w, h);
+  padding = 2.0 * widget->app->hdpi;
 }
 
 void c_label::cb_draw (void *w_, void *ptr) {
@@ -1082,7 +1083,8 @@ void c_label::cb_draw (void *w_, void *ptr) {
   cairo_set_font_size (w->crb, (w->app->normal_font * textsize) / w->scale.ascale);
   cairo_text_extents (w->crb, text, &extents);
 
-  const double padding = 2.0 * w->app->hdpi;
+  //const double padding = 2.0 * w->app->hdpi;
+  const double padding = self->padding;
   double x = padding - extents.x_bearing;
   if (align == TEXT_CENTER)
     x = (metrics.width - extents.width) * 0.5 - extents.x_bearing;
@@ -1447,7 +1449,7 @@ void c_button::create (
       widget = add_toggle_button (parent, label_ ? label_ : "", x, y, w, h);
       widget->func.value_changed_callback = button_value_changed;
     break;
-
+    
     case WSTYLE_IMAGE_TOGGLE:
       is_toggle = true;
       widget = add_image_toggle_button (parent, label_ ? label_ : "", x, y, w, h);
@@ -1469,7 +1471,7 @@ void c_button::create (
     break;
   }
 
-	  widget->func.expose_callback = c_button::cb_draw;
+  widget->func.expose_callback = c_button::cb_draw;
   widget->func.button_press_callback = button_mouse_down;
   wstyle = style;
   

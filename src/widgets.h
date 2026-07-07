@@ -45,7 +45,7 @@ enum _widget_role {
 };
 
 enum _widget_style {
-  WSTYLE_BUTTON,
+  WSTYLE_BUTTON, // TODO: decide what to do with these 2 vs redundant IMAGE_..
   WSTYLE_TOGGLE,
   WSTYLE_CHECKBOX,
   WSTYLE_RADIO,
