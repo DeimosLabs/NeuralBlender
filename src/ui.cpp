@@ -618,6 +618,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
 
   btn_bass.create (this, cont_checkboxes.widget, "Bass", 330, 0, 180, 32, WSTYLE_CHECKBOX);
   btn_bass.role = ROLE_CALIBBASS;
+  btn_bass.set_tooltip ("Calibrate trim levels for bass guitar");
   
   aboutwindow.create (this);
   prefswindow.create (this);
