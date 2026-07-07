@@ -186,12 +186,13 @@ public:
   virtual void on_calibrate (c_widget *w, bool b)              = 0;
   virtual void on_vu (c_widget *w, bool b)                     = 0;
   virtual void on_linked_calib (c_widget *w, bool b)           = 0;
+  virtual void on_calib_bass (c_widget *w, bool b)             = 0;
+  virtual void on_bypass (c_widget *w, bool b)                 = 0;
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;
           void on_button (c_button *btn, bool value)              ;
   virtual void on_window_resize (int w, int h)                    ;
   virtual bool request_window_size (int w, int h)                 ;
-  virtual void on_bypass (c_widget *w, bool b)                 = 0;
           void on_about ()                                        ;
           void on_prefs ()                                        ;
           void on_prefs_ok ()                                     ;
@@ -214,9 +215,10 @@ public:
   c_button       btn_enable;
   c_button       btn_muteall;
   c_button       btn_prefs;
-  c_button       btn_vu;
+  c_button       btn_linkcalib;
   c_button       btn_exclmode;
   c_button       btn_advanced;
+  c_button       btn_bass;
   //c_label        label_vu;
   //c_label        label_exclmode;
   //c_label        label_advanced;

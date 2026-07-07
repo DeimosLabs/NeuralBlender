@@ -33,6 +33,7 @@ enum _widget_role {
   ROLE_DELAY,
   ROLE_DCFLIP,
   ROLE_CALIBRATE,
+  ROLE_CALIBBASS,
   ROLE_VUTOGGLE,
   ROLE_LINKED_CALIB,
   ROLE_EXCL_TOGGLE,
@@ -131,6 +132,7 @@ public:
   virtual void move (int x, int y);
   virtual void resize (int w, int h);
   virtual bool set_label (const char *label);
+  virtual bool set_tooltip (const char *text);
   // TODO: complete key event propagation/dispatch, widget focus etc.
   virtual bool on_keydown (XKeyEvent *key);
   virtual bool on_keyup (XKeyEvent *key);
@@ -143,6 +145,7 @@ public:
       float r, float g, float b);
   
   std::string label;
+  std::string tooltip;
   _widget_role role        = ROLE_UNKNOWN;
   _widget_style wstyle     = WSTYLE_UNKNOWN;
   _widget_state wstate     = WSTATE_UNKNOWN;

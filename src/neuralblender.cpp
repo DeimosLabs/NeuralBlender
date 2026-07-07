@@ -660,7 +660,7 @@ c_neuralblender::c_neuralblender () { CP
 c_neuralblender::~c_neuralblender () { CP
 }
 
-/*static*/ void c_neuralblender::get_calib_data (std::vector<float> &v, bool bass) {
+/*void c_neuralblender::get_calib_data (std::vector<float> &v, bool bass) {
   debug ("bass=%d", (int) bass);
   unsigned char *scan = data_calib_f32;
   const int sf = sizeof (float);
@@ -676,7 +676,7 @@ c_neuralblender::~c_neuralblender () { CP
     scan += sizeof (float);
     v.push_back (*f);
   }
-}
+}*/
 
 bool c_neuralblender::calibrate (size_t which, bool bass) {
   debug ("bass=%d", (int) bass);

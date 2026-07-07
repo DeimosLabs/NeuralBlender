@@ -221,7 +221,7 @@ public:
   void on_fileclear (c_widget *w)                      { CP; clear_lane_model_ui (w->lane); write_model_path (w->lane, ""); }
   void on_mute (c_widget *w, bool b)                   { CP; write_control (lane_port (w->lane, PORT_A_MUTE), b ? 1.0f : 0.0f); }
   void on_dcflip (c_widget *w, bool b)                 { CP; write_control (lane_port (w->lane, PORT_A_DCFLIP), b ? 1.0f : 0.0f); }
-  void on_calibrate (c_widget *w, bool b)              { CP; write_control (lane_port (w->lane, PORT_A_CALIBRATE), b ? 1.0f : 0.0f); }
+  void on_calibrate (c_widget *w, bool b)              { CP; write_control (lane_port (w->lane, PORT_A_CALIBRATE), b == 1.0f ? 1.0f : 0.0f); }
   void on_muteall (c_widget *w, bool b)                { CP; write_control (PORT_MUTE_ALL, b ? 1.0f : 0.0f); }
   void on_excl (c_widget *w, int n) {
     CP
@@ -235,6 +235,7 @@ public:
   void on_about (c_widget *w)                          { CP }
   void on_vu (c_widget *w, bool b)                     { CP; write_control (PORT_VU_ENABLE, b ? 1.0f : 0.0f); }
   void on_linked_calib (c_widget *w, bool b)           { CP; write_control (PORT_LINKED_CALIB, b ? 1.0f : 0.0f); }
+  void on_calib_bass (c_widget *w, bool b)             { CP; write_control (PORT_CALIB_SOURCE, b == 1.0f ? 1.0f : 0.0f); }
 
 	  void apply_prefs (t_prefs &p) override {
 	    c_neuralblender_ui::apply_prefs (p);
@@ -309,7 +310,7 @@ public:
 
 	    if (port == PORT_LINKED_CALIB) {
 	      prefs.linked_calib = value >= 0.5f;
-	      btn_vu.set_value (prefs.linked_calib);
+	      btn_linkcalib.set_value (prefs.linked_calib);
 	      if (prefswindow.widget)
 	        prefswindow.btn_linkcalib.set_value (prefs.linked_calib);
 	      updating_from_state = old_updating_from_state;
@@ -322,6 +323,7 @@ public:
 	      if (source < 0)
 	        source = 0;
 	      prefs.calib_source = source;
+	      btn_bass.set_value (prefs.calib_source == 1);
 	      if (prefswindow.widget)
 	        prefswindow.btn_bass.set_value (prefs.calib_source == 1);
 	      updating_from_state = old_updating_from_state;

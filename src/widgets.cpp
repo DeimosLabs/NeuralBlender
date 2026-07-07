@@ -7,6 +7,7 @@
 #include "ui.h"
 
 #include "xdrawing_area.h"
+#include "xtooltip.h"
 #include "widgets/xknob_private.h"
 #include "xpngloader.h"
 #include "widgets/xcombobox_private.h"
@@ -508,6 +509,8 @@ void c_widget::create (
     debug ("!widget");
     return;
   }
+  add_tooltip (widget, ""); // creates initial tooltip
+  set_tooltip ("");         // our function below hides it
   set_x11_window_background (widget, g_colors->window_bg);
   widget->flags |= USE_TRANSPARENCY;
 
@@ -527,6 +530,22 @@ bool c_widget::set_label (const char *label_) {
   widget->label = label.c_str ();
   expose ();
   return true;
+}
+
+bool c_widget::set_tooltip (const char *tt) {
+  tooltip = tt ? tt : "";
+  
+  if (!widget)
+    return false;
+  
+  if (tooltip.empty ()) {
+    widget->flags &= ~HAS_TOOLTIP;
+    return false;
+  } else {
+    tooltip_set_text (widget, tooltip.c_str ());
+    widget->flags |= HAS_TOOLTIP;
+    return true;
+  }
 }
 
 bool c_widget::on_keydown (XKeyEvent *key) { CP

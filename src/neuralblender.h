@@ -60,7 +60,9 @@
 enum _engine_mode {
   ENGINE_NONE,
   ENGINE_NAM,
-  ENGINE_JSON
+  ENGINE_JSON,
+  ENGINE_IR,        // TODO
+  ENGINEN_UNKNOWN
 };
 
 enum _ramp_state {
@@ -225,7 +227,7 @@ public:
   bool calibrate_linked (bool bass);
   void update_input_meter (float *in, uint32_t nframes);
   
-  static void get_calib_data (std::vector<float> &v, bool bass);
+  //static void get_calib_data (std::vector<float> &v, bool bass);
 
   c_delayline delays [NB_NUM_MODELS];
   c_neuralamp amps [NB_NUM_MODELS];

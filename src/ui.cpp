@@ -414,6 +414,8 @@ void c_lane_widgets::create (
   btn_clear.create  (ui, wp, "",     0, 0, 100, 40, WSTYLE_IMAGE_BUTTON);
   btn_excl.create   (ui, wp, "Use",       0, 0, 100, 40, WSTYLE_TOGGLE);
   btn_mute.create   (ui, wp, "Mute",      0, 0, 100, 40, WSTYLE_IMAGE_TOGGLE);
+  btn_browse.set_tooltip ("Load a model from disk");
+  btn_clear.set_tooltip ("Clear this model");
   btn_mute.set_value (false);
   btn_browse.lane = which;
   btn_clear.lane = which;
@@ -439,6 +441,8 @@ void c_lane_widgets::create (
 
   btn_flip.create   (ui, wp, "", 0, 0, 32, 32, WSTYLE_IMAGE_TOGGLE);
   btn_calib.create   (ui, wp, "", 0, 0, 32, 32, WSTYLE_IMAGE_TOGGLE);
+  btn_flip.set_tooltip ("DC flip (phase invert)");
+  btn_calib.set_tooltip ("Calibrate (normalize) level");
   btn_flip.role = ROLE_DCFLIP;
   btn_calib.role = ROLE_CALIBRATE;
   btn_flip.lane = which;
@@ -599,16 +603,21 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_muteall.set_image (data_icon_speaker_off_big_png, WSTATE_ON);
   btn_muteall.set_image (data_icon_speaker_on_big_png, WSTATE_OFF);
   
-  cont_checkboxes.create (this, mainwindow.widget, "", 8, 604, 550, 40);
+  cont_checkboxes.create (this, mainwindow.widget, "", 8, 600, 550, 40);
   cont_checkboxes.widget->scale.gravity = NONE;
   
-  btn_vu.create (this, cont_checkboxes.widget, "Linked calibration", 0, 0, 180, 32, WSTYLE_CHECKBOX);
-  btn_vu.role = ROLE_LINKED_CALIB;
-  btn_vu.set_value (prefs.linked_calib);
-  
-  btn_exclmode.create (this, cont_checkboxes.widget, "Exclusive mode", 180, 0, 180, 32, WSTYLE_CHECKBOX);
+  btn_linkcalib.create (this, cont_checkboxes.widget, "Linked calib.", 0, 0, 180, 32, WSTYLE_CHECKBOX);
+  btn_linkcalib.role = ROLE_LINKED_CALIB;
+  btn_linkcalib.set_value (prefs.linked_calib);
+  btn_linkcalib.set_tooltip ("Calibrate all models by same amount (loudest model / lowest trim)");
+
+  btn_exclmode.create (this, cont_checkboxes.widget, "Exclusive mode", 150, 0, 180, 32, WSTYLE_CHECKBOX);
   btn_exclmode.set_value (state.do_excl);
   btn_exclmode.role = ROLE_EXCL_TOGGLE;
+  btn_exclmode.set_tooltip ("Allow only one model active, seamlessly switch between them");
+
+  btn_bass.create (this, cont_checkboxes.widget, "Bass", 330, 0, 180, 32, WSTYLE_CHECKBOX);
+  btn_bass.role = ROLE_CALIBBASS;
   
   aboutwindow.create (this);
   prefswindow.create (this);
@@ -718,7 +727,7 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     case ROLE_ABOUTOK: CP
       aboutwindow.hide ();
     break;
-    
+
     case ROLE_PREFS: CP
       write_prefs_to (prefs);
       prefswindow.get_prefs_from (prefs);
@@ -748,6 +757,11 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     case ROLE_LINKED_CALIB: CP
       prefs.linked_calib = value;
       on_linked_calib (btn, value);
+    break;
+
+    case ROLE_CALIBBASS: CP
+      prefs.calib_source = value ? 1 : 0;
+      on_calib_bass (btn, value);
     break;
 
     case ROLE_EXCL_TOGGLE: CP
@@ -797,6 +811,10 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
     lanes [i].vudata_out.set_headroom (headroom_db);
   }
 
+  btn_bass.set_value (p.calib_source == 1);
+  if (prefswindow.widget)
+    prefswindow.btn_bass.set_value (p.calib_source == 1);
+
   vu_on (p.vu_on);
 }
 
@@ -840,7 +858,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     
     debug ("window w/h %d,%d", window_width, window_height);
     
-    cont_checkboxes.move_resize (16, window_height - 44, 350, 40);
+    cont_checkboxes.move_resize (16, window_height - 44, 450, 40);
     
     btn_enable.move_resize (16, 12, 120, 40);
     btn_muteall.move_resize (window_width - 136, 12, 120, 40);
@@ -909,7 +927,7 @@ void c_neuralblender_ui::vu_on (bool b) { CP
   for (size_t i = 0; i < NB_NUM_MODELS; i++) {
     lanes [i].meter_out.show ();
   }
-  on_vu (&btn_vu, b);
+  //on_vu (&btn_vu, b);
 }
 
 void c_neuralblender_ui::vu_off () { CP
@@ -919,7 +937,7 @@ void c_neuralblender_ui::vu_off () { CP
   for (size_t i = 0; i < NB_NUM_MODELS; i++) {
     lanes [i].meter_out.hide ();
   }
-  on_vu (&btn_vu, false);
+  //on_vu (&btn_vu, false);
 }
 
 size_t c_neuralblender_ui::choose_exclusive_lane () const {
@@ -1100,7 +1118,8 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   /*btn_advanced.set_value (state.showadvanced);
   show_advanced_settings (state.showadvanced);*/
 
-  btn_vu.set_value (prefs.linked_calib);
+  btn_bass.set_value (prefs.calib_source == 0 ? false : true);
+  btn_linkcalib.set_value (prefs.linked_calib);
   if (state.do_vu) {
     meter_in.show ();
     for (size_t i = 0; i < NB_NUM_MODELS; ++i)

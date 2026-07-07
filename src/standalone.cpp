@@ -93,6 +93,7 @@ public:
   void on_muteall (c_widget *w, bool b);
   void on_vu (c_widget *w, bool);
   void on_linked_calib (c_widget *w, bool b);
+  void on_calib_bass (c_widget *w, bool b);
   //void on_excl (c_widget *w, int which);
   void on_bypass (c_widget *w, bool b);
   void on_about (c_widget *w);
@@ -202,6 +203,13 @@ void c_standalone_ui::on_linked_calib (c_widget *w, bool b) {
   (void) w;
   prefs.linked_calib = b;
   g_blender.linked_calib = b;
+}
+
+void c_standalone_ui::on_calib_bass (c_widget *w, bool b) {
+  (void) w;
+  prefs.calib_source = b ? 1 : 0;
+  if (blender)
+    blender->calib_source = prefs.calib_source;
 }
 
 /* these are UI only
