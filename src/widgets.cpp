@@ -1063,8 +1063,9 @@ void c_label::cb_draw (void *w_, void *ptr) {
   Widget_t *w = (Widget_t *) w_;
   if (!w)
     return;
-
+  
   c_label *self = (c_label *) w->parent_struct;
+  //debug ("is_link=%d", (int) self->is_link);
   const float textsize = self ? self->textsize : 1.0f;
   const _textalign align = self ? self->align : TEXT_CENTER;
   const char *text = w->label ? w->label : "";
@@ -1084,7 +1085,7 @@ void c_label::cb_draw (void *w_, void *ptr) {
   cairo_text_extents (w->crb, text, &extents);
 
   //const double padding = 2.0 * w->app->hdpi;
-  const double padding = self->padding;
+  const double padding = self ? self->padding : 2.0 * w->app->hdpi;
   double x = padding - extents.x_bearing;
   if (align == TEXT_CENTER)
     x = (metrics.width - extents.width) * 0.5 - extents.x_bearing;
@@ -1092,11 +1093,59 @@ void c_label::cb_draw (void *w_, void *ptr) {
     x = metrics.width - padding - extents.width - extents.x_bearing;
 
   const double y = (metrics.height - extents.height) * 0.5 - extents.y_bearing;
-
+  if (self->is_link)
+    cairo_set_source_rgba (w->crb, 0.4, 0.4, 1.0, 1.0);
   cairo_move_to (w->crb, x, y);
   cairo_text_path (w->crb, text);
   cairo_fill (w->crb);
   cairo_new_path (w->crb);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// c_linklabel : public c_label
+
+void c_linklabel::create (
+    c_neuralblender_ui *ui,
+    Widget_t *parent,
+    const char *label,
+    int x, int y, int w, int h) {
+    
+  c_label::create (ui, parent, label, x, y, w, h);
+  is_link = true; // can't make static functions virtual
+  widget->func.button_press_callback = cb_mousedown;
+  widget->func.enter_callback = cb_mousein;
+  widget->func.leave_callback = cb_mouseout;
+  
+  Cursor c = XCreateFontCursor (widget->app->dpy, XC_hand2);
+  XDefineCursor (widget->app->dpy, widget->widget, c);
+  XFreeCursor (widget->app->dpy, c);
+}
+
+void c_linklabel::open_link (std::string url) { CP
+  pid_t pid = fork();
+  if (pid < 0)
+    return;
+  if (pid == 0) {
+    const std::string &target = url.empty () ? label : url;
+    execlp ("xdg-open", "xdg-open", target.c_str (), (char *) NULL);
+    _exit (127);
+  }  
+}
+
+void c_linklabel::cb_mousedown (void *w, void *ev, void *userdata) { CP
+  if (!w)
+    return;
+  auto *wt = (Widget_t *) w;
+  auto l = (c_linklabel *) wt->parent_struct;
+  if (!l)
+    return;
+  l->open_link ();
+}
+
+void c_linklabel::cb_mousein (void *w, void *userdata) { CP
+}
+
+void c_linklabel::cb_mouseout (void *w, void *userdata) { CP
 }
 
 ////////////////////////////////////////////////////////////////////////////////

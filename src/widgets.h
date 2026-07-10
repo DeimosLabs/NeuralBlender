@@ -283,6 +283,24 @@ public:
 
   float textsize = 1.0;
   _textalign align = TEXT_LEFT;
+
+protected:
+  bool is_link = false; // can't make static functions virtual
+};
+
+class c_linklabel : public c_label {
+public:
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label,
+      int x, int y, int w, int h);
+//: c_label (ui, parent, label, x, y, w, h) { }
+  
+  void open_link (std::string url = "");
+  static void cb_mousedown (void *w, void *ev, void *userdata);
+  static void cb_mousein (void *w, void *userdata);
+  static void cb_mouseout (void *w, void *userdata);
 };
 
 class c_textbox : public c_widget {

@@ -98,6 +98,7 @@ public:
   c_frame frame;
   c_button btn_ok;
   c_label labels [16];
+  c_linklabel linklabel;
   c_image img_logo;
   c_neuralblender_ui *ui = NULL;
 };

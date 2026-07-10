@@ -12,6 +12,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
+#include <X11/cursorfont.h>
+
 #include "neuralblender.h"
 #include "ui.h"
 
@@ -306,7 +308,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
     "RTNeural and NeuralAmpModeler",
     "",
     "by Deimos Laboratories",
-    "github.com/DeimosLabs/NeuralBlender",
+    "", // web link, see below
     NULL
   };
   
@@ -316,6 +318,10 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
     labels [i].create (ui, frame.widget, text [i], 0, h, 400, 24);
     labels [i].align = TEXT_CENTER;
   }
+  
+  linklabel.create (ui, frame.widget, "https://github.com/DeimosLabs/NeuralBlender",
+      0, labels [6].y (), 400, 24);
+  linklabel.align = TEXT_CENTER;
 
   char buf [64];
   snprintf (buf, 63, "Build timestamp: %s", g_build_timestamp);
