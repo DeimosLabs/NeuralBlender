@@ -301,6 +301,8 @@ public:
   static void cb_mousedown (void *w, void *ev, void *userdata);
   static void cb_mousein (void *w, void *userdata);
   static void cb_mouseout (void *w, void *userdata);
+  
+  std::string url;
 };
 
 class c_textbox : public c_widget {

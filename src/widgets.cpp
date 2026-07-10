@@ -1,7 +1,15 @@
+
+/* NeuralBlender - RTNeural / NAM based amp modeler
+ *
+ * This is an "addendum" / wrapper classes around xputty to make it more
+ * fit to my style of coding, and work around some of its internals/callbacks
+ */
+
 #include <string.h>
 #include <algorithm>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 #include "neuralblender.h"
 #include "ui.h"
@@ -1093,7 +1101,7 @@ void c_label::cb_draw (void *w_, void *ptr) {
     x = metrics.width - padding - extents.width - extents.x_bearing;
 
   const double y = (metrics.height - extents.height) * 0.5 - extents.y_bearing;
-  if (self->is_link)
+  if (self && self->is_link)
     cairo_set_source_rgba (w->crb, 0.4, 0.4, 1.0, 1.0);
   cairo_move_to (w->crb, x, y);
   cairo_text_path (w->crb, text);
@@ -1111,6 +1119,7 @@ void c_linklabel::create (
     int x, int y, int w, int h) {
     
   c_label::create (ui, parent, label, x, y, w, h);
+  url = label;
   is_link = true; // can't make static functions virtual
   widget->func.button_press_callback = cb_mousedown;
   widget->func.enter_callback = cb_mousein;
@@ -1122,14 +1131,17 @@ void c_linklabel::create (
 }
 
 void c_linklabel::open_link (std::string url) { CP
-  pid_t pid = fork();
+  pid_t pid = fork ();
   if (pid < 0)
     return;
   if (pid == 0) {
-    const std::string &target = url.empty () ? label : url;
+    const std::string &target = url.empty () ? this->url : url;
     execlp ("xdg-open", "xdg-open", target.c_str (), (char *) NULL);
     _exit (127);
-  }  
+  } else {
+    int dummy = 0;
+    waitpid (pid, &dummy, 0);
+  }
 }
 
 void c_linklabel::cb_mousedown (void *w, void *ev, void *userdata) { CP
@@ -1139,6 +1151,11 @@ void c_linklabel::cb_mousedown (void *w, void *ev, void *userdata) { CP
   auto l = (c_linklabel *) wt->parent_struct;
   if (!l)
     return;
+  
+  auto *button = (XButtonEvent *) ev;
+  if (!button || button->button != Button1)
+    return;
+  
   l->open_link ();
 }
 
