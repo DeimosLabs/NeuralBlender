@@ -119,6 +119,36 @@ struct c_neuralblender_state {
   c_neuralblender_lane_state lanes [NB_NUM_MODELS];
 };
 
+// a very simple but effective noise gate
+class c_noisegate {
+public:
+  void process_block (float *in, float *out, uint32_t nframes);
+  void set_threshold (float thresh_db);
+  void set_attack (float attack_ms);
+  void set_hold (float hold_ms);
+  void set_release (float release_ms);
+  
+  void set_samplerate (int sr);
+  float threshold_db = -60.0f;
+  float attack_ms = 2.0f;
+  float hold_ms = 10.0f;
+  float release_ms = 20.0f;
+  
+private:
+  float samplerate = 48000.0f;
+  float env = 0.0f;
+  float gain = 1.0f;
+  int hold_samples = 0;
+  
+  float threshold_gain = 0.001f;
+  float attack_coeff = 0.0f;
+  int hold_coeff = 0.0f;
+  float release_coeff = 0.0f;
+  
+  bool coeffs_dirty = true;
+  void update_coeffs ();
+};
+
 class c_delayline {
 public:
   c_delayline ();
@@ -228,12 +258,14 @@ public:
   void update_input_meter (float *in, uint32_t nframes);
   
   //static void get_calib_data (std::vector<float> &v, bool bass);
-
+  
+  c_noisegate noisegate;
   c_delayline delays [NB_NUM_MODELS];
   c_neuralamp amps [NB_NUM_MODELS];
   c_vudata *meter_in;
   c_vudata *meters_out [NB_NUM_MODELS];
   bool do_vu = true;
+  bool noisegate_on = true;
   bool mute_all = false;
   bool linked_calib = false;
   int calib_source = 0; // 0=guitar, 1=bass

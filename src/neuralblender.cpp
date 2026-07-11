@@ -30,8 +30,20 @@
 
 //#define DEBUG
 
+
+#ifdef REALLY_DEBUG_DSP
 #define CMDLINE_DEBUG_COLOR ANSI_BLUE
 #include "cmdline_debug.h"
+#else
+#ifdef debug
+#undef debug
+#endif
+#ifdef CP
+#undef CP
+#endif
+#define debug(...)
+#define CP do {} while (0);
+#endif
 
 //#define STANDALONE // done for us by build system (currently cmake)
 
@@ -168,6 +180,89 @@ static float clamp_calib_target_db (float db) {
 
   return std::clamp (db, CALIB_TARGET_DB_MIN, CALIB_TARGET_DB_MAX);
 }
+
+/******************************************************************************
+ * c_noisegate
+ */
+
+// should be called on startup, and when user changes a setting
+void c_noisegate::update_coeffs () {
+  threshold_gain = db_to_gain (threshold_db);
+  attack_coeff = (attack_ms <= 0.0f) ? 0.0f : 
+                 expf (-1.0f / (0.001f * attack_ms * samplerate));
+  release_coeff = (release_ms <= 0.0f) ? 0.0f :
+                  expf (-1.0f / (0.001f * release_ms * samplerate));
+  hold_coeff = (int) (hold_ms * 0.001f * samplerate);
+  coeffs_dirty = false;
+}
+
+void c_noisegate::set_samplerate (int new_sr) {
+  if (new_sr > 0 && new_sr <= 192000) {
+    samplerate = new_sr;
+    coeffs_dirty = true;
+  }
+}
+
+void c_noisegate::set_threshold (float new_thresh_db) {
+  threshold_db = new_thresh_db;
+  coeffs_dirty = true;
+}
+
+void c_noisegate::set_attack (float new_attack_ms) {
+  if (new_attack_ms <= 0)
+    return;
+  attack_ms = new_attack_ms;
+  coeffs_dirty = true;
+}
+
+void c_noisegate::set_hold (float new_hold_ms) {
+  if (new_hold_ms <= 0)
+    return;
+  hold_ms = new_hold_ms;
+  coeffs_dirty = true;
+}
+
+void c_noisegate::set_release (float new_release_ms) {
+  if (new_release_ms <= 0)
+    return;
+  release_ms = new_release_ms;
+  coeffs_dirty = true;
+}
+
+// will process in-place if out == in or !out
+void c_noisegate::process_block (float *in, float *out, uint32_t nframes) {
+  if (!in || nframes == 0)
+    return;
+  
+  if (coeffs_dirty)
+    update_coeffs ();
+  
+  //const int hold_total = (int) (hold_ms * 0.001f * samplerate);
+  float *dst = out ? out : in;
+  
+  for (uint32_t i = 0; i < nframes; ++i) {
+    float x = fabsf (in [i]);
+
+    float coeff = (x > env) ? attack_coeff : release_coeff;
+    env = coeff * env + (1.0f - coeff) * x;
+    
+    float target = 0.0f;
+    
+    if (env >= threshold_gain) {
+      target = 1.0f;
+      hold_samples = hold_coeff;
+    } else if (hold_samples > 0) {
+      target = 1.0f;
+      hold_samples--;
+    }
+    
+    float gcoeff = (target > gain) ? attack_coeff : release_coeff;
+    gain = gcoeff * gain + (1.0f - gcoeff) * target;
+    
+    dst [i] = in [i] * gain;
+  }
+}
+
 
 /******************************************************************************
  * c_delayline
@@ -739,6 +834,8 @@ bool c_neuralblender::calibrate_linked (bool bass) {
 void c_neuralblender::set_samplerate (uint32_t sr) { CP
   debug ("start");
   m_samplerate = sr;
+  noisegate.set_samplerate (sr);
+  
   if (meter_in)
     meter_in->samplerate = (int) sr;
   for (size_t i = 0; i < NB_NUM_MODELS; ++i)
@@ -1095,7 +1192,6 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
 }
 */
 
-
 // mixing related static funcs, these are pretty self explanatory
 
 static inline float ramp_in_gain (uint32_t i, uint32_t n) {
@@ -1158,22 +1254,37 @@ uint32_t c_neuralblender::make_active_lane_mask() const {
   return mask;
 }
 
+// called when our mixing topology changes
 void c_neuralblender::request_mix_update () {
   pending_lane_mask.store (make_active_lane_mask (),
                            std::memory_order_release);
   xfade_pending.store (true, std::memory_order_release);
 }
 
+// alsp applies noise gate if it's enabled
 float *c_neuralblender::prepare_input_buffer (
     float *in, float *out, uint32_t nframes) {
-
-  if (in != out)
+  
+  if (!in || nframes == 0)
     return in;
+  
+  if (in != out) {
+    if (noisegate_on)
+      noisegate.process_block (in, out, nframes);
+    else
+      memcpy (out, in, nframes * sizeof (float));
 
+    return out;
+  }
+  
   if (m_input_buf.size () < nframes)
     m_input_buf.resize (nframes);
 
-  memcpy (m_input_buf.data (), in, nframes * sizeof (float));
+  if (noisegate_on)
+    noisegate.process_block (in, m_input_buf.data (), nframes);
+  else
+    memcpy (m_input_buf.data (), in, nframes * sizeof (float));
+  
   return m_input_buf.data ();
 }
 

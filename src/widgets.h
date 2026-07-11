@@ -144,6 +144,17 @@ public:
       const char *text,
       float r, float g, float b);
   
+  inline void expose () { if (widget) expose_widget (widget); }
+  
+  bool get_label_size (int *w, int *h, const char *text = NULL);
+  
+  // -1 for padding x/y means stay at that size
+  void shrinkwrap (int padding_x = 16, int padding_y = -1);
+  int x ();
+  int y ();
+  int w ();
+  int h ();
+  
   std::string label;
   std::string tooltip;
   _widget_role role        = ROLE_UNKNOWN;
@@ -168,16 +179,6 @@ public:
   c_neuralblender_ui *ui   = NULL;
   c_filepicker *filepicker = NULL;
 
-  inline void expose () { if (widget) expose_widget (widget); }
-  
-  bool get_label_size (int *w, int *h, const char *text = NULL);
-  
-  // -1 for padding x/y means stay at that size
-  void resize_to_label (int padding_x = 16, int padding_y = -1);
-  int x ();
-  int y ();
-  int w ();
-  int h ();
 };
 
 class c_toplevelwindow : public c_widget {

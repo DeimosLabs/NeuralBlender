@@ -644,7 +644,7 @@ bool c_widget::get_label_size (int *rw, int *rh, const char *text) {
 }
 
 // -1 for padding x/y means stay at that size
-void c_widget::resize_to_label (int padding_x, int padding_y) {
+void c_widget::shrinkwrap (int padding_x, int padding_y) {
   int lw, lh;
   if (get_label_size (&lw, &lh)) {
     if (padding_x < 0)

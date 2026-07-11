@@ -22,11 +22,11 @@
 #define CMDLINE_DEBUG_COLOR ANSI_MAGENTA
 #include "cmdline_debug.h"
 
-#define MIN_WINDOW_HEIGHT (64 + (150 * NB_NUM_MODELS))
+#define MIN_WINDOW_HEIGHT (64 + (130 * NB_NUM_MODELS))
 //#define DEFAULT_WINDOW_HEIGHT (12 + std::min (640, (52 + (180 * NB_NUM_MODELS))))
 #define DEFAULT_WINDOW_HEIGHT MIN_WINDOW_HEIGHT
-#define MIN_WINDOW_WIDTH 640
-#define DEFAULT_WINDOW_WIDTH 640
+#define MIN_WINDOW_WIDTH 620
+#define DEFAULT_WINDOW_WIDTH 620
 
 extern const char *g_build_timestamp;
 
@@ -193,7 +193,7 @@ void c_prefswindow::on_resize () {
   };
   for (int i = 0; i < leftcontrols.size (); i++) {
     int w = 0;
-    leftcontrols [i]->resize_to_label ();
+    leftcontrols [i]->shrinkwrap ();
     leftcontrols [i]->get_label_size (&w, NULL);
     debug ("w=%d", w);
     if (w > controls_x)
@@ -493,7 +493,7 @@ void c_lane_widgets::move_resize (
   
   //const int knob_size = 64;//std::max (64, h / 2);
   int knob_size = std::max (64, w / 10);
-  knob_size = std::min (knob_size, (h * 2) / 3);
+  knob_size = std::min (knob_size, (h * 3) / 5);
   const int knob_top = (h - knob_size) / 2 - 16;
   const int knob_right = w - knob_size * 2 - 12;
   const int menu_x = 16 + knob_size;//delay.x () + delay.w () + 8;
@@ -533,8 +533,8 @@ void c_lane_widgets::move_resize (
   
   int adv_btn_x = 84;
   int adv_btn_y = h * 2 / 11;
-  label_frames.move_resize (delay.x (), h - 24, delay.w (), 16);
-  label_trim.move_resize (gain_in.x (), h - 24, gain_in.w () + gain_out.w (), 16);
+  label_frames.move_resize (delay.x (), h - 20, delay.w (), 16);
+  label_trim.move_resize (gain_in.x (), h - 20, gain_in.w () + gain_out.w (), 16);
   //move_resize (x, y, w, h);
 }
 
@@ -609,13 +609,20 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_enable.set_image (data_icon_power_on_png, WSTATE_ON);
   btn_enable.set_image (data_icon_power_grey_png, WSTATE_OFF);
   //btn_enable.set_tooltip ("BYPASS SWITCH");
-  btn_prefs.create (this, mainwindow.widget, "Settings", 520, 600, 100, 40);
-  btn_prefs.role = ROLE_PREFS;
-  btn_prefs.set_image (data_xputty_gear_png);
+  
   btn_muteall.create (this, mainwindow.widget, "Mute all", 500, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
   btn_muteall.role = ROLE_MUTEALL;
   btn_muteall.set_image (data_icon_speaker_off_big_png, WSTATE_ON);
   btn_muteall.set_image (data_icon_speaker_on_big_png, WSTATE_OFF);
+  
+  //btn_noisegate.create (this, mainwindow.widget, "", 0, 0, 40, 40, WSTYLE_IMAGE_TOGGLE);
+  //btn_noisegate.set_image_default (data_icon_noisegate_png);
+  //btn_tuner.create (this, mainwindow.widget, "", 0, 0, 40, 40, WSTYLE_IMAGE_TOGGLE);
+  //btn_tuner.set_image_default (data_icon_tuner_png);
+  
+  btn_prefs.create (this, mainwindow.widget, "Settings", 520, 600, 100, 40);
+  btn_prefs.role = ROLE_PREFS;
+  btn_prefs.set_image (data_xputty_gear_png);
   
   cont_checkboxes.create (this, mainwindow.widget, "", 8, 600, 550, 40);
   cont_checkboxes.widget->scale.gravity = NONE;
@@ -668,6 +675,60 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   CP
   //do_set_min_size = true;
   return true;
+}
+
+void c_neuralblender_ui::move_resize (bool snap_to_default) {
+  CP
+  //state.showadvanced = b;
+  
+  if (!ui_resize_lock && mainwindow.widget) {
+    Widget_t *mw = mainwindow.widget;
+    Metrics_t metrics;
+    os_get_window_metrics (mw, &metrics);
+    ui_resize_lock = true;
+    
+    int window_width = DEFAULT_WINDOW_WIDTH;
+    int window_height = DEFAULT_WINDOW_HEIGHT;
+    if (!snap_to_default && metrics.visible) {
+      window_width = std::max (MIN_WINDOW_WIDTH, (int) (metrics.width / mw->app->hdpi));
+      window_height = std::max (MIN_WINDOW_HEIGHT, (int) (metrics.height / mw->app->hdpi));
+    }
+    
+    //if (do_set_min_size)
+    mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
+    
+    int lane_width = window_width - 32;
+    const int lane_top = 60;
+    const int lane_gap = 12;
+    const int bottom_reserve = 56;
+    const int lane_count = NB_NUM_MODELS;
+    const int total_gap = (lane_count > 1) ? (lane_count - 1) * lane_gap : 0;
+    const int lane_area = window_height - lane_top - bottom_reserve - total_gap;
+    int lane_height = std::max (1, lane_area / lane_count);
+    
+    debug ("window w/h %d,%d", window_width, window_height);
+    
+    cont_checkboxes.move_resize (16, window_height - 44, 450, 40);
+    
+    btn_enable.move_resize (16, 12, 120, 40);
+    btn_muteall.move_resize (window_width - 136, 12, 120, 40);
+    btn_prefs.move_resize (btn_muteall.x (), window_height - 48, 120, 40);
+    //btn_noisegate.move_resize (btn_enable.x () + btn_enable.w () + 8, 12, 40, 40);
+    //btn_tuner.move_resize (btn_muteall.x () - 48, 12, 40, 40);
+    
+    //label_exclmode.set_label ("Exclusive mode");
+    label_big.move_resize (150, 8, window_width - 300, 48);
+    
+    size_t i;
+    for (i = 0; i < NB_NUM_MODELS; i++) {
+      lanes [i].move_resize (16, lane_top + i * (lane_height + lane_gap), lane_width, lane_height);
+    }
+    
+    const int lane_bottom = lane_top + lane_count * lane_height + total_gap;
+    meter_in.move_resize (5, lane_top + 4, 5, std::max (1, lane_bottom - lane_top - 8));
+    
+    ui_resize_lock = false;
+  }
 }
 
 void c_neuralblender_ui::destroy () { CP
@@ -750,6 +811,10 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
       on_prefs ();
     break;
 
+    case ROLE_PREFSDEFAULTS: CP
+      prefswindow.load_defaults ();
+    break;
+
     case ROLE_PREFSOK: CP
       prefswindow.set_prefs_to (prefs);
       apply_prefs (prefs);
@@ -757,10 +822,6 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
       prefswindow.hide ();
     break;
     
-    case ROLE_PREFSDEFAULTS: CP
-      prefswindow.load_defaults ();
-    break;
-
     case ROLE_PREFSCANCEL: CP
       prefswindow.hide ();
     break;
@@ -840,57 +901,6 @@ void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
 
 void c_neuralblender_ui::write_prefs_to (t_prefs &p) { CP
   p.vu_on = state.do_vu;
-}
-
-void c_neuralblender_ui::move_resize (bool snap_to_default) {
-  CP
-  //state.showadvanced = b;
-  
-  if (!ui_resize_lock && mainwindow.widget) {
-    Widget_t *mw = mainwindow.widget;
-    Metrics_t metrics;
-    os_get_window_metrics (mw, &metrics);
-    ui_resize_lock = true;
-    
-    int window_width = DEFAULT_WINDOW_WIDTH;
-    int window_height = DEFAULT_WINDOW_HEIGHT;
-    if (!snap_to_default && metrics.visible) {
-      window_width = std::max (MIN_WINDOW_WIDTH, (int) (metrics.width / mw->app->hdpi));
-      window_height = std::max (MIN_WINDOW_HEIGHT, (int) (metrics.height / mw->app->hdpi));
-    }
-    
-    //if (do_set_min_size)
-    mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
-    
-    int lane_width = window_width - 32;
-    const int lane_top = 60;
-    const int lane_gap = 12;
-    const int bottom_reserve = 56;
-    const int lane_count = NB_NUM_MODELS;
-    const int total_gap = (lane_count > 1) ? (lane_count - 1) * lane_gap : 0;
-    const int lane_area = window_height - lane_top - bottom_reserve - total_gap;
-    int lane_height = std::max (1, lane_area / lane_count);
-    
-    debug ("window w/h %d,%d", window_width, window_height);
-    
-    cont_checkboxes.move_resize (16, window_height - 44, 450, 40);
-    
-    btn_enable.move_resize (16, 12, 120, 40);
-    btn_muteall.move_resize (window_width - 136, 12, 120, 40);
-    btn_prefs.move_resize (btn_muteall.x (), window_height - 48, 120, 40);
-    //label_exclmode.set_label ("Exclusive mode");
-    label_big.move_resize (150, 8, window_width - 300, 48);
-    
-    size_t i;
-    for (i = 0; i < NB_NUM_MODELS; i++) {
-      lanes [i].move_resize (16, lane_top + i * (lane_height + lane_gap), lane_width, lane_height);
-    }
-    
-    const int lane_bottom = lane_top + lane_count * lane_height + total_gap;
-    meter_in.move_resize (5, lane_top + 4, 5, std::max (1, lane_bottom - lane_top - 8));
-    
-    ui_resize_lock = false;
-  }
 }
 
 // called from lv2_ui - runs in UI thread
