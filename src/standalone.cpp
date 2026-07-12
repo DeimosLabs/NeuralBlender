@@ -100,6 +100,7 @@ public:
   void on_noiseattack (c_widget *w, float f);
   void on_noisehold (c_widget *w, float f);
   void on_noiserelease (c_widget *w, float f);
+  void on_threshgain (c_widget *w, float f);
   void on_tuner (c_widget *w, bool b);
   //void on_excl (c_widget *w, int which);
   void on_bypass (c_widget *w, bool b);
@@ -107,6 +108,7 @@ public:
   void apply_prefs (t_prefs &p) override;
   void write_prefs_to (t_prefs &p) override;
   void apply_effective_controls () override;
+  int idle () override;
 };
 
 bool c_standalone_ui::load_model (size_t which, const char *filename) {
@@ -232,6 +234,11 @@ void c_standalone_ui::on_noiserelease (c_widget *w, float value) {
   g_blender.noisegate.set_release (value);
 }
 
+void c_standalone_ui::on_threshgain (c_widget *w, float f) {
+  (void) w;
+  set_threshgain (f);
+}
+
 void c_standalone_ui::on_tuner (c_widget *w, bool b) {
   (void) w;
   g_blender.tuner_on = b;
@@ -314,6 +321,16 @@ void c_standalone_ui::apply_effective_controls () {
     blender->dcflip (i, state.lanes [i].dcflip);
     blender->calib_on (i, state.lanes [i].do_calib);
   }
+}
+
+int c_standalone_ui::idle () {
+  const float gain = g_blender.noisegate_on
+    ? g_blender.noisegate.get_current_gain ()
+    : 1.0f;
+
+  set_threshgain (gain);
+
+  return c_neuralblender_ui::idle ();
 }
 
 static std::thread ui_thread;

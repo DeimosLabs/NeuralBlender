@@ -473,9 +473,17 @@ nb:ModelD
 	        lv2:minimum 0.0 ;
 	        lv2:maximum 2000.0
 	    ] , [
-	        a lv2:InputPort ,
+	        a lv2:OutputPort ,
 	          lv2:ControlPort ;
 	        lv2:index 44 ;
+	        lv2:symbol "noisegate_gain" ;
+	        lv2:name "Noisegate Gain" ;
+	        lv2:minimum 0.0 ;
+	        lv2:maximum 1.0
+	    ] , [
+	        a lv2:InputPort ,
+	          lv2:ControlPort ;
+	        lv2:index 45 ;
 	        lv2:symbol "tuner_on" ;
 	        lv2:name "Tuner Enable" ;
 	        lv2:default 0 ;
@@ -485,20 +493,12 @@ nb:ModelD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 45 ;
+	        lv2:index 46 ;
 	        lv2:symbol "tuner_base_freq" ;
 	        lv2:name "Tuner Base Frequency" ;
 	        lv2:default 440.0 ;
 	        lv2:minimum 400.0 ;
 	        lv2:maximum 480.0
-	    ] , [
-	        a lv2:OutputPort ,
-	          lv2:ControlPort ;
-	        lv2:index 46 ;
-	        lv2:symbol "noisegate_gain" ;
-	        lv2:name "Noisegate Gain" ;
-	        lv2:minimum 0.0 ;
-	        lv2:maximum 1.0
 	    ] , [
 	        a lv2:OutputPort ,
 	          lv2:ControlPort ;

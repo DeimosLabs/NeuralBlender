@@ -157,7 +157,7 @@ public:
   virtual ~c_neuralblender_ui ();
   bool create (Window parent = 0);
   void destroy ();
-  int idle ();
+  virtual int idle ();
   void draw ();
   void clear_lane_model_ui (size_t which);
   void update_cwd (std::string path);
@@ -174,6 +174,7 @@ public:
   void sync_widgets_from_state (const c_neuralblender_state &state, bool scan_dirs = false);
   void write_calib_state_if_consistent ();
   virtual void apply_effective_controls ();
+  void set_threshgain (float f);
 
   virtual bool load_model (size_t which, const char *filename)  = 0;
   virtual void on_gain_in (c_widget *w, float f)                = 0;
@@ -197,6 +198,7 @@ public:
   virtual void on_noisehold (c_widget *w, float f)              = 0;
   virtual void on_noiserelease (c_widget *w, float f)           = 0;
   virtual void on_tuner (c_widget *w, bool b)                   = 0;
+  virtual void on_threshgain (c_widget *w, float f)             = 0;
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;
           void on_button (c_button *btn, bool value)              ;

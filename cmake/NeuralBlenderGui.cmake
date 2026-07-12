@@ -88,6 +88,7 @@ function(add_neuralblender_gui_library target_name)
     src/widgets.cpp
     src/timestamp.cpp
     src/meter.cpp
+    src/tuner.cpp
   )
 
   add_dependencies(${target_name} generate_inline_data)

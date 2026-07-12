@@ -27,6 +27,7 @@
 
 #ifdef METER_DATA_ONLY
 
+
 ////////////////////////////////////////////////////////////////////////////////
 // c_vudata
 
@@ -1037,6 +1038,12 @@ void c_meterwidget::render_base (cairo_t *cr) {
   }
 }
 
+void c_meterwidget::set_compression_gain (float f) {
+  compressor_gain = std::clamp (f, 0.0f, 1.0f);
+  invalidate_overlay ();
+  expose ();
+}
+
 void c_meterwidget::draw_bar (cairo_t *cr, int at, int bar_th, float level, float hold) {
   level = std::clamp (level, 0.0f, 1.0f);
   hold = std::clamp (hold, 0.0f, 1.0f);
@@ -1060,7 +1067,7 @@ void c_meterwidget::draw_bar (cairo_t *cr, int at, int bar_th, float level, floa
       w = bar_len - (tp * 2);
       h = bar_th - (tp * 2);
     }
-
+    
     if (w > 0 && h > 0) {
       cairo_pattern_t *gradient = nullptr;
       if (vertical)
@@ -1076,6 +1083,41 @@ void c_meterwidget::draw_bar (cairo_t *cr, int at, int bar_th, float level, floa
       cairo_fill (cr);
       cairo_pattern_destroy (gradient);
     }
+  }
+  
+  const float reduction = 1.0f - std::clamp (compressor_gain, 0.0f, 1.0f);
+  if (reduction > 0.0f) {
+    int mx = 0;
+    int my = 0;
+    int mw = 0;
+    int mh = 0;
+
+    if (vertical) {
+      mx = at + tp;
+      my = clip_size + tp;
+      mw = bar_th - (tp * 2);
+      mh = met_len - (tp * 2);
+    } else {
+      mx = rec_size + tp;
+      my = at + tp;
+      mw = met_len - (tp * 2);
+      mh = bar_th - (tp * 2);
+    }
+
+    if (mw <= 0 || mh <= 0)
+      return;
+
+    cairo_set_source_rgba (cr, 1.0, 1.0, 1.0, 0.2);
+    cairo_set_line_width (cr, 1.0);
+    if (vertical) {
+      const int ch = (int) ((float) mh * reduction);
+      cairo_rectangle (cr, mx, my, mw, ch);
+    } else {
+      const int cw = (int) ((float) mw * reduction);
+      cairo_rectangle (cr, mx, my, cw, mh);
+    }
+    cairo_fill_preserve (cr);
+    cairo_stroke (cr);
   }
 
   //const int holdpos = (int) (hold * met_len);

@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <atomic>
 
 //#ifndef METER_DATA_ONLY
 //#include "ui.h"
@@ -126,8 +126,8 @@ public:
   void invalidate_overlay_rect (int x, int y, int w, int h);
   void expose ();
 
-  Widget_t *widget = nullptr;
-  Widget_t *parent = nullptr;
+  Widget_t *widget = NULL;
+  Widget_t *parent = NULL;
   const char *label = "";
   int width = 0;
   int height = 0;
@@ -204,6 +204,7 @@ public:
   void set_stereo (bool b);
   void set_l (float level, float hold, bool clip = false, bool xrun = false);
   void set_r (float level, float hold, bool clip = false, bool xrun = false);
+  void set_compression_gain (float gain);
 
   bool vertical = false;
   int clip_size = 0;
@@ -223,6 +224,7 @@ private:
                           double w, double h);
   void update_geometry ();
 
+  float compressor_gain = 1.0f;
   bool stereo = true;
   int met_len = -1;
   float headroom = DEFAULT_VU_HEADROOM;

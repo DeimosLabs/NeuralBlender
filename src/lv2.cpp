@@ -25,6 +25,7 @@
 #include <string.h>
 #include <math.h>
 #include <thread>
+#include <chrono>
 #include <condition_variable>
 #include <lv2/core/lv2.h>
 #include <lv2/atom/atom.h>
@@ -95,9 +96,9 @@ enum {
 	  PORT_NOISEGATE_ATTACK,
 	  PORT_NOISEGATE_HOLD,
 	  PORT_NOISEGATE_RELEASE,
-	  PORT_TUNER_ON,
+    PORT_NOISEGATE_GAIN,
+    PORT_TUNER_ON,
 	  PORT_TUNER_BASE_FREQ,
-	  PORT_NOISEGATE_GAIN,
 	  PORT_TUNER_NOTE,
 	  PORT_TUNER_CENTS_OFF
 };
@@ -216,6 +217,9 @@ typedef struct {
   uint32_t meter_notify_samples = 0;
   std::atomic<bool> stats_dirty { true };
   std::atomic<bool> controls_dirty { false };
+  std::atomic<bool> tuner_enabled { false };
+  std::atomic<float> detected_tuner_note { 0.0f };
+  std::atomic<float> detected_tuner_cents { 0.0f };
   
 } Plugin;
 
@@ -261,7 +265,7 @@ static void run_linked_calibration (Plugin *self) {
   self->stats_dirty.store (true, std::memory_order_release);
 }
 
-// loader thread, also does calibration
+// loader thread, also does calibration and tuner analysis / pitch tracking
 // keeps these tasks OFF the dsp thread
 static void loader_main (Plugin *self) { CP
   while (true) {
@@ -270,11 +274,12 @@ static void loader_main (Plugin *self) { CP
     bool do_calib = false;
     bool do_calib_all = false;
     bool calib_enabled = false;
+    bool do_tuner = false;
     std::string path;
     { // scope: only hold this lock while moving pending jobs into locals
       std::unique_lock<std::mutex> lock (self->loader_mutex);
 
-      self->loader_cv.wait(lock, [&] {
+      self->loader_cv.wait_for(lock, std::chrono::milliseconds (50), [&] {
         for (size_t i = 0; i < NB_NUM_MODELS; ++i)
           if (self->pending_load [i] || self->pending_calibrate [i])
             return true;
@@ -314,6 +319,9 @@ static void loader_main (Plugin *self) { CP
           }
         }
       }
+
+      if (!do_load && !do_calib_all && !do_calib)
+        do_tuner = self->tuner_enabled.load (std::memory_order_acquire);
     } // unlocks here
 
     if (do_load) {
@@ -352,6 +360,15 @@ static void loader_main (Plugin *self) { CP
     if (do_calib_all) {
       run_linked_calibration (self);
       self->controls_dirty.store (true, std::memory_order_release);
+    }
+
+    if (do_tuner && self->blender.tuner.analyze ()) {
+      self->detected_tuner_note.store (
+        self->blender.tuner.detected_note.load (std::memory_order_acquire),
+        std::memory_order_release);
+      self->detected_tuner_cents.store (
+        self->blender.tuner.detected_cents.load (std::memory_order_acquire),
+        std::memory_order_release);
     }
   }
 }
@@ -1193,6 +1210,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	    if (v != self->last_tuner_on) {
 	      self->last_tuner_on = v;
 	      self->blender.tuner_on = v >= 0.5f;
+	      self->tuner_enabled.store (self->blender.tuner_on,
+	                                 std::memory_order_release);
 	    }
 	  }
 
@@ -1201,6 +1220,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	    if (v != self->last_tuner_base_freq) {
 	      self->last_tuner_base_freq = v;
 	      self->blender.tuner_base_freq = v;
+	      self->blender.tuner.set_base_freq ((int) lrintf (v));
 	    }
 	  }
 	  
@@ -1277,11 +1297,15 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   }
 
   if (self->noisegate_gain)
-    *self->noisegate_gain = self->blender.noisegate.get_current_gain ();
+    *self->noisegate_gain = self->blender.noisegate_on
+      ? self->blender.noisegate.get_current_gain ()
+      : 1.0f;
   if (self->tuner_note)
-    *self->tuner_note = self->blender.tuner_note;
+    *self->tuner_note =
+      self->detected_tuner_note.load (std::memory_order_acquire);
   if (self->tuner_cents_off)
-    *self->tuner_cents_off = self->blender.tuner_cents_off;
+    *self->tuner_cents_off =
+      self->detected_tuner_cents.load (std::memory_order_acquire);
 
   self->meter_notify_samples += nframes;
 }

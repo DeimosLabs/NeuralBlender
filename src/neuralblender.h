@@ -58,6 +58,7 @@
 #define WARMUP_BLOCKS            5
 #define NB_XFADE_MS              10.0f
 #define NB_LANE_XFADE_MS         NB_XFADE_MS
+#define TUNER_THRESH_DB          -40.0f
 
 enum _engine_mode {
   ENGINE_NONE,
@@ -169,11 +170,15 @@ public:
   ~c_tuner ();
   void set_samplerate (int sr);
   void process_block (float *in, int nframes);
-  int get_freq ();
+  bool analyze ();
   void dump ();
   
   void set_base_freq (int f = 440);
   void set_block_size (size_t sz);
+  
+  std::atomic<float> detected_freq  { 0.0f };
+  std::atomic<float> detected_note  { 0.0f };
+  std::atomic<float> detected_cents { 0.0f };
   
 private:
   void publish_snapshot ();
@@ -181,6 +186,7 @@ private:
   inline float get_lag_score (const std::vector<float> &buf, size_t lag) const;
   inline float sample_at (size_t i) const;
   int get_best_lag (const std::vector<float> &buf, int step) const;
+  void update_note_from_freq (float freq);
   
   std::vector<float>      ring;
   std::vector<float>      snapshots [2];
@@ -193,7 +199,7 @@ private:
   int lastfreq            = -1;
   
   std::atomic<int> published_snapshot { -1 };
-  std::atomic<uint64_t> published_seq {  0 };
+  std::atomic<uint64_t> published_seq {  0 };  
 };
 
 class c_delayline {
@@ -305,6 +311,7 @@ public:
   bool calibrate (size_t which, bool bass);
   bool calibrate_linked (bool bass);
   void update_input_meter (float *in, uint32_t nframes);
+  int tuner_freq ();
   
   //static void get_calib_data (std::vector<float> &v, bool bass);
   

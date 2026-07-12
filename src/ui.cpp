@@ -915,10 +915,13 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
   sync_widgets_from_state (state);
 }
 
+void c_neuralblender_ui::set_threshgain (float f) {
+  meter_in.set_compression_gain (f);
+}
+
 void c_neuralblender_ui::on_about () { CP }
 
-void c_neuralblender_ui::on_prefs () {
-}
+void c_neuralblender_ui::on_prefs () { CP }
 
 void c_neuralblender_ui::on_prefs_ok () {
 }

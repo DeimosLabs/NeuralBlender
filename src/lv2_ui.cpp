@@ -89,9 +89,9 @@ enum {
   PORT_NOISEGATE_ATTACK,
   PORT_NOISEGATE_HOLD,
   PORT_NOISEGATE_RELEASE,
+  PORT_NOISEGATE_GAIN,
   PORT_TUNER_ON,
   PORT_TUNER_BASE_FREQ,
-  PORT_NOISEGATE_GAIN,
   PORT_TUNER_NOTE,
   PORT_TUNER_CENTS_OFF
 };
@@ -261,6 +261,10 @@ public:
   void on_noiseattack (c_widget *w, float f)           { CP; write_control (PORT_NOISEGATE_ATTACK, f); }
   void on_noisehold (c_widget *w, float f)             { CP; write_control (PORT_NOISEGATE_HOLD, f); }
   void on_noiserelease (c_widget *w, float f)          { CP; write_control (PORT_NOISEGATE_RELEASE, f); }
+  void on_threshgain (c_widget *w, float f) {
+    (void) w;
+    meter_in.set_compression_gain (f);
+  }
   void on_tuner (c_widget *w, bool b) {
     (void) w;
     CP
@@ -389,6 +393,13 @@ public:
 	    if (port == PORT_NOISEGATE_THRESHOLD) {
 	      state.noisethresh = value;
 	      knob_noisethresh.set_value (value);
+	      updating_from_state = old_updating_from_state;
+	      updating_from_host = false;
+	      return;
+	    }
+
+	    if (port == PORT_NOISEGATE_GAIN) {
+	      on_threshgain (nullptr, value);
 	      updating_from_state = old_updating_from_state;
 	      updating_from_host = false;
 	      return;

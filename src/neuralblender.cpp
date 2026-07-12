@@ -181,6 +181,13 @@ static float clamp_calib_target_db (float db) {
  * c_tuner
  */
 
+static float block_rms (const std::vector<float> &buf) {
+  double sum = 0.0;
+  for (float x : buf)
+    sum += (double) x * (double) x;
+  return buf.empty () ? 0.0f : (float) sqrt (sum / (double) buf.size ());
+}
+
 c_tuner::c_tuner () { CP }
 
 c_tuner::~c_tuner () { CP }
@@ -208,7 +215,7 @@ inline float c_tuner::sample_at (size_t i) const {
 }
 
 inline float c_tuner::get_lag_score (const std::vector<float> &buf, size_t lag) const {
-  const size_t n = std::min (count, buf.size ());
+  const size_t n = buf.size ();
   if (lag == 0 || lag >= n)
     return std::numeric_limits<float>::infinity ();
 
@@ -224,8 +231,11 @@ inline float c_tuner::get_lag_score (const std::vector<float> &buf, size_t lag) 
 }
 
 int c_tuner::get_best_lag (const std::vector<float> &buf, int step) const {
-  const int start_lag = samplerate / 1000;
-  const int end_lag = std::min ((int) (samplerate / 40), (int) (ring.size () / 2));
+  const int min_freq = 25;
+  const int max_freq = 1000;
+  
+  const int start_lag = samplerate / max_freq;
+  const int end_lag = std::min ((int) (samplerate / min_freq), (int) (buf.size () - 1));
 
   if (start_lag >= end_lag)
     return 0;
@@ -245,22 +255,59 @@ int c_tuner::get_best_lag (const std::vector<float> &buf, int step) const {
   return best_lag;
 }
 
-int c_tuner::get_freq () {
+void c_tuner::update_note_from_freq (float freq) {
+  if (freq <= 0.0f || !std::isfinite (freq)) {
+    detected_freq.store (0.0f, std::memory_order_release);
+    detected_note.store (0.0f, std::memory_order_release);
+    detected_cents.store (0.0f, std::memory_order_release);
+    return;
+  }
+  
+  // thanks to Codex for help with the math here!
+  const float midi_f =
+    69.0f + 12.0f * log2f (freq / (float) basefreq);
+  const int midi = (int) lroundf (midi_f);
+
+  const float note_freq =
+    (float) basefreq * powf (2.0f, ((float) midi - 69.0f) / 12.0f);
+
+  const float cents =
+    1200.0f * log2f (freq / note_freq);
+  
+  debug ("freq=%f, midi=%d, cents=%f", freq, midi, cents);
+  
+  detected_freq.store (freq, std::memory_order_release);
+  detected_note.store ((float) midi, std::memory_order_release);
+  detected_cents.store (cents, std::memory_order_release);
+}
+
+// this runs on LOADER thread
+bool c_tuner::analyze () {
   const int idx = published_snapshot.load (std::memory_order_acquire);
   if (idx < 0 || idx > 1)
-    return 0;
+    return false;
 
   analysis = snapshots[idx];
 
+  if (block_rms (analysis) < db_to_gain (TUNER_THRESH_DB)) {
+    update_note_from_freq (0.0f);
+    return false;
+  }
+  
   const int lag = get_best_lag (analysis, 1);
-  if (lag <= 0)
-    return 0;
+  if (lag <= 0  || lag == samplerate / 1000) {
+    update_note_from_freq (0.0f);
+    return false;
+  }
 
-  lastfreq = samplerate / lag;
-  return lastfreq;
+  const float freq = (float) samplerate / (float) lag;
+  
+  update_note_from_freq (freq);
+
+  detected_freq.store (freq, std::memory_order_release);
+  return true;
 }
 
-// for UI thread to read our results
 void c_tuner::publish_snapshot () {
   const size_t n = ring.size ();
   const size_t first = count % n;
@@ -335,7 +382,7 @@ void c_tuner::dump () {
   debug ("lag score (65) = %f", get_lag_score (ring, 65));
   
   debug ("get_best_lag (1) = %d", get_best_lag (ring, 1));
-  debug ("get_freq () returned %d", get_freq ());
+  debug ("analyze () returned %d", analyze ());
 }
 
 /******************************************************************************
@@ -1268,6 +1315,14 @@ static void update_loaded_output_meters (c_neuralblender *blender) {
     if (blender->amps [lane].loaded () && blender->meters_out [lane])
       blender->meters_out [lane]->update ();
   }
+}
+
+int c_neuralblender::tuner_freq () {
+  if (!tuner.analyze ())
+    return 0;
+
+  return (int) lrintf (
+    tuner.detected_freq.load (std::memory_order_acquire));
 }
 
 // mixing related static funcs, these are pretty self explanatory

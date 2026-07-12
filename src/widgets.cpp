@@ -220,6 +220,31 @@ static cairo_pattern_t *create_vertical_gradient (
   return pat;
 }
 
+static c_toplevelwindow *toplevel_from_widget (void *w_) {
+  Widget_t *w = (Widget_t *) w_;
+  if (!w || !w->parent_struct)
+    return NULL;
+
+  return (c_toplevelwindow *) w->parent_struct;
+}
+
+static c_toplevelwindow *toplevel_from_child_widget (Widget_t *w) {
+  while (w && w->parent) {
+    Widget_t *parent_widget = (Widget_t *) w->parent;
+    if ((parent_widget->flags & IS_WINDOW) && parent_widget->parent_struct)
+      return (c_toplevelwindow *) parent_widget->parent_struct;
+
+    w = parent_widget;
+  }
+
+  return NULL;
+}
+
+uint64_t get_unique_id () {
+  static uint64_t current = 1;
+  return current++;
+}
+
 static void path_rounded_rect (
     cairo_t *cr,
     double x,
@@ -422,70 +447,8 @@ void set_x11_window_background (
 
 void cb_dummy (void *w_, void* user_data) {}
 
-static c_toplevelwindow *toplevel_from_widget (void *w_) {
-  Widget_t *w = (Widget_t *) w_;
-  if (!w || !w->parent_struct)
-    return NULL;
-
-  return (c_toplevelwindow *) w->parent_struct;
-}
-
-static c_toplevelwindow *toplevel_from_child_widget (Widget_t *w) {
-  while (w && w->parent) {
-    Widget_t *parent_widget = (Widget_t *) w->parent;
-    if ((parent_widget->flags & IS_WINDOW) && parent_widget->parent_struct)
-      return (c_toplevelwindow *) parent_widget->parent_struct;
-
-    w = parent_widget;
-  }
-
-  return NULL;
-}
-
-uint64_t get_unique_id () {
-  static uint64_t current = 1;
-  return current++;
-}
-
-void c_toplevelwindow::cb_expose (void *w_, void *user_data) {
-  (void) user_data;
-
-  c_toplevelwindow *window = toplevel_from_widget (w_);
-  if (!window)
-    return;
-
-  window->on_expose ();
-}
-
-void c_toplevelwindow::cb_resize (void *w_, void *user_data) {
-  (void) user_data;
-
-  c_toplevelwindow *window = toplevel_from_widget (w_);
-  if (!window)
-    return;
-
-  window->on_resize ();
-}
-
-void c_toplevelwindow::cb_key_press (void *w_, void *event, void *user_data) {
-  (void) user_data;
-
-  c_toplevelwindow *window = toplevel_from_widget (w_);
-  if (!window)
-    return;
-
-  window->on_keydown ((XKeyEvent *) event);
-}
-
-void c_toplevelwindow::cb_close (void *w_, void *user_data) { CP
-  (void) user_data;
-
-  c_toplevelwindow *window = toplevel_from_widget (w_);
-  if (!window)
-    return;
-
-  window->on_close ();
-}
+////////////////////////////////////////////////////////////////////////////////
+// c_widget
 
 // this one must be called AFTER add_* (Widget_t *, ...) in child create functions
 void c_widget::create (
@@ -698,6 +661,62 @@ int c_widget::h () {
   return (int) (widget->scale.init_height / widget->app->hdpi);
 }
 
+void c_widget::move_resize (int x, int y, int w, int h) {
+  if (!widget)
+    return;
+
+  const int sx = x * widget->app->hdpi;
+  const int sy = y * widget->app->hdpi;
+  const int sw = std::max (1, (int) (w * widget->app->hdpi));
+  const int sh = std::max (1, (int) (h * widget->app->hdpi));
+
+  widget->x = sx;
+  widget->y = sy;
+  widget->scale.init_x = sx;
+  widget->scale.init_y = sy;
+  widget->scale.init_width = sw;
+  widget->scale.init_height = sh;
+
+  os_move_window (widget->app->dpy, widget, sx, sy);
+  os_resize_window (widget->app->dpy, widget, sw, sh);
+  widget->func.configure_callback (widget, NULL);
+  expose ();
+}
+
+void c_widget::move (int x, int y) {
+  if (!widget)
+    return;
+
+  const int sx = x * widget->app->hdpi;
+  const int sy = y * widget->app->hdpi;
+
+  widget->x = sx;
+  widget->y = sy;
+  widget->scale.init_x = sx;
+  widget->scale.init_y = sy;
+
+  os_move_window (widget->app->dpy, widget, sx, sy);
+  expose ();
+}
+
+void c_widget::resize (int w, int h) {
+  if (!widget)
+    return;
+
+  const int sw = std::max (1, (int) (w * widget->app->hdpi));
+  const int sh = std::max (1, (int) (h * widget->app->hdpi));
+
+  widget->scale.init_width = sw;
+  widget->scale.init_height = sh;
+
+  os_resize_window (widget->app->dpy, widget, sw, sh);
+  widget->func.configure_callback (widget, NULL);
+  expose ();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// c_toplevelwindow / c_mainwindow
+
 bool c_toplevelwindow::create (
     c_neuralblender_ui *ui_,
     Window parent_,
@@ -737,6 +756,46 @@ bool c_toplevelwindow::create (
   set_x11_window_background (widget, get_colortheme ()->window_bg);
 
   return true;
+}
+
+void c_toplevelwindow::cb_expose (void *w_, void *user_data) {
+  (void) user_data;
+
+  c_toplevelwindow *window = toplevel_from_widget (w_);
+  if (!window)
+    return;
+
+  window->on_expose ();
+}
+
+void c_toplevelwindow::cb_resize (void *w_, void *user_data) {
+  (void) user_data;
+
+  c_toplevelwindow *window = toplevel_from_widget (w_);
+  if (!window)
+    return;
+
+  window->on_resize ();
+}
+
+void c_toplevelwindow::cb_key_press (void *w_, void *event, void *user_data) {
+  (void) user_data;
+
+  c_toplevelwindow *window = toplevel_from_widget (w_);
+  if (!window)
+    return;
+
+  window->on_keydown ((XKeyEvent *) event);
+}
+
+void c_toplevelwindow::cb_close (void *w_, void *user_data) { CP
+  (void) user_data;
+
+  c_toplevelwindow *window = toplevel_from_widget (w_);
+  if (!window)
+    return;
+
+  window->on_close ();
 }
 
 bool c_mainwindow::create (
@@ -892,60 +951,6 @@ void c_mainwindow::on_resize () { CP
       metrics.height / widget->app->hdpi);
 }
 
-
-void c_widget::move_resize (int x, int y, int w, int h) {
-  if (!widget)
-    return;
-
-  const int sx = x * widget->app->hdpi;
-  const int sy = y * widget->app->hdpi;
-  const int sw = std::max (1, (int) (w * widget->app->hdpi));
-  const int sh = std::max (1, (int) (h * widget->app->hdpi));
-
-  widget->x = sx;
-  widget->y = sy;
-  widget->scale.init_x = sx;
-  widget->scale.init_y = sy;
-  widget->scale.init_width = sw;
-  widget->scale.init_height = sh;
-
-  os_move_window (widget->app->dpy, widget, sx, sy);
-  os_resize_window (widget->app->dpy, widget, sw, sh);
-  widget->func.configure_callback (widget, NULL);
-  expose ();
-}
-
-void c_widget::move (int x, int y) {
-  if (!widget)
-    return;
-
-  const int sx = x * widget->app->hdpi;
-  const int sy = y * widget->app->hdpi;
-
-  widget->x = sx;
-  widget->y = sy;
-  widget->scale.init_x = sx;
-  widget->scale.init_y = sy;
-
-  os_move_window (widget->app->dpy, widget, sx, sy);
-  expose ();
-}
-
-void c_widget::resize (int w, int h) {
-  if (!widget)
-    return;
-
-  const int sw = std::max (1, (int) (w * widget->app->hdpi));
-  const int sh = std::max (1, (int) (h * widget->app->hdpi));
-
-  widget->scale.init_width = sw;
-  widget->scale.init_height = sh;
-
-  os_resize_window (widget->app->dpy, widget, sw, sh);
-  widget->func.configure_callback (widget, NULL);
-  expose ();
-}
-
 void c_frame::create (
     c_neuralblender_ui *ui_,
     Widget_t *parent,
@@ -958,6 +963,9 @@ void c_frame::create (
   widget->func.expose_callback = c_frame::cb_draw;
   c_widget::create (ui_, parent, label_, x, y, w, h);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// c_frame, c_container
 
 void c_frame::cb_draw (void *w_, void *user_data) {
   (void) user_data;
@@ -1006,6 +1014,9 @@ void c_meter::create (
   meter.create (widget, label_, 0, 0, w, h);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// c_meter
+
 void c_meter::move_resize (int x, int y, int w, int h) {
   c_widget::move_resize (x, y, w, h);
 
@@ -1046,6 +1057,17 @@ void c_meter::hide () {
   if (widget)
     widget_hide (widget);
 }
+
+void c_meter::set_compression_gain (float f) {
+  meter.set_compression_gain (f);
+}
+
+void c_meter::set_compression_db (float f) {
+  meter.set_compression_gain (db_to_gain (f));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// c_label, c_linklabel
 
 void c_label::create (
     c_neuralblender_ui *ui_,
@@ -1102,9 +1124,6 @@ void c_label::cb_draw (void *w_, void *ptr) {
   cairo_fill (w->crb);
   cairo_new_path (w->crb);
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// c_linklabel : public c_label
 
 void c_linklabel::create (
     c_neuralblender_ui *ui,
@@ -1366,7 +1385,7 @@ bool c_textbox::on_keydown (XKeyEvent *key) { CP
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// c_image
+// c_image, c_button
 
 void c_image::create (
     c_neuralblender_ui *ui,
@@ -1777,6 +1796,9 @@ bool c_button::set_value (bool value_) {
   return true;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// c_knob
+
 void knob_double_click (void *w_, void *event, void *user_data) {
   (void) event;
   (void) user_data;
@@ -1985,6 +2007,8 @@ void c_knob::on_doubleclick () { CP
     set_value (defaultvalue);
 }
 
+
+
 void c_combobox::create (
     c_neuralblender_ui *ui_,
     Widget_t *parent,
@@ -1998,6 +2022,9 @@ void c_combobox::create (
 
   update_widget ();
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// c_combobox
 
 // work around xputty's weirdness
 void c_combobox::move_resize (int x, int y, int w, int h) {
@@ -2140,6 +2167,9 @@ void combobox_selected_callback (void *w_, void *user_data) { CP
 
   cb->on_change (index);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// c_filepicker
 
 static void filepicker_response (void *w_, void *user_data) { CP
   Widget_t *w = (Widget_t *) w_;

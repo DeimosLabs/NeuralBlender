@@ -270,15 +270,17 @@ public:
   void move_resize (int x, int y, int w, int h) override;
   void show ();
   void hide ();
+  void set_compression_gain (float f);
+  void set_compression_db (float f);
       
   c_meterwidget meter;
   
-  inline void on_ui_timer () { meter.on_ui_timer (); }
-  inline void set_vudata (c_vudata *p) {meter.set_vudata (p); }
-  inline void set_stereo (bool b) { meter.set_stereo (b); }
-  inline void set_db_scale (float f) { meter.set_db_scale (f); }
-  inline void set_headroom (float f) { meter.set_headroom (f); }
-  inline bool needs_redraw () { return meter.needs_redraw (); }
+  inline void on_ui_timer ()           { meter.on_ui_timer ();         }
+  inline void set_db_scale (float f)   { meter.set_db_scale (f);       }
+  inline void set_headroom (float f)   { meter.set_headroom (f);       }
+  inline void set_vudata (c_vudata *p) { meter.set_vudata (p);         }
+  inline void set_stereo (bool b)      { meter.set_stereo (b);         }
+  inline bool needs_redraw ()          { return meter.needs_redraw (); }
 };
 
 class c_label : public c_widget {
@@ -418,6 +420,17 @@ public:
   float defaultvalue = 0;
   float step = 1;
   bool reset_on_doubleclick = true;
+};
+
+class c_tunerwidget : public c_widget {
+public:
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label,
+      int x, int y, int w, int h);
+      
+  static void cb_draw (void *w, void *userdata);
 };
 
 class c_combobox : public c_widget {
