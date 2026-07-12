@@ -11,6 +11,7 @@ Features:
   - Calibration target dB is now a user defined setting
   - "Linked" calibration mode follows loudest model which has calib. enabled
   - Calibration can be tuned for guitar or bass
+  - Tuner, can be enabled/disabled
   - Volume ramping/crossfade when loading, switching etc. to avoid clicks
   - Each model slot / lane has:
     - input gain
