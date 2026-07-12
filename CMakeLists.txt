@@ -285,8 +285,12 @@ if (LV2)
   set_target_properties(neuralblender_lv2 PROPERTIES
     PREFIX ""
     OUTPUT_NAME "neuralblender"
+    C_VISIBILITY_PRESET hidden
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
   )
 
+  # avoid symbol collision with other xputty based plugins
   install(TARGETS neuralblender_lv2
     LIBRARY DESTINATION lib/lv2/neuralblender.lv2
   )
@@ -309,6 +313,15 @@ if (LV2)
     set_target_properties(neuralblender_ui PROPERTIES
       PREFIX ""
       OUTPUT_NAME "neuralblender_ui"
+      C_VISIBILITY_PRESET hidden
+      CXX_VISIBILITY_PRESET hidden
+      VISIBILITY_INLINES_HIDDEN ON
+    )
+
+    set_target_properties(neuralblender_gui_lv2 PROPERTIES
+      C_VISIBILITY_PRESET hidden
+      CXX_VISIBILITY_PRESET hidden
+      VISIBILITY_INLINES_HIDDEN ON
     )
     
     target_link_libraries(neuralblender_ui PRIVATE
@@ -318,6 +331,10 @@ if (LV2)
       PkgConfig::LV2_DEPS
     )
     target_compile_definitions(neuralblender_ui PRIVATE LV2 LV2_UI)
+
+    target_link_options(neuralblender_ui PRIVATE
+      "LINKER:--version-script=${PROJECT_SOURCE_DIR}/lv2/neuralblender_ui.map"
+    )
 
     install(TARGETS neuralblender_ui
       LIBRARY DESTINATION lib/lv2/neuralblender.lv2
