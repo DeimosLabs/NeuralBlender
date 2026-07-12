@@ -119,7 +119,7 @@ struct c_neuralblender_state {
   bool showadvanced = false;
   bool mute_all = false;
   int  exclusive_lane = 0;
-  bool tuner = false;
+  bool tuner_on = false;
   bool noisegate_on = false;
   float noisethresh = -60.0f;
   float noiseattack = 2.0f;
@@ -128,7 +128,7 @@ struct c_neuralblender_state {
   c_neuralblender_lane_state lanes [NB_NUM_MODELS];
 };
 
-// a very simple but effective noise gate
+// a simple but effective noise gate
 class c_noisegate {
 public:
   void process_block (float *in, float *out, uint32_t nframes);
@@ -161,6 +161,39 @@ private:
   bool coeffs_dirty = true;
 
   std::atomic<float> display_gain = 0.0f;
+};
+
+class c_tuner {
+public:
+  c_tuner ();
+  ~c_tuner ();
+  void set_samplerate (int sr);
+  void process_block (float *in, int nframes);
+  int get_freq ();
+  void dump ();
+  
+  void set_base_freq (int f = 440);
+  void set_block_size (size_t sz);
+  
+private:
+  void publish_snapshot ();
+  
+  inline float get_lag_score (const std::vector<float> &buf, size_t lag) const;
+  inline float sample_at (size_t i) const;
+  int get_best_lag (const std::vector<float> &buf, int step) const;
+  
+  std::vector<float>      ring;
+  std::vector<float>      snapshots [2];
+  std::vector<float>      analysis;
+  
+  size_t count            = 0;
+  int write_snapshot      = 0;
+  int samplerate          = 48000;
+  int basefreq            = 440;
+  int lastfreq            = -1;
+  
+  std::atomic<int> published_snapshot { -1 };
+  std::atomic<uint64_t> published_seq {  0 };
 };
 
 class c_delayline {
@@ -280,6 +313,8 @@ public:
   c_neuralamp amps [NB_NUM_MODELS];
   c_vudata *meter_in;
   c_vudata *meters_out [NB_NUM_MODELS];
+  c_tuner tuner;
+  
   bool do_vu = true;
   bool noisegate_on = false;
   bool tuner_on = false;

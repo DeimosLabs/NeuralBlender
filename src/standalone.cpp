@@ -83,6 +83,7 @@ public:
   bool load_model (size_t which, const char *filename);
   void on_gain_in (c_widget *w, float f);
   void on_gain_out (c_widget *w, float f);
+  void on_dry_out (c_widget *w, float f);
   void on_delay (c_widget *w, float f);
   void on_filebrowse (c_widget *w);
   void on_fileselected (c_widget *w, const char *path);
@@ -99,6 +100,7 @@ public:
   void on_noiseattack (c_widget *w, float f);
   void on_noisehold (c_widget *w, float f);
   void on_noiserelease (c_widget *w, float f);
+  void on_tuner (c_widget *w, bool b);
   //void on_excl (c_widget *w, int which);
   void on_bypass (c_widget *w, bool b);
   void on_about (c_widget *w);
@@ -136,6 +138,11 @@ void c_standalone_ui::on_gain_in (c_widget *w, float f) {
 void c_standalone_ui::on_gain_out (c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
   g_blender.set_gain_out (w->lane, f);
+}
+
+void c_standalone_ui::on_dry_out (c_widget *w, float f) {
+  debug ("lane %d, f=%f", w->lane, f);
+  g_blender.set_dry_out (w->lane, f);
 }
 
 void c_standalone_ui::on_delay (c_widget *w, float f) {
@@ -223,6 +230,11 @@ void c_standalone_ui::on_noisehold (c_widget *w, float value) {
 
 void c_standalone_ui::on_noiserelease (c_widget *w, float value) {
   g_blender.noisegate.set_release (value);
+}
+
+void c_standalone_ui::on_tuner (c_widget *w, bool b) {
+  (void) w;
+  g_blender.tuner_on = b;
 }
 
 void c_standalone_ui::on_linked_calib (c_widget *w, bool b) {
@@ -383,6 +395,24 @@ int main (int argc, char **argv) {
   signal (SIGINT, signal_handler);
   signal (SIGTERM, signal_handler);
 #endif
+
+  /*
+  // tuner test
+  c_tuner tuner;
+  
+  std::vector<float> f;
+  f.resize (64);
+  for (int i = 0; i < f.size (); i++)
+    f [i] = sinf (2.0f * M_PI * i / 64.0f);
+    //f [i] = i - 8;
+  
+  tuner.set_samplerate (48000);
+  for (int i = 0; i < 100; i++)
+    tuner.process_block (f.data (), f.size ());
+  
+  tuner.dump ();
+  exit (0);
+  */
   
   if (!parse_args (argc, argv, &g_blender)) {
     printf ("Error parsing command line\n");

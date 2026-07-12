@@ -229,6 +229,7 @@ public:
   bool load_model (size_t which, const char *filename) { CP; return write_model_path (which, filename); }
   void on_gain_in (c_widget *w, float f)               { CP; write_control (lane_port (w->lane, PORT_A_GAIN_IN), gain_to_db (f)); }
   void on_gain_out (c_widget *w, float f)              { CP; write_control (lane_port (w->lane, PORT_A_GAIN_OUT), gain_to_db (f)); }
+  void on_dry_out (c_widget *w, float f)               { CP; write_control (lane_port (w->lane, PORT_A_DRY_OUT), gain_to_db (f)); }
   void on_delay (c_widget *w, float f)                 { CP; write_control (lane_port (w->lane, PORT_A_DELAY), f); }
   void on_filebrowse (c_widget *w)                     { CP }
   void on_fileselected (c_widget *w, const char *path) { CP }
@@ -260,6 +261,12 @@ public:
   void on_noiseattack (c_widget *w, float f)           { CP; write_control (PORT_NOISEGATE_ATTACK, f); }
   void on_noisehold (c_widget *w, float f)             { CP; write_control (PORT_NOISEGATE_HOLD, f); }
   void on_noiserelease (c_widget *w, float f)          { CP; write_control (PORT_NOISEGATE_RELEASE, f); }
+  void on_tuner (c_widget *w, bool b) {
+    (void) w;
+    CP
+    state.tuner_on = b;
+    write_control (PORT_TUNER_ON, b ? 1.0f : 0.0f);
+  }
 
 	  void apply_prefs (t_prefs &p) override {
 	    c_neuralblender_ui::apply_prefs (p);
@@ -387,6 +394,18 @@ public:
 	      return;
 	    }
 
+	    if (port == PORT_TUNER_ON) {
+	      state.tuner_on = value >= 0.5f;
+	      btn_tuner.set_value (state.tuner_on);
+	      /*if (state.tuner_on)
+	        widget_tuner.show ();
+	      else
+	        widget_tuner.hide ();*/
+	      updating_from_state = old_updating_from_state;
+	      updating_from_host = false;
+	      return;
+	    }
+
     for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
       const uint32_t base = PORT_A_GAIN_IN + (uint32_t) lane * 7;
       if (port == base) {
@@ -404,6 +423,7 @@ public:
       } else if (port == base + 2) {
         state.lanes [lane].dry_out =
           value <= DB_SILENCE ? 0.0f : db_to_gain (value);
+        lanes [lane].knob_dry_out.set_value (value);
         updating_from_state = old_updating_from_state;
         updating_from_host = false;
         return;

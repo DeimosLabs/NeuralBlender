@@ -322,7 +322,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
     labels [i].align = TEXT_CENTER;
   }
   
-  linklabel.create (ui, frame.widget, "https://github.com/DeimosLabs/NeuralBlender",
+  linklabel.create (ui, frame.widget, "http://deimos.ca/neuralblender",
       0, labels [4].y (), 400, 24);
   linklabel.align = TEXT_CENTER;
 
@@ -405,7 +405,7 @@ void c_lane_widgets::create (
 
   int knobs_right = w - 180;
   knob_gain_in.create (ui, wp, "Input", 0, 0, 64, 64);
-  knob_gain_in.lane = knob_gain_out.lane = knob_delay.lane = which;
+  knob_gain_in.lane = knob_gain_out.lane = knob_dry_out.lane = knob_delay.lane = which;
   knob_gain_in.set_min (-40);
   knob_gain_in.set_max (40);
   knob_gain_in.set_default (0);
@@ -414,7 +414,6 @@ void c_lane_widgets::create (
   knob_gain_in.role = ROLE_GAIN_IN;
   
   knob_gain_out.create (ui, wp, "Output", 0, 0, 64, 64);
-  knob_gain_out.role = ROLE_GAIN_OUT;
   knob_gain_out.set_min (-40);
   knob_gain_out.set_max (40);
   knob_gain_out.set_default (0);
@@ -423,13 +422,12 @@ void c_lane_widgets::create (
   knob_gain_out.role = ROLE_GAIN_OUT;
   
   knob_dry_out.create (ui, wp, "Dry out", 0, 0, 64, 64);
-  knob_dry_out.role = ROLE_GAIN_OUT;
   knob_dry_out.set_min (-120);
-  knob_dry_out.set_max (0);
+  knob_dry_out.set_max (12);
   knob_dry_out.set_default (-120);
   knob_dry_out.set_value (-120);
   knob_dry_out.set_step (0.1);
-  knob_dry_out.role = ROLE_GAIN_OUT;
+  knob_dry_out.role = ROLE_DRY_OUT;
   
   meter_out.create (ui, parent, "", 0, 0, METER_WIDTH, 120);
   meter_out.set_vudata (&vudata_out);
@@ -652,6 +650,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_tuner.create (this, mainwindow.widget, "", 0, 0, 40, 40, WSTYLE_IMAGE_TOGGLE);
   btn_tuner.set_image_default (data_icon_tuner_png);
   btn_tuner.set_tooltip ("Tuner (TODO)");
+  btn_tuner.role = ROLE_TUNER;
   
   knob_noisethresh.create (this, mainwindow.widget, "", 0, 0, 64, 64);
   knob_noisethresh.set_min (-120);
@@ -886,6 +885,11 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     case ROLE_NOISEGATE: CP
       state.noisegate_on = value;
       on_noisegate (btn, value);
+    break;
+    
+    case ROLE_TUNER: CP
+      state.tuner_on = value;
+      on_tuner (btn, value);
     break;
 
     case ROLE_EXCL_TOGGLE: CP
@@ -1182,6 +1186,8 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
 
     lanes [i].knob_gain_in.set_value (gain_to_db (lane.gain_in));
     lanes [i].knob_gain_out.set_value (gain_to_db (lane.gain_out));
+    lanes [i].knob_dry_out.set_value (
+      lane.dry_out > 0.0f ? gain_to_db (lane.dry_out) : DB_SILENCE);
     lanes [i].knob_delay.set_value (lane.delay_ms);
     lanes [i].btn_flip.set_value (lane.dcflip);
     lanes [i].btn_calib.set_value (lane.do_calib);

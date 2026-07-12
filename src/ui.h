@@ -178,6 +178,7 @@ public:
   virtual bool load_model (size_t which, const char *filename)  = 0;
   virtual void on_gain_in (c_widget *w, float f)                = 0;
   virtual void on_gain_out (c_widget *w, float f)               = 0;
+  virtual void on_dry_out (c_widget *w, float f)                = 0;
   virtual void on_delay (c_widget *w, float f)                  = 0;
   virtual void on_filebrowse (c_widget *w)                      = 0;
   virtual void on_fileselected (c_widget *w, const char *path)  = 0;
@@ -195,6 +196,7 @@ public:
   virtual void on_noiseattack (c_widget *w, float f)            = 0;
   virtual void on_noisehold (c_widget *w, float f)              = 0;
   virtual void on_noiserelease (c_widget *w, float f)           = 0;
+  virtual void on_tuner (c_widget *w, bool b)                   = 0;
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;
           void on_button (c_button *btn, bool value)              ;

@@ -167,7 +167,7 @@ static float clamp_dry_multiplier (float gain) {
   if (!std::isfinite (gain))
     return 0.0f;
 
-  return std::clamp (gain, 0.0f, db_to_gain (1.0f));
+  return std::clamp (gain, 0.0f, db_to_gain (12.0f));
 }
 
 static float clamp_calib_target_db (float db) {
@@ -178,7 +178,169 @@ static float clamp_calib_target_db (float db) {
 }
 
 /******************************************************************************
+ * c_tuner
+ */
+
+c_tuner::c_tuner () { CP }
+
+c_tuner::~c_tuner () { CP }
+
+void c_tuner::set_samplerate (int sr) { CP
+  if (sr < 800 || sr > 192000)
+    return;
+  
+  samplerate = sr;
+  set_block_size (samplerate / 10);
+}
+
+inline float c_tuner::sample_at (size_t i) const {
+  size_t n = ring.size ();
+  if (n == 0)
+    return 0.0f;
+  
+  size_t valid = std::min (count, n);
+  size_t first = (count >= n) ? (count % n) : 0;
+
+  if (i >= valid)
+    return 0.0f;
+
+  return ring [(first + i) % n];
+}
+
+inline float c_tuner::get_lag_score (const std::vector<float> &buf, size_t lag) const {
+  const size_t n = std::min (count, buf.size ());
+  if (lag == 0 || lag >= n)
+    return std::numeric_limits<float>::infinity ();
+
+  float ret = 0.0f;
+  const size_t end = n - lag;
+
+  for (size_t i = 0; i < end; i++) {
+    const float d = buf [i] - buf [i + lag];
+    ret += d * d;
+  }
+  
+  return ret / (float) end;
+}
+
+int c_tuner::get_best_lag (const std::vector<float> &buf, int step) const {
+  const int start_lag = samplerate / 1000;
+  const int end_lag = std::min ((int) (samplerate / 40), (int) (ring.size () / 2));
+
+  if (start_lag >= end_lag)
+    return 0;
+
+  float best_score = get_lag_score (buf, start_lag);
+  int best_lag = start_lag;
+  
+  // first coarse pass
+  for (int i = start_lag + step; i < end_lag; i += step) {
+    float s = get_lag_score (buf, i);
+    //debug ("i=%d, s=%f", i, s);
+    if (s < best_score) {
+      best_score = s;
+      best_lag = i;
+    }
+  }
+  return best_lag;
+}
+
+int c_tuner::get_freq () {
+  const int idx = published_snapshot.load (std::memory_order_acquire);
+  if (idx < 0 || idx > 1)
+    return 0;
+
+  analysis = snapshots[idx];
+
+  const int lag = get_best_lag (analysis, 1);
+  if (lag <= 0)
+    return 0;
+
+  lastfreq = samplerate / lag;
+  return lastfreq;
+}
+
+// for UI thread to read our results
+void c_tuner::publish_snapshot () {
+  const size_t n = ring.size ();
+  const size_t first = count % n;
+
+  int idx = write_snapshot;
+  float *dst = snapshots [idx].data ();
+
+  const size_t front = n - first;
+  memcpy (dst, &ring [first], front * sizeof (float));
+  if (first)
+    memcpy (dst + front, &ring [0], first * sizeof (float));
+
+  published_snapshot.store (idx, std::memory_order_release);
+  published_seq.fetch_add (1, std::memory_order_release);
+
+  write_snapshot = 1 - write_snapshot;
+}
+
+void c_tuner::process_block (float *in, int nframes_) {
+  size_t bs = ring.size ();
+  
+  if (bs <= 0 || !in || nframes_ <= 0)
+    return;
+  
+  const size_t nframes = (size_t) nframes_;
+  const size_t pos = count % bs;
+  const size_t front = std::min<size_t> (nframes, bs - pos);
+  const size_t back = nframes - front;
+  size_t i;
+  
+  //debug ("bs=%ld, count=%ld, front=%ld, back=%ld", bs, count, front, back);
+  memcpy (&ring [pos], in, front * sizeof (float));
+  if (back)
+    memcpy (&ring [0], in + front, back * sizeof (float));
+
+  count += nframes;
+
+  if (count >= bs) {
+    publish_snapshot ();
+  }
+}
+
+void c_tuner::set_base_freq (int f) {
+  if (f >= 220 && f <= 880)
+    basefreq = f;
+}
+
+void c_tuner::set_block_size (size_t sz) { CP
+  ring.resize (sz);
+  
+  ring.resize (sz);
+  snapshots[0].resize (sz);
+  snapshots[1].resize (sz);
+  analysis.resize (sz);
+  count = 0;
+  write_snapshot = 0;
+  published_snapshot.store (-1, std::memory_order_release);
+  published_seq.store (0, std::memory_order_release);
+
+  std::fill (ring.begin (), ring.end (), 0.0f);
+  std::fill (snapshots[0].begin (), snapshots[0].end (), 0.0f);
+  std::fill (snapshots[1].begin (), snapshots[1].end (), 0.0f);
+  std::fill (analysis.begin (), analysis.end (), 0.0f);
+}
+
+void c_tuner::dump () {
+  for (size_t i = 0; i < ring.size (); i++)
+    printf ("sample %d=%f\n", i, sample_at (i));
+  
+  debug ("lag score (63) = %f", get_lag_score (ring, 63));
+  debug ("lag score (64) = %f", get_lag_score (ring, 64));
+  debug ("lag score (65) = %f", get_lag_score (ring, 65));
+  
+  debug ("get_best_lag (1) = %d", get_best_lag (ring, 1));
+  debug ("get_freq () returned %d", get_freq ());
+}
+
+/******************************************************************************
  * c_noisegate
+ * TODO: add UI settings for attack, hold, delay
  */
 
 // should be called on startup, and when user changes a setting
@@ -843,6 +1005,7 @@ void c_neuralblender::set_samplerate (uint32_t sr) { CP
   debug ("start");
   m_samplerate = sr;
   noisegate.set_samplerate (sr);
+  tuner.set_samplerate (sr);
   
   if (meter_in)
     meter_in->samplerate = (int) sr;
@@ -1107,113 +1270,6 @@ static void update_loaded_output_meters (c_neuralblender *blender) {
   }
 }
 
-/*
-void c_neuralblender::process_block_main (float *in, float *out, uint32_t nframes) {
-  if (!in || !out || !nframes)
-    return;
-
-  float *process_in = in;
-  if (in == out) {
-    if (m_input_buf.size () < nframes)
-      m_input_buf.resize (nframes);
-    memcpy (m_input_buf.data (), in, nframes * sizeof (float));
-    process_in = m_input_buf.data ();
-  }
-
-  if (do_vu && meter_in) {
-    for (uint32_t i = 0; i < nframes; i++)
-      meter_in->sample (process_in [i], 0.0f);
-    meter_in->update ();
-  }
-
-  if (m_bypass.load (std::memory_order_relaxed)) {
-    if (process_in != out)
-      memcpy (out, process_in, nframes * sizeof (float));
-    update_loaded_output_meters (this);
-    return;
-  }
-
-  if (mute_all) {
-    std::fill(out, out + nframes, 0.0f);
-    if (do_vu)
-      update_loaded_output_meters(this);
-    return;
-  }
-
-  for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
-    if (m_delay_bufs [lane].size () < nframes)
-      m_delay_bufs [lane].resize (nframes);
-    if (m_model_bufs [lane].size () < nframes)
-      m_model_bufs [lane].resize (nframes);
-  }
-
-  bool any_loaded = false;
-  bool any_active = false;
-  for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
-    if (!amps [lane].loaded ())
-      continue;
-
-    any_loaded = true;
-
-    if (!amps [lane].mute.load (std::memory_order_relaxed) &&
-        !m_lane_mute [lane].load (std::memory_order_relaxed))
-      any_active = true;
-  }
-
-  if (!any_loaded) {
-    delays [0].process_block (process_in, out, nframes);
-    for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
-      if (do_vu && meters_out [lane])
-        meters_out [lane]->update ();
-    }
-    return;
-  }
-
-  if (!any_active) {
-    std::fill (out, out + nframes, 0.0f);
-    if (do_vu)
-      update_loaded_output_meters (this);
-    return;
-  }
-
-  std::fill (out, out + nframes, 0.0f);
-
-  for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
-    if (!amps [lane].loaded ()) {
-      if (meters_out [lane] && do_vu)
-        meters_out [lane]->update ();
-      continue;
-    }
-
-    if (amps [lane].mute.load (std::memory_order_relaxed) ||
-        m_lane_mute [lane].load (std::memory_order_relaxed)) {
-      if (meters_out [lane] && do_vu)
-        meters_out [lane]->update ();
-      continue;
-    }
-
-    delays [lane].process_block (process_in, m_delay_bufs [lane].data (), nframes);
-    amps [lane].process_block (m_delay_bufs [lane].data (), m_model_bufs [lane].data (), nframes);
-
-    for (uint32_t i = 0; i < nframes; ++i) {
-      if (meters_out [lane] && do_vu)
-        meters_out [lane]->sample (m_model_bufs [lane] [i], 0.0);
-      out [i] += m_model_bufs [lane][i];
-    }
-
-    if (meters_out [lane] && do_vu)
-      meters_out [lane]->update ();
-  }
-
-  for (uint32_t i = 0; i < nframes; ++i)
-    out [i] = std::clamp (out [i], -1.0f, 1.0f);
-}
-
-void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
-  process_block_main (in, out, nframes);
-}
-*/
-
 // mixing related static funcs, these are pretty self explanatory
 
 static inline float ramp_in_gain (uint32_t i, uint32_t n) {
@@ -1341,11 +1397,14 @@ void c_neuralblender::render_lane (
   amps [lane].process_block (m_delay_bufs [lane].data (),
                              m_model_bufs [lane].data (),
                              nframes);
-
+  
   const float dry_gain = clamp_dry_multiplier (amps [lane].dry_out);
   if (dry_gain > 0.0f) {
-    for (uint32_t i = 0; i < nframes; ++i)
-      m_model_bufs [lane] [i] += m_delay_bufs [lane] [i] * dry_gain;
+    const float *dry = m_delay_bufs [lane].data ();
+    float *dst = m_model_bufs [lane].data ();
+
+    for (uint32_t i = 0; i < nframes; i++)
+      dst [i] += dry [i] * dry_gain;
   }
 
   if (meters_out [lane] && do_vu) {
@@ -1389,14 +1448,19 @@ void c_neuralblender::render_mix (float *in, float *out, uint32_t nframes,
 void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
   if (!in || !out || !nframes)
     return;
-
+  
+  if (tuner_on) {
+    tuner.process_block (in, nframes);
+  }
+  
   float *process_in = prepare_input_buffer (in, out, nframes);
 
   update_input_meter (process_in, nframes);
 
   uint32_t new_mask =
     pending_lane_mask.load (std::memory_order_acquire);
-
+  
+  // cross fade
   const bool requested_transition =
     xfade_pending.exchange (false, std::memory_order_acq_rel);
 

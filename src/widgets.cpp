@@ -1943,6 +1943,11 @@ void c_knob::on_change () {
       ui->on_gain_out (this, g);
     break;
 
+    case ROLE_DRY_OUT:
+      debug ("lane %d dry out %f", lane, g);
+      ui->on_dry_out (this, g);
+    break;
+
     case ROLE_DELAY:
       debug ("lane %d delay %f", lane, value);
       ui->on_delay (this, value);
