@@ -20,6 +20,6 @@ c_tunerwidget::c_tunerwidget () { CP }
 c_tunerwidget::~c_tunerwidget () { CP }
 
 void c_tunerwidget::create (Widget_t *parent, const char *label,
-                            int x, int y, int w, int h) override {
+                            int x, int y, int w, int h) {
   CP                            
 }
