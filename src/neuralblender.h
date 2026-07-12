@@ -281,7 +281,7 @@ public:
   c_vudata *meter_in;
   c_vudata *meters_out [NB_NUM_MODELS];
   bool do_vu = true;
-  bool noisegate_on = true;
+  bool noisegate_on = false;
   bool tuner_on = false;
   float tuner_base_freq = 440.0f;
   float tuner_note = 0.0f;

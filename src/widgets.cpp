@@ -1918,7 +1918,7 @@ void c_knob::set_value (float x) {
   expose ();
 }
 
-void c_knob::set_defaultvalue (float x) {
+void c_knob::set_default (float x) {
   defaultvalue = x;
 }
 

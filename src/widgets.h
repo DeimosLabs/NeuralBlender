@@ -402,7 +402,7 @@ public:
       int x, int y, int w, int h);
   
   void set_value (float v);
-  void set_defaultvalue (float v);
+  void set_default (float v);
   void set_min (float min);
   void set_max (float max);
   void set_step (float max);

@@ -408,7 +408,7 @@ void c_lane_widgets::create (
   knob_gain_in.lane = knob_gain_out.lane = knob_delay.lane = which;
   knob_gain_in.set_min (-40);
   knob_gain_in.set_max (40);
-  knob_gain_in.set_defaultvalue (0);
+  knob_gain_in.set_default (0);
   knob_gain_in.set_value (0);
   knob_gain_in.set_step (0.1);
   knob_gain_in.role = ROLE_GAIN_IN;
@@ -417,7 +417,7 @@ void c_lane_widgets::create (
   knob_gain_out.role = ROLE_GAIN_OUT;
   knob_gain_out.set_min (-40);
   knob_gain_out.set_max (40);
-  knob_gain_out.set_defaultvalue (0);
+  knob_gain_out.set_default (0);
   knob_gain_out.set_value (0);
   knob_gain_out.set_step (0.1);
   knob_gain_out.role = ROLE_GAIN_OUT;
@@ -426,7 +426,7 @@ void c_lane_widgets::create (
   knob_dry_out.role = ROLE_GAIN_OUT;
   knob_dry_out.set_min (-120);
   knob_dry_out.set_max (0);
-  knob_dry_out.set_defaultvalue (-120);
+  knob_dry_out.set_default (-120);
   knob_dry_out.set_value (-120);
   knob_dry_out.set_step (0.1);
   knob_dry_out.role = ROLE_GAIN_OUT;
@@ -460,7 +460,7 @@ void c_lane_widgets::create (
   knob_delay.create (ui, wp, "Delay", 0, 0, 64, 64);
   knob_delay.set_min (0);
   knob_delay.set_max (30);
-  knob_delay.set_defaultvalue (0);
+  knob_delay.set_default (0);
   knob_delay.set_value (0);
   knob_delay.set_step (0.01);
   knob_delay.role = ROLE_DELAY;
@@ -538,6 +538,10 @@ void c_lane_widgets::move_resize (
   int mute_width = menu_list.x () + menu_list.w () - mute_x;
   btn_mute.move_resize (mute_x,
                          button_top, mute_width, button_width);
+  if (btn_mute.w () > 80)
+    btn_mute.set_label ("Mute");
+  else
+    btn_mute.set_label ("");
   btn_excl.move_resize (btn_mute.x (), btn_mute.y (), btn_mute.w (), btn_mute.h ());
   btn_mute.padding = btn_mute.h () / 4;
   
@@ -644,7 +648,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_noisegate.create (this, mainwindow.widget, "", 0, 0, 40, 40, WSTYLE_IMAGE_TOGGLE);
   btn_noisegate.role = ROLE_NOISEGATE;
   btn_noisegate.set_image_default (data_icon_noisegate_png);
-  btn_noisegate.set_tooltip ("noise gate (see prefs.)");
+  btn_noisegate.set_tooltip ("noise gate");
   btn_tuner.create (this, mainwindow.widget, "", 0, 0, 40, 40, WSTYLE_IMAGE_TOGGLE);
   btn_tuner.set_image_default (data_icon_tuner_png);
   btn_tuner.set_tooltip ("Tuner (TODO)");
@@ -653,6 +657,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   knob_noisethresh.set_min (-120);
   knob_noisethresh.set_max (-6);
   knob_noisethresh.set_value (-60);
+  knob_noisethresh.set_default (-60);
   knob_noisethresh.set_step (0.1);
   knob_noisethresh.role = ROLE_NOISETHRESH;
   

@@ -149,7 +149,7 @@ typedef struct {
 	  float last_linked_calib   = 0.0;
 	  float last_calib_source   = 0.0;
 	  float last_calib_target_db = DB_CALIB_TARGET_DEFAULT;
-	  float last_noisegate_enabled = 1.0;
+	  float last_noisegate_enabled = 0.0;
 	  float last_noisegate_threshold = -60.0;
 	  float last_noisegate_attack = 2.0;
 	  float last_noisegate_hold = 10.0;
