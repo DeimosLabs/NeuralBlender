@@ -1,17 +1,60 @@
-
-/* NeuralBlender - tuner widget.
- * Code for c_customwidget used for c_meter and here, originally written
- * for wxWidgets, translated to cairo by codex.
+/* NeuralBlender - tuner / pitch tracking data.
  */
+
+#pragma once
+
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 
 #include "meter.h"
 
+class c_pitchtracker {
+public:
+  c_pitchtracker ();
+  ~c_pitchtracker ();
+  void set_samplerate (int sr);
+  void process_block (float *in, int nframes);
+  bool analyze ();
+  void dump ();
+
+  void set_base_freq (int f = 440);
+  void set_block_size (size_t sz);
+
+  std::atomic<float> detected_freq  { 0.0f };
+  std::atomic<float> detected_note  { 0.0f };
+  std::atomic<float> detected_cents { 0.0f };
+
+private:
+  void publish_snapshot ();
+
+  inline float get_lag_score (const std::vector<float> &buf, size_t lag) const;
+  inline float sample_at (size_t i) const;
+  int get_best_lag (const std::vector<float> &buf, int step) const;
+  void update_note_from_freq (float freq);
+
+  std::vector<float> ring;
+  std::vector<float> snapshots [2];
+  std::vector<float> analysis;
+
+  size_t count       = 0;
+  int write_snapshot = 0;
+  int samplerate     = 48000;
+  int basefreq       = 440;
+  int lastfreq       = -1;
+
+  std::atomic<int> published_snapshot { -1 };
+  std::atomic<uint64_t> published_seq { 0 };
+};
+
+#ifndef METER_DATA_ONLY
 
 class c_tunerwidget : public c_customwidget {
-  c_tunerwidget ();
-  ~c_tunerwidget ();
-  
+public:
   void create (Widget_t *parent,
                const char *label,
                int x, int y, int w, int h) override;
 };
+
+#endif

@@ -995,7 +995,7 @@ void c_container::create (
     Widget_t *parent,
     const char *label_,
     int x, int y, int w, int h) {
-
+  
   widget = create_widget (parent->app, parent, x, y, w, h);
   c_widget::create (ui_, parent, label_, x, y, w, h);
 }
@@ -1005,10 +1005,10 @@ void c_meter::create (
     Widget_t *parent,
     const char *label_,
     int x, int y, int w, int h) {
-
+  
   if (!parent || !parent->app)
     return;
-
+  
   widget = create_widget (parent->app, parent, x, y, w, h);
   c_widget::create (ui_, parent, label_, x, y, w, h);
   meter.create (widget, label_, 0, 0, w, h);
@@ -1023,17 +1023,17 @@ void c_meter::move_resize (int x, int y, int w, int h) {
   Widget_t *child = meter.widget;
   if (!child)
     return;
-
+  
   const int sw = std::max (1, (int) (w * child->app->hdpi));
   const int sh = std::max (1, (int) (h * child->app->hdpi));
-
+  
   child->x = 0;
   child->y = 0;
   child->scale.init_x = 0;
   child->scale.init_y = 0;
   child->scale.init_width = sw;
   child->scale.init_height = sh;
-
+  
   os_move_window (child->app->dpy, child, 0, 0);
   os_resize_window (child->app->dpy, child, sw, sh);
   child->func.configure_callback (child, NULL);
@@ -1075,7 +1075,7 @@ void c_label::create (
     const char *label_,
     int x, int y, int w, int h) {
 
-  role = ROLE_UNKNOWN;
+  role = ROLE_NONE;
   widget = add_label (parent, label.c_str (), x, y, w, h);
   widget->func.expose_callback = c_label::cb_draw;
   c_widget::create (ui_, parent, label_, x, y, w, h);

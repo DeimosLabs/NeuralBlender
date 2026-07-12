@@ -422,7 +422,7 @@ public:
   bool reset_on_doubleclick = true;
 };
 
-class c_tunerwidget : public c_widget {
+class c_tuner : public c_widget {
 public:
   void create (
       c_neuralblender_ui *ui,

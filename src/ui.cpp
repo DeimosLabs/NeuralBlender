@@ -560,7 +560,8 @@ void c_lane_widgets::move_resize (
   int adv_btn_x = 84;
   int adv_btn_y = h * 2 / 11;
   label_frames.move_resize (knob_delay.x (), h - 20, knob_delay.w (), 16);
-  label_trim.move_resize (knob_gain_in.x (), h - 20, knob_gain_in.w () + knob_gain_out.w (), 16);
+  label_trim.move_resize (knob_gain_in.x (), h - 20, knob_gain_in.w () + 
+                          knob_gain_out.w () + knob_dry_out.w (), 16);
   //move_resize (x, y, w, h);
 }
 

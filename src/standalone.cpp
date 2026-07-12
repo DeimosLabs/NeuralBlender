@@ -414,8 +414,8 @@ int main (int argc, char **argv) {
 #endif
 
   /*
-  // tuner test
-  c_tuner tuner;
+  // tuner/pitch tracker test
+  c_pitchtracker pitchtracker;
   
   std::vector<float> f;
   f.resize (64);
@@ -423,11 +423,11 @@ int main (int argc, char **argv) {
     f [i] = sinf (2.0f * M_PI * i / 64.0f);
     //f [i] = i - 8;
   
-  tuner.set_samplerate (48000);
+  pitchtracker.set_samplerate (48000);
   for (int i = 0; i < 100; i++)
-    tuner.process_block (f.data (), f.size ());
+    pitchtracker.process_block (f.data (), f.size ());
   
-  tuner.dump ();
+  pitchtracker.dump ();
   exit (0);
   */
   

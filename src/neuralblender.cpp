@@ -178,214 +178,6 @@ static float clamp_calib_target_db (float db) {
 }
 
 /******************************************************************************
- * c_tuner
- */
-
-static float block_rms (const std::vector<float> &buf) {
-  double sum = 0.0;
-  for (float x : buf)
-    sum += (double) x * (double) x;
-  return buf.empty () ? 0.0f : (float) sqrt (sum / (double) buf.size ());
-}
-
-c_tuner::c_tuner () { CP }
-
-c_tuner::~c_tuner () { CP }
-
-void c_tuner::set_samplerate (int sr) { CP
-  if (sr < 800 || sr > 192000)
-    return;
-  
-  samplerate = sr;
-  set_block_size (samplerate / 10);
-}
-
-inline float c_tuner::sample_at (size_t i) const {
-  size_t n = ring.size ();
-  if (n == 0)
-    return 0.0f;
-  
-  size_t valid = std::min (count, n);
-  size_t first = (count >= n) ? (count % n) : 0;
-
-  if (i >= valid)
-    return 0.0f;
-
-  return ring [(first + i) % n];
-}
-
-inline float c_tuner::get_lag_score (const std::vector<float> &buf, size_t lag) const {
-  const size_t n = buf.size ();
-  if (lag == 0 || lag >= n)
-    return std::numeric_limits<float>::infinity ();
-
-  float ret = 0.0f;
-  const size_t end = n - lag;
-
-  for (size_t i = 0; i < end; i++) {
-    const float d = buf [i] - buf [i + lag];
-    ret += d * d;
-  }
-  
-  return ret / (float) end;
-}
-
-int c_tuner::get_best_lag (const std::vector<float> &buf, int step) const {
-  const int min_freq = 25;
-  const int max_freq = 1000;
-  
-  const int start_lag = samplerate / max_freq;
-  const int end_lag = std::min ((int) (samplerate / min_freq), (int) (buf.size () - 1));
-
-  if (start_lag >= end_lag)
-    return 0;
-
-  float best_score = get_lag_score (buf, start_lag);
-  int best_lag = start_lag;
-  
-  // first coarse pass
-  for (int i = start_lag + step; i < end_lag; i += step) {
-    float s = get_lag_score (buf, i);
-    //debug ("i=%d, s=%f", i, s);
-    if (s < best_score) {
-      best_score = s;
-      best_lag = i;
-    }
-  }
-  return best_lag;
-}
-
-void c_tuner::update_note_from_freq (float freq) {
-  if (freq <= 0.0f || !std::isfinite (freq)) {
-    detected_freq.store (0.0f, std::memory_order_release);
-    detected_note.store (0.0f, std::memory_order_release);
-    detected_cents.store (0.0f, std::memory_order_release);
-    return;
-  }
-  
-  // thanks to Codex for help with the math here!
-  const float midi_f =
-    69.0f + 12.0f * log2f (freq / (float) basefreq);
-  const int midi = (int) lroundf (midi_f);
-
-  const float note_freq =
-    (float) basefreq * powf (2.0f, ((float) midi - 69.0f) / 12.0f);
-
-  const float cents =
-    1200.0f * log2f (freq / note_freq);
-  
-  debug ("freq=%f, midi=%d, cents=%f", freq, midi, cents);
-  
-  detected_freq.store (freq, std::memory_order_release);
-  detected_note.store ((float) midi, std::memory_order_release);
-  detected_cents.store (cents, std::memory_order_release);
-}
-
-// this runs on LOADER thread
-bool c_tuner::analyze () {
-  const int idx = published_snapshot.load (std::memory_order_acquire);
-  if (idx < 0 || idx > 1)
-    return false;
-
-  analysis = snapshots[idx];
-
-  if (block_rms (analysis) < db_to_gain (TUNER_THRESH_DB)) {
-    update_note_from_freq (0.0f);
-    return false;
-  }
-  
-  const int lag = get_best_lag (analysis, 1);
-  if (lag <= 0  || lag == samplerate / 1000) {
-    update_note_from_freq (0.0f);
-    return false;
-  }
-
-  const float freq = (float) samplerate / (float) lag;
-  
-  update_note_from_freq (freq);
-
-  detected_freq.store (freq, std::memory_order_release);
-  return true;
-}
-
-void c_tuner::publish_snapshot () {
-  const size_t n = ring.size ();
-  const size_t first = count % n;
-
-  int idx = write_snapshot;
-  float *dst = snapshots [idx].data ();
-
-  const size_t front = n - first;
-  memcpy (dst, &ring [first], front * sizeof (float));
-  if (first)
-    memcpy (dst + front, &ring [0], first * sizeof (float));
-
-  published_snapshot.store (idx, std::memory_order_release);
-  published_seq.fetch_add (1, std::memory_order_release);
-
-  write_snapshot = 1 - write_snapshot;
-}
-
-void c_tuner::process_block (float *in, int nframes_) {
-  size_t bs = ring.size ();
-  
-  if (bs <= 0 || !in || nframes_ <= 0)
-    return;
-  
-  const size_t nframes = (size_t) nframes_;
-  const size_t pos = count % bs;
-  const size_t front = std::min<size_t> (nframes, bs - pos);
-  const size_t back = nframes - front;
-  size_t i;
-  
-  //debug ("bs=%ld, count=%ld, front=%ld, back=%ld", bs, count, front, back);
-  memcpy (&ring [pos], in, front * sizeof (float));
-  if (back)
-    memcpy (&ring [0], in + front, back * sizeof (float));
-
-  count += nframes;
-
-  if (count >= bs) {
-    publish_snapshot ();
-  }
-}
-
-void c_tuner::set_base_freq (int f) {
-  if (f >= 220 && f <= 880)
-    basefreq = f;
-}
-
-void c_tuner::set_block_size (size_t sz) { CP
-  ring.resize (sz);
-  
-  ring.resize (sz);
-  snapshots[0].resize (sz);
-  snapshots[1].resize (sz);
-  analysis.resize (sz);
-  count = 0;
-  write_snapshot = 0;
-  published_snapshot.store (-1, std::memory_order_release);
-  published_seq.store (0, std::memory_order_release);
-
-  std::fill (ring.begin (), ring.end (), 0.0f);
-  std::fill (snapshots[0].begin (), snapshots[0].end (), 0.0f);
-  std::fill (snapshots[1].begin (), snapshots[1].end (), 0.0f);
-  std::fill (analysis.begin (), analysis.end (), 0.0f);
-}
-
-void c_tuner::dump () {
-  for (size_t i = 0; i < ring.size (); i++)
-    printf ("sample %d=%f\n", i, sample_at (i));
-  
-  debug ("lag score (63) = %f", get_lag_score (ring, 63));
-  debug ("lag score (64) = %f", get_lag_score (ring, 64));
-  debug ("lag score (65) = %f", get_lag_score (ring, 65));
-  
-  debug ("get_best_lag (1) = %d", get_best_lag (ring, 1));
-  debug ("analyze () returned %d", analyze ());
-}
-
-/******************************************************************************
  * c_noisegate
  * TODO: add UI settings for attack, hold, delay
  */
@@ -1052,7 +844,7 @@ void c_neuralblender::set_samplerate (uint32_t sr) { CP
   debug ("start");
   m_samplerate = sr;
   noisegate.set_samplerate (sr);
-  tuner.set_samplerate (sr);
+  pitchtracker.set_samplerate (sr);
   
   if (meter_in)
     meter_in->samplerate = (int) sr;
@@ -1318,11 +1110,11 @@ static void update_loaded_output_meters (c_neuralblender *blender) {
 }
 
 int c_neuralblender::tuner_freq () {
-  if (!tuner.analyze ())
+  if (!pitchtracker.analyze ())
     return 0;
 
   return (int) lrintf (
-    tuner.detected_freq.load (std::memory_order_acquire));
+    pitchtracker.detected_freq.load (std::memory_order_acquire));
 }
 
 // mixing related static funcs, these are pretty self explanatory
@@ -1505,7 +1297,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     return;
   
   if (tuner_on) {
-    tuner.process_block (in, nframes);
+    pitchtracker.process_block (in, nframes);
   }
   
   float *process_in = prepare_input_buffer (in, out, nframes);

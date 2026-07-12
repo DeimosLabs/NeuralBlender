@@ -362,12 +362,12 @@ static void loader_main (Plugin *self) { CP
       self->controls_dirty.store (true, std::memory_order_release);
     }
 
-    if (do_tuner && self->blender.tuner.analyze ()) {
+    if (do_tuner && self->blender.pitchtracker.analyze ()) {
       self->detected_tuner_note.store (
-        self->blender.tuner.detected_note.load (std::memory_order_acquire),
+        self->blender.pitchtracker.detected_note.load (std::memory_order_acquire),
         std::memory_order_release);
       self->detected_tuner_cents.store (
-        self->blender.tuner.detected_cents.load (std::memory_order_acquire),
+        self->blender.pitchtracker.detected_cents.load (std::memory_order_acquire),
         std::memory_order_release);
     }
   }
@@ -1220,7 +1220,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	    if (v != self->last_tuner_base_freq) {
 	      self->last_tuner_base_freq = v;
 	      self->blender.tuner_base_freq = v;
-	      self->blender.tuner.set_base_freq ((int) lrintf (v));
+	      self->blender.pitchtracker.set_base_freq ((int) lrintf (v));
 	    }
 	  }
 	  

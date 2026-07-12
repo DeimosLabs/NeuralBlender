@@ -147,6 +147,7 @@ add_library(neuralblender_core OBJECT
 
 add_library(neuralblender_meter_data OBJECT
   src/meter.cpp
+  src/tuner.cpp
 )
 
 set_target_properties(neuralblender_core PROPERTIES

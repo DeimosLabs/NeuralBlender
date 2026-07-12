@@ -1,25 +1,236 @@
-
-/* NeuralBlender - tuner widget.
- * Code for c_customwidget used for c_meter and here, originally written
- * for wxWidgets, translated to cairo by codex.
+/* NeuralBlender - tuner / pitch tracking data.
  */
+
+#include "tuner.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
-#include <X11/Xlib.h>
-
-#include "xputty_compat.h"
-#include "tuner.h"
+#include <limits>
 
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_GREEN
 #include "cmdline_debug.h"
 
-c_tunerwidget::c_tunerwidget () { CP }
-c_tunerwidget::~c_tunerwidget () { CP }
+#ifdef METER_DATA_ONLY
 
-void c_tunerwidget::create (Widget_t *parent, const char *label,
-                            int x, int y, int w, int h) {
-  CP                            
+#define TUNER_THRESH_DB -40.0f
+
+static inline float tuner_db_to_gain (float db) {
+  return powf (10.0f, db / 20.0f);
 }
+
+static float block_rms (const std::vector<float> &buf) {
+  double sum = 0.0;
+  for (float x : buf)
+    sum += (double) x * (double) x;
+  return buf.empty () ? 0.0f : (float) sqrt (sum / (double) buf.size ());
+}
+
+c_pitchtracker::c_pitchtracker () { CP }
+
+c_pitchtracker::~c_pitchtracker () { CP }
+
+void c_pitchtracker::set_samplerate (int sr) { CP
+  if (sr < 800 || sr > 192000)
+    return;
+
+  samplerate = sr;
+  set_block_size (samplerate / 10);
+}
+
+inline float c_pitchtracker::sample_at (size_t i) const {
+  size_t n = ring.size ();
+  if (n == 0)
+    return 0.0f;
+
+  size_t valid = std::min (count, n);
+  size_t first = (count >= n) ? (count % n) : 0;
+
+  if (i >= valid)
+    return 0.0f;
+
+  return ring [(first + i) % n];
+}
+
+inline float c_pitchtracker::get_lag_score (
+    const std::vector<float> &buf,
+    size_t lag) const {
+
+  const size_t n = buf.size ();
+  if (lag == 0 || lag >= n)
+    return std::numeric_limits<float>::infinity ();
+
+  float ret = 0.0f;
+  const size_t end = n - lag;
+
+  for (size_t i = 0; i < end; i++) {
+    const float d = buf [i] - buf [i + lag];
+    ret += d * d;
+  }
+
+  return ret / (float) end;
+}
+
+int c_pitchtracker::get_best_lag (const std::vector<float> &buf, int step) const {
+  const int min_freq = 25;
+  const int max_freq = 1000;
+
+  const int start_lag = samplerate / max_freq;
+  const int end_lag =
+    std::min ((int) (samplerate / min_freq), (int) (buf.size () - 1));
+
+  if (start_lag >= end_lag)
+    return 0;
+
+  float best_score = get_lag_score (buf, start_lag);
+  int best_lag = start_lag;
+
+  for (int i = start_lag + step; i < end_lag; i += step) {
+    float s = get_lag_score (buf, i);
+    if (s < best_score) {
+      best_score = s;
+      best_lag = i;
+    }
+  }
+  return best_lag;
+}
+
+void c_pitchtracker::update_note_from_freq (float freq) {
+  if (freq <= 0.0f || !std::isfinite (freq)) {
+    detected_freq.store (0.0f, std::memory_order_release);
+    detected_note.store (0.0f, std::memory_order_release);
+    detected_cents.store (0.0f, std::memory_order_release);
+    return;
+  }
+
+  const float midi_f =
+    69.0f + 12.0f * log2f (freq / (float) basefreq);
+  const int midi = (int) lroundf (midi_f);
+
+  const float note_freq =
+    (float) basefreq * powf (2.0f, ((float) midi - 69.0f) / 12.0f);
+
+  const float cents =
+    1200.0f * log2f (freq / note_freq);
+
+  debug ("freq=%f, midi=%d, cents=%f", freq, midi, cents);
+
+  detected_freq.store (freq, std::memory_order_release);
+  detected_note.store ((float) midi, std::memory_order_release);
+  detected_cents.store (cents, std::memory_order_release);
+}
+
+bool c_pitchtracker::analyze () {
+  const int idx = published_snapshot.load (std::memory_order_acquire);
+  if (idx < 0 || idx > 1)
+    return false;
+
+  analysis = snapshots [idx];
+
+  if (block_rms (analysis) < tuner_db_to_gain (TUNER_THRESH_DB)) {
+    update_note_from_freq (0.0f);
+    return false;
+  }
+
+  const int lag = get_best_lag (analysis, 1);
+  if (lag <= 0 || lag == samplerate / 1000) {
+    update_note_from_freq (0.0f);
+    return false;
+  }
+
+  const float freq = (float) samplerate / (float) lag;
+
+  update_note_from_freq (freq);
+
+  detected_freq.store (freq, std::memory_order_release);
+  return true;
+}
+
+void c_pitchtracker::publish_snapshot () {
+  const size_t n = ring.size ();
+  if (n == 0)
+    return;
+
+  const size_t first = count % n;
+
+  int idx = write_snapshot;
+  float *dst = snapshots [idx].data ();
+
+  const size_t front = n - first;
+  memcpy (dst, &ring [first], front * sizeof (float));
+  if (first)
+    memcpy (dst + front, &ring [0], first * sizeof (float));
+
+  published_snapshot.store (idx, std::memory_order_release);
+  published_seq.fetch_add (1, std::memory_order_release);
+
+  write_snapshot = 1 - write_snapshot;
+}
+
+void c_pitchtracker::process_block (float *in, int nframes_) {
+  size_t bs = ring.size ();
+
+  if (bs <= 0 || !in || nframes_ <= 0)
+    return;
+
+  const size_t nframes = (size_t) nframes_;
+  const size_t pos = count % bs;
+  const size_t front = std::min<size_t> (nframes, bs - pos);
+  const size_t back = nframes - front;
+
+  memcpy (&ring [pos], in, front * sizeof (float));
+  if (back)
+    memcpy (&ring [0], in + front, back * sizeof (float));
+
+  count += nframes;
+
+  if (count >= bs)
+    publish_snapshot ();
+}
+
+void c_pitchtracker::set_base_freq (int f) {
+  if (f >= 220 && f <= 880)
+    basefreq = f;
+}
+
+void c_pitchtracker::set_block_size (size_t sz) { CP
+  ring.resize (sz);
+  snapshots [0].resize (sz);
+  snapshots [1].resize (sz);
+  analysis.resize (sz);
+  count = 0;
+  write_snapshot = 0;
+  published_snapshot.store (-1, std::memory_order_release);
+  published_seq.store (0, std::memory_order_release);
+
+  std::fill (ring.begin (), ring.end (), 0.0f);
+  std::fill (snapshots [0].begin (), snapshots [0].end (), 0.0f);
+  std::fill (snapshots [1].begin (), snapshots [1].end (), 0.0f);
+  std::fill (analysis.begin (), analysis.end (), 0.0f);
+}
+
+void c_pitchtracker::dump () {
+  for (size_t i = 0; i < ring.size (); i++)
+    printf ("sample %d=%f\n", (int) i, sample_at (i));
+
+  debug ("lag score (63) = %f", get_lag_score (ring, 63));
+  debug ("lag score (64) = %f", get_lag_score (ring, 64));
+  debug ("lag score (65) = %f", get_lag_score (ring, 65));
+
+  debug ("get_best_lag (1) = %d", get_best_lag (ring, 1));
+  debug ("analyze () returned %d", analyze ());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// c_pitchtrackerwidget
+
+#else
+
+void c_tunerwidget::create (Widget_t *parent,
+                            const char *label,
+                            int x, int y, int w, int h) {
+  c_customwidget::create (parent, label, x, y, w, h);
+}
+
+#endif // METER_DATA_ONLY
