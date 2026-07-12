@@ -512,8 +512,8 @@ void c_lane_widgets::move_resize (
   int button_padding = 4;
   
   //const int knob_size = 64;//std::max (64, h / 2);
-  int knob_size = std::max (64, w / 10);
-  knob_size = std::min (knob_size, (h * 5) / 8);
+  int knob_size = std::max (48, w / 10);
+  knob_size = std::min (knob_size, std::max (48, (h * 5) / 8));
   const int knob_top = (h - knob_size) / 2 - 16;
   const int knob_right = w - knob_size * 3 - 8;
   const int menu_x = 16 + knob_size;//delay.x () + delay.w () + 8;
@@ -522,7 +522,7 @@ void c_lane_widgets::move_resize (
   //int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
   int button_left = menu_list.x ();
   int button_top = menu_list.y () + menu_list.h () + 8;
-  int button_width = std::min (h - 68, w / 10);
+  int button_width = std::clamp (std::min (h - 68, w / 10), 24, 96);
   
   knob_delay.move_resize (12, knob_top, knob_size, knob_size + 16);
 
@@ -535,7 +535,7 @@ void c_lane_widgets::move_resize (
                          button_top, button_width, button_width);
                          
   int mute_x = btn_flip.x () + btn_calib.w () + button_padding;
-  int mute_width = menu_list.x () + menu_list.w () - mute_x;
+  int mute_width = std::max (24, menu_list.x () + menu_list.w () - mute_x);
   btn_mute.move_resize (mute_x,
                          button_top, mute_width, button_width);
   if (btn_mute.w () > 80)
@@ -1042,8 +1042,12 @@ size_t c_neuralblender_ui::choose_exclusive_lane () const {
 }
 
 void c_neuralblender_ui::on_window_resize (int w, int h) {
-  if (ui_ready && !ui_resize_lock)
-    move_resize ();
+  if (!ui_ready || ui_resize_lock)
+    return;
+
+  pending_resize_w = w;
+  pending_resize_h = h;
+  ui_resize_pending = true;
 }
 
 bool c_neuralblender_ui::request_window_size (int w, int h) {
@@ -1085,6 +1089,11 @@ int c_neuralblender_ui::idle () {
   if (!ui_ready) {
     CP
     return 0;
+  }
+
+  if (ui_resize_pending && !ui_resize_lock) {
+    ui_resize_pending = false;
+    move_resize ();
   }
 
   if (state.do_vu) {

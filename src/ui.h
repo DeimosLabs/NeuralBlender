@@ -254,6 +254,9 @@ public:
   bool config_file_written = false;
   //bool show_advanced = false;
   bool ui_resize_lock = false;
+  bool ui_resize_pending = false;
+  int pending_resize_w = 0;
+  int pending_resize_h = 0;
   float stats [NB_NUM_MODELS * 2];
   //inline void move_resize () { show_advanced_settings (show_advanced); }
 };
