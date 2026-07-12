@@ -46,6 +46,7 @@ enum {
 
   PORT_A_GAIN_IN,
   PORT_A_GAIN_OUT,
+  PORT_A_DRY_OUT,
   PORT_A_DELAY,
   PORT_A_MUTE,
   PORT_A_DCFLIP,
@@ -53,6 +54,7 @@ enum {
 
   PORT_B_GAIN_IN,
   PORT_B_GAIN_OUT,
+  PORT_B_DRY_OUT,
   PORT_B_DELAY,
   PORT_B_MUTE,
   PORT_B_DCFLIP,
@@ -60,6 +62,7 @@ enum {
 
   PORT_C_GAIN_IN,
   PORT_C_GAIN_OUT,
+  PORT_C_DRY_OUT,
   PORT_C_DELAY,
   PORT_C_MUTE,
   PORT_C_DCFLIP,
@@ -67,6 +70,7 @@ enum {
 
   PORT_D_GAIN_IN,
   PORT_D_GAIN_OUT,
+  PORT_D_DRY_OUT,
   PORT_D_DELAY,
   PORT_D_MUTE,
   PORT_D_DCFLIP,
@@ -75,11 +79,21 @@ enum {
   PORT_CONTROL,
   PORT_NOTIFY,
   PORT_VU_ENABLE,
-	  PORT_MUTE_ALL,
-	  PORT_EXCLUSIVE_LANE,
-	  PORT_LINKED_CALIB,
-	  PORT_CALIB_SOURCE,
-	  PORT_CALIB_TARGET_DB
+  PORT_MUTE_ALL,
+  PORT_EXCLUSIVE_LANE,
+  PORT_LINKED_CALIB,
+  PORT_CALIB_SOURCE,
+  PORT_CALIB_TARGET_DB,
+  PORT_NOISEGATE_ENABLED,
+  PORT_NOISEGATE_THRESHOLD,
+  PORT_NOISEGATE_ATTACK,
+  PORT_NOISEGATE_HOLD,
+  PORT_NOISEGATE_RELEASE,
+  PORT_TUNER_ON,
+  PORT_TUNER_BASE_FREQ,
+  PORT_NOISEGATE_GAIN,
+  PORT_TUNER_NOTE,
+  PORT_TUNER_CENTS_OFF
 };
 
 class c_lv2_ui : public c_neuralblender_ui {
@@ -114,7 +128,7 @@ public:
   }
 
   uint32_t lane_port (size_t lane, uint32_t first) const {
-    return first + (uint32_t) lane * 6;
+    return first + (uint32_t) lane * 7;
   }
 
 	  bool write_model_path (size_t which, const char *filename) {
@@ -236,6 +250,16 @@ public:
   void on_vu (c_widget *w, bool b)                     { CP; write_control (PORT_VU_ENABLE, b ? 1.0f : 0.0f); }
   void on_linked_calib (c_widget *w, bool b)           { CP; write_control (PORT_LINKED_CALIB, b ? 1.0f : 0.0f); }
   void on_calib_bass (c_widget *w, bool b)             { CP; write_control (PORT_CALIB_SOURCE, b == 1.0f ? 1.0f : 0.0f); }
+  void on_noisegate (c_widget *w, bool b) {
+    (void) w;
+    CP
+    state.noisegate_on = b;
+    write_control (PORT_NOISEGATE_ENABLED, b ? 1.0f : 0.0f);
+  }
+  void on_noisethresh (c_widget *w, float f)           { CP; write_control (PORT_NOISEGATE_THRESHOLD, f); }
+  void on_noiseattack (c_widget *w, float f)           { CP; write_control (PORT_NOISEGATE_ATTACK, f); }
+  void on_noisehold (c_widget *w, float f)             { CP; write_control (PORT_NOISEGATE_HOLD, f); }
+  void on_noiserelease (c_widget *w, float f)          { CP; write_control (PORT_NOISEGATE_RELEASE, f); }
 
 	  void apply_prefs (t_prefs &p) override {
 	    c_neuralblender_ui::apply_prefs (p);
@@ -343,39 +367,65 @@ public:
 	      return;
 	    }
 
+	    if (port == PORT_NOISEGATE_ENABLED) {
+	      state.noisegate_on = value >= 0.5f;
+	      btn_noisegate.set_value (state.noisegate_on);
+	      if (state.noisegate_on)
+	        knob_noisethresh.show ();
+	      else
+	        knob_noisethresh.hide ();
+	      updating_from_state = old_updating_from_state;
+	      updating_from_host = false;
+	      return;
+	    }
+
+	    if (port == PORT_NOISEGATE_THRESHOLD) {
+	      state.noisethresh = value;
+	      knob_noisethresh.set_value (value);
+	      updating_from_state = old_updating_from_state;
+	      updating_from_host = false;
+	      return;
+	    }
+
     for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
-      const uint32_t base = PORT_A_GAIN_IN + (uint32_t) lane * 6;
+      const uint32_t base = PORT_A_GAIN_IN + (uint32_t) lane * 7;
       if (port == base) {
         state.lanes [lane].gain_in = db_to_gain (value);
-        lanes [lane].gain_in.set_value (value);
+        lanes [lane].knob_gain_in.set_value (value);
         updating_from_state = old_updating_from_state;
         updating_from_host = false;
         return;
       } else if (port == base + 1) {
         state.lanes [lane].gain_out = db_to_gain (value);
-        lanes [lane].gain_out.set_value (value);
+        lanes [lane].knob_gain_out.set_value (value);
         updating_from_state = old_updating_from_state;
         updating_from_host = false;
         return;
       } else if (port == base + 2) {
-        state.lanes [lane].delay_ms = value;
-        lanes [lane].delay.set_value (value);
+        state.lanes [lane].dry_out =
+          value <= DB_SILENCE ? 0.0f : db_to_gain (value);
         updating_from_state = old_updating_from_state;
         updating_from_host = false;
         return;
       } else if (port == base + 3) {
+        state.lanes [lane].delay_ms = value;
+        lanes [lane].knob_delay.set_value (value);
+        updating_from_state = old_updating_from_state;
+        updating_from_host = false;
+        return;
+      } else if (port == base + 4) {
         state.lanes [lane].lane_mute = value >= 0.5f;
         lanes [lane].btn_mute.set_value (state.lanes [lane].lane_mute);
         updating_from_state = old_updating_from_state;
         updating_from_host = false;
         return;
-      } else if (port == base + 4) {
+      } else if (port == base + 5) {
         state.lanes [lane].dcflip = value >= 0.5f;
         lanes [lane].btn_flip.set_value (state.lanes [lane].dcflip);
         updating_from_state = old_updating_from_state;
         updating_from_host = false;
         return;
-      } else if (port == base + 5) {
+      } else if (port == base + 6) {
         state.lanes [lane].do_calib = value >= 0.5f;
         lanes [lane].btn_calib.set_value (state.lanes [lane].do_calib);
         updating_from_state = old_updating_from_state;
@@ -538,6 +588,16 @@ public:
 	    subscribe->subscribe (subscribe->handle, PORT_LINKED_CALIB, 0, NULL);
 	    subscribe->subscribe (subscribe->handle, PORT_CALIB_SOURCE, 0, NULL);
 	    subscribe->subscribe (subscribe->handle, PORT_CALIB_TARGET_DB, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_NOISEGATE_ENABLED, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_NOISEGATE_THRESHOLD, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_NOISEGATE_ATTACK, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_NOISEGATE_HOLD, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_NOISEGATE_RELEASE, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_TUNER_ON, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_TUNER_BASE_FREQ, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_NOISEGATE_GAIN, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_TUNER_NOTE, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_TUNER_CENTS_OFF, 0, NULL);
 	  }
 };
 

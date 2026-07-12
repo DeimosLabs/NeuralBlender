@@ -25,8 +25,10 @@
 #define MIN_WINDOW_HEIGHT (64 + (130 * NB_NUM_MODELS))
 //#define DEFAULT_WINDOW_HEIGHT (12 + std::min (640, (52 + (180 * NB_NUM_MODELS))))
 #define DEFAULT_WINDOW_HEIGHT MIN_WINDOW_HEIGHT
-#define MIN_WINDOW_WIDTH 620
+#define MIN_WINDOW_WIDTH 640
 #define DEFAULT_WINDOW_WIDTH 620
+
+#define METER_WIDTH 5
 
 extern const char *g_build_timestamp;
 
@@ -274,6 +276,19 @@ void c_prefswindow::set_prefs_to (t_prefs &prefs) {
 ////////////////////////////////////////////////////////////////////////////////
 // c_aboutwindow
 
+static const char *g_about_text [] = {
+#ifdef LV2
+  "An amp modeling plugin based on",
+#else
+  "An amp modeling app based on",
+#endif
+  "RTNeural and NeuralAmpModeler",
+  "",
+  "by Deimos Laboratories",
+  "", // web link, see below
+  NULL
+};
+  
 void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   ui = ui_;
   if (!ui || !ui->ui_ready || widget)
@@ -283,7 +298,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
       ui,
       os_get_root_window (&ui->app, IS_WINDOW),
       "About NeuralBlender",
-      0, 0, 420, 480,
+      0, 0, 450, 480,
       ui->mainwindow.widget))
     return;
 
@@ -292,41 +307,30 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   
   frame.create (ui, widget, "", 12, 12, w () - 24, h () - 80);
   
+  img_toplogo.create (ui, frame.widget, "", 0, 8, 128, 50);
+  img_toplogo.set_png (data_textlogo_256x100_png);
+  
   //btn_ok.create (ui, frame.widget, "OK", 160, 395, 80, 40);
   btn_ok.create (ui, widget, "OK", 0, 0, 120, 40);
   btn_ok.role = ROLE_ABOUTOK;
   btn_ok.set_image (data_xputty_approved_png);
   
-  const char *text [] = {
-    "NeuralBlender",
-    "",
-#ifdef LV2
-    "An amp modeling plugin based on",
-#else
-    "An amp modeling app based on",
-#endif
-    "RTNeural and NeuralAmpModeler",
-    "",
-    "by Deimos Laboratories",
-    "", // web link, see below
-    NULL
-  };
-  
   int i;
-  for (i = 0; text [i]; i++) {
-    int h = (i == 0 ? 20 : (180 + i * 24));
-    labels [i].create (ui, frame.widget, text [i], 0, h, 400, 24);
+  for (i = 0; g_about_text [i]; i++) {
+    int h = 240 + (i * 24);
+    labels [i].create (ui, frame.widget, g_about_text [i], 0, h, 400, 24);
     labels [i].align = TEXT_CENTER;
   }
   
   linklabel.create (ui, frame.widget, "https://github.com/DeimosLabs/NeuralBlender",
-      0, labels [6].y (), 400, 24);
+      0, labels [4].y (), 400, 24);
   linklabel.align = TEXT_CENTER;
 
   char buf [64];
   snprintf (buf, 63, "Build timestamp: %s", g_build_timestamp);
 
-  labels [0].textsize = 1.5;
+  //labels [0].textsize = 1.5;
+  //labels [1].textsize = 1.5;
   labels [i].create (ui, frame.widget, buf, 0, 360, 400, 20);
   labels [i].textsize = 0.75;
   labels [i].align = TEXT_CENTER;
@@ -357,6 +361,13 @@ void c_aboutwindow::hide () { CP
 void c_aboutwindow::on_resize () { CP
   frame.move ((w () - frame.w ()) / 2, (h () - frame.h ()) / 2 - 24);
   btn_ok.move_resize (w () - 140, h () - 56, 128, 40);
+  int center_h = frame.w () / 2;
+  img_toplogo.move (center_h - img_toplogo.w () / 2, 8);
+  img_logo.move (center_h - img_logo.w () / 2, img_logo.y ());
+  for (int i = 0; i < 16 && labels [i].widget; i++) {
+    labels [i].move_resize (0, labels [i].y (), frame.w (), labels [i].h ());
+  }
+  linklabel.move_resize (0, linklabel.y (), frame.w (), labels [4].h ());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -393,25 +404,34 @@ void c_lane_widgets::create (
   menu_list.lane = which;
 
   int knobs_right = w - 180;
-  gain_in.create (ui, wp, "Input", 0, 0, 64, 64);
-  gain_in.lane = gain_out.lane = delay.lane = which;
-  gain_in.set_min (-40);
-  gain_in.set_max (40);
-  gain_in.set_defaultvalue (0);
-  gain_in.set_value (0);
-  gain_in.set_step (1);
-  gain_in.role = ROLE_GAIN_IN;
+  knob_gain_in.create (ui, wp, "Input", 0, 0, 64, 64);
+  knob_gain_in.lane = knob_gain_out.lane = knob_delay.lane = which;
+  knob_gain_in.set_min (-40);
+  knob_gain_in.set_max (40);
+  knob_gain_in.set_defaultvalue (0);
+  knob_gain_in.set_value (0);
+  knob_gain_in.set_step (0.1);
+  knob_gain_in.role = ROLE_GAIN_IN;
   
-  gain_out.create (ui, wp, "Output", 0, 0, 64, 64);
-  gain_out.role = ROLE_GAIN_OUT;
-  gain_out.set_min (-40);
-  gain_out.set_max (40);
-  gain_out.set_defaultvalue (0);
-  gain_out.set_value (0);
-  gain_out.set_step (1);
-  gain_out.role = ROLE_GAIN_OUT;
+  knob_gain_out.create (ui, wp, "Output", 0, 0, 64, 64);
+  knob_gain_out.role = ROLE_GAIN_OUT;
+  knob_gain_out.set_min (-40);
+  knob_gain_out.set_max (40);
+  knob_gain_out.set_defaultvalue (0);
+  knob_gain_out.set_value (0);
+  knob_gain_out.set_step (0.1);
+  knob_gain_out.role = ROLE_GAIN_OUT;
   
-  meter_out.create (ui, wp, "", 0, 0, 5, 120);
+  knob_dry_out.create (ui, wp, "Dry out", 0, 0, 64, 64);
+  knob_dry_out.role = ROLE_GAIN_OUT;
+  knob_dry_out.set_min (-120);
+  knob_dry_out.set_max (0);
+  knob_dry_out.set_defaultvalue (-120);
+  knob_dry_out.set_value (-120);
+  knob_dry_out.set_step (0.1);
+  knob_dry_out.role = ROLE_GAIN_OUT;
+  
+  meter_out.create (ui, parent, "", 0, 0, METER_WIDTH, 120);
   meter_out.set_vudata (&vudata_out);
   meter_out.set_stereo (false);
   vudata_out.set_l (0.0, 0.0);
@@ -436,14 +456,14 @@ void c_lane_widgets::create (
   btn_mute.padding = 16;
   
   // advanced controls
-  delay.role = ROLE_DELAY;
-  delay.create (ui, wp, "Delay", 0, 0, 64, 64);
-  delay.set_min (0);
-  delay.set_max (30);
-  delay.set_defaultvalue (0);
-  delay.set_value (0);
-  delay.set_step (0.01);
-  delay.role = ROLE_DELAY;
+  knob_delay.role = ROLE_DELAY;
+  knob_delay.create (ui, wp, "Delay", 0, 0, 64, 64);
+  knob_delay.set_min (0);
+  knob_delay.set_max (30);
+  knob_delay.set_defaultvalue (0);
+  knob_delay.set_value (0);
+  knob_delay.set_step (0.01);
+  knob_delay.role = ROLE_DELAY;
   //delay.set_tooltip ("Micro delay applied to this amp's output");
 
   btn_flip.create   (ui, wp, "", 0, 0, 32, 32, WSTYLE_IMAGE_TOGGLE);
@@ -493,9 +513,9 @@ void c_lane_widgets::move_resize (
   
   //const int knob_size = 64;//std::max (64, h / 2);
   int knob_size = std::max (64, w / 10);
-  knob_size = std::min (knob_size, (h * 3) / 5);
+  knob_size = std::min (knob_size, (h * 5) / 8);
   const int knob_top = (h - knob_size) / 2 - 16;
-  const int knob_right = w - knob_size * 2 - 12;
+  const int knob_right = w - knob_size * 3 - 8;
   const int menu_x = 16 + knob_size;//delay.x () + delay.w () + 8;
   const int menu_width = std::max (64, w - menu_x - (w - knob_right) - button_padding - 10);
   menu_list.move_resize (menu_x, 16, menu_width, 32);
@@ -504,7 +524,7 @@ void c_lane_widgets::move_resize (
   int button_top = menu_list.y () + menu_list.h () + 8;
   int button_width = std::min (h - 68, w / 10);
   
-  delay.move_resize (12, knob_top, knob_size, knob_size + 16);
+  knob_delay.move_resize (12, knob_top, knob_size, knob_size + 16);
 
   btn_browse.move_resize (button_left, button_top, button_width, button_width);
   btn_clear.move_resize (btn_browse.x () + btn_browse.w () + button_padding,
@@ -527,14 +547,18 @@ void c_lane_widgets::move_resize (
   btn_flip.padding = btnpadding;
   btn_calib.padding = btnpadding;
   
-  gain_in.move_resize (knob_right, knob_top, knob_size, knob_size + 16);
-  gain_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size + 16);
-  meter_out.move_resize (w - 12, 16, 5, h - 28);
+  knob_gain_in.move_resize (knob_right, knob_top, knob_size, knob_size + 16);
+  knob_gain_out.move_resize (knob_right + (knob_size + 1) * 2, knob_top, knob_size, knob_size + 16);
+  knob_dry_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size + 16);
+  
+  // these are outside ->relative to PARENT
+  //meter_out.move_resize (w - 12, 16, 5, h - 28);
+  meter_out.move_resize (w + 22, y + 4, METER_WIDTH, h - 8);
   
   int adv_btn_x = 84;
   int adv_btn_y = h * 2 / 11;
-  label_frames.move_resize (delay.x (), h - 20, delay.w (), 16);
-  label_trim.move_resize (gain_in.x (), h - 20, gain_in.w () + gain_out.w (), 16);
+  label_frames.move_resize (knob_delay.x (), h - 20, knob_delay.w (), 16);
+  label_trim.move_resize (knob_gain_in.x (), h - 20, knob_gain_in.w () + knob_gain_out.w (), 16);
   //move_resize (x, y, w, h);
 }
 
@@ -599,9 +623,11 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   
   mainwindow.set_icon_from_png (data_neuralblender_logo_512_png);
 
-  label_big.create (this, mainwindow.widget, "NeuralBlender", 120, 24, 400, 40);
-  label_big.align = TEXT_CENTER;
-  label_big.textsize = 1.5;
+  //label_big.create (this, mainwindow.widget, "NeuralBlender", 120, 24, 400, 40);
+  //label_big.align = TEXT_CENTER;
+  //label_big.textsize = 1.5;
+  img_logo.create (this, mainwindow.widget, "", 0, 0, 256, 100);
+  img_logo.set_png (data_textlogo_256x100_png);
   
   btn_enable.create (this, mainwindow.widget, "ON/OFF",  20, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
   btn_enable.set_value (true);
@@ -615,10 +641,20 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_muteall.set_image (data_icon_speaker_off_big_png, WSTATE_ON);
   btn_muteall.set_image (data_icon_speaker_on_big_png, WSTATE_OFF);
   
-  //btn_noisegate.create (this, mainwindow.widget, "", 0, 0, 40, 40, WSTYLE_IMAGE_TOGGLE);
-  //btn_noisegate.set_image_default (data_icon_noisegate_png);
-  //btn_tuner.create (this, mainwindow.widget, "", 0, 0, 40, 40, WSTYLE_IMAGE_TOGGLE);
-  //btn_tuner.set_image_default (data_icon_tuner_png);
+  btn_noisegate.create (this, mainwindow.widget, "", 0, 0, 40, 40, WSTYLE_IMAGE_TOGGLE);
+  btn_noisegate.role = ROLE_NOISEGATE;
+  btn_noisegate.set_image_default (data_icon_noisegate_png);
+  btn_noisegate.set_tooltip ("noise gate (see prefs.)");
+  btn_tuner.create (this, mainwindow.widget, "", 0, 0, 40, 40, WSTYLE_IMAGE_TOGGLE);
+  btn_tuner.set_image_default (data_icon_tuner_png);
+  btn_tuner.set_tooltip ("Tuner (TODO)");
+  
+  knob_noisethresh.create (this, mainwindow.widget, "", 0, 0, 64, 64);
+  knob_noisethresh.set_min (-120);
+  knob_noisethresh.set_max (-6);
+  knob_noisethresh.set_value (-60);
+  knob_noisethresh.set_step (0.1);
+  knob_noisethresh.role = ROLE_NOISETHRESH;
   
   btn_prefs.create (this, mainwindow.widget, "Settings", 520, 600, 100, 40);
   btn_prefs.role = ROLE_PREFS;
@@ -639,7 +675,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
 
   btn_bass.create (this, cont_checkboxes.widget, "Bass", 350, 0, 180, 32, WSTYLE_CHECKBOX);
   btn_bass.role = ROLE_CALIBBASS;
-  btn_bass.set_tooltip ("Calibrate trim levels for bass guitar");
+  btn_bass.set_tooltip ("Calibrate trim levels for bass guitar / lower freqs");
   
   aboutwindow.create (this);
   prefswindow.create (this);
@@ -694,6 +730,8 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
       window_height = std::max (MIN_WINDOW_HEIGHT, (int) (metrics.height / mw->app->hdpi));
     }
     
+    img_logo.move_resize (window_width / 2 - 64, 4, 128, 50);
+    
     //if (do_set_min_size)
     mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
     
@@ -713,11 +751,11 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     btn_enable.move_resize (16, 12, 120, 40);
     btn_muteall.move_resize (window_width - 136, 12, 120, 40);
     btn_prefs.move_resize (btn_muteall.x (), window_height - 48, 120, 40);
-    //btn_noisegate.move_resize (btn_enable.x () + btn_enable.w () + 8, 12, 40, 40);
-    //btn_tuner.move_resize (btn_muteall.x () - 48, 12, 40, 40);
+    btn_noisegate.move_resize (btn_enable.x () + btn_enable.w () + 8, 12, 40, 40);
+    knob_noisethresh.move_resize (btn_noisegate.x () + btn_noisegate.w () + 16, 8, 48, 64);
+    btn_tuner.move_resize (btn_muteall.x () - 48, 12, 40, 40);
     
     //label_exclmode.set_label ("Exclusive mode");
-    label_big.move_resize (150, 8, window_width - 300, 48);
     
     size_t i;
     for (i = 0; i < NB_NUM_MODELS; i++) {
@@ -838,6 +876,11 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     case ROLE_CALIBBASS: CP
       prefs.calib_source = value ? 1 : 0;
       on_calib_bass (btn, value);
+    break;
+
+    case ROLE_NOISEGATE: CP
+      state.noisegate_on = value;
+      on_noisegate (btn, value);
     break;
 
     case ROLE_EXCL_TOGGLE: CP
@@ -1112,14 +1155,20 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     last_exclusive_lane = (size_t) state.exclusive_lane;
 
   updating_from_state = true;
+  
+  btn_noisegate.set_value (state.noisegate_on);
+  if (state.noisegate_on)
+    knob_noisethresh.show ();
+  else
+    knob_noisethresh.hide ();
 
   const size_t nlanes = NB_NUM_MODELS < NB_NUM_MODELS ? NB_NUM_MODELS : NB_NUM_MODELS;
   for (size_t i = 0; i < nlanes; ++i) {
     const c_neuralblender_lane_state &lane = state.lanes [i];
 
-    lanes [i].gain_in.set_value (gain_to_db (lane.gain_in));
-    lanes [i].gain_out.set_value (gain_to_db (lane.gain_out));
-    lanes [i].delay.set_value (lane.delay_ms);
+    lanes [i].knob_gain_in.set_value (gain_to_db (lane.gain_in));
+    lanes [i].knob_gain_out.set_value (gain_to_db (lane.gain_out));
+    lanes [i].knob_delay.set_value (lane.delay_ms);
     lanes [i].btn_flip.set_value (lane.dcflip);
     lanes [i].btn_calib.set_value (lane.do_calib);
 
@@ -1135,7 +1184,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     }
     update_stats ();
   }
-
+  
   const bool enabled = !state.bypass;
   btn_enable.set_value (enabled);
   //btn_enable.set_label (enabled ? "Enabled" : " Bypass ");

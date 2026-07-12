@@ -99,6 +99,7 @@ public:
   c_button btn_ok;
   c_label labels [16];
   c_linklabel linklabel;
+  c_image img_toplogo;
   c_image img_logo;
   c_neuralblender_ui *ui = NULL;
 };
@@ -126,9 +127,13 @@ public:
   c_frame lane_widget;
   c_container cont_regcontrols;
   //c_container cont_advcontrols;
-  c_knob gain_in;
-  c_knob gain_out;
-  c_knob delay;
+  
+  c_knob knob_gain_in;
+  c_knob knob_gain_out;
+  c_knob knob_dry_out;
+  c_knob knob_delay;
+  c_knob knob_dryout;
+  
   c_button btn_mute;
   c_button btn_excl;
   c_button btn_browse;
@@ -140,10 +145,6 @@ public:
   //c_label label_calib;
   c_label label_frames;
   c_label label_trim;
-  
-  //int knob_size = 64;
-  //int knob_top = 0;
-  //int knob_right = 0;
   
   //c_meterwidget meter_in; // we only have one input
   c_meter meter_out;
@@ -174,21 +175,26 @@ public:
   void write_calib_state_if_consistent ();
   virtual void apply_effective_controls ();
 
-  virtual bool load_model (size_t which, const char *filename) = 0;
-  virtual void on_gain_in (c_widget *w, float f)               = 0;
-  virtual void on_gain_out (c_widget *w, float f)              = 0;
-  virtual void on_delay (c_widget *w, float f)                 = 0;
-  virtual void on_filebrowse (c_widget *w)                     = 0;
-  virtual void on_fileselected (c_widget *w, const char *path) = 0;
-  virtual void on_fileclear (c_widget *w)                      = 0;
-  virtual void on_mute (c_widget *w, bool b)                   = 0;
-  virtual void on_muteall (c_widget *w, bool b)                = 0;
-  virtual void on_dcflip (c_widget *w, bool b)                 = 0;
-  virtual void on_calibrate (c_widget *w, bool b)              = 0;
-  virtual void on_vu (c_widget *w, bool b)                     = 0;
-  virtual void on_linked_calib (c_widget *w, bool b)           = 0;
-  virtual void on_calib_bass (c_widget *w, bool b)             = 0;
-  virtual void on_bypass (c_widget *w, bool b)                 = 0;
+  virtual bool load_model (size_t which, const char *filename)  = 0;
+  virtual void on_gain_in (c_widget *w, float f)                = 0;
+  virtual void on_gain_out (c_widget *w, float f)               = 0;
+  virtual void on_delay (c_widget *w, float f)                  = 0;
+  virtual void on_filebrowse (c_widget *w)                      = 0;
+  virtual void on_fileselected (c_widget *w, const char *path)  = 0;
+  virtual void on_fileclear (c_widget *w)                       = 0;
+  virtual void on_mute (c_widget *w, bool b)                    = 0;
+  virtual void on_muteall (c_widget *w, bool b)                 = 0;
+  virtual void on_dcflip (c_widget *w, bool b)                  = 0;
+  virtual void on_calibrate (c_widget *w, bool b)               = 0;
+  virtual void on_vu (c_widget *w, bool b)                      = 0;
+  virtual void on_linked_calib (c_widget *w, bool b)            = 0;
+  virtual void on_calib_bass (c_widget *w, bool b)              = 0;
+  virtual void on_bypass (c_widget *w, bool b)                  = 0;
+  virtual void on_noisegate (c_widget *w, bool b)               = 0;
+  virtual void on_noisethresh (c_widget *w, float f)            = 0;
+  virtual void on_noiseattack (c_widget *w, float f)            = 0;
+  virtual void on_noisehold (c_widget *w, float f)              = 0;
+  virtual void on_noiserelease (c_widget *w, float f)           = 0;
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;
           void on_button (c_button *btn, bool value)              ;
@@ -212,7 +218,8 @@ public:
   bool do_set_min_size = false; // ugly hack for ardour's window size shenanigans
   
   c_container    cont_checkboxes;
-  c_label        label_big;
+  //c_label        label_big;
+  c_image        img_logo;
   c_button       btn_enable;
   c_button       btn_muteall;
   c_button       btn_noisegate;
@@ -222,6 +229,7 @@ public:
   c_button       btn_exclmode;
   c_button       btn_advanced;
   c_button       btn_bass;
+  c_knob         knob_noisethresh;
   //c_label        label_vu;
   //c_label        label_exclmode;
   //c_label        label_advanced;

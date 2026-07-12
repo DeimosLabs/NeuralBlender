@@ -31,19 +31,8 @@
 //#define DEBUG
 
 
-#ifdef REALLY_DEBUG_DSP
 #define CMDLINE_DEBUG_COLOR ANSI_BLUE
 #include "cmdline_debug.h"
-#else
-#ifdef debug
-#undef debug
-#endif
-#ifdef CP
-#undef CP
-#endif
-#define debug(...)
-#define CP do {} while (0);
-#endif
 
 //#define STANDALONE // done for us by build system (currently cmake)
 
@@ -174,6 +163,13 @@ static float clamp_gain_multiplier (float gain) {
   return std::clamp (gain, db_to_gain (GAIN_DB_MIN), db_to_gain (GAIN_DB_MAX));
 }
 
+static float clamp_dry_multiplier (float gain) {
+  if (!std::isfinite (gain))
+    return 0.0f;
+
+  return std::clamp (gain, 0.0f, db_to_gain (1.0f));
+}
+
 static float clamp_calib_target_db (float db) {
   if (!std::isfinite (db))
     return DB_CALIB_TARGET_DEFAULT;
@@ -196,6 +192,14 @@ void c_noisegate::update_coeffs () {
   coeffs_dirty = false;
 }
 
+float c_noisegate::get_current_gain () {
+  return display_gain.load (std::memory_order_relaxed);
+}
+
+float c_noisegate::get_current_db () {
+  return gain_to_db (display_gain.load (std::memory_order_relaxed));
+}
+
 void c_noisegate::set_samplerate (int new_sr) {
   if (new_sr > 0 && new_sr <= 192000) {
     samplerate = new_sr;
@@ -204,26 +208,29 @@ void c_noisegate::set_samplerate (int new_sr) {
 }
 
 void c_noisegate::set_threshold (float new_thresh_db) {
-  threshold_db = new_thresh_db;
+  threshold_db = std::clamp (
+    new_thresh_db,
+    NOISEGATE_THRESH_MIN,
+    NOISEGATE_THRESH_MAX);
   coeffs_dirty = true;
 }
 
 void c_noisegate::set_attack (float new_attack_ms) {
-  if (new_attack_ms <= 0)
+  if (new_attack_ms < 0)
     return;
   attack_ms = new_attack_ms;
   coeffs_dirty = true;
 }
 
 void c_noisegate::set_hold (float new_hold_ms) {
-  if (new_hold_ms <= 0)
+  if (new_hold_ms < 0)
     return;
   hold_ms = new_hold_ms;
   coeffs_dirty = true;
 }
 
 void c_noisegate::set_release (float new_release_ms) {
-  if (new_release_ms <= 0)
+  if (new_release_ms < 0)
     return;
   release_ms = new_release_ms;
   coeffs_dirty = true;
@@ -261,6 +268,7 @@ void c_noisegate::process_block (float *in, float *out, uint32_t nframes) {
     
     dst [i] = in [i] * gain;
   }
+  display_gain.store (gain, std::memory_order_relaxed);
 }
 
 
@@ -906,6 +914,14 @@ bool c_neuralblender::set_gain_out (size_t which, float g) {
   return true;
 }
 
+bool c_neuralblender::set_dry_out (size_t which, float g) {
+  if (which >= NB_NUM_MODELS)
+    return false;
+
+  amps [which].dry_out = clamp_dry_multiplier (g);
+  return true;
+}
+
 bool c_neuralblender::set_lane_mute (size_t which, bool muted) {
   if (which >= NB_NUM_MODELS)
     return false;
@@ -970,10 +986,16 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
   state.bypass = bypass ();
   state.do_vu = do_vu;
   state.mute_all = mute_all;
+  state.noisegate_on = noisegate_on;
+  state.noisethresh = noisegate.threshold_db;
+  state.noiseattack = noisegate.attack_ms;
+  state.noisehold = noisegate.hold_ms;
+  state.noiserelease = noisegate.release_ms;
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     state.lanes [i].filename = amps [i].model_filename ();
     state.lanes [i].gain_in = amps [i].gain_in;
     state.lanes [i].gain_out = amps [i].gain_out;
+    state.lanes [i].dry_out = amps [i].dry_out;
     state.lanes [i].delay_ms = delay_ms (i);
     state.lanes [i].lane_mute = lane_mute (i);
     state.lanes [i].loaded = amps [i].loaded ();
@@ -1269,10 +1291,13 @@ float *c_neuralblender::prepare_input_buffer (
     return in;
   
   if (in != out) {
-    if (noisegate_on)
+    if (noisegate_on) {
+      //CP
       noisegate.process_block (in, out, nframes);
-    else
+    } else {
+      //CP
       memcpy (out, in, nframes * sizeof (float));
+    }
 
     return out;
   }
@@ -1280,10 +1305,13 @@ float *c_neuralblender::prepare_input_buffer (
   if (m_input_buf.size () < nframes)
     m_input_buf.resize (nframes);
 
-  if (noisegate_on)
+  if (noisegate_on) {
     noisegate.process_block (in, m_input_buf.data (), nframes);
-  else
+    //CP
+  } else {
     memcpy (m_input_buf.data (), in, nframes * sizeof (float));
+    //CP
+  }
   
   return m_input_buf.data ();
 }
@@ -1313,6 +1341,12 @@ void c_neuralblender::render_lane (
   amps [lane].process_block (m_delay_bufs [lane].data (),
                              m_model_bufs [lane].data (),
                              nframes);
+
+  const float dry_gain = clamp_dry_multiplier (amps [lane].dry_out);
+  if (dry_gain > 0.0f) {
+    for (uint32_t i = 0; i < nframes; ++i)
+      m_model_bufs [lane] [i] += m_delay_bufs [lane] [i] * dry_gain;
+  }
 
   if (meters_out [lane] && do_vu) {
     for (uint32_t i = 0; i < nframes; ++i)

@@ -94,6 +94,11 @@ public:
   void on_vu (c_widget *w, bool);
   void on_linked_calib (c_widget *w, bool b);
   void on_calib_bass (c_widget *w, bool b);
+  void on_noisegate (c_widget *w, bool b);
+  void on_noisethresh (c_widget *w, float f);
+  void on_noiseattack (c_widget *w, float f);
+  void on_noisehold (c_widget *w, float f);
+  void on_noiserelease (c_widget *w, float f);
   //void on_excl (c_widget *w, int which);
   void on_bypass (c_widget *w, bool b);
   void on_about (c_widget *w);
@@ -197,6 +202,27 @@ void c_standalone_ui::on_muteall (c_widget *w, bool b) {
 void c_standalone_ui::on_vu (c_widget *w, bool b) {
   debug ("b=%d", (int) b);
   g_blender.do_vu = b;
+}
+
+void c_standalone_ui::on_noisegate (c_widget *w, bool b) {
+  (void) w;
+  g_blender.noisegate_on = b;
+}
+
+void c_standalone_ui::on_noisethresh (c_widget *w, float value) {
+  g_blender.noisegate.set_threshold (value);
+}
+
+void c_standalone_ui::on_noiseattack (c_widget *w, float value) {
+  g_blender.noisegate.set_attack (value);
+}
+
+void c_standalone_ui::on_noisehold (c_widget *w, float value) {
+  g_blender.noisegate.set_hold (value);
+}
+
+void c_standalone_ui::on_noiserelease (c_widget *w, float value) {
+  g_blender.noisegate.set_release (value);
 }
 
 void c_standalone_ui::on_linked_calib (c_widget *w, bool b) {

@@ -53,6 +53,8 @@
 #define GAIN_DB_MAX              40.0f
 #define CALIB_TARGET_DB_MIN      -40.0f
 #define CALIB_TARGET_DB_MAX      0.0f
+#define NOISEGATE_THRESH_MIN     DB_SILENCE
+#define NOISEGATE_THRESH_MAX     -6.0f
 #define WARMUP_BLOCKS            5
 #define NB_XFADE_MS              10.0f
 #define NB_LANE_XFADE_MS         NB_XFADE_MS
@@ -101,6 +103,7 @@ struct c_neuralblender_lane_state {
   std::string filename;
   float gain_in = 1.0f;
   float gain_out = 1.0f;
+  float dry_out = 0.0f;
   float delay_ms = 0.0f;
   bool lane_mute = false;
   bool loaded = false;
@@ -116,6 +119,12 @@ struct c_neuralblender_state {
   bool showadvanced = false;
   bool mute_all = false;
   int  exclusive_lane = 0;
+  bool tuner = false;
+  bool noisegate_on = false;
+  float noisethresh = -60.0f;
+  float noiseattack = 2.0f;
+  float noisehold = 10.0f;
+  float noiserelease = 20.0f;
   c_neuralblender_lane_state lanes [NB_NUM_MODELS];
 };
 
@@ -127,14 +136,18 @@ public:
   void set_attack (float attack_ms);
   void set_hold (float hold_ms);
   void set_release (float release_ms);
+  float get_current_gain ();
+  float get_current_db ();
   
   void set_samplerate (int sr);
   float threshold_db = -60.0f;
   float attack_ms = 2.0f;
   float hold_ms = 10.0f;
   float release_ms = 20.0f;
-  
+
 private:
+  void update_coeffs ();
+
   float samplerate = 48000.0f;
   float env = 0.0f;
   float gain = 1.0f;
@@ -144,9 +157,10 @@ private:
   float attack_coeff = 0.0f;
   int hold_coeff = 0.0f;
   float release_coeff = 0.0f;
-  
+
   bool coeffs_dirty = true;
-  void update_coeffs ();
+
+  std::atomic<float> display_gain = 0.0f;
 };
 
 class c_delayline {
@@ -190,6 +204,7 @@ public:
   std::string filename        = "";
   float       gain_in         = 1.0f;
   float       gain_out        = 1.0f;
+  float       dry_out         = 0.0f;
   float       calib_target_db = DB_CALIB_TARGET_DEFAULT;
   uint32_t    samplerate      = 48000;
   uint32_t    blocksize       = -1;
@@ -242,6 +257,7 @@ public:
   bool set_delay_ms (size_t which, float ms);
   bool set_gain_in (size_t which, float g);
   bool set_gain_out (size_t which, float g);
+  bool set_dry_out (size_t which, float g);
   bool set_lane_mute (size_t which, bool muted);
   void set_bypass (bool bypass);
   bool lane_mute (size_t which) const;
@@ -266,6 +282,10 @@ public:
   c_vudata *meters_out [NB_NUM_MODELS];
   bool do_vu = true;
   bool noisegate_on = true;
+  bool tuner_on = false;
+  float tuner_base_freq = 440.0f;
+  float tuner_note = 0.0f;
+  float tuner_cents_off = 0.0f;
   bool mute_all = false;
   bool linked_calib = false;
   int calib_source = 0; // 0=guitar, 1=bass

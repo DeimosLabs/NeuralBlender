@@ -34,6 +34,7 @@ enum _widget_role {
   ROLE_DCFLIP,
   ROLE_CALIBRATE,
   ROLE_CALIBBASS,
+  ROLE_NOISEGATE,
   ROLE_VUTOGGLE,
   ROLE_LINKED_CALIB,
   ROLE_EXCL_TOGGLE,
@@ -41,6 +42,11 @@ enum _widget_role {
   ROLE_EXCL_USE,
   ROLE_BYPASS,
   ROLE_MASTER,
+  ROLE_NOISETHRESH,
+  ROLE_NOISEATTACK,
+  ROLE_NOISEHOLD,
+  ROLE_NOISERELEASE,
+  ROLE_TUNER,
   ROLE_UNKNOWN
 };
 
@@ -136,8 +142,10 @@ public:
   // TODO: complete key event propagation/dispatch, widget focus etc.
   virtual bool on_keydown (XKeyEvent *key);
   virtual bool on_keyup (XKeyEvent *key);
-  void focus ();
-  void clear_focus ();
+  virtual void show ();
+  virtual void hide ();
+  virtual void focus ();
+  virtual void clear_focus ();
   
   void set_state (_widget_state state);
   static void draw_text_centered (Widget_t *w, 
@@ -398,6 +406,8 @@ public:
   void set_min (float min);
   void set_max (float max);
   void set_step (float max);
+  bool get_circle_geometry (int *r_x, int *r_y, int *r_radius);
+  float knob_angle_from_value ();
   static void cb_draw (void *w, void *userdata);
   virtual void on_change ();
   virtual void on_doubleclick ();

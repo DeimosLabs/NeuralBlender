@@ -46,20 +46,6 @@ static constexpr t_statecolors sc (
   return { bg, fg };
 }
 
-static float knob_angle_from_value (float value, float min, float max) {
-  if (max <= min)
-    return 0.0f;
-
-  float t = (value - min) / (max - min);
-  t = std::clamp (t, 0.0f, 1.0f);
-
-  const float start = 3.0f * M_PI / 4.0f; // 135 deg, lower-left
-  const float sweep = 3.0f * M_PI / 2.0f; // 270 deg
-
-  return start + t * sweep;
-}
-
-
 // Floats galore. Bring a row boat.
 // (Codex generated most of this table)
 
@@ -564,6 +550,14 @@ bool c_widget::on_keydown (XKeyEvent *key) { CP
 bool c_widget::on_keyup (XKeyEvent *key) { CP
   (void) key;
   return false;
+}
+
+void c_widget::show () {
+  if (widget) widget_show (widget);
+}
+
+void c_widget::hide () {
+  if (widget) widget_hide (widget);
 }
 
 void c_widget::focus () {
@@ -1832,6 +1826,42 @@ void c_knob::create (
   c_widget::create (ui_, parent, label_, x, y, w, h);
 }
 
+float c_knob::knob_angle_from_value () {
+  if (max <= min)
+    return 0.0f;
+
+  float t = (value - min) / (max - min);
+  t = std::clamp (t, 0.0f, 1.0f);
+
+  const float start = 3.0f * M_PI / 4.0f; // 135 deg, lower-left
+  const float sweep = 3.0f * M_PI / 2.0f; // 270 deg FROM START
+
+  return start + t * sweep;
+}
+
+bool c_knob::get_circle_geometry (int *r_x, int *r_y, int *r_radius) {
+
+  if (!widget)
+    return false;
+
+  int w = 0;
+  int h = 0;
+  if (!get_widget_size (widget, NULL, NULL, &w, &h))
+    return false;
+
+  // match xputty's _draw_knob(): the knob circle is drawn in a smaller
+  // rectangle, leaving room below for the value/label text.
+  const int knob_w = std::max (1, w - 2);
+  const int knob_h = std::max (1, h - (widget->app->small_font + 7));
+  const int d = std::min (knob_w, knob_h);
+
+  if (r_x) *r_x = knob_w / 2 - 1; // TODO: figure out wtf
+  if (r_y) *r_y = knob_h / 2;
+  if (r_radius) *r_radius = 1 + std::max (1, (d / 2) - std::max (2, d / 16));
+
+  return true;
+}
+
 void c_knob::cb_draw (void *w, void *user_data) {
   Widget_t *widget = (Widget_t *) w;
   if (!widget || !widget->parent_struct)
@@ -1842,28 +1872,29 @@ void c_knob::cb_draw (void *w, void *user_data) {
   if (g_knob_image && g_knob_image->image && widget->image != g_knob_image->image)
     widget_get_surface_ptr (widget, g_knob_image);
 
+  // xputty function
   _draw_knob (widget, user_data);
   
   if (widget->crb) {
-    // arc around knob - thanks to codex for help with the math!
-    int w, h;
+    int cx, cy, radius;
     float a0 = 3.0f * M_PI / 4.0f;
-    float a1 = knob_angle_from_value (knob->value, knob->min, knob->max);
-    get_widget_size (widget, NULL, NULL, &w, &h);
-    int cx = w / 2 - 2;
-    int cy = cx;//h / 2;
-    cairo_arc (widget->crb, cx, cy, cx - cx / 16, a0, a1);
-    cairo_stroke (widget->crb);
+    float a1 = knob->knob_angle_from_value ();
     
-    // little dot indicating value
-    float dot_r = std::max (2.0f, (float) (cx - 2) / 12);
-    float dot_dist = (cx / 2) * 0.95f;
-    float dot_x = cx + cosf (a1) * dot_dist;
-    float dot_y = cy + sinf (a1) * dot_dist;
-    cairo_arc (widget->crb, dot_x, dot_y, dot_r, 0.0, 2.0 * M_PI);
-    cairo_fill (widget->crb);
+    if (knob->get_circle_geometry (&cx, &cy, &radius)) {
+      // simplified: arc around knob
+      cairo_arc (widget->crb, cx, cy, radius, a0, a1);
+      cairo_stroke (widget->crb);
+
+      // little dot incicating value
+      float dot_r = std::max (2.0f, radius / 14.0f);
+      float dot_dist = radius * 0.55f;
+      float dot_x = cx + cosf (a1) * dot_dist;
+      float dot_y = cy + sinf (a1) * dot_dist;
+      cairo_arc (widget->crb, dot_x, dot_y, dot_r, 0.0, 2.0 * M_PI);
+      cairo_fill (widget->crb);
+    }
   }
- 
+
 }
 
 void c_knob::set_min (float x) {
@@ -1915,6 +1946,26 @@ void c_knob::on_change () {
     case ROLE_DELAY:
       debug ("lane %d delay %f", lane, value);
       ui->on_delay (this, value);
+    break;
+
+    case ROLE_NOISETHRESH:
+      debug ("noise threshold set to %f", value);
+      ui->on_noisethresh (this, value);
+    break;
+
+    case ROLE_NOISEATTACK:
+      debug ("noise attack set to %f", value);
+      ui->on_noiseattack (this, value);
+    break;
+
+    case ROLE_NOISEHOLD:
+      debug ("noise hold set to %f", value);
+      ui->on_noisehold (this, value);
+    break;
+
+    case ROLE_NOISERELEASE:
+      debug ("noise release set to %f", value);
+      ui->on_noiserelease (this, value);
     break;
 
     default:
