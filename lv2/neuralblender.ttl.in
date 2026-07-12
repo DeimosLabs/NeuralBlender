@@ -515,4 +515,12 @@ nb:ModelD
 	        lv2:name "Tuner Cents Off" ;
 	        lv2:minimum -50.0 ;
 	        lv2:maximum 50.0
+	    ] , [
+	        a lv2:OutputPort ,
+	          lv2:ControlPort ;
+	        lv2:index 49 ;
+	        lv2:symbol "tuner_freq" ;
+	        lv2:name "Tuner Frequency" ;
+	        lv2:minimum 0.0 ;
+	        lv2:maximum 1000.0
 	    ].

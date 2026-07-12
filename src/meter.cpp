@@ -623,6 +623,61 @@ void c_customwidget::inspect () {
   debug ("widget=%p size=%dx%d", widget, width, height);
 }
 
+void c_customwidget::move_resize (int x, int y, int w, int h) {
+  if (!widget || !widget->app)
+    return;
+
+  const int sx = x * widget->app->hdpi;
+  const int sy = y * widget->app->hdpi;
+  const int sw = std::max (1, (int) (w * widget->app->hdpi));
+  const int sh = std::max (1, (int) (h * widget->app->hdpi));
+
+  widget->x = sx;
+  widget->y = sy;
+  widget->scale.init_x = sx;
+  widget->scale.init_y = sy;
+  widget->scale.init_width = sw;
+  widget->scale.init_height = sh;
+
+  os_move_window (widget->app->dpy, widget, sx, sy);
+  os_resize_window (widget->app->dpy, widget, sw, sh);
+  configure_cb (widget, NULL);
+  invalidate_base ();
+  invalidate_overlay ();
+}
+
+void c_customwidget::move (int x, int y) {
+  if (!widget || !widget->app)
+    return;
+
+  const int sx = x * widget->app->hdpi;
+  const int sy = y * widget->app->hdpi;
+
+  widget->x = sx;
+  widget->y = sy;
+  widget->scale.init_x = sx;
+  widget->scale.init_y = sy;
+
+  os_move_window (widget->app->dpy, widget, sx, sy);
+  expose ();
+}
+
+void c_customwidget::resize (int w, int h) {
+  if (!widget || !widget->app)
+    return;
+
+  const int sw = std::max (1, (int) (w * widget->app->hdpi));
+  const int sh = std::max (1, (int) (h * widget->app->hdpi));
+
+  widget->scale.init_width = sw;
+  widget->scale.init_height = sh;
+
+  os_resize_window (widget->app->dpy, widget, sw, sh);
+  configure_cb (widget, NULL);
+  invalidate_base ();
+  invalidate_overlay ();
+}
+
 void c_customwidget::invalidate_base () {
   base_image_valid = false;
   expose ();

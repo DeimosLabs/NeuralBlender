@@ -121,6 +121,9 @@ public:
   virtual void set_opacity (int opacity);
   virtual void inspect ();
   virtual void on_ui_timer () {}
+  virtual void move_resize (int x, int y, int w, int h);
+  virtual void move (int x, int y);
+  virtual void resize (int w, int h);
   void invalidate_base ();
   void invalidate_overlay ();
   void invalidate_overlay_rect (int x, int y, int w, int h);
@@ -210,7 +213,7 @@ public:
   int clip_size = 0;
   int rec_size = 0;
   bool rec_enabled = false;
-  c_vudata *data = nullptr;
+  c_vudata *data = NULL;
   float db_scale = DEFAULT_VU_DB;
 
 protected:

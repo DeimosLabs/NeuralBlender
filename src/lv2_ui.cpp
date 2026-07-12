@@ -93,7 +93,8 @@ enum {
   PORT_TUNER_ON,
   PORT_TUNER_BASE_FREQ,
   PORT_TUNER_NOTE,
-  PORT_TUNER_CENTS_OFF
+  PORT_TUNER_CENTS_OFF,
+  PORT_TUNER_FREQ
 };
 
 class c_lv2_ui : public c_neuralblender_ui {
@@ -115,11 +116,14 @@ public:
   LV2_URID urid_patch_value = 0;
   LV2_URID urid_model [NB_NUM_MODELS] = { 0 };
   LV2_URID urid_meters = 0;
-	  LV2_URID urid_stats = 0;
-	  LV2_URID urid_calib_target_db = 0;
+  LV2_URID urid_stats = 0;
+  LV2_URID urid_calib_target_db = 0;
   LV2UI_Port_Subscribe *subscribe = NULL;
   LV2UI_Resize *resize = NULL;
   bool updating_from_host = false;
+  float tuner_freq_value = 0.0f;
+  float tuner_note_value = 0.0f;
+  float tuner_cents_value = 0.0f;
   
   void write_control (uint32_t port, float value) {
     if (updating_from_host || !write)
@@ -408,10 +412,37 @@ public:
 	    if (port == PORT_TUNER_ON) {
 	      state.tuner_on = value >= 0.5f;
 	      btn_tuner.set_value (state.tuner_on);
-	      /*if (state.tuner_on)
-	        widget_tuner.show ();
-	      else
-	        widget_tuner.hide ();*/
+	      if (state.tuner_on) {
+	        tuner.show ();
+	        img_logo.hide ();
+	      } else {
+	        tuner.hide ();
+	        img_logo.show ();
+	      }
+	      updating_from_state = old_updating_from_state;
+	      updating_from_host = false;
+	      return;
+	    }
+
+	    if (port == PORT_TUNER_NOTE) {
+	      tuner_note_value = value;
+	      tuner.set_pitch (tuner_freq_value, tuner_note_value, tuner_cents_value);
+	      updating_from_state = old_updating_from_state;
+	      updating_from_host = false;
+	      return;
+	    }
+
+	    if (port == PORT_TUNER_CENTS_OFF) {
+	      tuner_cents_value = value;
+	      tuner.set_pitch (tuner_freq_value, tuner_note_value, tuner_cents_value);
+	      updating_from_state = old_updating_from_state;
+	      updating_from_host = false;
+	      return;
+	    }
+
+	    if (port == PORT_TUNER_FREQ) {
+	      tuner_freq_value = value;
+	      tuner.set_pitch (tuner_freq_value, tuner_note_value, tuner_cents_value);
 	      updating_from_state = old_updating_from_state;
 	      updating_from_host = false;
 	      return;
@@ -629,6 +660,7 @@ public:
 	    subscribe->subscribe (subscribe->handle, PORT_NOISEGATE_GAIN, 0, NULL);
 	    subscribe->subscribe (subscribe->handle, PORT_TUNER_NOTE, 0, NULL);
 	    subscribe->subscribe (subscribe->handle, PORT_TUNER_CENTS_OFF, 0, NULL);
+	    subscribe->subscribe (subscribe->handle, PORT_TUNER_FREQ, 0, NULL);
 	  }
 };
 

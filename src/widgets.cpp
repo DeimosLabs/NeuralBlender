@@ -1000,6 +1000,9 @@ void c_container::create (
   c_widget::create (ui_, parent, label_, x, y, w, h);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// c_meter
+
 void c_meter::create (
     c_neuralblender_ui *ui_,
     Widget_t *parent,
@@ -1014,30 +1017,9 @@ void c_meter::create (
   meter.create (widget, label_, 0, 0, w, h);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// c_meter
-
 void c_meter::move_resize (int x, int y, int w, int h) {
   c_widget::move_resize (x, y, w, h);
-
-  Widget_t *child = meter.widget;
-  if (!child)
-    return;
-  
-  const int sw = std::max (1, (int) (w * child->app->hdpi));
-  const int sh = std::max (1, (int) (h * child->app->hdpi));
-  
-  child->x = 0;
-  child->y = 0;
-  child->scale.init_x = 0;
-  child->scale.init_y = 0;
-  child->scale.init_width = sw;
-  child->scale.init_height = sh;
-  
-  os_move_window (child->app->dpy, child, 0, 0);
-  os_resize_window (child->app->dpy, child, sw, sh);
-  child->func.configure_callback (child, NULL);
-  expose_widget (child);
+  meter.move_resize (0, 0, w, h);
 }
 
 void c_meter::show () {
@@ -1064,6 +1046,41 @@ void c_meter::set_compression_gain (float f) {
 
 void c_meter::set_compression_db (float f) {
   meter.set_compression_gain (db_to_gain (f));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// c_tuner
+
+void c_tuner::create (c_neuralblender_ui *ui, Widget_t *parent,
+                      const char *label, int x, int y, int w, int h) {
+                      
+  CP
+  widget = create_widget (parent->app, parent, x, y, w, h);
+  c_widget::create (ui, parent, label, x, y, w, h);
+  tuner.create (widget, label, 0, 0, w, h);
+}
+
+void c_tuner::move_resize (int x, int y, int w, int h) {
+  c_widget::move_resize (x, y, w, h);
+  tuner.move_resize (0, 0, w, h);
+}
+
+void c_tuner::show () {
+  if (widget)
+    widget_show (widget);
+  if (tuner.widget)
+    widget_show (tuner.widget);
+  if (widget)
+    expose ();
+  if (tuner.widget)
+    expose_widget (tuner.widget);
+}
+
+void c_tuner::hide () {
+  if (tuner.widget)
+    widget_hide (tuner.widget);
+  if (widget)
+    widget_hide (widget);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

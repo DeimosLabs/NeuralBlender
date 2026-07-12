@@ -283,6 +283,29 @@ public:
   inline bool needs_redraw ()          { return meter.needs_redraw (); }
 };
 
+class c_tuner : public c_widget {
+public:
+  void create (
+      c_neuralblender_ui *ui,
+      Widget_t *parent,
+      const char *label,
+      int x, int y, int w, int h);
+  
+  void move_resize (int x, int y, int w, int h) override;
+  void show () override;
+  void hide () override;
+  
+  //static void cb_draw (void *w, void *userdata);
+  c_tunerwidget tuner;
+  
+  inline void on_ui_timer ()                       { tuner.on_ui_timer ();       }
+  inline void set_pitchtracker (c_pitchtracker *p) { tuner.set_pitchtracker (p); }
+  inline void set_pitch (float freq, float note, float cents) {
+    tuner.set_pitch (freq, note, cents);
+  }
+  inline bool needs_redraw ()                      { return tuner.needs_redraw (); }
+};
+
 class c_label : public c_widget {
 public:
   void create (
@@ -420,17 +443,6 @@ public:
   float defaultvalue = 0;
   float step = 1;
   bool reset_on_doubleclick = true;
-};
-
-class c_tuner : public c_widget {
-public:
-  void create (
-      c_neuralblender_ui *ui,
-      Widget_t *parent,
-      const char *label,
-      int x, int y, int w, int h);
-      
-  static void cb_draw (void *w, void *userdata);
 };
 
 class c_combobox : public c_widget {

@@ -100,7 +100,8 @@ enum {
     PORT_TUNER_ON,
 	  PORT_TUNER_BASE_FREQ,
 	  PORT_TUNER_NOTE,
-	  PORT_TUNER_CENTS_OFF
+	  PORT_TUNER_CENTS_OFF,
+	  PORT_TUNER_FREQ
 };
 
 typedef struct {
@@ -133,6 +134,7 @@ typedef struct {
 	  float *noisegate_gain = NULL;
 	  float *tuner_note = NULL;
 	  float *tuner_cents_off = NULL;
+	  float *tuner_freq = NULL;
   
   float last_delay          [NB_NUM_MODELS] = { 0.0 };
   float last_gain_in_db     [NB_NUM_MODELS] = { 0.0 };
@@ -218,6 +220,7 @@ typedef struct {
   std::atomic<bool> stats_dirty { true };
   std::atomic<bool> controls_dirty { false };
   std::atomic<bool> tuner_enabled { false };
+  std::atomic<float> detected_tuner_freq { 0.0f };
   std::atomic<float> detected_tuner_note { 0.0f };
   std::atomic<float> detected_tuner_cents { 0.0f };
   
@@ -362,7 +365,11 @@ static void loader_main (Plugin *self) { CP
       self->controls_dirty.store (true, std::memory_order_release);
     }
 
-    if (do_tuner && self->blender.pitchtracker.analyze ()) {
+    if (do_tuner) {
+      self->blender.pitchtracker.analyze ();
+      self->detected_tuner_freq.store (
+        self->blender.pitchtracker.detected_freq.load (std::memory_order_acquire),
+        std::memory_order_release);
       self->detected_tuner_note.store (
         self->blender.pitchtracker.detected_note.load (std::memory_order_acquire),
         std::memory_order_release);
@@ -961,6 +968,10 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
 	    case PORT_TUNER_CENTS_OFF:
 	      self->tuner_cents_off = (float *) data;
 	    break;
+
+	    case PORT_TUNER_FREQ:
+	      self->tuner_freq = (float *) data;
+	    break;
 	  }
 	}
 
@@ -1306,6 +1317,9 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   if (self->tuner_cents_off)
     *self->tuner_cents_off =
       self->detected_tuner_cents.load (std::memory_order_acquire);
+  if (self->tuner_freq)
+    *self->tuner_freq =
+      self->detected_tuner_freq.load (std::memory_order_acquire);
 
   self->meter_notify_samples += nframes;
 }

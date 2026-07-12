@@ -692,6 +692,11 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   meter_in.set_vudata (&vudata_in);
   meter_in.set_stereo (false);
   vudata_in.set_l (0.0, 0.0);
+  
+  tuner.create (this, mainwindow.widget, "", 0, 0, 400, 24);
+  if (blender)
+    tuner.set_pitchtracker (&blender->pitchtracker);
+  tuner.hide ();
 
   if (blender) {
     for (i = 0; i < NB_NUM_MODELS; i++) {
@@ -759,6 +764,8 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     btn_noisegate.move_resize (btn_enable.x () + btn_enable.w () + 8, 12, 40, 40);
     knob_noisethresh.move_resize (btn_noisegate.x () + btn_noisegate.w () + 16, 8, 48, 64);
     btn_tuner.move_resize (btn_muteall.x () - 48, 12, 40, 40);
+    tuner.move_resize (btn_noisegate.x () + btn_noisegate.w () + 4, 2, 
+                       btn_tuner. x () - 8 - btn_noisegate.x () - btn_noisegate.w (), 56);
     
     //label_exclmode.set_label ("Exclusive mode");
     
@@ -891,6 +898,11 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     case ROLE_TUNER: CP
       state.tuner_on = value;
       on_tuner (btn, value);
+      if (value)
+        tuner.show ();
+      else
+        tuner.hide ();
+        
     break;
 
     case ROLE_EXCL_TOGGLE: CP
@@ -1110,6 +1122,11 @@ int c_neuralblender_ui::idle () {
       lanes [i].meter_out.on_ui_timer ();
     }
   }
+  
+  if (state.tuner_on) {
+    tuner.on_ui_timer ();
+  }
+  
   run_embedded (&app);
   return 0;
 }
@@ -1211,6 +1228,15 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   
   const bool enabled = !state.bypass;
   btn_enable.set_value (enabled);
+  
+  btn_tuner.set_value (state.tuner_on);
+  if (state.tuner_on) {
+    tuner.show ();
+    img_logo.hide ();
+  } else {
+    tuner.hide ();
+    img_logo.show ();
+  }
   //btn_enable.set_label (enabled ? "Enabled" : " Bypass ");
 
   /*btn_advanced.set_value (state.showadvanced);

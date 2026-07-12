@@ -1,3 +1,4 @@
+
 /* NeuralBlender - tuner / pitch tracking data.
  */
 
@@ -12,7 +13,12 @@
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_GREEN
 #include "cmdline_debug.h"
 
+#ifndef METER_DATA_ONLY
+#include "xputty_compat.h"
+#endif
+
 #ifdef METER_DATA_ONLY
+
 
 #define TUNER_THRESH_DB -40.0f
 
@@ -98,9 +104,11 @@ int c_pitchtracker::get_best_lag (const std::vector<float> &buf, int step) const
 
 void c_pitchtracker::update_note_from_freq (float freq) {
   if (freq <= 0.0f || !std::isfinite (freq)) {
-    detected_freq.store (0.0f, std::memory_order_release);
-    detected_note.store (0.0f, std::memory_order_release);
-    detected_cents.store (0.0f, std::memory_order_release);
+    const float old_freq = detected_freq.exchange (0.0f, std::memory_order_release);
+    const float old_note = detected_note.exchange (0.0f, std::memory_order_release);
+    const float old_cents = detected_cents.exchange (0.0f, std::memory_order_release);
+    if (old_freq != 0.0f || old_note != 0.0f || old_cents != 0.0f)
+      needs_redraw.store (true, std::memory_order_release);
     return;
   }
 
@@ -116,9 +124,11 @@ void c_pitchtracker::update_note_from_freq (float freq) {
 
   debug ("freq=%f, midi=%d, cents=%f", freq, midi, cents);
 
-  detected_freq.store (freq, std::memory_order_release);
-  detected_note.store ((float) midi, std::memory_order_release);
-  detected_cents.store (cents, std::memory_order_release);
+  const float old_freq = detected_freq.exchange (freq, std::memory_order_release);
+  const float old_note = detected_note.exchange ((float) midi, std::memory_order_release);
+  const float old_cents = detected_cents.exchange (cents, std::memory_order_release);
+  if (old_freq != freq || old_note != (float) midi || old_cents != cents)
+    needs_redraw.store (true, std::memory_order_release);
 }
 
 bool c_pitchtracker::analyze () {
@@ -223,7 +233,7 @@ void c_pitchtracker::dump () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// c_pitchtrackerwidget
+// c_tunerwidget
 
 #else
 
@@ -231,6 +241,124 @@ void c_tunerwidget::create (Widget_t *parent,
                             const char *label,
                             int x, int y, int w, int h) {
   c_customwidget::create (parent, label, x, y, w, h);
+}
+
+void c_tunerwidget::set_pitchtracker (c_pitchtracker *p) {
+  pitchtracker = p;
+}
+
+void c_tunerwidget::set_pitch (float freq, float note, float cents) {
+  if (freq == current_freq && note == current_note && cents == current_cents)
+    return;
+
+  current_freq = freq;
+  current_note = note;
+  current_cents = cents;
+  ui_needs_redraw.store (true, std::memory_order_release);
+}
+
+void c_tunerwidget::on_ui_timer () {
+  if (!widget)
+    return;
+
+  bool dirty =
+    ui_needs_redraw.exchange (false, std::memory_order_acq_rel);
+
+  if (pitchtracker &&
+      pitchtracker->needs_redraw.exchange (false, std::memory_order_acq_rel)) {
+    current_freq =
+      pitchtracker->detected_freq.load (std::memory_order_acquire);
+    current_note =
+      pitchtracker->detected_note.load (std::memory_order_acquire);
+    current_cents =
+      pitchtracker->detected_cents.load (std::memory_order_acquire);
+    dirty = true;
+  }
+
+  if (dirty)
+    transparent_draw (widget, NULL);
+}
+
+bool c_tunerwidget::needs_redraw () {
+  const bool ui_dirty =
+    ui_needs_redraw.exchange (false, std::memory_order_acq_rel);
+  const bool tracker_dirty =
+    pitchtracker && pitchtracker->needs_redraw.exchange (false);
+
+  return ui_dirty || tracker_dirty;
+}
+
+void c_tunerwidget::render_base (cairo_t *cr) { CP
+  cairo_set_line_width (cr, 1.0);
+
+  cairo_set_source_rgba (cr, 0.5, 0.5, 1.0, 0.3);
+  for (int i = 0; i < 5; i++) {
+    int w = std::clamp ((width / 4) * i, 1, width - 1);
+    cairo_move_to (cr, w, 0);
+    cairo_line_to (cr, w, height);
+  }
+  cairo_stroke (cr);
+
+  cairo_set_source_rgba (cr, 0.5, 0.8, 1.0, 1.0);
+  cairo_move_to (cr, width / 2, 0);
+  cairo_line_to (cr, width / 2, height);
+  cairo_stroke (cr);
+}
+
+static const char *note_names [] = {
+  "C-",
+  "C#",
+  "D-",
+  "D#",
+  "E-",
+  "F-",
+  "F#",
+  "G-",
+  "G#",
+  "A-",
+  "A#",
+  "B-",
+};
+
+void c_tunerwidget::on_paint (cairo_t *cr) { CP
+  char buf [32];
+  
+  bool valid = true;
+  if (current_note < 20 || current_note > 108)
+    valid = false;
+  if (current_freq < 20 || current_freq > 1000)
+    valid = false;
+  if (current_cents < -50 || current_cents > 50)
+    valid = false;
+  
+  if (valid) {
+    snprintf (buf, 31, "%s%d", note_names [((int) current_note) % 12],
+              (int) (-1 + current_note / 12));
+    float x = (float) width / 2 + (current_cents / 50 * (float) width / 2);
+    cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 1.0);
+    cairo_move_to (cr, x - height / 5, height - 1);
+    cairo_line_to (cr, x, height / 2);
+    cairo_line_to (cr, x + height / 5, height - 1);
+    cairo_close_path (cr);
+    cairo_fill (cr);
+  } else {
+    snprintf (buf, 31, "---");
+  }
+  cairo_set_source_rgba (cr, 0.5, 1.0, 0.5, 1.0);
+  cairo_set_font_size (cr, 40.0);
+  cairo_move_to (cr, 8, 44);
+  cairo_show_text (cr, buf);
+  cairo_set_font_size (cr, 14.0);
+  cairo_move_to (cr, width - 72, height - 4);
+  if (current_freq >= 20 && current_freq <= 1000)
+    snprintf (buf, 31, "%.2f Hz", current_freq);
+  else
+    snprintf (buf, 31, "--- Hz");
+  cairo_show_text (cr, buf);
+  
+}
+
+void c_tunerwidget::on_resize (int w, int h) { CP
 }
 
 #endif // METER_DATA_ONLY

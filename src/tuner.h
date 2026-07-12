@@ -1,3 +1,4 @@
+
 /* NeuralBlender - tuner / pitch tracking data.
  */
 
@@ -21,10 +22,12 @@ public:
 
   void set_base_freq (int f = 440);
   void set_block_size (size_t sz);
+  void set_pitchtracker (c_pitchtracker *p);
 
   std::atomic<float> detected_freq  { 0.0f };
   std::atomic<float> detected_note  { 0.0f };
   std::atomic<float> detected_cents { 0.0f };
+  std::atomic<bool> needs_redraw { false };
 
 private:
   void publish_snapshot ();
@@ -45,7 +48,7 @@ private:
   int lastfreq       = -1;
 
   std::atomic<int> published_snapshot { -1 };
-  std::atomic<uint64_t> published_seq { 0 };
+  std::atomic<uint64_t> published_seq {  0 };
 };
 
 #ifndef METER_DATA_ONLY
@@ -55,6 +58,22 @@ public:
   void create (Widget_t *parent,
                const char *label,
                int x, int y, int w, int h) override;
+               
+  void set_pitchtracker (c_pitchtracker *p);
+  void set_pitch (float freq, float note, float cents);
+  void on_ui_timer () override;
+  bool needs_redraw ();
+
+protected:
+  void render_base (cairo_t *cr) override;
+  void on_paint (cairo_t *cr) override;
+  void on_resize (int w, int h) override;
+
+  c_pitchtracker *pitchtracker = NULL;
+  float current_freq = 0.0f;
+  float current_note = 0.0f;
+  float current_cents = 0.0f;
+  std::atomic<bool> ui_needs_redraw { false };
 };
 
 #endif

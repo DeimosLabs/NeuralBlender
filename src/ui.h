@@ -240,6 +240,7 @@ public:
   c_lane_widgets lanes [NB_NUM_MODELS];
   c_filepicker   filepickers [NB_NUM_MODELS];
   c_meter        meter_in;
+  c_tuner        tuner;
   
   t_prefs        prefs;
   
