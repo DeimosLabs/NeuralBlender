@@ -16,6 +16,7 @@ Features:
   - Each model slot / lane has:
     - input gain
     - output gain
+    - dry out gain
     - pre-delay for phasing correction/effects
     - optional DC flip for more phasing effects
     - optional level calibration
