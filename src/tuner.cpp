@@ -122,7 +122,7 @@ void c_pitchtracker::update_note_from_freq (float freq) {
   const float cents =
     1200.0f * log2f (freq / note_freq);
 
-  debug ("freq=%f, midi=%d, cents=%f", freq, midi, cents);
+  //debug ("freq=%f, midi=%d, cents=%f", freq, midi, cents);
 
   const float old_freq = detected_freq.exchange (freq, std::memory_order_release);
   const float old_note = detected_note.exchange ((float) midi, std::memory_order_release);
@@ -288,7 +288,7 @@ bool c_tunerwidget::needs_redraw () {
   return ui_dirty || tracker_dirty;
 }
 
-void c_tunerwidget::render_base (cairo_t *cr) { CP
+void c_tunerwidget::render_base (cairo_t *cr) {
   cairo_set_line_width (cr, 1.0);
 
   cairo_set_source_rgba (cr, 0.5, 0.5, 1.0, 0.3);
@@ -320,7 +320,7 @@ static const char *note_names [] = {
   "B-",
 };
 
-void c_tunerwidget::on_paint (cairo_t *cr) { CP
+void c_tunerwidget::on_paint (cairo_t *cr) {
   char buf [32];
   
   bool valid = true;
@@ -334,7 +334,7 @@ void c_tunerwidget::on_paint (cairo_t *cr) { CP
   if (valid) {
     snprintf (buf, 31, "%s%d", note_names [((int) current_note) % 12],
               (int) (-1 + current_note / 12));
-    float x = (float) width / 2 + (current_cents / 50 * (float) width / 2);
+    float x = (float) width / 2.0 + (current_cents / 50.0 * (float) width / 2.0);
     cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 1.0);
     cairo_move_to (cr, x - height / 5, height - 1);
     cairo_line_to (cr, x, height / 2);
@@ -358,7 +358,7 @@ void c_tunerwidget::on_paint (cairo_t *cr) { CP
   
 }
 
-void c_tunerwidget::on_resize (int w, int h) { CP
+void c_tunerwidget::on_resize (int w, int h) {
 }
 
 #endif // METER_DATA_ONLY

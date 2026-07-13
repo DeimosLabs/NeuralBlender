@@ -307,8 +307,8 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   
   frame.create (ui, widget, "", 12, 12, w () - 24, h () - 80);
   
-  img_toplogo.create (ui, frame.widget, "", 0, 8, 128, 50);
-  img_toplogo.set_png (data_textlogo_256x100_png);
+  img_toplogo.create (ui, frame.widget, "", 0, 8, 256, 32);
+  img_toplogo.set_png (data_textlogo_1024x128_png);
   
   //btn_ok.create (ui, frame.widget, "OK", 160, 395, 80, 40);
   btn_ok.create (ui, widget, "OK", 0, 0, 120, 40);
@@ -362,7 +362,7 @@ void c_aboutwindow::on_resize () { CP
   frame.move ((w () - frame.w ()) / 2, (h () - frame.h ()) / 2 - 24);
   btn_ok.move_resize (w () - 140, h () - 56, 128, 40);
   int center_h = frame.w () / 2;
-  img_toplogo.move (center_h - img_toplogo.w () / 2, 8);
+  img_toplogo.move (center_h - img_toplogo.w () / 2, 12);
   img_logo.move (center_h - img_logo.w () / 2, img_logo.y ());
   for (int i = 0; i < 16 && labels [i].widget; i++) {
     labels [i].move_resize (0, labels [i].y (), frame.w (), labels [i].h ());
@@ -629,8 +629,8 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   //label_big.create (this, mainwindow.widget, "NeuralBlender", 120, 24, 400, 40);
   //label_big.align = TEXT_CENTER;
   //label_big.textsize = 1.5;
-  img_logo.create (this, mainwindow.widget, "", 0, 0, 256, 100);
-  img_logo.set_png (data_textlogo_256x100_png);
+  img_logo.create (this, mainwindow.widget, "", 0, 0, 256, 32);
+  img_logo.set_png (data_textlogo_1024x128_png);
   
   btn_enable.create (this, mainwindow.widget, "ON/OFF",  20, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
   btn_enable.set_value (true);
@@ -740,7 +740,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
       window_height = std::max (MIN_WINDOW_HEIGHT, (int) (metrics.height / mw->app->hdpi));
     }
     
-    img_logo.move_resize (window_width / 2 - 64, 4, 128, 50);
+    img_logo.move_resize (window_width / 2 - 128, 12, 256, 32);
     
     //if (do_set_min_size)
     mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
