@@ -20,7 +20,7 @@
 #ifdef METER_DATA_ONLY
 
 
-#define TUNER_THRESH_DB -40.0f
+#define TUNER_THRESH_DB -60.0f
 
 static inline float tuner_db_to_gain (float db) {
   return powf (10.0f, db / 20.0f);
@@ -78,7 +78,8 @@ inline float c_pitchtracker::get_lag_score (
   return ret / (float) end;
 }
 
-int c_pitchtracker::get_best_lag (const std::vector<float> &buf, int step) const {
+int c_pitchtracker::get_best_lag (const std::vector<float> &buf, int step,
+                                  float *r_score) const {
   const int min_freq = 25;
   const int max_freq = 1000;
 
@@ -99,7 +100,51 @@ int c_pitchtracker::get_best_lag (const std::vector<float> &buf, int step) const
       best_lag = i;
     }
   }
+  if (r_score)
+    *r_score = best_score;
+  
   return best_lag;
+}
+
+bool c_pitchtracker::analyze () {
+  const int idx = published_snapshot.load (std::memory_order_acquire);
+  if (idx < 0 || idx > 3)
+    return false;
+
+  analysis = snapshots [idx];
+
+  if (block_rms (analysis) < tuner_db_to_gain (TUNER_THRESH_DB)) {
+    update_note_from_freq (0.0f);
+    return false;
+  }
+  
+  float l = 0.0f;
+  float m = 0.0f;
+  float r = 0.0f;
+  
+  const int lag = get_best_lag (analysis, 1, &m);
+  
+  if (lag <= 1 || lag + 1 >= (int) analysis.size () || lag == samplerate / 1000) {
+    update_note_from_freq (0.0f);
+    return false;
+  }
+
+  // "parabolic" interpolation
+  
+  l = get_lag_score (analysis, lag - 1);
+  r = get_lag_score (analysis, lag + 1);
+  float denom = l - 2.0f * m + r;
+  float offset = 0.0f;
+  if (fabsf(denom) > 1e-12f)
+    offset = 0.5f * (l - r) / denom;
+  offset = std::clamp(offset, -0.5f, 0.5f);
+  float refined_lag = lag + offset;
+
+  const float freq = (float) samplerate / (float) refined_lag;
+  update_note_from_freq (freq);
+
+  //detected_freq.store (freq, std::memory_order_release);
+  return true;
 }
 
 void c_pitchtracker::update_note_from_freq (float freq) {
@@ -131,32 +176,6 @@ void c_pitchtracker::update_note_from_freq (float freq) {
     needs_redraw.store (true, std::memory_order_release);
 }
 
-bool c_pitchtracker::analyze () {
-  const int idx = published_snapshot.load (std::memory_order_acquire);
-  if (idx < 0 || idx > 1)
-    return false;
-
-  analysis = snapshots [idx];
-
-  if (block_rms (analysis) < tuner_db_to_gain (TUNER_THRESH_DB)) {
-    update_note_from_freq (0.0f);
-    return false;
-  }
-
-  const int lag = get_best_lag (analysis, 1);
-  if (lag <= 0 || lag == samplerate / 1000) {
-    update_note_from_freq (0.0f);
-    return false;
-  }
-
-  const float freq = (float) samplerate / (float) lag;
-
-  update_note_from_freq (freq);
-
-  detected_freq.store (freq, std::memory_order_release);
-  return true;
-}
-
 void c_pitchtracker::publish_snapshot () {
   const size_t n = ring.size ();
   if (n == 0)
@@ -164,18 +183,18 @@ void c_pitchtracker::publish_snapshot () {
 
   const size_t first = count % n;
 
-  int idx = write_snapshot;
-  float *dst = snapshots [idx].data ();
+  float *dst = snapshots [write_snapshot].data ();
 
   const size_t front = n - first;
   memcpy (dst, &ring [first], front * sizeof (float));
   if (first)
     memcpy (dst + front, &ring [0], first * sizeof (float));
 
-  published_snapshot.store (idx, std::memory_order_release);
+  published_snapshot.store (write_snapshot, std::memory_order_release);
   published_seq.fetch_add (1, std::memory_order_release);
 
-  write_snapshot = 1 - write_snapshot;
+  write_snapshot++;
+  write_snapshot %= 3;
 }
 
 void c_pitchtracker::process_block (float *in, int nframes_) {
@@ -206,8 +225,10 @@ void c_pitchtracker::set_base_freq (int f) {
 
 void c_pitchtracker::set_block_size (size_t sz) { CP
   ring.resize (sz);
-  snapshots [0].resize (sz);
-  snapshots [1].resize (sz);
+  
+  for (int i = 0; i < 3; i++)
+    snapshots [i].resize (sz);
+    
   analysis.resize (sz);
   count = 0;
   write_snapshot = 0;
@@ -215,8 +236,8 @@ void c_pitchtracker::set_block_size (size_t sz) { CP
   published_seq.store (0, std::memory_order_release);
 
   std::fill (ring.begin (), ring.end (), 0.0f);
-  std::fill (snapshots [0].begin (), snapshots [0].end (), 0.0f);
-  std::fill (snapshots [1].begin (), snapshots [1].end (), 0.0f);
+  for (int i = 0; i < 3; i++)
+    std::fill (snapshots [i].begin (), snapshots [i].end (), 0.0f);
   std::fill (analysis.begin (), analysis.end (), 0.0f);
 }
 
