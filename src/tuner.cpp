@@ -371,10 +371,18 @@ void c_tunerwidget::on_paint (cairo_t *cr) {
   cairo_show_text (cr, buf);
   cairo_set_font_size (cr, 14.0);
   cairo_move_to (cr, width - 72, height - 4);
-  if (current_freq >= 20 && current_freq <= 1000)
+  if (valid)
     snprintf (buf, 31, "%.2f Hz", current_freq);
   else
     snprintf (buf, 31, "--- Hz");
+  cairo_show_text (cr, buf);
+  
+  int abscents = abs (current_cents);
+  if (valid)
+    snprintf (buf, 31, "%s%d", current_cents >= 0 ? "+" : "-", abscents);
+  else
+    snprintf (buf, 31, "---");
+  cairo_move_to (cr, width - 72, 16);
   cairo_show_text (cr, buf);
   
 }
