@@ -324,6 +324,9 @@ void c_standalone_ui::apply_effective_controls () {
 }
 
 int c_standalone_ui::idle () {
+  if (g_blender.tuner_on)
+    g_blender.pitchtracker.analyze ();
+
   const float gain = g_blender.noisegate_on
     ? g_blender.noisegate.get_current_gain ()
     : 1.0f;
