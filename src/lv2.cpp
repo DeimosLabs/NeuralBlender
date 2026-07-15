@@ -47,7 +47,7 @@
 #include "cmdline_debug.h"
 
 
-typedef struct {
+struct Plugin : public c_lv2_urids {
   // audio buffers
   const float *audio_in     = NULL;
   float *audio_out          = NULL;
@@ -62,22 +62,22 @@ typedef struct {
   const float *calibrate    [NB_NUM_MODELS] = { NULL };
   const float *bypass       = NULL;
   const float *vu_enable    = NULL;
-	  const float *mute_all     = NULL;
-	  const float *exclusive_lane = NULL;
-	  const float *linked_calib = NULL;
-	  const float *calib_source = NULL;
-	  const float *calib_target_db = NULL;
-	  const float *noisegate_enabled = NULL;
-	  const float *noisegate_threshold = NULL;
-	  const float *noisegate_attack = NULL;
-	  const float *noisegate_hold = NULL;
-	  const float *noisegate_release = NULL;
-	  const float *tuner_on = NULL;
-	  const float *tuner_base_freq = NULL;
-	  float *noisegate_gain = NULL;
-	  float *tuner_note = NULL;
-	  float *tuner_cents_off = NULL;
-	  float *tuner_freq = NULL;
+  const float *mute_all     = NULL;
+  const float *exclusive_lane = NULL;
+  const float *linked_calib = NULL;
+  const float *calib_source = NULL;
+  const float *calib_target_db = NULL;
+  const float *noisegate_enabled = NULL;
+  const float *noisegate_threshold = NULL;
+  const float *noisegate_attack = NULL;
+  const float *noisegate_hold = NULL;
+  const float *noisegate_release = NULL;
+  const float *tuner_on = NULL;
+  const float *tuner_base_freq = NULL;
+  float *noisegate_gain = NULL;
+  float *tuner_note = NULL;
+  float *tuner_cents_off = NULL;
+  float *tuner_freq = NULL;
   
   float last_delay          [NB_NUM_MODELS] = { 0.0 };
   float last_gain_in_db     [NB_NUM_MODELS] = { 0.0 };
@@ -90,18 +90,18 @@ typedef struct {
   float last_calibrate      [NB_NUM_MODELS] = { 0.0 };
   float last_bypass         = 1.0;
   float last_vu_enable      = 1.0;
-	  float last_mute_all       = 0.0;
-	  float last_exclusive_lane = 0.0;
-	  float last_linked_calib   = 0.0;
-	  float last_calib_source   = 0.0;
-	  float last_calib_target_db = DB_CALIB_TARGET_DEFAULT;
-	  float last_noisegate_enabled = 0.0;
-	  float last_noisegate_threshold = -60.0;
-	  float last_noisegate_attack = 2.0;
-	  float last_noisegate_hold = 10.0;
-	  float last_noisegate_release = 20.0;
-	  float last_tuner_on = 0.0;
-	  float last_tuner_base_freq = 440.0;
+  float last_mute_all       = 0.0;
+  float last_exclusive_lane = 0.0;
+  float last_linked_calib   = 0.0;
+  float last_calib_source   = 0.0;
+  float last_calib_target_db = DB_CALIB_TARGET_DEFAULT;
+  float last_noisegate_enabled = 0.0;
+  float last_noisegate_threshold = -60.0;
+  float last_noisegate_attack = 2.0;
+  float last_noisegate_hold = 10.0;
+  float last_noisegate_release = 20.0;
+  float last_tuner_on = 0.0;
+  float last_tuner_base_freq = 440.0;
   bool base_lane_mute [NB_NUM_MODELS] = { false };
   bool host_bypass = false;
 
@@ -110,26 +110,6 @@ typedef struct {
   double samplerate            = 48000;
   uint32_t blocksize           = 64;
   
-  // control port for filenames
-  LV2_URID_Map *map            = NULL;
-
-  LV2_URID urid_patch_Set      = 0;
-  LV2_URID urid_patch_Get      = 0;
-  LV2_URID urid_patch_property = 0;
-  LV2_URID urid_patch_value    = 0;
-  LV2_URID urid_atom_Path      = 0;
-  LV2_URID urid_atom_String    = 0;
-  LV2_URID urid_atom_Blank     = 0;
-  LV2_URID urid_atom_Float     = 0;
-  LV2_URID urid_atom_Int       = 0;
-  LV2_URID urid_atom_Vector    = 0;
-
-  LV2_URID urid_model [NB_NUM_MODELS] = { 0 };
-  LV2_URID urid_meters         = 0;
-  LV2_URID urid_stats          = 0;
-  LV2_URID urid_calib_target_db = 0;
-	  LV2_URID urid_calib_bass     = 0; // legacy restore compatibility
-  LV2_URID urid_atom_URID      = 0;
   const LV2_Atom_Sequence *control = NULL;
   LV2_Atom_Sequence *notify    = NULL;
   
@@ -151,8 +131,6 @@ typedef struct {
   std::string current_model [NB_NUM_MODELS];
   
   // to get notified back when model is loaded from session restore
-  LV2_Atom_Forge forge;
-  LV2_URID urid_atom_Sequence  = 0;
   bool notify_path [NB_NUM_MODELS] = { false };
   std::string current_path [NB_NUM_MODELS];
   bool restored_from_state = false;
@@ -167,7 +145,28 @@ typedef struct {
   std::atomic<float> detected_tuner_note { 0.0f };
   std::atomic<float> detected_tuner_cents { 0.0f };
   
-} Plugin;
+};
+
+static bool read_changed (const float *port, float &last, float &value) {
+  if (!port)
+    return false;
+
+  value = *port;
+  if (value == last)
+    return false;
+
+  last = value;
+  return true;
+}
+
+static bool read_changed_bool (const float *port, float &last, bool &value) {
+  float f = 0.0f;
+  if (!read_changed (port, last, f))
+    return false;
+
+  value = f >= 0.5f;
+  return true;
+}
 
 static void apply_effective_controls (Plugin *self) {
   if (!self)
@@ -663,43 +662,11 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
     return NULL;
   }
   CP
-  lv2_atom_forge_init(&self->forge, self->map);
-  
-  self->urid_patch_Set      = self->map->map (self->map->handle, LV2_PATCH__Set);
-  self->urid_patch_Get      = self->map->map (self->map->handle, LV2_PATCH__Get);
-  self->urid_patch_property = self->map->map (self->map->handle, LV2_PATCH__property);
-  self->urid_patch_value    = self->map->map (self->map->handle, LV2_PATCH__value);
-  self->urid_atom_Path      = self->map->map (self->map->handle, LV2_ATOM__Path);
-  self->urid_atom_String    = self->map->map (self->map->handle, LV2_ATOM__String);
-  self->urid_atom_URID      = self->map->map (self->map->handle, LV2_ATOM__URID);
-	  self->urid_atom_Blank     = self->map->map (self->map->handle, LV2_ATOM__Blank);
-	  self->urid_atom_Float     = self->map->map (self->map->handle, LV2_ATOM__Float);
-	  self->urid_atom_Int       = self->map->map (self->map->handle, LV2_ATOM__Int);
-	  self->urid_atom_Vector    = self->map->map (self->map->handle, LV2_ATOM__Vector);
-  
-  self->urid_model [0] =
-    self->map->map(self->map->handle, "http://deimos.ca/neuralblender#ModelA");
-  
-  self->urid_model [1] =
-  self->map->map(self->map->handle, "http://deimos.ca/neuralblender#ModelB");
-  
-  self->urid_model [2] =
-  self->map->map(self->map->handle, "http://deimos.ca/neuralblender#ModelC");
-  
-  self->urid_model [3] =
-  self->map->map(self->map->handle, "http://deimos.ca/neuralblender#ModelD");
-
-  self->urid_meters =
-    self->map->map(self->map->handle, "http://deimos.ca/neuralblender#Meters");
-
-  self->urid_stats =
-    self->map->map(self->map->handle, "http://deimos.ca/neuralblender#Stats");
-
-	  self->urid_calib_target_db =
-	    self->map->map(self->map->handle, "http://deimos.ca/neuralblender#CalibTargetDb");
-
-	  self->urid_calib_bass =
-	    self->map->map(self->map->handle, "http://deimos.ca/neuralblender#CalibBass");
+  if (!self->init (self->map)) {
+    debug ("failed to initialize LV2 URIDs");
+    delete self;
+    return NULL;
+  }
 
   self->blender.meter_in = &self->meter_in;
   for (int i = 0; i < NB_NUM_MODELS; i++)
@@ -715,130 +682,53 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
 static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
   Plugin *self = (Plugin *) instance;
 
+  size_t lane = 0;
+  uint32_t param = 0;
+  if (nb_lv2_decode_lane_port (port, &lane, &param)) {
+    switch (param) {
+      case NB_LV2_LANE_GAIN_IN:
+        self->gain_in_db [lane] = (const float *) data;
+      break;
+
+      case NB_LV2_LANE_GAIN_OUT:
+        self->gain_out_db [lane] = (const float *) data;
+      break;
+
+      case NB_LV2_LANE_DRY_OUT:
+        self->dry_out_db [lane] = (const float *) data;
+      break;
+
+      case NB_LV2_LANE_DELAY:
+        self->delay [lane] = (const float *) data;
+      break;
+
+      case NB_LV2_LANE_MUTE:
+        self->lane_mute [lane] = (const float *) data;
+      break;
+
+      case NB_LV2_LANE_DCFLIP:
+        self->dcflip [lane] = (const float *) data;
+      break;
+
+      case NB_LV2_LANE_CALIBRATE:
+        self->calibrate [lane] = (const float *) data;
+      break;
+    }
+    return;
+  }
+
   switch (port) {
     case PORT_AUDIO_IN:
       self->audio_in = (const float *) data;
-      break;
+    break;
 
     case PORT_AUDIO_OUT:
       self->audio_out = (float *) data;
-      break;
+    break;
 
     case PORT_BYPASS:
       self->bypass = (const float *) data;
-      break;
-
-    case PORT_A_GAIN_IN:
-      self->gain_in_db [0] = (float *) data;
-      break;
-
-    case PORT_A_GAIN_OUT:
-      self->gain_out_db [0] = (float *) data;
-      break;
-
-    case PORT_A_DRY_OUT:
-      self->dry_out_db [0] = (const float *) data;
-      break;
-
-    case PORT_A_DELAY:
-      self->delay [0] = (const float *) data;
-      break;
-
-    case PORT_A_MUTE:
-      self->lane_mute [0] = (const float *) data;
-      break;
-
-    case PORT_A_DCFLIP:
-      self->dcflip [0] = (const float *) data;
-      break;
-
-    case PORT_A_CALIBRATE:
-      self->calibrate [0] = (const float *) data;
-      break;
-
-    case PORT_B_GAIN_IN:
-      self->gain_in_db [1] = (float *) data;
-      break;
-
-    case PORT_B_GAIN_OUT:
-      self->gain_out_db [1] = (float *) data;
-      break;
-
-    case PORT_B_DRY_OUT:
-      self->dry_out_db [1] = (const float *) data;
-      break;
-
-    case PORT_B_DELAY:
-      self->delay [1] = (const float *) data;
-      break;
-
-    case PORT_B_MUTE:
-      self->lane_mute [1] = (const float *) data;
-      break;
-
-    case PORT_B_DCFLIP:
-      self->dcflip [1] = (const float *) data;
-      break;
-
-    case PORT_B_CALIBRATE:
-      self->calibrate [1] = (const float *) data;
-      break;
-
-    case PORT_C_GAIN_IN:
-      self->gain_in_db [2] = (float *) data;
-      break;
-
-    case PORT_C_GAIN_OUT:
-      self->gain_out_db [2] = (float *) data;
-      break;
-
-    case PORT_C_DRY_OUT:
-      self->dry_out_db [2] = (const float *) data;
-      break;
-
-    case PORT_C_DELAY:
-      self->delay [2] = (const float *) data;
-      break;
-
-    case PORT_C_MUTE:
-      self->lane_mute [2] = (const float *) data;
-      break;
-
-    case PORT_C_DCFLIP:
-      self->dcflip [2] = (const float *) data;
-      break;
-
-    case PORT_C_CALIBRATE:
-      self->calibrate [2] = (const float *) data;
-      break;
-
-    case PORT_D_GAIN_IN:
-      self->gain_in_db [3] = (float *) data;
-      break;
-
-    case PORT_D_GAIN_OUT:
-      self->gain_out_db [3] = (float *) data;
-      break;
-
-    case PORT_D_DRY_OUT:
-      self->dry_out_db [3] = (const float *) data;
-      break;
-
-    case PORT_D_DELAY:
-      self->delay [3] = (const float *) data;
-      break;
-
-    case PORT_D_MUTE:
-      self->lane_mute [3] = (const float *) data;
-      break;
-
-    case PORT_D_DCFLIP:
-      self->dcflip [3] = (const float *) data;
-      break;
-
-    case PORT_D_CALIBRATE:
-      self->calibrate [3] = (const float *) data;
-      break;
+    break;
 
     case PORT_CONTROL:
       self->control = (const LV2_Atom_Sequence *) data;
@@ -860,63 +750,63 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
       self->exclusive_lane = (const float *) data;
     break;
 
-	    case PORT_LINKED_CALIB:
-	      self->linked_calib = (const float *) data;
-	    break;
+    case PORT_LINKED_CALIB:
+      self->linked_calib = (const float *) data;
+    break;
 
-	    case PORT_CALIB_SOURCE:
-	      self->calib_source = (const float *) data;
-	    break;
+    case PORT_CALIB_SOURCE:
+      self->calib_source = (const float *) data;
+    break;
 
-	    case PORT_CALIB_TARGET_DB:
-	      self->calib_target_db = (const float *) data;
-	    break;
+    case PORT_CALIB_TARGET_DB:
+      self->calib_target_db = (const float *) data;
+    break;
 
-	    case PORT_NOISEGATE_ENABLED:
-	      self->noisegate_enabled = (const float *) data;
-	    break;
+    case PORT_NOISEGATE_ENABLED:
+      self->noisegate_enabled = (const float *) data;
+    break;
 
-	    case PORT_NOISEGATE_THRESHOLD:
-	      self->noisegate_threshold = (const float *) data;
-	    break;
+    case PORT_NOISEGATE_THRESHOLD:
+      self->noisegate_threshold = (const float *) data;
+    break;
 
-	    case PORT_NOISEGATE_ATTACK:
-	      self->noisegate_attack = (const float *) data;
-	    break;
+    case PORT_NOISEGATE_ATTACK:
+      self->noisegate_attack = (const float *) data;
+    break;
 
-	    case PORT_NOISEGATE_HOLD:
-	      self->noisegate_hold = (const float *) data;
-	    break;
+    case PORT_NOISEGATE_HOLD:
+      self->noisegate_hold = (const float *) data;
+    break;
 
-	    case PORT_NOISEGATE_RELEASE:
-	      self->noisegate_release = (const float *) data;
-	    break;
+    case PORT_NOISEGATE_RELEASE:
+      self->noisegate_release = (const float *) data;
+    break;
 
-	    case PORT_TUNER_ON:
-	      self->tuner_on = (const float *) data;
-	    break;
+    case PORT_TUNER_ON:
+      self->tuner_on = (const float *) data;
+    break;
 
-	    case PORT_TUNER_BASE_FREQ:
-	      self->tuner_base_freq = (const float *) data;
-	    break;
+    case PORT_TUNER_BASE_FREQ:
+      self->tuner_base_freq = (const float *) data;
+    break;
 
-	    case PORT_NOISEGATE_GAIN:
-	      self->noisegate_gain = (float *) data;
-	    break;
+    case PORT_NOISEGATE_GAIN:
+      self->noisegate_gain = (float *) data;
+    break;
 
-	    case PORT_TUNER_NOTE:
-	      self->tuner_note = (float *) data;
-	    break;
+    case PORT_TUNER_NOTE:
+      self->tuner_note = (float *) data;
+    break;
 
-	    case PORT_TUNER_CENTS_OFF:
-	      self->tuner_cents_off = (float *) data;
-	    break;
+    case PORT_TUNER_CENTS_OFF:
+      self->tuner_cents_off = (float *) data;
+    break;
 
-	    case PORT_TUNER_FREQ:
-	      self->tuner_freq = (float *) data;
-	    break;
-	  }
-	}
+    case PORT_TUNER_FREQ:
+      self->tuner_freq = (float *) data;
+    break;
+  }
+}
 
 static void activate (LV2_Handle instance) {
   Plugin *self = (Plugin *) instance;
@@ -1042,37 +932,24 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       self->meters_out [i].bufsize = (int) nframes;
   }
 
-  if (self->bypass) {
-    const float v = *self->bypass;
-    if (v != self->last_bypass) { CP
-      self->last_bypass = v;
-      self->host_bypass = v < 0.5f;
-      apply_effective_controls (self);
-    }
+  float v = 0.0f;
+  bool b = false;
+
+  if (read_changed (self->bypass, self->last_bypass, v)) { CP
+    self->host_bypass = v < 0.5f;
+    apply_effective_controls (self);
   }
 
-  if (self->vu_enable) {
-    const float v = *self->vu_enable;
-    if (v != self->last_vu_enable) { CP
-      self->last_vu_enable = v;
-      self->blender.do_vu = v >= 0.5f;
-    }
+  if (read_changed_bool (self->vu_enable, self->last_vu_enable, b)) { CP
+    self->blender.do_vu = b;
   }
 
-  if (self->mute_all) {
-    const float v = *self->mute_all;
-    if (v != self->last_mute_all) { CP
-      self->last_mute_all = v;
-      self->blender.mute_all = v >= 0.5f;
-    }
+  if (read_changed_bool (self->mute_all, self->last_mute_all, b)) { CP
+    self->blender.mute_all = b;
   }
 
-  if (self->exclusive_lane) {
-    const float v = *self->exclusive_lane;
-    if (v != self->last_exclusive_lane) { CP
-      self->last_exclusive_lane = v;
-      apply_effective_controls (self);
-    }
+  if (read_changed (self->exclusive_lane, self->last_exclusive_lane, v)) { CP
+    apply_effective_controls (self);
   }
 
 	  if (self->linked_calib) {
@@ -1114,121 +991,78 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	  }
 
 	  if (self->calib_target_db) {
-	    const float v = *self->calib_target_db;
+	    v = *self->calib_target_db;
 	    if (v != self->last_calib_target_db)
 	      set_calib_target_db (self, v);
 	  }
 
-	  if (self->noisegate_enabled) {
-	    const float v = *self->noisegate_enabled;
-	    if (v != self->last_noisegate_enabled) {
-	      self->last_noisegate_enabled = v;
-	      self->blender.noisegate_on = v >= 0.5f;
-	    }
+	  if (read_changed_bool (
+          self->noisegate_enabled, self->last_noisegate_enabled, b))
+	    self->blender.noisegate_on = b;
+
+	  if (read_changed (
+          self->noisegate_threshold, self->last_noisegate_threshold, v))
+	    self->blender.noisegate.set_threshold (v);
+
+	  if (read_changed (
+          self->noisegate_attack, self->last_noisegate_attack, v))
+	    self->blender.noisegate.set_attack (v);
+
+	  if (read_changed (
+          self->noisegate_hold, self->last_noisegate_hold, v))
+	    self->blender.noisegate.set_hold (v);
+
+	  if (read_changed (
+          self->noisegate_release, self->last_noisegate_release, v))
+	    self->blender.noisegate.set_release (v);
+
+	  if (read_changed_bool (self->tuner_on, self->last_tuner_on, b)) {
+	    self->blender.tuner_on = b;
+	    self->tuner_enabled.store (self->blender.tuner_on,
+	                               std::memory_order_release);
 	  }
 
-	  if (self->noisegate_threshold) {
-	    const float v = *self->noisegate_threshold;
-	    if (v != self->last_noisegate_threshold) {
-	      self->last_noisegate_threshold = v;
-	      self->blender.noisegate.set_threshold (v);
-	    }
-	  }
-
-	  if (self->noisegate_attack) {
-	    const float v = *self->noisegate_attack;
-	    if (v != self->last_noisegate_attack) {
-	      self->last_noisegate_attack = v;
-	      self->blender.noisegate.set_attack (v);
-	    }
-	  }
-
-	  if (self->noisegate_hold) {
-	    const float v = *self->noisegate_hold;
-	    if (v != self->last_noisegate_hold) {
-	      self->last_noisegate_hold = v;
-	      self->blender.noisegate.set_hold (v);
-	    }
-	  }
-
-	  if (self->noisegate_release) {
-	    const float v = *self->noisegate_release;
-	    if (v != self->last_noisegate_release) {
-	      self->last_noisegate_release = v;
-	      self->blender.noisegate.set_release (v);
-	    }
-	  }
-
-	  if (self->tuner_on) {
-	    const float v = *self->tuner_on;
-	    if (v != self->last_tuner_on) {
-	      self->last_tuner_on = v;
-	      self->blender.tuner_on = v >= 0.5f;
-	      self->tuner_enabled.store (self->blender.tuner_on,
-	                                 std::memory_order_release);
-	    }
-	  }
-
-	  if (self->tuner_base_freq) {
-	    const float v = *self->tuner_base_freq;
-	    if (v != self->last_tuner_base_freq) {
-	      self->last_tuner_base_freq = v;
-	      self->blender.tuner_base_freq = v;
-	      self->blender.pitchtracker.set_base_freq ((int) lrintf (v));
-	    }
+	  if (read_changed (
+          self->tuner_base_freq, self->last_tuner_base_freq, v)) {
+	    self->blender.tuner_base_freq = v;
+	    self->blender.pitchtracker.set_base_freq ((int) lrintf (v));
 	  }
 	  
 	  // check all parameters
   for (i = 0; i < NB_NUM_MODELS; i++) {
-    if (self->gain_in_db [i]) {
-      const float v = *self->gain_in_db [i];
-      if (v != self->last_gain_in_db [i]) { CP
-        self->last_gain_in_db [i] = v;
-        self->blender.set_gain_in (i, db_to_gain (v));
-      }
+    if (read_changed (self->gain_in_db [i], self->last_gain_in_db [i], v)) {
+      CP
+      self->blender.set_gain_in (i, db_to_gain (v));
     }
     
-	    if (self->gain_out_db [i]) {
-	      const float v = *self->gain_out_db [i];
-	      if (v != self->last_gain_out_db [i]) { CP
-	        self->last_gain_out_db [i] = v;
-	        self->blender.set_gain_out (i, db_to_gain (v));
-	      }
+	    if (read_changed (
+          self->gain_out_db [i], self->last_gain_out_db [i], v)) {
+	      CP
+	      self->blender.set_gain_out (i, db_to_gain (v));
 	    }
 
-	    if (self->dry_out_db [i]) {
-	      const float v = *self->dry_out_db [i];
-	      if (v != self->last_dry_out_db [i]) { CP
-	        self->last_dry_out_db [i] = v;
-	        self->blender.set_dry_out (
-	          i, v <= DB_SILENCE ? 0.0f : db_to_gain (v));
-	      }
+	    if (read_changed (
+          self->dry_out_db [i], self->last_dry_out_db [i], v)) {
+	      CP
+	      self->blender.set_dry_out (
+	        i, v <= DB_SILENCE ? 0.0f : db_to_gain (v));
 	    }
 
-	    if (self->delay [i]) {
-      const float v = *self->delay [i];
-      if (v != self->last_delay [i]) { CP
-        self->last_delay [i] = v;
-        self->blender.set_delay_ms (i, v);
-        self->stats_dirty.store (true, std::memory_order_release);
-      }
+	    if (read_changed (self->delay [i], self->last_delay [i], v)) {
+      CP
+      self->blender.set_delay_ms (i, v);
+      self->stats_dirty.store (true, std::memory_order_release);
     }
 
-    if (self->lane_mute [i]) {
-      const float v = *self->lane_mute [i];
-      if (v != self->last_lane_mute [i]) { CP
-        self->last_lane_mute [i] = v;
-        self->base_lane_mute [i] = v >= 0.5f;
-        apply_effective_controls (self);
-      }
+    if (read_changed_bool (self->lane_mute [i], self->last_lane_mute [i], b)) {
+      CP
+      self->base_lane_mute [i] = b;
+      apply_effective_controls (self);
     }
 
-    if (self->dcflip [i]) {
-      const float v = *self->dcflip [i];
-      if (v != self->last_dcflip [i]) { CP
-        self->last_dcflip [i] = v;
-        self->blender.dcflip (i, v >= 0.5f);
-      }
+    if (read_changed_bool (self->dcflip [i], self->last_dcflip [i], b)) {
+      CP
+      self->blender.dcflip (i, b);
     }
 
     if (self->calibrate [i]) {
