@@ -28,11 +28,6 @@
 #include "config.h"
 #include "widgets.h"
 
-#define NB_BG_R 0.10
-#define NB_BG_G 0.12
-#define NB_BG_B 0.14
-#define NB_BG_A 1.00
-
 #define UI_BUTTON_RADIUS     12.0
 #define UI_CHECKBOX_RADIUS   8.0
 #define UI_FRAME_RADIUS      12.0

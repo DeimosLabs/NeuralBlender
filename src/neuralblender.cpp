@@ -1195,14 +1195,13 @@ float *c_neuralblender::prepare_input_buffer (
   
   if (in != out) {
     if (noisegate_on) {
-      //CP
-      noisegate.process_block (in, out, nframes);
-    } else {
-      //CP
-      memcpy (out, in, nframes * sizeof (float));
+      if (m_input_buf.size () < nframes)
+        m_input_buf.resize (nframes);
+      noisegate.process_block (in, m_input_buf.data (), nframes);
+      return m_input_buf.data ();
     }
 
-    return out;
+    return in;
   }
   
   if (m_input_buf.size () < nframes)
