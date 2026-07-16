@@ -24,9 +24,14 @@
 #include <cstdlib>
 #include <chrono>
 #include <thread>
+#include <iostream>
 #include "neuralblender.h"
 #include "data.h"
 #include "config.h"
+
+#ifdef HAVE_SNDFILE
+#include <sndfile.h>
+#endif
 
 //#define DEBUG
 
@@ -319,31 +324,391 @@ void c_delayline::process_block (float *in, float *out, uint32_t nframes) {
   }
 }
 
-#ifdef HAVE_FFTW
-
 ////////////////////////////////////////////////////////////////////////////////
 // c_convolver
 
-c_convolver::c_convolver () { CP }
-c_convolver::~c_convolver () { CP }
+#ifdef HAVE_FFTW
 
-void c_convolver::process_block (const float *in, float *out, uint32_t nframes) {
-  CP
+static bool read_wav (const char *filename, std::vector<float> &v, int channel, int &sr) {
+  debug ("start");
+  
+  v.clear ();
+  
+  SF_INFO info {};
+  
+  SNDFILE *f = sf_open (filename, SFM_READ, &info);
+  if (!f) {
+    std::cerr << "Error: failed to open WAV file: " << filename << "\n";
+    return false;
+  }
+  
+  sr = info.samplerate;
+  int chans = info.channels;
+  sf_count_t frames = info.frames;
+
+  if (frames <= 0 || chans <= 0) {
+    std::cerr << "Error: invalid WAV format in " << filename << "\n";
+    sf_close (f);
+    return false;
+  }
+  
+  std::vector<float> buf (frames * chans);
+  sf_count_t readframes = sf_readf_float (f, buf.data (), frames);
+  sf_close (f);
+
+  if (readframes <= 0) {
+    std::cerr << "Error: no samples read from " << filename << "\n";
+    return false;
+  }
+  
+  if (channel < 0 || channel >= chans) {
+    std::cerr << "Error: " << filename << " does not have channel " << channel << "\n";
+    return false;
+  }
+  
+  v.resize ((size_t) readframes);
+
+  // read every 'channel' sample out of 'chans' into v
+  for (sf_count_t i = 0; i < readframes; i++) {
+    v [i] = buf [chans * i + channel];
+  }
+  
+  return true;
 }
 
-bool c_convolver::load_ir (const float *ir, uint32_t nframes, uint32_t samplerate) {
-  if (!ir || !nframes)
+c_convolver::c_convolver () { CP }
+c_convolver::~c_convolver () { CP
+  clear ();
+}
+
+static uint32_t ceil_div_u32 (size_t a, uint32_t b) {
+  if (!b)
+    return 0;
+
+  return (uint32_t) ((a + (size_t) b - 1) / (size_t) b);
+}
+
+static void convolver_remove_dc (std::vector<float> &v) {
+  if (v.empty ())
+    return;
+
+  double sum = 0.0;
+  for (float f : v)
+    sum += (double) f;
+
+  const float dc = (float) (sum / (double) v.size ());
+  for (float &f : v)
+    f -= dc;
+}
+
+static void convolver_trim_trailing_silence (
+    std::vector<float> &v,
+    float threshold = 1.0e-7f) {
+
+  while (!v.empty () && fabsf (v.back ()) <= threshold)
+    v.pop_back ();
+}
+
+static inline cpx cpx_mul (const cpx &a, const cpx &b) {
+  cpx ret;
+  ret.r = a.r * b.r - a.i * b.i;
+  ret.i = a.r * b.i + a.i * b.r;
+  return ret;
+}
+
+static inline void cpx_add (cpx &a, const cpx &b) {
+  a.r += b.r;
+  a.i += b.i;
+}
+
+static void clear_cpx_vector (std::vector<cpx> &v) {
+  for (cpx &x : v) {
+    x.r = 0.0f;
+    x.i = 0.0f;
+  }
+}
+
+bool c_convolver::load_ir (
+    const float *ir,
+    uint32_t nframes,
+    uint32_t samplerate) { CP
+
+  if (!ir || nframes == 0)
     return false;
 
+  // keep canonical copy for rebuilds, TODO: resampling on sr mismatch
   m_ir.assign (ir, ir + nframes);
-  std::fill (m_history.begin (), m_history.end (), 0.0f);
-  m_loaded = !m_ir.empty ();
+  m_ir_samplerate = samplerate;
+
+  // cleanup
+  convolver_remove_dc (m_ir);
+  convolver_trim_trailing_silence (m_ir);
+  // TODO: maybe_normalize (m_ir);
+
+  if (m_ir.empty ()) {
+    clear ();
+    return false;
+  }
+
+  m_loaded = true;
+  m_ready = false;
+
+  // if block size is already known, build realtime FFT state
+  if (m_blocksize > 0) {
+    if (!rebuild_for_blocksize (m_blocksize)) {
+      m_ready = false;
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool c_convolver::load_ir_from_file (const char *filename, int channel) {
+  if (!filename || !filename [0])
+    return false;
+
+  std::vector<float> ir;
+  int sr = 0;
+
+  if (!read_wav (filename, ir, channel, sr))
+    return false;
+
+  return load_ir (ir.data (), (uint32_t) ir.size (), (uint32_t) sr);
+}
+
+void c_convolver::clear () {
+  clear_fft_state ();
+  m_ir.clear ();
+  m_loaded = false;
+  m_ir_samplerate = 0;
+}
+
+void c_convolver::reset () {
+  for (std::vector<cpx> &slot : m_accum_fft)
+    clear_cpx_vector (slot);
+
+  std::fill (m_overlap.begin (), m_overlap.end (), 0.0f);
+  m_accum_pos = 0;
+}
+
+bool c_convolver::loaded () const {
   return m_loaded;
 }
 
-bool c_convolver::load_ir_from_file (const char *filename, int nchannel) {
-  CP
-  return false;
+bool c_convolver::ready () const {
+  return m_ready;
+}
+
+void c_convolver::set_blocksize (uint32_t nframes) {
+  if (nframes == m_blocksize)
+    return;
+
+  m_blocksize = nframes;
+
+  if (m_loaded && m_blocksize > 0)
+    rebuild_for_blocksize (m_blocksize);
+}
+
+void c_convolver::clear_fft_state () { CP
+  if (m_forward_plan) {
+    fftwf_destroy_plan (m_forward_plan);
+    m_forward_plan = nullptr;
+  }
+  
+  if (m_inverse_plan) {
+    fftwf_destroy_plan (m_inverse_plan);
+    m_inverse_plan = nullptr;
+  }
+  
+  if (m_fftw_time_in) {
+    fftwf_free (m_fftw_time_in);
+    m_fftw_time_in = nullptr;
+  }
+  
+  if (m_fftw_time_out) {
+    fftwf_free (m_fftw_time_out);
+    m_fftw_time_out = nullptr;
+  }
+  
+  if (m_fftw_freq_in) {
+    fftwf_free (m_fftw_freq_in);
+    m_fftw_freq_in = nullptr;
+  }
+  
+  if (m_fftw_freq_out) {
+    fftwf_free (m_fftw_freq_out);
+    m_fftw_freq_out = nullptr;
+  }
+  
+  m_fft_out.clear ();
+  m_ir_fft.clear ();
+  m_accum_fft.clear ();
+  m_overlap.clear ();
+  
+  m_ready = false;
+  m_fft_size = 0;
+  m_freq_bins = 0;
+  m_num_partitions = 0;
+  m_accum_pos = 0;
+}
+
+// THIS MUST BE CALLED FROM THE LOADER THREAD!!!
+bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
+  if (m_ir.empty () || blocksize == 0)
+    return false;
+    
+  clear_fft_state ();
+
+  m_blocksize = blocksize;
+  m_partition_size = blocksize;
+  m_fft_size = m_partition_size * 2;
+
+  m_num_partitions =
+    ceil_div_u32 (m_ir.size (), m_partition_size);
+
+  m_overlap.resize (m_partition_size);
+  std::fill (m_overlap.begin (), m_overlap.end (), 0.0f);
+
+  // frequency-domain sizes for real FFT
+  m_freq_bins = (m_fft_size / 2) + 1;
+
+  // frequency-domain IR partitions
+  m_ir_fft.resize (m_num_partitions);
+  for (std::vector<cpx> &partition : m_ir_fft)
+    partition.resize (m_freq_bins);
+
+  // freq-domain accumulation ring
+  // 1 slot per IR partition.
+  m_accum_fft.resize (m_num_partitions);
+  for (std::vector<cpx> &slot : m_accum_fft) {
+    slot.resize (m_freq_bins);
+    clear_cpx_vector (slot);
+  }
+  m_fft_out.resize (m_freq_bins);
+  
+  // FFTW buffers/plans
+  m_fftw_time_in =
+    (float *) fftwf_alloc_real (m_fft_size);
+  m_fftw_time_out =
+    (float *) fftwf_alloc_real (m_fft_size);
+
+  m_fftw_freq_in =
+    (fftwf_complex *) fftwf_alloc_complex (m_freq_bins);
+  m_fftw_freq_out =
+    (fftwf_complex *) fftwf_alloc_complex (m_freq_bins);
+
+  if (!m_fftw_time_in || !m_fftw_time_out ||
+      !m_fftw_freq_in || !m_fftw_freq_out) {
+    clear_fft_state ();
+    return false;
+  }
+
+  m_forward_plan =
+    fftwf_plan_dft_r2c_1d (
+      (int) m_fft_size,
+      m_fftw_time_in,
+      m_fftw_freq_out,
+      FFTW_MEASURE);
+
+  m_inverse_plan =
+    fftwf_plan_dft_c2r_1d (
+      (int) m_fft_size,
+      m_fftw_freq_in,
+      m_fftw_time_out,
+      FFTW_MEASURE);
+
+  if (!m_forward_plan || !m_inverse_plan) {
+    clear_fft_state ();
+    return false;
+  }
+  
+  // pre-transform each IR partition
+  for (uint32_t p = 0; p < m_num_partitions; ++p) {
+    std::fill (m_fftw_time_in, m_fftw_time_in + m_fft_size, 0.0f);
+
+    const size_t ir_offset = (size_t) p * (size_t) m_partition_size;
+
+    for (uint32_t j = 0; j < m_partition_size; ++j) {
+      if (ir_offset + j < m_ir.size ())
+        m_fftw_time_in [j] = m_ir [ir_offset + j];
+    }
+
+    fftwf_execute (m_forward_plan);
+
+    // Copy FFTW output into our persistent IR partition bins.
+    for (uint32_t bin = 0; bin < m_freq_bins; ++bin) {
+      m_ir_fft [p] [bin].r = m_fftw_freq_out [bin] [0];
+      m_ir_fft [p] [bin].i = m_fftw_freq_out [bin] [1];
+    }
+  }
+
+  // reset runtime state
+  reset ();
+  m_ready = true;
+
+  return true;
+}
+
+void c_convolver::process_block (
+    const float *in,
+    float *out,
+    uint32_t nframes) {
+
+  if (!in || !out || !nframes)
+    return;
+
+  if (!m_ready || nframes != m_blocksize) {
+    if (in != out) {
+      for (uint32_t i = 0; i < nframes; ++i)
+        out [i] = in [i];
+    }
+    return;
+  }
+
+  // 1. FFT input block, zero-padded to fft_size
+  std::fill (m_fftw_time_in, m_fftw_time_in + m_fft_size, 0.0f);
+  for (uint32_t i = 0; i < m_blocksize; ++i)
+    m_fftw_time_in [i] = in [i];
+
+  fftwf_execute (m_forward_plan);
+  for (uint32_t bin = 0; bin < m_freq_bins; ++bin) {
+    m_fft_out [bin].r = m_fftw_freq_out [bin] [0];
+    m_fft_out [bin].i = m_fftw_freq_out [bin] [1];
+  }
+
+  // 2. Multiply current input FFT by every IR partition.
+  //    Add each result into a future accumulation slot.
+  for (uint32_t p = 0; p < m_num_partitions; ++p) {
+    const uint32_t slot = (m_accum_pos + p) % m_num_partitions;
+
+    for (uint32_t bin = 0; bin < m_freq_bins; ++bin)
+      cpx_add (
+        m_accum_fft [slot] [bin],
+        cpx_mul (m_fft_out [bin], m_ir_fft [p] [bin]));
+  }
+
+  // 3. Inverse FFT the current accumulation slot
+  for (uint32_t bin = 0; bin < m_freq_bins; ++bin) {
+    m_fftw_freq_in [bin] [0] = m_accum_fft [m_accum_pos] [bin].r;
+    m_fftw_freq_in [bin] [1] = m_accum_fft [m_accum_pos] [bin].i;
+  }
+  fftwf_execute (m_inverse_plan);
+
+  // 4. Normalize IFFT. FFTW inverse is unnormalized.
+  const float scale = 1.0f / (float) m_fft_size;
+
+  for (uint32_t i = 0; i < m_blocksize; ++i)
+    out [i] = m_fftw_time_out [i] * scale + m_overlap [i];
+
+  for (uint32_t i = 0; i < m_blocksize; ++i)
+    m_overlap [i] = m_fftw_time_out [i + m_blocksize] * scale;
+
+  // 5. Clear current accumulation slot for reuse
+  clear_cpx_vector (m_accum_fft [m_accum_pos]);
+
+  // 6. Advance ring
+  m_accum_pos = (m_accum_pos + 1) % m_num_partitions;
 }
 
 #endif

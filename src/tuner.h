@@ -13,7 +13,7 @@
 #include "meter.h"
 
 #define INTUNE_THRESHOLD   2 // in cents
-#define INTUNE_DELAY       5 // in frames/redraws
+#define INTUNE_DELAY       5 // frames/redraws
 
 class c_pitchtracker {
 public:
@@ -23,16 +23,16 @@ public:
   void process_block (float *in, int nframes);
   bool analyze ();
   void dump ();
-
+  
   void set_base_freq (int f = 440);
   void set_block_size (size_t sz);
   void set_pitchtracker (c_pitchtracker *p);
-
+  
   std::atomic<float> detected_freq  { 0.0f };
   std::atomic<float> detected_note  { 0.0f };
   std::atomic<float> detected_cents { 0.0f };
   std::atomic<bool> needs_redraw { false };
-
+  
 private:
   void publish_snapshot ();
   

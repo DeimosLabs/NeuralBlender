@@ -678,7 +678,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_noisegate.set_tooltip ("noise gate");
   btn_tuner.create (this, mainwindow.widget, "", 0, 0, 40, 40, WSTYLE_IMAGE_TOGGLE);
   btn_tuner.set_image_default (data_icon_tuner_png);
-  btn_tuner.set_tooltip ("Tuner (TODO)");
+  btn_tuner.set_tooltip ("Tuner");
   btn_tuner.role = ROLE_TUNER;
   
   knob_noisethresh.create (this, mainwindow.widget, "", 0, 0, 64, 64);

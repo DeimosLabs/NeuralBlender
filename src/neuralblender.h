@@ -35,8 +35,6 @@
 #include "NAM/dsp.h"
 #include "NAM/get_dsp.h"
 
-#define HAVE_FFTW
-
 #ifdef HAVE_FFTW
 #include "fftw3.h"
 #endif
@@ -191,28 +189,78 @@ private:
 
 #ifdef HAVE_FFTW
 
+typedef struct {
+  float r = 0.0f;
+  float i = 0.0f;
+} cpx;
+
 class c_convolver {
 public:
   c_convolver ();
   ~c_convolver ();
-
+  
   bool load_ir (const float *ir, uint32_t nframes, uint32_t samplerate = 0);
   bool load_ir_from_file (const char *filename, int channel = 0);
   void clear ();
+  void reset ();
+  void clear_fft_state ();
   bool loaded () const;
+  bool ready () const;
   void process_block (const float *in, float *out, uint32_t nframes);
   void set_blocksize (uint32_t nframes);
-  void reset ();
   
 private:
   bool rebuild_for_blocksize (uint32_t nframes);
+  
+  std::vector<float> m_ir;              // canonical/resampled IR
+  std::vector<float> m_overlap;
 
-  std::vector<float> m_ir;
-  std::vector<float> m_history;
-  bool               m_loaded = false;
-  uint32_t           m_ir_samplerate = 0;
-  uint32_t           m_blocksize = 0;
-  uint32_t           m_fft_size = 0;
+  std::vector<cpx> m_fft_out;
+  std::vector<std::vector<cpx>> m_ir_fft;
+  std::vector<std::vector<cpx>> m_accum_fft;
+
+  bool               m_loaded           = false;
+  bool               m_ready            = false;
+  uint32_t           m_ir_samplerate    = 0;
+  uint32_t           m_blocksize        = 0;
+  uint32_t           m_partition_size   = 0;
+  uint32_t           m_num_partitions   = 0;
+  uint32_t           m_fft_size         = 0;
+  uint32_t           m_freq_bins        = 0;
+  uint32_t           m_accum_pos        = 0;
+  
+  fftwf_plan m_forward_plan = NULL;
+  fftwf_plan m_inverse_plan = NULL;
+  
+  float *m_fftw_time_in = NULL;
+  float *m_fftw_time_out = NULL;
+  
+  fftwf_complex *m_fftw_freq_in = NULL;
+  fftwf_complex *m_fftw_freq_out = NULL;
+};
+
+#else
+
+// just a stub class that will pass signal through
+class c_convolver {
+public:
+  c_convolver () { }
+  ~c_convolver () { }
+
+  bool load_ir (const float *, uint32_t, uint32_t = 0) { return false; }
+  bool load_ir_from_file (const char *, int = 0) { return false; }
+  void clear () { }
+  void reset () { }
+  void clear_fft_state () { }
+  bool loaded () const { return false; }
+  bool ready () const { return false; }
+  void process_block (const float *in, float *out, uint32_t nframes) {
+    if (!in || !out)
+      return;
+    for (uint32_t i = 0; i < nframes; ++i)
+      out [i] = in [i];
+  }
+  void set_blocksize (uint32_t) { }
 };
 
 #endif
@@ -267,7 +315,7 @@ private:
   // model impl.
   std::unique_ptr<nam::DSP> m_nam_model;
   std::unique_ptr<RTNeural::Model<float>> m_rtneural_model;
-  c_convolver convolver;
+  c_convolver convolvers [2];
   
   mutable std::mutex model_mutex;
   mutable std::mutex pending_mutex;

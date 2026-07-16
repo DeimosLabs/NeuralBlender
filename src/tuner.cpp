@@ -361,7 +361,7 @@ void c_tunerwidget::on_paint (cairo_t *cr) {
   bool stable_tuning = true;
   int i;
   for (i = 0; hist_notes.size () == INTUNE_DELAY && i < INTUNE_DELAY; i++)
-    if (hist_notes [i] != current_note || abs (hist_cents [i]) > INTUNE_THRESHOLD)
+    if (hist_notes [i] != current_note || abs (hist_cents [i]) >= INTUNE_THRESHOLD)
       stable_tuning = false;
   
   if (valid) {
