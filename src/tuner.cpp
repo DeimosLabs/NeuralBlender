@@ -358,41 +358,48 @@ void c_tunerwidget::on_paint (cairo_t *cr) {
   if (hist_notes.size () > INTUNE_DELAY) hist_notes.pop_front ();
   if (hist_cents.size () > INTUNE_DELAY) hist_cents.pop_front ();
   
+  int side = height / 4;
+  int bracketsize = std::max (height / 5, width * INTUNE_THRESHOLD / 100);
   bool stable_tuning = true;
+  float a = 1.0 - ((float) abscents / 100.0);
+  
   int i;
   for (i = 0; hist_notes.size () == INTUNE_DELAY && i < INTUNE_DELAY; i++)
-    if (hist_notes [i] != current_note || abs (hist_cents [i]) >= INTUNE_THRESHOLD)
+    if (((int) hist_notes [i] % 12) != ((int) current_note % 12) || abs (hist_cents [i]) >= INTUNE_THRESHOLD)
       stable_tuning = false;
   
   if (valid) {
     snprintf (buf, 31, "%s%d", note_names [((int) current_note) % 12],
               (int) (-1 + current_note / 12));
     float x = (float) width / 2.0 + (current_cents / 50.0 * (float) width / 2.0);
-    float a = 1.0 - ((float) abscents / 100.0);
-    if (abscents < INTUNE_THRESHOLD)
+    if (stable_tuning)
       cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 1.0);
     else
       cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, a);
-    int side = height / 5;
-    int bracketsize = std::max (height / 5, width * INTUNE_THRESHOLD / 100);
+  
     cairo_move_to (cr, x - side, height);
-    cairo_line_to (cr, x, height / 2);
+    cairo_line_to (cr, x, height / 3);
     cairo_line_to (cr, x + side, height);
     cairo_close_path (cr);
     cairo_fill (cr);
-    if (!stable_tuning) {
-      cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 0.2);
-    }
-    cairo_set_line_width (cr, 2.0);
-    
-    cairo_move_to (cr, width / 2 - bracketsize, 16);
-    cairo_line_to (cr, width / 2 - bracketsize, 8);
-    cairo_line_to (cr, width / 2 + bracketsize, 8);
-    cairo_line_to (cr, width / 2 + bracketsize, 16);
-    cairo_stroke (cr);
   } else {
     snprintf (buf, 31, "---");
   }
+  
+  cairo_set_line_width (cr, 2.0);
+  
+  if (valid && stable_tuning) {
+    cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 1.0);
+  } else {
+    cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 0.2);
+  }
+  
+  cairo_move_to (cr, width / 2 - bracketsize, 12);
+  cairo_line_to (cr, width / 2 - bracketsize, 4);
+  cairo_line_to (cr, width / 2 + bracketsize, 4);
+  cairo_line_to (cr, width / 2 + bracketsize, 12);
+  cairo_stroke (cr);
+  
   cairo_set_source_rgba (cr, 0.5, 1.0, 0.5, 1.0);
   cairo_set_font_size (cr, 40.0);
   cairo_move_to (cr, 8, 44);
