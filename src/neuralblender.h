@@ -198,6 +198,8 @@ class c_convolver {
 public:
   c_convolver ();
   ~c_convolver ();
+  c_convolver (const c_convolver &) = delete;
+  c_convolver &operator= (const c_convolver &) = delete;
   
   bool load_ir (const float *ir, uint32_t nframes, uint32_t samplerate = 0);
   bool load_ir_from_file (const char *filename, int channel = 0);
@@ -315,7 +317,7 @@ private:
   // model impl.
   std::unique_ptr<nam::DSP> m_nam_model;
   std::unique_ptr<RTNeural::Model<float>> m_rtneural_model;
-  c_convolver convolvers [2];
+  //c_convolver convolvers [2];
   
   mutable std::mutex model_mutex;
   mutable std::mutex pending_mutex;

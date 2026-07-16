@@ -360,6 +360,7 @@ static c_standalone_ui g_ui (&g_blender);
 static void ui_main () {
   fprintf (stderr, "Creating UI...\n");
   g_ui.create (0);        // no LV2 parent, so root/toplevel
+  g_blender.do_vu = g_ui.prefs.vu_on;
   g_blender.tuner_on = g_ui.prefs.tuner_on;
   g_blender.noisegate_on = g_ui.prefs.noisegate_on;
   g_blender.noisegate.set_threshold (g_ui.prefs.noisethresh);

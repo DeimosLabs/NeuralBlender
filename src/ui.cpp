@@ -906,6 +906,7 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
 
     case ROLE_VUTOGGLE: CP
       vu_on (value);
+      on_vu (btn, value);
     break;
 
     case ROLE_LINKED_CALIB: CP

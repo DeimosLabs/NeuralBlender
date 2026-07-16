@@ -1688,9 +1688,9 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     pitchtracker.process_block (in, nframes);
   }
   
-  float *process_in = prepare_input_buffer (in, out, nframes);
+  update_input_meter (in, nframes);
 
-  update_input_meter (process_in, nframes);
+  float *process_in = prepare_input_buffer (in, out, nframes);
 
   uint32_t new_mask =
     pending_lane_mask.load (std::memory_order_acquire);
