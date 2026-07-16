@@ -10,16 +10,19 @@
 #include <filesystem>
 #include <stdio.h>
 
-#define CONFIG_FILE_NAME       ".config/neuralblender.conf"
-#define CONFIG_KEY_NAME_CWD    "modelpath"
-#define CONFIG_KEY_NAME_ADV    "showadvanced"
-#define CONFIG_KEY_NAME_EXCL   "excldefault"
-#define CONFIG_KEY_NAME_CALIB  "calibdefault"
+#define CONFIG_FILE_NAME             ".config/neuralblender.conf"
+#define CONFIG_KEY_NAME_CWD          "modelpath"
+#define CONFIG_KEY_NAME_ADV          "showadvanced"
+#define CONFIG_KEY_NAME_EXCL         "excldefault"
+#define CONFIG_KEY_NAME_CALIB        "calibdefault"
 #define CONFIG_KEY_NAME_CALIB_TARGET "calibtargetdb"
-#define CONFIG_KEY_NAME_VU_SCALE "vuscaledb"
-#define CONFIG_KEY_NAME_VU_HEADROOM "vuheadroomdb"
-#define CONFIG_KEY_NAME_VU     "vuon"
-#define CONFIG_DEFAULT_DIR     "/"
+#define CONFIG_KEY_NAME_VU_SCALE     "vuscaledb"
+#define CONFIG_KEY_NAME_VU_HEADROOM  "vuheadroomdb"
+#define CONFIG_KEY_NAME_VU           "vu"
+#define CONFIG_KEY_NAME_TUNER        "tuner"
+#define CONFIG_KEY_NAME_NOISEGATE    "noisegate"
+#define CONFIG_KEY_NAME_NOISETHRESH  "noisethresh"
+#define CONFIG_DEFAULT_DIR           "/"
 
 class c_configfile {
 public:
@@ -30,12 +33,13 @@ public:
   bool write_file ();
   std::string get_path ();
   bool set_item (size_t n, std::string value);
-  bool istrue (std::string name);
   std::string get_item (size_t n);
   bool set_item (std::string name, std::string value);
   std::string get_item (std::string name);
   int find_item (std::string name);
   void dump (); // for debugging
+
+  static bool istrue (std::string name);
   
 private:
   void process_in (int which, std::string value);

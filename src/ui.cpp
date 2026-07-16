@@ -99,9 +99,26 @@ bool read_prefs_from_config (c_configfile &configfile, t_prefs &prefs) {
       vu_headroom_db <= 12.0f)
     prefs.vu_headroom_db = vu_headroom_db;
 
-  const std::string vu = configfile.get_item (CONFIG_KEY_NAME_VU);
-  if (!vu.empty ())
-    prefs.vu_on = configfile.istrue (CONFIG_KEY_NAME_VU);
+  std::string str;
+  
+  str = configfile.get_item (CONFIG_KEY_NAME_VU);
+  if (!str.empty ())
+    prefs.vu_on = c_configfile::istrue (str);
+  
+  str = configfile.get_item (CONFIG_KEY_NAME_TUNER);
+  if (!str.empty ())
+    prefs.tuner_on = c_configfile::istrue (str);
+
+  str = configfile.get_item (CONFIG_KEY_NAME_NOISEGATE);
+  if (!str.empty ())
+    prefs.noisegate_on = c_configfile::istrue (str);
+
+  float noisethresh = prefs.noisethresh;
+  if (parse_config_float (
+      configfile.get_item (CONFIG_KEY_NAME_NOISETHRESH),
+      noisethresh))
+    prefs.noisethresh =
+      std::clamp (noisethresh, NOISEGATE_THRESH_MIN, NOISEGATE_THRESH_MAX);
 
   return true;
 }
@@ -118,6 +135,14 @@ bool write_prefs_to_config (c_configfile &configfile, const t_prefs &prefs) {
   configfile.set_item (CONFIG_KEY_NAME_VU_HEADROOM, buf);
 
   configfile.set_item (CONFIG_KEY_NAME_VU, prefs.vu_on ? "1" : "0");
+  configfile.set_item (CONFIG_KEY_NAME_TUNER, prefs.tuner_on ? "1" : "0");
+  configfile.set_item (
+    CONFIG_KEY_NAME_NOISEGATE,
+    prefs.noisegate_on ? "1" : "0");
+
+  snprintf (buf, sizeof (buf), "%.6g", prefs.noisethresh);
+  configfile.set_item (CONFIG_KEY_NAME_NOISETHRESH, buf);
+
   return configfile.write_file ();
 }
 
@@ -602,6 +627,9 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   configfile.read_file ();
   read_prefs_from_config (configfile, prefs);
   state.do_vu = prefs.vu_on;
+  state.tuner_on = prefs.tuner_on;
+  state.noisegate_on = prefs.noisegate_on;
+  state.noisethresh = prefs.noisethresh;
   
   if (configfile.istrue (CONFIG_KEY_NAME_ADV)) {
     CP
@@ -656,7 +684,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   knob_noisethresh.create (this, mainwindow.widget, "", 0, 0, 64, 64);
   knob_noisethresh.set_min (-120);
   knob_noisethresh.set_max (-6);
-  knob_noisethresh.set_value (-60);
+  knob_noisethresh.set_value (state.noisethresh);
   knob_noisethresh.set_default (-60);
   knob_noisethresh.set_step (0.1);
   knob_noisethresh.role = ROLE_NOISETHRESH;
@@ -892,11 +920,15 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
 
     case ROLE_NOISEGATE: CP
       state.noisegate_on = value;
+      prefs.noisegate_on = value;
+      write_prefs_to_config (configfile, prefs);
       on_noisegate (btn, value);
     break;
     
     case ROLE_TUNER: CP
       state.tuner_on = value;
+      prefs.tuner_on = value;
+      write_prefs_to_config (configfile, prefs);
       on_tuner (btn, value);
       if (value)
         tuner.show ();
@@ -960,6 +992,22 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
     prefswindow.btn_bass.set_value (p.calib_source == 1);
 
   vu_on (p.vu_on);
+
+  state.noisegate_on = p.noisegate_on;
+  state.noisethresh = p.noisethresh;
+  btn_noisegate.set_value (p.noisegate_on);
+  knob_noisethresh.set_value (p.noisethresh);
+  if (p.noisegate_on)
+    knob_noisethresh.show ();
+  else
+    knob_noisethresh.hide ();
+
+  state.tuner_on = p.tuner_on;
+  btn_tuner.set_value (p.tuner_on);
+  if (p.tuner_on)
+    tuner.show ();
+  else
+    tuner.hide ();
 }
 
 void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
@@ -969,6 +1017,9 @@ void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
 
 void c_neuralblender_ui::write_prefs_to (t_prefs &p) { CP
   p.vu_on = state.do_vu;
+  p.tuner_on = state.tuner_on;
+  p.noisegate_on = state.noisegate_on;
+  p.noisethresh = state.noisethresh;
 }
 
 // called from lv2_ui - runs in UI thread
@@ -1196,6 +1247,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   updating_from_state = true;
   
   btn_noisegate.set_value (state.noisegate_on);
+  knob_noisethresh.set_value (state.noisethresh);
   if (state.noisegate_on)
     knob_noisethresh.show ();
   else

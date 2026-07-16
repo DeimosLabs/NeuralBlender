@@ -245,12 +245,16 @@ void c_lv2_ui::on_noisegate (c_widget *w, bool b) {
   (void) w;
   CP
   state.noisegate_on = b;
+  prefs.noisegate_on = b;
   write_control (PORT_NOISEGATE_ENABLED, b ? 1.0f : 0.0f);
 }
 
 void c_lv2_ui::on_noisethresh (c_widget *w, float f) {
   (void) w;
   CP
+  state.noisethresh = f;
+  prefs.noisethresh = f;
+  write_prefs_to_config (configfile, prefs);
   write_control (PORT_NOISEGATE_THRESHOLD, f);
 }
 
@@ -392,6 +396,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
   if (port == PORT_NOISEGATE_ENABLED) {
     state.noisegate_on = value >= 0.5f;
+    prefs.noisegate_on = state.noisegate_on;
     btn_noisegate.set_value (state.noisegate_on);
     if (state.noisegate_on)
       knob_noisethresh.show ();
@@ -404,6 +409,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
   if (port == PORT_NOISEGATE_THRESHOLD) {
     state.noisethresh = value;
+    prefs.noisethresh = value;
     knob_noisethresh.set_value (value);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;

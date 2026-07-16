@@ -215,10 +215,15 @@ void c_standalone_ui::on_vu (c_widget *w, bool b) {
 
 void c_standalone_ui::on_noisegate (c_widget *w, bool b) {
   (void) w;
+  prefs.noisegate_on = b;
   g_blender.noisegate_on = b;
 }
 
 void c_standalone_ui::on_noisethresh (c_widget *w, float value) {
+  (void) w;
+  state.noisethresh = value;
+  prefs.noisethresh = value;
+  write_prefs_to_config (configfile, prefs);
   g_blender.noisegate.set_threshold (value);
 }
 
@@ -285,6 +290,12 @@ void c_standalone_ui::apply_prefs (t_prefs &p) {
   if (blender)
     blender->do_vu = p.vu_on;
   if (blender)
+    blender->tuner_on = p.tuner_on;
+  if (blender) {
+    blender->noisegate_on = p.noisegate_on;
+    blender->noisegate.set_threshold (p.noisethresh);
+  }
+  if (blender)
     blender->linked_calib = p.linked_calib;
   if (blender)
     blender->calib_source = p.calib_source;
@@ -295,6 +306,12 @@ void c_standalone_ui::write_prefs_to (t_prefs &p) {
 
   if (blender)
     p.calib_target_db = blender->amps [0].calib_target_db;
+  if (blender)
+    p.tuner_on = blender->tuner_on;
+  if (blender) {
+    p.noisegate_on = blender->noisegate_on;
+    p.noisethresh = blender->noisegate.threshold_db;
+  }
   if (blender)
     p.linked_calib = blender->linked_calib;
   if (blender)
@@ -343,6 +360,10 @@ static c_standalone_ui g_ui (&g_blender);
 static void ui_main () {
   fprintf (stderr, "Creating UI...\n");
   g_ui.create (0);        // no LV2 parent, so root/toplevel
+  g_blender.tuner_on = g_ui.prefs.tuner_on;
+  g_blender.noisegate_on = g_ui.prefs.noisegate_on;
+  g_blender.noisegate.set_threshold (g_ui.prefs.noisethresh);
+
   c_neuralblender_state state;
   g_blender.get_state (state);
   if (g_ui.calib_default) {

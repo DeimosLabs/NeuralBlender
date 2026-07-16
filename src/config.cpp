@@ -23,6 +23,9 @@ struct s_option {
   { CONFIG_KEY_NAME_VU_SCALE, "" },
   { CONFIG_KEY_NAME_VU_HEADROOM, "" },
   { CONFIG_KEY_NAME_VU, "" },
+  { CONFIG_KEY_NAME_TUNER, "" },
+  { CONFIG_KEY_NAME_NOISEGATE, "" },
+  { CONFIG_KEY_NAME_NOISETHRESH, "" },
   { "", "" }
 };
 
@@ -94,8 +97,9 @@ void c_configfile::process_in (int which, std::string value) {
 void c_configfile::process_out (int which, std::string value) {
 }
 
-bool c_configfile::istrue (std::string name) {
-  std::string value = get_item (name);
+//bool c_configfile::istrue (std::string name) {
+bool c_configfile::istrue (std::string value) {
+  //std::string value = get_item (name);
   if (!value.size ())
     return false;
   
