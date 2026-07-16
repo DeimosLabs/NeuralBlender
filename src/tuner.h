@@ -8,8 +8,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include <deque>
 
 #include "meter.h"
+
+#define INTUNE_THRESHOLD   2 // in cents
+#define INTUNE_DELAY       5 // in frames/redraws
 
 class c_pitchtracker {
 public:
@@ -69,6 +73,9 @@ protected:
   void render_base (cairo_t *cr) override;
   void on_paint (cairo_t *cr) override;
   void on_resize (int w, int h) override;
+  
+  std::deque<int> hist_notes;
+  std::deque<int> hist_cents;
 
   c_pitchtracker *pitchtracker = NULL;
   float current_freq = 0.0f;

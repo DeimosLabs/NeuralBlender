@@ -35,6 +35,12 @@
 #include "NAM/dsp.h"
 #include "NAM/get_dsp.h"
 
+#define HAVE_FFTW
+
+#ifdef HAVE_FFTW
+#include "fftw3.h"
+#endif
+
 #include "meter.h"
 #include "tuner.h"
 
@@ -183,6 +189,34 @@ private:
   uint32_t m_writepos = 0;
 };
 
+#ifdef HAVE_FFTW
+
+class c_convolver {
+public:
+  c_convolver ();
+  ~c_convolver ();
+
+  bool load_ir (const float *ir, uint32_t nframes, uint32_t samplerate = 0);
+  bool load_ir_from_file (const char *filename, int channel = 0);
+  void clear ();
+  bool loaded () const;
+  void process_block (const float *in, float *out, uint32_t nframes);
+  void set_blocksize (uint32_t nframes);
+  void reset ();
+  
+private:
+  bool rebuild_for_blocksize (uint32_t nframes);
+
+  std::vector<float> m_ir;
+  std::vector<float> m_history;
+  bool               m_loaded = false;
+  uint32_t           m_ir_samplerate = 0;
+  uint32_t           m_blocksize = 0;
+  uint32_t           m_fft_size = 0;
+};
+
+#endif
+
 class c_neuralamp {
 public:
   c_neuralamp ();
@@ -229,9 +263,12 @@ private:
   bool load_json ( const std::string &filename);
   bool load_nam ( const std::string &filename);
   float get_block_rms (float *data, size_t sz);
+  
   // model impl.
   std::unique_ptr<nam::DSP> m_nam_model;
   std::unique_ptr<RTNeural::Model<float>> m_rtneural_model;
+  c_convolver convolver;
+  
   mutable std::mutex model_mutex;
   mutable std::mutex pending_mutex;
   std::string pending_filename;

@@ -177,10 +177,9 @@ static float clamp_calib_target_db (float db) {
   return std::clamp (db, CALIB_TARGET_DB_MIN, CALIB_TARGET_DB_MAX);
 }
 
-/******************************************************************************
- * c_noisegate
- * TODO: add UI settings for attack, hold, delay
- */
+////////////////////////////////////////////////////////////////////////////////
+// c_noisegate
+// TODO: add UI settings for attack, hold, delay
 
 // should be called on startup, and when user changes a setting
 void c_noisegate::update_coeffs () {
@@ -273,9 +272,8 @@ void c_noisegate::process_block (float *in, float *out, uint32_t nframes) {
 }
 
 
-/******************************************************************************
- * c_delayline
- */
+////////////////////////////////////////////////////////////////////////////////
+// c_delayline
 
 c_delayline::c_delayline ()
 : m_buffer (MAX_DELAY_FRAMES, 0.0f) { CP
@@ -321,9 +319,37 @@ void c_delayline::process_block (float *in, float *out, uint32_t nframes) {
   }
 }
 
-/******************************************************************************
- * c_neuralamp
- */
+#ifdef HAVE_FFTW
+
+////////////////////////////////////////////////////////////////////////////////
+// c_convolver
+
+c_convolver::c_convolver () { CP }
+c_convolver::~c_convolver () { CP }
+
+void c_convolver::process_block (const float *in, float *out, uint32_t nframes) {
+  CP
+}
+
+bool c_convolver::load_ir (const float *ir, uint32_t nframes, uint32_t samplerate) {
+  if (!ir || !nframes)
+    return false;
+
+  m_ir.assign (ir, ir + nframes);
+  std::fill (m_history.begin (), m_history.end (), 0.0f);
+  m_loaded = !m_ir.empty ();
+  return m_loaded;
+}
+
+bool c_convolver::load_ir_from_file (const char *filename, int nchannel) {
+  CP
+  return false;
+}
+
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
+// c_neuralamp
 
 c_neuralamp::c_neuralamp () { CP
 }
@@ -362,9 +388,7 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
       return false;
     }
 
-    new_model->Reset(
-      static_cast<double> (samplerate),
-      MAX_BLOCK_SIZE); /* revisit later */
+    new_model->Reset (static_cast<double> (samplerate), MAX_BLOCK_SIZE); /* revisit later */
 
     m_nam_model = std::move (new_model);
 
@@ -733,9 +757,8 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
   }
 }
 
-/******************************************************************************
- * c_neuralblender
- */
+////////////////////////////////////////////////////////////////////////////////
+// c_neuralblender
 
 c_neuralblender::c_neuralblender () { CP
   meter_in = nullptr;
