@@ -124,9 +124,13 @@ bool c_standalone_ui::load_model (size_t which, const char *filename) {
       blender->calibrate_linked (blender->calib_source == 1);
     else
       blender->calibrate (which, blender->calib_source == 1);
-    stats [which * 2] = (float) blender->delays [which].frames ();
-    for (size_t i = 0; i < NB_NUM_MODELS; ++i)
-      stats [i * 2 + 1] = blender->amps [i].trim;
+    stats [which * UI_STATS_PER_LANE] =
+      (float) blender->delays [which].frames ();
+    for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+      const size_t n = i * UI_STATS_PER_LANE;
+      stats [n + 1] = blender->amps [i].trim;
+      stats [n + 2] = (float) blender->amps [i].engine ();
+    }
   }
   sync_widgets_from_state (state);
   return loaded;
@@ -151,7 +155,8 @@ void c_standalone_ui::on_delay (c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
   g_blender.set_delay_ms (w->lane, f);
   if (w->lane < NB_NUM_MODELS)
-    stats [w->lane * 2] = (float) g_blender.delays [w->lane].frames ();
+    stats [w->lane * UI_STATS_PER_LANE] =
+      (float) g_blender.delays [w->lane].frames ();
   update_stats ();
 }
 
@@ -198,7 +203,9 @@ void c_standalone_ui::on_calibrate (c_widget *w, bool b) { CP
   else
     g_blender.calibrate (which, g_blender.calib_source == 1);
   for (size_t i = 0; i < NB_NUM_MODELS; i++) {
-    stats [i * 2 + 1] = g_blender.amps [i].trim;
+    const size_t n = i * UI_STATS_PER_LANE;
+    stats [n + 1] = g_blender.amps [i].trim;
+    stats [n + 2] = (float) g_blender.amps [i].engine ();
   }
   update_stats ();
 }

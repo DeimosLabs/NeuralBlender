@@ -594,14 +594,15 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
     }
 
     case ATOM_STATS: { CP
-      const uint32_t need = NB_NUM_MODELS * 2;
+      const uint32_t need = NB_NUM_MODELS * UI_STATS_PER_LANE;
       if (count < need)
         return;
 
       for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
-        const size_t n = lane * 2;
+        const size_t n = lane * UI_STATS_PER_LANE;
         stats [n] = values [n];
         stats [n + 1] = values [n + 1];
+        stats [n + 2] = values [n + 2];
       }
 
       update_stats ();

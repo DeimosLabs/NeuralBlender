@@ -50,6 +50,7 @@
 #endif
 
 #define NB_NUM_MODELS            4
+#define NB_STATS_PER_LANE        3
 
 #define MAX_DELAY_MS             30
 #define MAX_DELAY_FRAMES         (MAX_DELAY_MS * 192)
@@ -69,10 +70,11 @@
 
 enum _engine_mode {
   ENGINE_NONE,
-  ENGINE_NAM,
+  ENGINE_NAM_A1,
+  ENGINE_NAM_A2,
   ENGINE_JSON,
   ENGINE_IR,        // TODO
-  ENGINEN_UNKNOWN
+  ENGINE_UNKNOWN
 };
 
 enum _ramp_state {
@@ -279,6 +281,7 @@ public:
   void unload_model ();
   void reset ();
   float calibrate (float *data, size_t sz);
+  _engine_mode engine () const { return m_engine_mode; }
 
   //float process_sample (float x);
   void process_block (float *in, float *out, uint32_t nframes);
@@ -295,7 +298,7 @@ public:
   float       dry_out         = 0.0f;
   float       calib_target_db = DB_CALIB_TARGET_DEFAULT;
   uint32_t    samplerate      = 48000;
-  uint32_t    blocksize       = -1;
+  uint32_t    blocksize       = 0;
   std::atomic<bool> mute      { false };
   std::atomic<_ramp_state> ramp = RAMP_PLAYING;
   uint32_t    ramp_pos       = 0;
@@ -317,7 +320,7 @@ private:
   // model impl.
   std::unique_ptr<nam::DSP> m_nam_model;
   std::unique_ptr<RTNeural::Model<float>> m_rtneural_model;
-  //c_convolver convolvers [2];
+  c_convolver m_convolver;
   
   mutable std::mutex model_mutex;
   mutable std::mutex pending_mutex;

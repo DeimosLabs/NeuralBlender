@@ -2300,7 +2300,7 @@ void c_filepicker::show () { CP
   }
   debug ("current_dir='%s'", current_dir.c_str ());
   const char *path = current_dir.empty () ? CONFIG_DEFAULT_DIR : current_dir.c_str ();
-  dialog = open_file_dialog (parent, path, ".nam|.json|.aidax");
+  dialog = open_file_dialog (parent, path, ".nam|.json|.aidax|.wav");
 }
 
 void c_filepicker::hide () { CP

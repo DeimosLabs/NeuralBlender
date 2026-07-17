@@ -60,7 +60,8 @@ bool is_supported_model_filename (const std::string &path) {
 
   return (lower.size () >= 4 && lower.rfind (".nam") == lower.size () - 4) ||
          (lower.size () >= 5 && lower.rfind (".json") == lower.size () - 5) ||
-         (lower.size () >= 6 && lower.rfind (".aidax") == lower.size () - 6);
+         (lower.size () >= 6 && lower.rfind (".aidax") == lower.size () - 6) ||
+         (lower.size () >= 4 && lower.rfind (".wav") == lower.size () - 4);
 }
 
 static bool parse_config_float (const std::string &s, float &value) {
@@ -507,6 +508,9 @@ void c_lane_widgets::create (
   label_trim.create (ui, wp, "1.0", 0, 0, 75, 24);
   label_trim.textsize = 0.75;
   label_trim.align = TEXT_CENTER;
+  label_engine.create (ui,wp, "Engine: none", 0, 0, 120, 24);
+  label_engine.textsize = 0.75;
+  label_engine.align = TEXT_CENTER;
   
   btn_browse.set_image_default (data_icon_folder_big_png);
   btn_clear.set_image_default (data_icon_x_big_png);
@@ -585,8 +589,10 @@ void c_lane_widgets::move_resize (
   int adv_btn_x = 84;
   int adv_btn_y = h * 2 / 11;
   label_frames.move_resize (knob_delay.x (), h - 20, knob_delay.w (), 16);
-  label_trim.move_resize (knob_gain_in.x (), h - 20, knob_gain_in.w () + 
-                          knob_gain_out.w () + knob_dry_out.w (), 16);
+  label_engine.move_resize (knob_gain_in.x (), h - 20, knob_gain_in.w (), 16);
+  label_trim.move_resize (knob_dry_out.x (), h - 20, knob_dry_out.w () + 
+                          knob_dry_out.w (), 16);
+                          
   //move_resize (x, y, w, h);
 }
 
@@ -596,8 +602,10 @@ void c_lane_widgets::move_resize (
 c_neuralblender_ui::c_neuralblender_ui () { CP
   memset (&app, 0, sizeof (app));
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-    stats [i * 2] = 0.0f;
-    stats [i * 2 + 1] = 1.0f;
+    const size_t n = i * UI_STATS_PER_LANE;
+    stats [n] = 0.0f;
+    stats [n + 1] = 1.0f;
+    stats [n + 2] = (float) ENGINE_NONE;
   }
   display = NULL;
   window = 0;
@@ -1027,10 +1035,25 @@ void c_neuralblender_ui::write_prefs_to (t_prefs &p) { CP
 void c_neuralblender_ui::update_stats () {
   char buf [128];
   
+  static const char *engine_names [] = {
+    "",
+    "NAM A1",
+    "NAM A2",
+    "JSON",
+    "IR",
+    "(unknown)",
+    NULL
+  };
+  
   for (size_t i = 0; i < NB_NUM_MODELS; i++) {
-    int nframes = stats [i * 2];
-    float trim = stats [i * 2 + 1];
+    const size_t n = i * UI_STATS_PER_LANE;
+    int nframes = stats [n];
+    float trim = stats [n + 1];
+    int eng = (int) stats [n + 2];
+    if (eng < ENGINE_NONE || eng > ENGINE_UNKNOWN)
+      eng = ENGINE_UNKNOWN;
     
+    lanes [i].label_engine.set_label (engine_names [eng]);
     /*if (trim != 1.0f) {
       snprintf (buf, 127, "%d frames, trim=%.02f", nframes, trim);
     } else {

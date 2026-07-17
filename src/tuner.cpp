@@ -49,57 +49,85 @@ inline float c_pitchtracker::sample_at (size_t i) const {
   size_t n = ring.size ();
   if (n == 0)
     return 0.0f;
-
+  
   size_t valid = std::min (count, n);
   size_t first = (count >= n) ? (count % n) : 0;
-
+  
   if (i >= valid)
     return 0.0f;
-
+  
   return ring [(first + i) % n];
 }
 
 inline float c_pitchtracker::get_lag_score (
     const std::vector<float> &buf,
     size_t lag) const {
-
+  
   const size_t n = buf.size ();
   if (lag == 0 || lag >= n)
     return std::numeric_limits<float>::infinity ();
-
-  float ret = 0.0f;
+  
+  float totdiff = 0.0f;
   const size_t end = n - lag;
-
+  
   for (size_t i = 0; i < end; i++) {
     const float d = buf [i] - buf [i + lag];
-    ret += d * d;
+    totdiff += d * d;
   }
-
-  return ret / (float) end;
+  
+  return totdiff / (float) end;
 }
 
 int c_pitchtracker::get_best_lag (const std::vector<float> &buf, int step,
-                                  float *r_score) const {
+                                  float *r_score) {
   const int min_freq = 25;
   const int max_freq = 1000;
+  
+  if (buf.size () < 2 || step <= 0)
+    return 0;
 
   const int start_lag = samplerate / max_freq;
   const int end_lag =
     std::min ((int) (samplerate / min_freq), (int) (buf.size () - 1));
-
+  
   if (start_lag >= end_lag)
     return 0;
 
+  // this should only resize vectors on samplerate change
+  if (lag_scores.size () != (size_t) end_lag + 1)
+    lag_scores.resize ((size_t) end_lag + 1);
+  
   float best_score = get_lag_score (buf, start_lag);
+  lag_scores [start_lag] = best_score;
   int best_lag = start_lag;
-
-  for (int i = start_lag + step; i < end_lag; i += step) {
-    float s = get_lag_score (buf, i);
+  int count = 0;
+  float scoreavg = 0.0;
+  
+  for (int lag = start_lag + step; lag < end_lag; lag += step) {
+    float s = get_lag_score (buf, lag);
+    scoreavg += s;
+    count++;
+    lag_scores [lag] = s;
     if (s < best_score) {
       best_score = s;
-      best_lag = i;
+      best_lag = lag;
     }
   }
+  scoreavg /= count;
+  
+  //debug ("scoreavg=%f, best_score=%f", scoreavg, best_score);
+  
+  int oct = best_lag / 2;
+  if (oct >= start_lag) {
+    float oct_score = get_lag_score (buf, oct);
+    lag_scores [oct] = oct_score;
+
+    if (oct_score <= best_score * 1.25f) {
+      best_lag = oct;
+      best_score = oct_score;
+    }
+  }
+
   if (r_score)
     *r_score = best_score;
   
@@ -108,7 +136,7 @@ int c_pitchtracker::get_best_lag (const std::vector<float> &buf, int step,
 
 bool c_pitchtracker::analyze () {
   const int idx = published_snapshot.load (std::memory_order_acquire);
-  if (idx < 0 || idx > 3)
+  if (idx < 0 || idx >= 3)
     return false;
 
   analysis = snapshots [idx];

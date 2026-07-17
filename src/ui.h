@@ -31,6 +31,7 @@
 #define UI_BUTTON_RADIUS     12.0
 #define UI_CHECKBOX_RADIUS   8.0
 #define UI_FRAME_RADIUS      12.0
+#define UI_STATS_PER_LANE    NB_STATS_PER_LANE
 
 class c_neuralblender;
 struct c_neuralblender_state;
@@ -143,6 +144,7 @@ public:
   //c_label label_calib;
   c_label label_frames;
   c_label label_trim;
+  c_label label_engine;
   
   //c_meterwidget meter_in; // we only have one input
   c_meter meter_out;
@@ -260,6 +262,6 @@ public:
   bool ui_resize_pending = false;
   int pending_resize_w = 0;
   int pending_resize_h = 0;
-  float stats [NB_NUM_MODELS * 2];
+  float stats [NB_NUM_MODELS * UI_STATS_PER_LANE];
   //inline void move_resize () { show_advanced_settings (show_advanced); }
 };

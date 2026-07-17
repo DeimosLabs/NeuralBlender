@@ -597,12 +597,13 @@ static void forge_meter_notify (Plugin *self) {
 }
 
 static void forge_stats_notify (Plugin *self) {
-  float values [NB_NUM_MODELS * 2];
+  float values [NB_NUM_MODELS * NB_STATS_PER_LANE];
   size_t n = 0;
 
   for (int i = 0; i < NB_NUM_MODELS; i++) {
     values [n++] = (float) self->blender.delays [i].frames ();
     values [n++] = self->blender.amps [i].trim.load (std::memory_order_acquire);
+    values [n++] = (float) self->blender.amps [i].engine ();
   }
 
   LV2_Atom_Forge_Frame frame;

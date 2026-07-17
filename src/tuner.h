@@ -39,12 +39,13 @@ private:
   inline float get_lag_score (const std::vector<float> &buf, size_t lag) const;
   inline float sample_at (size_t i) const;
   int get_best_lag (const std::vector<float> &buf, 
-                    int step, float *r_score = NULL) const;
+                    int step, float *r_score = NULL);
   void update_note_from_freq (float freq);
   
   std::vector<float> ring;
   std::vector<float> snapshots [3];
   std::vector<float> analysis;
+  std::vector<float> lag_scores;
   
   size_t count       = 0;
   int write_snapshot = 0;

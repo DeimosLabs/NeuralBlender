@@ -144,7 +144,8 @@ static bool ends_with (const std::string &a, const std::string &b, bool casesens
 static bool is_supported_model_path (const std::string &path) {
   return ends_with (path, ".nam") ||
          ends_with (path, ".json") ||
-         ends_with (path, ".aidax");
+         ends_with (path, ".aidax") ||
+         ends_with (path, ".wav");
 }
 
 static bool parse_float (const std::string &s, float &value) {
@@ -566,6 +567,8 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
 
   m_num_partitions =
     ceil_div_u32 (m_ir.size (), m_partition_size);
+  if (m_num_partitions == 0)
+    return false;
 
   m_overlap.resize (m_partition_size);
   std::fill (m_overlap.begin (), m_overlap.end (), 0.0f);
@@ -716,6 +719,45 @@ void c_convolver::process_block (
 ////////////////////////////////////////////////////////////////////////////////
 // c_neuralamp
 
+
+static int nam_version_major_minor (const std::string &filename) {
+  std::ifstream f (filename, std::ios::binary);
+  if (!f)
+    return -1;
+
+  std::string head (8192, '\0');
+  f.read (head.data (), head.size ());
+  head.resize ((size_t) f.gcount ());
+
+  size_t pos = head.find("\"version\"");
+  if (pos == std::string::npos)
+    return -1;
+
+  pos = head.find (':', pos);
+  if (pos == std::string::npos)
+    return -1;
+
+  pos = head.find ('"', pos);
+  if (pos == std::string::npos)
+    return -1;
+
+  size_t end = head.find ('"', pos + 1);
+  if (end == std::string::npos)
+    return -1;
+
+  int major = 0, minor = 0;
+  if (sscanf (head.substr (pos + 1, end - pos - 1).c_str (),
+             "%d.%d", &major, &minor) != 2)
+    return -1;
+
+  return major * 1000 + minor;
+}
+
+static bool nam_file_is_a2 (const std::string &filename) {
+  return nam_version_major_minor (filename) >= 7; // 0.7.x
+}
+
+
 c_neuralamp::c_neuralamp () { CP
 }
 
@@ -730,6 +772,15 @@ void c_neuralamp::set_samplerate (uint32_t sr) { CP
   reset ();
 }
 
+void c_neuralamp::set_blocksize (uint32_t bs) { CP
+  if (blocksize == bs)
+    return;
+
+  blocksize = bs;
+  if (!m_convolver.loaded ())
+    m_convolver.set_blocksize (bs);
+}
+
 bool c_neuralamp::loaded () const {
   return m_loaded.load (std::memory_order_relaxed);
 }
@@ -740,6 +791,10 @@ std::string c_neuralamp::model_filename () const {
 }
 
 bool c_neuralamp::load_nam (const std::string &fn) { CP
+  bool a2 = false;
+  if (nam_file_is_a2 (fn))
+    a2 = true;
+  
   try
   {
     auto new_model =
@@ -753,15 +808,17 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
       return false;
     }
 
-    new_model->Reset (static_cast<double> (samplerate), MAX_BLOCK_SIZE); /* revisit later */
+    new_model->Reset (static_cast<double> (samplerate), MAX_BLOCK_SIZE); // revisit later
 
     m_nam_model = std::move (new_model);
 
     fprintf (stderr,
             "Loaded NAM model: %s\n",
             fn.c_str ());
-
-    m_engine_mode = ENGINE_NAM;
+    if (a2)
+      m_engine_mode = ENGINE_NAM_A2;
+    else
+      m_engine_mode = ENGINE_NAM_A1;
     return true;
   }
   catch (const std::exception &e)
@@ -860,9 +917,20 @@ bool c_neuralamp::load_model_now (const std::string &load_fn) { CP
   std::lock_guard<std::mutex> lock (model_mutex);
   m_loaded.store (false, std::memory_order_release);
 
-  const bool ret = ends_with (load_fn, ".nam")
-    ? load_nam (load_fn)
-    : load_json (load_fn);
+  bool ret = false;
+  if (ends_with (load_fn, ".nam"))
+    ret = load_nam (load_fn);
+  else if (ends_with (load_fn, ".wav")) {
+    m_nam_model.reset ();
+    m_rtneural_model.reset ();
+    m_convolver.clear ();
+    if (blocksize > 0)
+      m_convolver.set_blocksize (blocksize);
+    ret = m_convolver.load_ir_from_file (load_fn.c_str (), 0);
+    if (ret)
+      m_engine_mode = ENGINE_IR;
+  } else
+    ret = load_json (load_fn);
 
   if (ret) {
     filename = load_fn;
@@ -875,6 +943,7 @@ bool c_neuralamp::load_model_now (const std::string &load_fn) { CP
     reset_unlocked ();
     m_rtneural_model.reset ();
     m_nam_model.reset ();
+    m_convolver.clear ();
     m_engine_mode = ENGINE_NONE;
     filename = "";
     m_loaded.store (false, std::memory_order_release);
@@ -910,7 +979,8 @@ float c_neuralamp::get_block_rms (float *data, size_t nframes) {
       return (float) sqrt (sum / (double) nframes);
     break;
 
-    case ENGINE_NAM:
+    case ENGINE_NAM_A1:
+    case ENGINE_NAM_A2:
       if (!m_nam_model) {
         return 0.0f;
       }
@@ -921,6 +991,23 @@ float c_neuralamp::get_block_rms (float *data, size_t nframes) {
         NAM_SAMPLE *outputs [1] = { buf.data () };
 
         m_nam_model->process (inputs, outputs, (int) nframes);
+
+        for (uint32_t i = 0; i < nframes; ++i) {
+          const float y = buf [i];
+          sum += (double) y * (double) y;
+        }
+      }
+      return (float) sqrt (sum / (double) nframes);
+    break;
+
+    case ENGINE_IR:
+      if (!m_convolver.ready ()) {
+        return 0.0f;
+      }
+
+      {
+        std::vector<float> buf (nframes);
+        m_convolver.process_block (data, buf.data (), (uint32_t) nframes);
 
         for (uint32_t i = 0; i < nframes; ++i) {
           const float y = buf [i];
@@ -943,7 +1030,10 @@ float c_neuralamp::calibrate (float *data, size_t size) {
   calib_target_db = clamp_calib_target_db (calib_target_db);
 
   size_t i;
-  size_t blocksize = 128;
+  //size_t blocksize = 128;
+  // nope, we need same blocksize that the amp is using, or else calibration of
+  // IR's just sees the dry calib. sample ---> huge trim
+  size_t blocksize = this->blocksize > 0 ? this->blocksize : 128;
   
   reset_unlocked ();
   
@@ -979,6 +1069,7 @@ void c_neuralamp::reset_unlocked () { CP
   debug ("RESET, block %ld", (long int) block_counter);
   if (m_rtneural_model) m_rtneural_model->reset ();
   if (m_nam_model) m_nam_model->Reset (samplerate, MAX_BLOCK_SIZE);
+  m_convolver.reset ();
   warmup = WARMUP_BLOCKS;
   ramp_pos = 0;
 }
@@ -994,6 +1085,7 @@ void c_neuralamp::unload_model () {
   reset_unlocked ();
   m_rtneural_model.reset ();
   m_nam_model.reset ();
+  m_convolver.clear ();
   m_engine_mode = ENGINE_NONE;
   filename = "";
   trim = 1.0f;
@@ -1046,7 +1138,8 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
       //return;
     break;
 
-    case ENGINE_NAM:
+    case ENGINE_NAM_A1:
+    case ENGINE_NAM_A2:
       if (!m_nam_model) {
         copy_with_gain (in, out, nframes, input_gain * output_gain);
         break;
@@ -1071,6 +1164,29 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
             out [i] = std::clamp (out [i] * out_gain, -1.0f, 1.0f);
       }
       //return;
+    break;
+
+    case ENGINE_IR:
+      if (!m_convolver.ready ()) {
+        copy_with_gain (in, out, nframes, input_gain * output_gain);
+        break;
+      }
+
+      {
+        if (input_gain != 1.0f) {
+          for (uint32_t i = 0; i < nframes; ++i)
+            in [i] *= input_gain;
+        }
+
+        m_convolver.process_block (in, out, nframes);
+
+        const float out_gain = output_gain * trim;
+        for (uint32_t i = 0; i < nframes; ++i)
+          if (dcflip)
+            out [i] = -1.0f * std::clamp (out [i] * out_gain, -1.0f, 1.0f);
+          else
+            out [i] = std::clamp (out [i] * out_gain, -1.0f, 1.0f);
+      }
     break;
   }
 
@@ -1249,7 +1365,7 @@ void c_neuralblender::set_blocksize (uint32_t bs) { CP
   if (meter_in)
     meter_in->bufsize = (int) bs;
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-    amps [i].blocksize = bs;
+    amps [i].set_blocksize (bs);
     if (meters_out [i])
       meters_out [i]->bufsize = (int) bs;
     m_delay_bufs [i].resize (MAX_BLOCK_SIZE);
