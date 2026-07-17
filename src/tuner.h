@@ -69,7 +69,7 @@ public:
   void set_pitch (float freq, float note, float cents);
   void on_ui_timer () override;
   bool needs_redraw ();
-
+  
 protected:
   void render_base (cairo_t *cr) override;
   void on_paint (cairo_t *cr) override;
@@ -77,7 +77,7 @@ protected:
   
   std::deque<int> hist_notes;
   std::deque<int> hist_cents;
-
+  
   c_pitchtracker *pitchtracker = NULL;
   float current_freq = 0.0f;
   float current_note = 0.0f;
