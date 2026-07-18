@@ -1,6 +1,7 @@
 calib.f32
 calib-bass.f32
-bypass.nam
+gx_presence_contrast.f32
+#bypass.nam
 neuralblender_logo_512.png
 neuralblender_logo_160.png
 textlogo-1024x128.png

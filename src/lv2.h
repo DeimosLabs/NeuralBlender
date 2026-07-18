@@ -1,5 +1,5 @@
 
-/* NeuralBlender - shared LV2 port definitions.
+/* NeuralBlender - shared LV2 port definitions
  */
 
 #pragma once
@@ -56,8 +56,8 @@ enum nb_lv2_port {
   PORT_D_DRY_OUT,
   PORT_D_DELAY,
   PORT_D_MUTE,
-	  PORT_D_DCFLIP,
-	  PORT_D_CALIBRATE,
+  PORT_D_DCFLIP,
+  PORT_D_CALIBRATE,
 
   PORT_PEDAL_A_GAIN_IN,
   PORT_PEDAL_A_IR_PITCH,

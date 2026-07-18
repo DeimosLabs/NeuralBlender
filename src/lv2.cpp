@@ -521,105 +521,100 @@ static void set_calib_target_db (Plugin *self, float db) {
 }
 
 static LV2_State_Status save (
-    LV2_Handle instance,
-    LV2_State_Store_Function store,
-    LV2_State_Handle handle,
-    uint32_t flags,
-    const LV2_Feature *const *features) {
-	    Plugin *self = (Plugin *) instance;
-	    LV2_State_Map_Path *map_path = NULL;
-	    LV2_State_Free_Path *free_path = NULL;
-	    get_state_path_features (features, &map_path, &free_path);
-	    
-		    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
-		      for (int i = 0; i < NB_NUM_MODELS; i++) {
-		        const std::string filename =
-		          self->blender.banks [bank].lanes [i].model_filename ();
-		        const bool empty = filename.empty ();
-		        char *abstract_path = NULL;
-		        const char *stored_path = filename.c_str ();
-		        if (!empty && map_path && map_path->abstract_path)
-		          abstract_path =
-		            map_path->abstract_path (map_path->handle, filename.c_str ());
-		        if (abstract_path)
-		          stored_path = abstract_path;
-
-	        store (handle,
-	               self->urid_bank_model [bank] [i],
-	               stored_path,
-	               strlen (stored_path) + 1,
-	               empty ? self->urid_atom_String : self->urid_atom_Path,
-	               LV2_STATE_IS_POD);
-
-	        if (abstract_path && free_path && free_path->free_path)
-	          free_path->free_path (free_path->handle, abstract_path);
-			      }
-			    }
-
-		    return LV2_STATE_SUCCESS;
-		}
-
-static LV2_State_Status restore (
-    LV2_Handle instance,
-    LV2_State_Retrieve_Function retrieve,
-    LV2_State_Handle handle,
-    uint32_t flags,
-    const LV2_Feature *const *features) { 
-    
+  LV2_Handle instance,
+  LV2_State_Store_Function store,
+  LV2_State_Handle handle,
+  uint32_t flags,
+  const LV2_Feature *const *features) {
     Plugin *self = (Plugin *) instance;
     LV2_State_Map_Path *map_path = NULL;
     LV2_State_Free_Path *free_path = NULL;
     get_state_path_features (features, &map_path, &free_path);
+    
+    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+      for (int i = 0; i < NB_NUM_MODELS; i++) {
+        const std::string filename =
+          self->blender.banks [bank].lanes [i].model_filename ();
+        const bool empty = filename.empty ();
+        char *abstract_path = NULL;
+        const char *stored_path = filename.c_str ();
+        if (!empty && map_path && map_path->abstract_path)
+          abstract_path =
+            map_path->abstract_path (map_path->handle, filename.c_str ());
+        if (abstract_path)
+          stored_path = abstract_path;
 
-	    size_t size;
-	    uint32_t type;
-	    uint32_t valflags;
+      store (handle,
+             self->urid_bank_model [bank] [i],
+             stored_path,
+             strlen (stored_path) + 1,
+             empty ? self->urid_atom_String : self->urid_atom_Path,
+             LV2_STATE_IS_POD);
 
-	    const void *calib_bass =
-	      retrieve (handle,
-	                self->urid_calib_bass,
-	                &size,
-	                &type,
-	                &valflags);
-	    if (calib_bass && type == self->urid_atom_Int &&
-	        size >= sizeof (int32_t))
-	      self->blender.calib_source =
-	        (*(const int32_t *) calib_bass) != 0 ? 1 : 0;
-	    self->restored_from_state = true;
+      if (abstract_path && free_path && free_path->free_path)
+        free_path->free_path (free_path->handle, abstract_path);
+        }
+      }
 
-			    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
-		      for (int i = 0; i < NB_NUM_MODELS; i++) {
-		        const void *p =
-	            retrieve (handle,
-                      self->urid_bank_model [bank] [i],
-                      &size,
-                      &type,
-                      &valflags);
+    return LV2_STATE_SUCCESS;
+}
 
-		        if (p && type == self->urid_atom_Path && size > 1) {
-		          const char *path = (const char *) p;
-		          char *absolute_path = NULL;
-		          if (map_path && map_path->absolute_path)
-		            absolute_path =
-		              map_path->absolute_path (map_path->handle, path);
+static LV2_State_Status restore (
+  LV2_Handle instance,
+  LV2_State_Retrieve_Function retrieve,
+  LV2_State_Handle handle,
+  uint32_t flags,
+  const LV2_Feature *const *features) { 
+  
+  Plugin *self = (Plugin *) instance;
+  LV2_State_Map_Path *map_path = NULL;
+  LV2_State_Free_Path *free_path = NULL;
+  get_state_path_features (features, &map_path, &free_path);
 
-		          clear_model_slot (self, (_lane_bank) bank, i, false);
-		          request_load (
-		            self,
-		            (_lane_bank) bank,
-		            i,
-		            absolute_path ? absolute_path : path);
+  size_t size;
+  uint32_t type;
+  uint32_t valflags;
 
-		          if (absolute_path && free_path && free_path->free_path)
-		            free_path->free_path (free_path->handle, absolute_path);
-		        } else {
-			          clear_model_slot (self, (_lane_bank) bank, i, true);
-			        }
-		      }
-			    }
+  const void *calib_bass =
+    retrieve (handle,
+              self->urid_calib_bass,
+              &size,
+              &type,
+              &valflags);
+  if (calib_bass && type == self->urid_atom_Int && size >= sizeof (int32_t))
+    self->blender.calib_source = (*(const int32_t *) calib_bass) != 0 ? 1 : 0;
+  self->restored_from_state = true;
 
-		    return LV2_STATE_SUCCESS;
-		}
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    for (int i = 0; i < NB_NUM_MODELS; i++) {
+      const void *p =
+        retrieve (handle,
+                self->urid_bank_model [bank] [i],
+                &size,
+                &type,
+                &valflags);
+
+      if (p && type == self->urid_atom_Path && size > 1) {
+        const char *path = (const char *) p;
+        char *absolute_path = NULL;
+        if (map_path && map_path->absolute_path)
+          absolute_path =
+            map_path->absolute_path (map_path->handle, path);
+
+        clear_model_slot (self, (_lane_bank) bank, i, false);
+        request_load (self, (_lane_bank) bank, i,
+                      absolute_path ? absolute_path : path);
+
+        if (absolute_path && free_path && free_path->free_path)
+          free_path->free_path (free_path->handle, absolute_path);
+      } else {
+          clear_model_slot (self, (_lane_bank) bank, i, true);
+      }
+    }
+  }
+
+  return LV2_STATE_SUCCESS;
+}
 
 static void forge_model_path_notify (Plugin *self,
                                      LV2_URID property,
