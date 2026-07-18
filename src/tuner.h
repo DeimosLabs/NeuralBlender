@@ -69,6 +69,7 @@ public:
   void set_pitch (float freq, float note, float cents);
   void on_ui_timer () override;
   bool needs_redraw ();
+  void set_base_freq (float f) { pitchtracker->set_base_freq (f); }
   
 protected:
   void render_base (cairo_t *cr) override;

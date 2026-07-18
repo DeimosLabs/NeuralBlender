@@ -1279,7 +1279,7 @@ nb:CabD
 	        lv2:name "Noisegate Threshold (dB)" ;
 	        lv2:default -60.0 ;
 	        lv2:minimum -120.0 ;
-	        lv2:maximum 0.0
+	        lv2:maximum 500.0
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;

@@ -884,21 +884,21 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   knob_noisethresh.role = ROLE_NOISETHRESH;
 
   knob_noiseattack.set_min (0);
-  knob_noiseattack.set_max (500);
+  knob_noiseattack.set_max (200);
   knob_noiseattack.set_value (state.noiseattack);
   knob_noiseattack.set_default (2);
   knob_noiseattack.set_step (0.1);
   knob_noiseattack.role = ROLE_NOISEATTACK;
 
   knob_noisehold.set_min (0);
-  knob_noisehold.set_max (1000);
+  knob_noisehold.set_max (200);
   knob_noisehold.set_value (state.noisehold);
   knob_noisehold.set_default (10);
   knob_noisehold.set_step (0.1);
   knob_noisehold.role = ROLE_NOISEHOLD;
 
   knob_noiserelease.set_min (0);
-  knob_noiserelease.set_max (2000);
+  knob_noiserelease.set_max (500);
   knob_noiserelease.set_value (state.noiserelease);
   knob_noiserelease.set_default (20);
   knob_noiserelease.set_step (0.1);
@@ -945,6 +945,16 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_other_about.role = ROLE_ABOUT;
   text_other_tuner.role = ROLE_TUNER_BASE_FREQ;
   text_other_calib.role = ROLE_CALIB_TARGET_DB;
+  
+  btn_other_tuner_down.create (this, frame_other_misc.widget, "", 420, 14, 40, 40, WSTYLE_IMAGE_BUTTON);
+  btn_other_tuner_down.set_image_default (data_icon_flat_png);
+  btn_other_tuner_down.role = ROLE_TUNER_DOWN;
+  btn_other_tuner_up.create (this, frame_other_misc.widget, "", 468, 14, 40, 40, WSTYLE_IMAGE_BUTTON);
+  btn_other_tuner_up.set_image_default (data_icon_sharp_png);
+  btn_other_tuner_up.role = ROLE_TUNER_UP;
+  btn_other_tuner_default.create (this, frame_other_misc.widget, "", 512, 14, 40, 40, WSTYLE_IMAGE_BUTTON);
+  btn_other_tuner_default.set_image_default (data_icon_x_big_png);
+  btn_other_tuner_default.role = ROLE_TUNER_DEFAULT;
   
   tuner.create (this, mainwindow.widget, "", 0, 0, 400, 24);
   if (blender)
@@ -1335,6 +1345,21 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
       else
         tuner.hide ();
         
+    break;
+    
+    case ROLE_TUNER_UP:
+      state.tuner_base_freq *= SEMITONE_MULTIPLIER;
+      tuner.tuner.set_base_freq ((int) state.tuner_base_freq);
+    break;
+    
+    case ROLE_TUNER_DOWN:
+      state.tuner_base_freq /= SEMITONE_MULTIPLIER;
+      tuner.tuner.set_base_freq ((int) state.tuner_base_freq);
+    break;
+
+    case ROLE_TUNER_DEFAULT:
+      state.tuner_base_freq = 440.0;
+      tuner.tuner.set_base_freq (440);
     break;
 
     case ROLE_EXCL_TOGGLE: CP

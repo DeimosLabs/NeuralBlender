@@ -290,6 +290,9 @@ public:
   c_label        label_other_calib;
   c_textbox      text_other_tuner;
   c_textbox      text_other_calib;
+  c_button       btn_other_tuner_down;
+  c_button       btn_other_tuner_up;
+  c_button       btn_other_tuner_default;
   c_button       btn_other_vu;
   c_button       btn_other_bass;
   c_button       btn_other_prefs;

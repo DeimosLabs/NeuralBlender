@@ -49,6 +49,7 @@
 #undef min
 #endif
 
+#define SEMITONE_MULTIPLIER      1.0594630943592953
 #define NB_NUM_PEDALS            4
 #define NB_NUM_MODELS            4
 #define NB_NUM_CABS              4
