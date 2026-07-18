@@ -220,11 +220,13 @@ public:
   
   virtual void on_expose ();
   virtual void on_resize ();
+  virtual void on_configure_notify ();
   bool on_keydown (XKeyEvent *key) override;
   virtual void on_close ()  {};
   
   static void cb_expose (void *w, void *user_data);
   static void cb_resize (void *w, void *user_data);
+  static void cb_configure_notify (void *w, void *user_data);
   static void cb_key_press (void *w, void *event, void *user_data);
   static void cb_close (void *w, void *user_data);
   
@@ -242,7 +244,14 @@ public:
       int x, int y, int w, int h,
       Widget_t *owner = NULL);
 
+  void show ();
+  void show_children ();
+  void on_expose () override;
   void on_resize () override;
+  void on_configure_notify () override;
+
+private:
+  bool children_mapped = false;
 };
 
 #include "meter.h"

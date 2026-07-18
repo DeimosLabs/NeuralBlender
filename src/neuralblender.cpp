@@ -45,8 +45,6 @@
 
 //#define STANDALONE // done for us by build system (currently cmake)
 
-extern c_neuralblender g_blender;
-
 // a few helper functions
 
 // not using this one, let's keep it for now
@@ -1237,13 +1235,16 @@ void c_neuralamp::reset () {
 void c_neuralamp::unload_model () {
   std::lock_guard<std::mutex> lock (model_mutex);
   m_loaded.store (false, std::memory_order_release);
-  reset_unlocked ();
   m_rtneural_model.reset ();
   m_nam_model.reset ();
   m_convolver.clear ();
   m_engine_mode = ENGINE_NONE;
   filename = "";
   trim = 1.0f;
+  delay.clear ();
+  warmup = WARMUP_BLOCKS;
+  ramp_pos = 0;
+  ramp.store (RAMP_PLAYING, std::memory_order_release);
 }
 
 static void copy_with_gain (float *in, float *out, uint32_t nframes, float gain) {
@@ -1766,8 +1767,9 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
     for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
       const c_neuralamp &amp = banks [bank].lanes [i];
       c_neuralblender_lane_state &lane = state.banks [bank].lanes [i];
-
+      debug ("before calling amp.model_filename ()");
       lane.filename = amp.model_filename ();
+      debug ("after calling amp.model_filename ()");
       lane.gain_in = amp.gain_in;
       lane.ir_pitch_semitones = amp.ir_pitch_semitones;
       lane.gain_out = amp.gain_out;

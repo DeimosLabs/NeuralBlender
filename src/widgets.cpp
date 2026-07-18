@@ -764,6 +764,8 @@ bool c_toplevelwindow::create (
   widget->label = label.c_str ();
   widget->scale.gravity = NONE;
   widget->func.resize_notify_callback = c_toplevelwindow::cb_resize;
+  widget->func.configure_notify_callback =
+      c_toplevelwindow::cb_configure_notify;
   widget->func.expose_callback = c_toplevelwindow::cb_expose;
   widget->func.key_press_callback = c_toplevelwindow::cb_key_press;
   widget->func.unmap_notify_callback = c_toplevelwindow::cb_close;
@@ -796,6 +798,16 @@ void c_toplevelwindow::cb_resize (void *w_, void *user_data) {
     return;
 
   window->on_resize ();
+}
+
+void c_toplevelwindow::cb_configure_notify (void *w_, void *user_data) {
+  (void) user_data;
+
+  c_toplevelwindow *window = toplevel_from_widget (w_);
+  if (!window)
+    return;
+
+  window->on_configure_notify ();
 }
 
 void c_toplevelwindow::cb_key_press (void *w_, void *event, void *user_data) {
@@ -858,8 +870,8 @@ void c_toplevelwindow::show () {
 
   widget_show_all (widget);
   widget_draw (widget, NULL);
-  if (widget->app && widget->app->dpy)
-    XFlush (widget->app->dpy);
+  /*if (widget->app && widget->app->dpy)
+    XFlush (widget->app->dpy);*/
 }
 
 void c_toplevelwindow::hide () {
@@ -942,11 +954,17 @@ void c_toplevelwindow::on_expose () {
   if (!metrics.visible)
     return;
 
+  debug ("toplevel expose: metrics=%d,%d init=%d,%d",
+         (int) metrics.width, (int) metrics.height,
+         widget->scale.init_width, widget->scale.init_height);
   fill_rounded_rect (widget, 0, 0, metrics.width, metrics.height,
                      0.0f, g_colors->window_bg);
 }
 
 void c_toplevelwindow::on_resize () { CP
+}
+
+void c_toplevelwindow::on_configure_notify () {
 }
 
 bool c_toplevelwindow::on_keydown (XKeyEvent *key) { CP
@@ -959,6 +977,48 @@ bool c_toplevelwindow::on_keydown (XKeyEvent *key) { CP
   return focused_widget->on_keydown (key);
 }
 
+void c_mainwindow::show () {
+  if (!widget)
+    return;
+
+  children_mapped = false;
+  widget_show (widget);
+  /*if (widget->app && widget->app->dpy)
+    XFlush (widget->app->dpy);*/
+}
+
+void c_mainwindow::show_children () {
+  if (!widget || children_mapped)
+    return;
+
+  for (int i = 0; i < widget->childlist->elem; ++i)
+    widget_show_all (widget->childlist->childs [i]);
+
+  children_mapped = true;
+  if (ui)
+    ui->sync_page_visibility ();
+  widget_draw (widget, NULL);
+}
+
+void c_mainwindow::on_expose () {
+  if (!widget)
+    return;
+
+  Metrics_t metrics;
+  os_get_window_metrics (widget, &metrics);
+  if (metrics.visible &&
+      (widget->width != metrics.width || widget->height != metrics.height)) {
+    debug ("mainwindow expose configure: metrics=%d,%d cached=%d,%d init=%d,%d",
+           (int) metrics.width, (int) metrics.height,
+           widget->width, widget->height,
+           widget->scale.init_width, widget->scale.init_height);
+    widget->func.configure_callback (widget, NULL);
+  }
+
+  c_toplevelwindow::on_expose ();
+  show_children ();
+}
+
 void c_mainwindow::on_resize () { CP
   if (!widget || !ui)
     return;
@@ -968,9 +1028,19 @@ void c_mainwindow::on_resize () { CP
   if (!metrics.visible)
     return;
 
+  debug ("mainwindow resize: metrics=%d,%d init=%d,%d",
+         (int) metrics.width, (int) metrics.height,
+         widget->scale.init_width, widget->scale.init_height);
   ui->on_window_resize (
       metrics.width / widget->app->hdpi,
       metrics.height / widget->app->hdpi);
+}
+
+void c_mainwindow::on_configure_notify () {
+  if (!ui)
+    return;
+
+  ui->on_window_configured ();
 }
 
 void c_frame::create (

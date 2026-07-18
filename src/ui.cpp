@@ -26,13 +26,46 @@
 //#define DEFAULT_WINDOW_HEIGHT (12 + std::min (640, (52 + (180 * NB_NUM_MODELS))))
 #define DEFAULT_WINDOW_HEIGHT MIN_WINDOW_HEIGHT
 #define MIN_WINDOW_WIDTH 640
-#define DEFAULT_WINDOW_WIDTH 620
+#define DEFAULT_WINDOW_WIDTH MIN_WINDOW_WIDTH
 
 #define METER_WIDTH 5
 
 extern const char *g_build_timestamp;
 
 void combobox_selected_callback (void *w_, void *user_data);
+static bool page_has_bank (_ui_page page);
+static _lane_bank bank_for_page (_ui_page page);
+
+static bool get_parent_window_size (
+    Display *display, Window parent,
+    double hdpi,
+    int *w, int *h) {
+
+  if (!display || !parent || !w || !h)
+    return false;
+
+  XWindowAttributes attr;
+  if (!XGetWindowAttributes (display, parent, &attr))
+    return false;
+
+  if (attr.width <= 0 || attr.height <= 0)
+    return false;
+
+  const double scale = hdpi > 0.0 ? hdpi : 1.0;
+  const int logical_w = (int) (attr.width / scale);
+  const int logical_h = (int) (attr.height / scale);
+
+  if (logical_w < MIN_WINDOW_WIDTH || logical_h < MIN_WINDOW_HEIGHT)
+    return false;
+
+  // Avoid using the root window size as a startup hint in standalone mode.
+  if (logical_w > 3000 || logical_h > 2200)
+    return false;
+
+  *w = logical_w;
+  *h = logical_h;
+  return true;
+}
 
 std::string path_dirname (const std::string &path) {
   const size_t pos = path.find_last_of ('/');
@@ -731,9 +764,17 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   parent = parent_;
   if (!parent)
     parent = DefaultRootWindow (display);
+
+  int initial_w = DEFAULT_WINDOW_WIDTH;
+  int initial_h = DEFAULT_WINDOW_HEIGHT;
+  if (parent_ &&
+      get_parent_window_size (
+        display, parent, app.hdpi, &initial_w, &initial_h)) {
+    debug ("initial parent window size %d,%d", initial_w, initial_h);
+  }
     
   if (!mainwindow.create (this, parent, "NeuralBlender", 0, 0, 
-                          DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)) {
+                          initial_w, initial_h)) {
     fprintf (stderr, "Cant' create main window!\n");
     return false;
   }
@@ -929,11 +970,11 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   //  hide_advanced_settings ();
   //}
   
-  mainwindow.show ();
   ui_ready = true;
   move_resize ();
+  mainwindow.show ();
   CP
-  XFlush (display);
+  //XFlush (display);
   CP
   //do_set_min_size = true;
   return true;
@@ -949,8 +990,13 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     os_get_window_metrics (mw, &metrics);
     ui_resize_lock = true;
     
-    int window_width = DEFAULT_WINDOW_WIDTH;
-    int window_height = DEFAULT_WINDOW_HEIGHT;
+    int window_width = std::max (MIN_WINDOW_WIDTH, mainwindow.w ());
+    int window_height = std::max (MIN_WINDOW_HEIGHT, mainwindow.h ());
+    debug ("move_resize: snap=%d visible=%d main=%d,%d metrics=%d,%d pending=%d,%d",
+           (int) snap_to_default, (int) metrics.visible,
+           mainwindow.w (), mainwindow.h (),
+           (int) metrics.width, (int) metrics.height,
+           pending_resize_w, pending_resize_h);
     if (!snap_to_default && metrics.visible) {
       window_width = std::max (MIN_WINDOW_WIDTH, (int) (metrics.width / mw->app->hdpi));
       window_height = std::max (MIN_WINDOW_HEIGHT, (int) (metrics.height / mw->app->hdpi));
@@ -961,19 +1007,13 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     //if (do_set_min_size)
     mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
     
-    cont_pedals.move_resize (0, 128, window_width, window_height - 80 - 56);
-    cont_models.move_resize (0, 128, window_width, window_height - 80 - 56);
-    cont_cabs.move_resize (0, 128, window_width, window_height - 80 - 56);
-    cont_other.move_resize (0, 128, window_width, window_height - 80 - 56);
+    const int page_y = 128;
+    const int page_h = window_height - 80 - 56;
+    cont_pedals.move_resize (0, page_y, window_width, page_h);
+    cont_models.move_resize (0, page_y, window_width, page_h);
+    cont_cabs.move_resize (0, page_y, window_width, page_h);
+    cont_other.move_resize (0, page_y, window_width, page_h);
     
-    const int panelwidth = window_width - 32;
-    frame_other_volumepresence.move_resize (16, 0, panelwidth / 2 - 8, 120);
-    frame_other_noisegate.move_resize (panelwidth / 2 + 24, 0, panelwidth / 2 - 8, 120);
-    frame_other_linkexcl.move_resize (16, 136, panelwidth, 120);
-    frame_other_misc.move_resize (16, 272, panelwidth, window_height - 416);
-    const int about_y = frame_other_misc.h () - 60;
-    btn_other_prefs.move (frame_other_misc.w () - 280, about_y);
-    btn_other_about.move (frame_other_misc.w () - 140, about_y);
     sync_page_visibility ();
     
     int lane_width = window_width - 32;
@@ -982,7 +1022,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     const int lane_count = NB_NUM_MODELS;
     const int total_gap = (lane_count > 1) ? (lane_count - 1) * lane_gap : 0;
     //const int lane_area = window_height - lane_top - bottom_reserve - total_gap;
-    const int lane_area = cont_models.h () - total_gap;
+    const int lane_area = page_h - total_gap;
     int lane_height = std::max (1, lane_area / lane_count);
     
     debug ("window w/h %d,%d", window_width, window_height);
@@ -999,19 +1039,26 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     
     tuner.move_resize (4, 4, window_width - 8, 56);
     
-    size_t i;
-    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
-      c_lane_widgets *bank_lanes = lanes_for_bank ((_lane_bank) bank);
+    if (page_has_bank (visible_page)) {
+      size_t i;
+      c_lane_widgets *bank_lanes = lanes_for_bank (visible_bank);
       for (i = 0; i < NB_NUM_MODELS; i++) {
         bank_lanes [i].move_resize (
           16, lane_top + i * (lane_height + lane_gap), lane_width, lane_height);
       }
-    }
-    
-    const int lane_bottom = lane_top + lane_count * lane_height + total_gap;
-    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
-      meter_in [bank].move_resize (
+      
+      const int lane_bottom = lane_top + lane_count * lane_height + total_gap;
+      meter_in [visible_bank].move_resize (
         5, lane_top + 4, 5, std::max (1, lane_bottom - lane_top - 8));
+    } else {
+      const int panelwidth = window_width - 32;
+      frame_other_volumepresence.move_resize (16, 0, panelwidth / 2 - 8, 120);
+      frame_other_noisegate.move_resize (panelwidth / 2 + 24, 0, panelwidth / 2 - 8, 120);
+      frame_other_linkexcl.move_resize (16, 136, panelwidth, 120);
+      frame_other_misc.move_resize (16, 272, panelwidth, window_height - 416);
+      const int about_y = frame_other_misc.h () - 60;
+      btn_other_prefs.move (frame_other_misc.w () - 280, about_y);
+      btn_other_about.move (frame_other_misc.w () - 140, about_y);
     }
     
     ui_resize_lock = false;
@@ -1084,9 +1131,6 @@ void c_neuralblender_ui::set_linked_calib_for_bank (_lane_bank bank, bool b) {
   state.banks [bank].linked_calib = b;
 }
 
-static bool page_has_bank (_ui_page page);
-static _lane_bank bank_for_page (_ui_page page);
-
 void c_neuralblender_ui::on_bank_switch (c_widget *w, int n) { CP
   (void) w;
   if (n >= PAGE_PEDAL && n < PAGE_COUNT) {
@@ -1096,6 +1140,7 @@ void c_neuralblender_ui::on_bank_switch (c_widget *w, int n) { CP
   }
 
   sync_widgets_from_state (state);
+  move_resize ();
 }
 
 void c_neuralblender_ui::sync_page_visibility () {
@@ -1524,9 +1569,23 @@ void c_neuralblender_ui::on_window_resize (int w, int h) {
   if (!ui_ready || ui_resize_lock)
     return;
 
+  debug ("on_window_resize: %d,%d", w, h);
   pending_resize_w = w;
   pending_resize_h = h;
   ui_resize_pending = true;
+}
+
+void c_neuralblender_ui::on_window_configured () {
+  if (!ui_ready || ui_resize_lock || !ui_resize_pending)
+    return;
+
+  debug ("on_window_configured: consume pending resize %d,%d",
+         pending_resize_w, pending_resize_h);
+  ui_resize_pending = false;
+  move_resize ();
+  mainwindow.show_children ();
+  pending_resize_w = 0;
+  pending_resize_h = 0;
 }
 
 bool c_neuralblender_ui::request_window_size (int w, int h) {
@@ -1582,8 +1641,11 @@ int c_neuralblender_ui::idle () {
   }
 
   if (ui_resize_pending && !ui_resize_lock) {
+    debug ("idle: consume pending resize %d,%d", pending_resize_w, pending_resize_h);
     ui_resize_pending = false;
     move_resize ();
+    pending_resize_w = 0;
+    pending_resize_h = 0;
   }
 
   if (state.do_vu) {

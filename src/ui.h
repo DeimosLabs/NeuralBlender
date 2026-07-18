@@ -234,6 +234,7 @@ public:
           void on_bank_switch (c_widget *w, int n)                ;
           void sync_page_visibility ()                            ;
   virtual void on_window_resize (int w, int h)                    ;
+          void on_window_configured ()                            ;
   virtual bool request_window_size (int w, int h)                 ;
           void on_about ()                                        ;
           void on_prefs ()                                        ;
