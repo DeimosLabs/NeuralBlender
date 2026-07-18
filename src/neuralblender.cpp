@@ -1420,13 +1420,33 @@ c_neuralblender::c_neuralblender () { CP
         calib_target_db))
       set_calib_target_db (calib_target_db);
   }
-
+  
+  m_conv_presence.load_ir ((float *) data_gx_presence_contrast_f32,
+                           data_gx_presence_contrast_f32_len / sizeof (float),
+                           48000);
+  
   m_bypass.store (false, std::memory_order_relaxed);
   update_mutes ();
-
 }
 
 c_neuralblender::~c_neuralblender () { CP
+}
+
+bool c_neuralblender::set_master_gain (float db) {
+  float gain = db_to_gain (db);
+  if (gain > 10.0f) return false; // TODO: should we allow positive gain here?
+  if (gain <  0.0f) return false;
+  
+  master_gain = gain;
+  return true;
+}
+
+bool c_neuralblender::set_presence (float pres) {
+  if (pres < 0.0f) return false;
+  if (pres > 1.0f) return false;
+  
+  presence = pres;
+  return true;
 }
 
 // i hate dup code :/
@@ -1560,6 +1580,8 @@ void c_neuralblender::set_samplerate (uint32_t sr) { CP
         banks [bank].meters_out [i]->samplerate = (int) sr;
     }
   }
+  
+  m_conv_presence.set_samplerate (sr);
   debug ("end");
 }
 
@@ -1580,6 +1602,8 @@ void c_neuralblender::set_blocksize (uint32_t bs) { CP
     m_delay_bufs [i].resize (MAX_BLOCK_SIZE);
     m_model_bufs [i].resize (MAX_BLOCK_SIZE);
   }
+  
+  m_conv_presence.set_blocksize (bs);
 }
 
 bool c_neuralblender::dcflip (_lane_bank bank, size_t which, bool b) {
@@ -1726,6 +1750,8 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
   state.bypass = bypass ();
   state.do_vu = do_vu;
   state.mute_all = mute_all;
+  state.master_gain = master_gain;
+  state.presence = presence;
   state.tuner_on = tuner_on;
   state.tuner_base_freq = tuner_base_freq;
   state.noisegate_on = noisegate_on;
@@ -1909,12 +1935,12 @@ static bool bank_exclusive_empty (const c_model_bank &bank) {
   return lane >= NB_NUM_MODELS || !bank.lanes [lane].loaded ();
 }
 
-static void final_clamp (float *out, uint32_t n) {
+static void final_clamp (float *out, uint32_t n, float master_gain) {
   if (!out)
     return;
 
   for (uint32_t i = 0; i < n; ++i)
-    out [i] = std::clamp (out [i], -1.0f, 1.0f);
+    out [i] = std::clamp (out [i] * master_gain, -1.0f, 1.0f);
 }
 
 
@@ -2135,6 +2161,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
   }
 
   float *process_in = prepare_input_buffer (in, out, nframes);
+  bool do_presence = true;
 
   uint32_t new_mask =
     pending_lane_mask.load (std::memory_order_acquire);
@@ -2182,11 +2209,14 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     update_loaded_output_meters (BANK_CAB);
     return;
   }
-
+  
+  // here we should keep realloc/resizing to a minimum
   if (m_stage_buf_a.size () < nframes)
     m_stage_buf_a.resize (nframes);
   if (m_stage_buf_b.size () < nframes)
     m_stage_buf_b.resize (nframes);
+  if (m_presence_buf.size () < nframes)
+    m_presence_buf.resize (nframes);
 
   if (!xfade_active) {
     const uint32_t mask = active_lane_mask.load (std::memory_order_acquire);
@@ -2215,7 +2245,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     render_bank (
       BANK_CAB, m_stage_buf_b.data (), out, nframes,
       cab_mask, cab_mask, 0, 1);
-
+    
     if (xfade_pos + nframes >= xfade_len) {
       active_lane_mask.store (xfade_new_mask, std::memory_order_release);
       xfade_active = false;
@@ -2225,5 +2255,18 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     }
   }
 
-  final_clamp (out, nframes);
+  const float presence_mix = std::clamp (presence, 0.0f, 1.0f);
+  if (presence_mix > 0.0f && do_presence && m_conv_presence.ready ()) {
+    m_conv_presence.process_block (out, m_presence_buf.data (), nframes);
+
+    constexpr float half_pi = 1.57079632679489661923f;
+    const float angle = presence_mix * half_pi;
+    const float dry_gain = cosf (angle);
+    const float wet_gain = sinf (angle);
+
+    for (uint32_t i = 0; i < nframes; i++)
+      out [i] = out [i] * dry_gain + m_presence_buf [i] * wet_gain;
+  }
+
+  final_clamp (out, nframes, master_gain);
 }

@@ -75,6 +75,8 @@ struct Plugin : public c_lv2_urids {
   const float *noisegate_release = NULL;
   const float *tuner_on = NULL;
   const float *tuner_base_freq = NULL;
+  const float *master_gain = NULL;
+  const float *presence = NULL;
   float *noisegate_gain = NULL;
   float *tuner_note = NULL;
   float *tuner_cents_off = NULL;
@@ -102,6 +104,8 @@ struct Plugin : public c_lv2_urids {
   float last_noisegate_release = 20.0;
   float last_tuner_on = 0.0;
   float last_tuner_base_freq = 440.0;
+  float last_master_gain = 0.0;
+  float last_presence = 0.0;
   bool base_lane_mute [BANK_COUNT] [NB_NUM_MODELS] = {};
   bool host_bypass = false;
 
@@ -915,6 +919,14 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
       self->tuner_base_freq = (const float *) data;
     break;
 
+    case PORT_MASTER_GAIN:
+      self->master_gain = (const float *) data;
+    break;
+
+    case PORT_PRESENCE:
+      self->presence = (const float *) data;
+    break;
+
     case PORT_NOISEGATE_GAIN:
       self->noisegate_gain = (float *) data;
     break;
@@ -1166,6 +1178,14 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	    self->blender.tuner_base_freq = v;
 	    self->blender.pitchtracker.set_base_freq ((int) lrintf (v));
 	  }
+
+	  if (read_changed (
+          self->master_gain, self->last_master_gain, v))
+	    self->blender.set_master_gain (v);
+
+	  if (read_changed (
+          self->presence, self->last_presence, v))
+	    self->blender.set_presence (v);
 	  
   // check all lane parameters
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {

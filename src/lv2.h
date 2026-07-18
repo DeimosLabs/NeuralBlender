@@ -154,6 +154,8 @@ enum nb_lv2_port {
   PORT_TUNER_NOTE,
   PORT_TUNER_CENTS_OFF,
   PORT_TUNER_FREQ,
+  PORT_MASTER_GAIN,
+  PORT_PRESENCE,
 
   PORT_COUNT,
 
@@ -401,6 +403,8 @@ public:
   void on_tuner (c_widget *w, bool b) override;
   void on_tuner_base_freq (c_widget *w, float f) override;
   void on_calib_target_db (c_widget *w, float f) override;
+  void on_master_gain (c_widget *w, float f) override;
+  void on_presence (c_widget *w, float f) override;
   void apply_prefs (t_prefs &p) override;
   bool request_window_size (int w, int h) override;
 

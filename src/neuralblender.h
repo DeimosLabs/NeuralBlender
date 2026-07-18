@@ -154,6 +154,8 @@ struct c_neuralblender_state {
     do_vu = other.do_vu;
     showadvanced = other.showadvanced;
     mute_all = other.mute_all;
+    master_gain = other.master_gain;
+    presence = other.presence;
     tuner_on = other.tuner_on;
     tuner_base_freq = other.tuner_base_freq;
     noisegate_on = other.noisegate_on;
@@ -174,6 +176,8 @@ struct c_neuralblender_state {
   bool do_vu = true;
   bool showadvanced = false;
   bool mute_all = false;
+  float master_gain = 1.0f;
+  float presence = 0.0f;
   bool tuner_on = false;
   float tuner_base_freq = 440.0f;
   bool noisegate_on = false;
@@ -452,6 +456,8 @@ public:
                     uint32_t xfade_pos,
                     uint32_t xfade_len);
   int tuner_freq ();
+  bool set_master_gain (float db);
+  bool set_presence (float pres);
   
   //static void get_calib_data (std::vector<float> &v, bool bass);
   
@@ -459,6 +465,8 @@ public:
   c_model_bank banks [BANK_COUNT];
   c_pitchtracker pitchtracker;
   
+  float master_gain = 1.0f;
+  float presence = 0.0f;
   bool do_vu = true;
   bool noisegate_on = false;
   bool tuner_on = false;
@@ -479,13 +487,16 @@ private:
   void request_mix_update ();
   bool consistent_calib_state (bool &enabled,
       c_neuralblender_state &state) const;
-  std::vector <float> m_delay_bufs [NB_NUM_MODELS];
-  std::vector <float> m_model_bufs [NB_NUM_MODELS];
-  std::vector <float> m_input_buf;
-  std::vector <float> m_stage_buf_a;
-  std::vector <float> m_stage_buf_b;
-  std::atomic<bool> m_bypass { false };
-  std::atomic<bool> xfade_pending { false };
+  
+  c_convolver           m_conv_presence;
+  std::vector<float>    m_delay_bufs [NB_NUM_MODELS];
+  std::vector<float>    m_model_bufs [NB_NUM_MODELS];
+  std::vector<float>    m_input_buf;
+  std::vector<float>    m_stage_buf_a;
+  std::vector<float>    m_stage_buf_b;
+  std::vector<float>    m_presence_buf;
+  std::atomic<bool>     m_bypass { false };
+  std::atomic<bool>     xfade_pending { false };
   std::atomic<uint32_t> active_lane_mask { 0 };
   std::atomic<uint32_t> pending_lane_mask { 0 };
   std::atomic<uint32_t> loaded_lane_mask { 0 };

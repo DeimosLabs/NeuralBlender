@@ -106,6 +106,8 @@ public:
   void on_tuner (c_widget *w, bool b);
   void on_tuner_base_freq (c_widget *w, float f);
   void on_calib_target_db (c_widget *w, float f);
+  void on_master_gain (c_widget *w, float f);
+  void on_presence (c_widget *w, float f);
   //void on_excl (c_widget *w, int which);
   void on_bypass (c_widget *w, bool b);
   void on_about (c_widget *w);
@@ -296,6 +298,18 @@ void c_standalone_ui::on_calib_target_db (c_widget *w, float value) {
   prefs.calib_target_db = value;
   write_prefs_to_config (configfile, prefs);
   g_blender.set_calib_target_db (value);
+}
+
+void c_standalone_ui::on_master_gain (c_widget *w, float value) {
+  (void) w;
+  state.master_gain = db_to_gain (value);
+  g_blender.set_master_gain (value);
+}
+
+void c_standalone_ui::on_presence (c_widget *w, float value) {
+  (void) w;
+  state.presence = value;
+  g_blender.set_presence (value);
 }
 
 void c_standalone_ui::on_linked_calib (c_widget *w, bool b) {

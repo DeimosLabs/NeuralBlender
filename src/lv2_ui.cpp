@@ -364,6 +364,18 @@ void c_lv2_ui::on_calib_target_db (c_widget *w, float f) {
   write_control (PORT_CALIB_TARGET_DB, f);
 }
 
+void c_lv2_ui::on_master_gain (c_widget *w, float f) {
+  (void) w;
+  state.master_gain = db_to_gain (f);
+  write_control (PORT_MASTER_GAIN, f);
+}
+
+void c_lv2_ui::on_presence (c_widget *w, float f) {
+  (void) w;
+  state.presence = f;
+  write_control (PORT_PRESENCE, f);
+}
+
 void c_lv2_ui::apply_prefs (t_prefs &p) {
   c_neuralblender_ui::apply_prefs (p);
   write_control (PORT_LINKED_CALIB_PEDAL, p.linked_calib ? 1.0f : 0.0f);
@@ -471,11 +483,11 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
   if (port == PORT_CALIB_TARGET_DB) {
     prefs.calib_target_db = value;
-    text_other_calib.set_text (
-      std::to_string (prefs.calib_target_db).c_str ());
+    char buf [64];
+    snprintf (buf, sizeof (buf), "%.1f", prefs.calib_target_db);
+    text_other_calib.set_text (buf);
     if (prefswindow.widget) {
-      char buf [64];
-      snprintf (buf, sizeof (buf), "%.6g", prefs.calib_target_db);
+      snprintf (buf, sizeof (buf), "%.1f", prefs.calib_target_db);
       prefswindow.text_calibdb.set_text (buf);
     }
     updating_from_state = old_updating_from_state;
@@ -553,8 +565,25 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
   if (port == PORT_TUNER_BASE_FREQ) {
     state.tuner_base_freq = value;
     prefs.tuner_base_freq = value;
-    text_other_tuner.set_text (
-      std::to_string (prefs.tuner_base_freq).c_str ());
+    char buf [64];
+    snprintf (buf, sizeof (buf), "%.3f", prefs.tuner_base_freq);
+    text_other_tuner.set_text (buf);
+    updating_from_state = old_updating_from_state;
+    updating_from_host = false;
+    return;
+  }
+
+  if (port == PORT_MASTER_GAIN) {
+    state.master_gain = db_to_gain (value);
+    knob_mastervolume.set_value (value);
+    updating_from_state = old_updating_from_state;
+    updating_from_host = false;
+    return;
+  }
+
+  if (port == PORT_PRESENCE) {
+    state.presence = value;
+    knob_presence.set_value (value);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;
@@ -840,6 +869,8 @@ void c_lv2_ui::subscribe_ports () {
     PORT_TUNER_NOTE,
     PORT_TUNER_CENTS_OFF,
     PORT_TUNER_FREQ,
+    PORT_MASTER_GAIN,
+    PORT_PRESENCE,
   };
 
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {

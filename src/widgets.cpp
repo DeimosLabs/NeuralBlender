@@ -2128,6 +2128,20 @@ void c_knob::on_change () {
       ui->on_delay (this, value);
     break;
 
+    case ROLE_MASTER:
+      debug ("master gain %f", value);
+      if (ui)
+        ui->state.master_gain = g;
+      ui->on_master_gain (this, value);
+    break;
+
+    case ROLE_PRESENCE:
+      debug ("presence %f", value);
+      if (ui)
+        ui->state.presence = value;
+      ui->on_presence (this, value);
+    break;
+
     case ROLE_NOISETHRESH:
       debug ("noise threshold set to %f", value);
       ui->on_noisethresh (this, value);

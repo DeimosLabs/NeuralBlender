@@ -225,6 +225,8 @@ public:
   virtual void on_tuner (c_widget *w, bool b)                  = 0;
   virtual void on_tuner_base_freq (c_widget *w, float f)       = 0;
   virtual void on_calib_target_db (c_widget *w, float f)       = 0;
+  virtual void on_master_gain (c_widget *w, float f)           = 0;
+  virtual void on_presence (c_widget *w, float f)              = 0;
   virtual void on_threshgain (c_widget *w, float f)            = 0;
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;

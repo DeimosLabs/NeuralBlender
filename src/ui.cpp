@@ -816,6 +816,18 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   frame_other_volumepresence.create (this, cont_other.widget, "", 16, 16, 512, 128);
   knob_mastervolume.create (this, frame_other_volumepresence.widget, "Master", 16, 12, 80, 96);
   knob_presence.create (this, frame_other_volumepresence.widget, "Presence", 116, 12, 80, 96);
+  knob_mastervolume.set_min (-40);
+  knob_mastervolume.set_max (12);
+  knob_mastervolume.set_value (gain_to_db (state.master_gain));
+  knob_mastervolume.set_default (0);
+  knob_mastervolume.set_step (0.1);
+  knob_mastervolume.role = ROLE_MASTER;
+  knob_presence.set_min (0);
+  knob_presence.set_max (1);
+  knob_presence.set_value (state.presence);
+  knob_presence.set_default (0);
+  knob_presence.set_step (0.01);
+  knob_presence.role = ROLE_PRESENCE;
   
   frame_other_noisegate.create (this, cont_other.widget, "", 16, 16, 512, 128);
   label_other_noisegate.create (this, frame_other_noisegate.widget, "Noise gate:", 16, 8, 200, 24);
@@ -959,8 +971,9 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     frame_other_noisegate.move_resize (panelwidth / 2 + 24, 0, panelwidth / 2 - 8, 120);
     frame_other_linkexcl.move_resize (16, 136, panelwidth, 120);
     frame_other_misc.move_resize (16, 272, panelwidth, window_height - 416);
-    btn_other_prefs.move (frame_other_misc.w () - 280, btn_other_prefs.y ());
-    btn_other_about.move (frame_other_misc.w () - 140, btn_other_prefs.y ());
+    const int about_y = frame_other_misc.h () - 60;
+    btn_other_prefs.move (frame_other_misc.w () - 280, about_y);
+    btn_other_about.move (frame_other_misc.w () - 140, about_y);
     sync_page_visibility ();
     
     int lane_width = window_width - 32;
@@ -1350,6 +1363,8 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
   state.noiserelease = p.noiserelease;
   state.tuner_base_freq = p.tuner_base_freq;
   btn_noisegate.set_value (p.noisegate_on);
+  knob_mastervolume.set_value (gain_to_db (state.master_gain));
+  knob_presence.set_value (state.presence);
   knob_noisethresh.set_value (p.noisethresh);
   knob_noiseattack.set_value (p.noiseattack);
   knob_noisehold.set_value (p.noisehold);
@@ -1675,6 +1690,8 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   sync_page_visibility ();
   
   btn_noisegate.set_value (state.noisegate_on);
+  knob_mastervolume.set_value (gain_to_db (state.master_gain));
+  knob_presence.set_value (state.presence);
   knob_noisethresh.set_value (state.noisethresh);
   knob_noiseattack.set_value (state.noiseattack);
   knob_noisehold.set_value (state.noisehold);
