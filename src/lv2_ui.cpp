@@ -306,7 +306,6 @@ void c_lv2_ui::on_noisethresh (c_widget *w, float f) {
   CP
   state.noisethresh = f;
   prefs.noisethresh = f;
-  write_prefs_to_config (configfile, prefs);
   write_control (PORT_NOISEGATE_THRESHOLD, f);
 }
 
@@ -315,7 +314,6 @@ void c_lv2_ui::on_noiseattack (c_widget *w, float f) {
   CP
   state.noiseattack = f;
   prefs.noiseattack = f;
-  write_prefs_to_config (configfile, prefs);
   write_control (PORT_NOISEGATE_ATTACK, f);
 }
 
@@ -324,7 +322,6 @@ void c_lv2_ui::on_noisehold (c_widget *w, float f) {
   CP
   state.noisehold = f;
   prefs.noisehold = f;
-  write_prefs_to_config (configfile, prefs);
   write_control (PORT_NOISEGATE_HOLD, f);
 }
 
@@ -333,7 +330,6 @@ void c_lv2_ui::on_noiserelease (c_widget *w, float f) {
   CP
   state.noiserelease = f;
   prefs.noiserelease = f;
-  write_prefs_to_config (configfile, prefs);
   write_control (PORT_NOISEGATE_RELEASE, f);
 }
 
@@ -353,14 +349,12 @@ void c_lv2_ui::on_tuner_base_freq (c_widget *w, float f) {
   (void) w;
   state.tuner_base_freq = f;
   prefs.tuner_base_freq = f;
-  write_prefs_to_config (configfile, prefs);
   write_control (PORT_TUNER_BASE_FREQ, f);
 }
 
 void c_lv2_ui::on_calib_target_db (c_widget *w, float f) {
   (void) w;
   prefs.calib_target_db = f;
-  write_prefs_to_config (configfile, prefs);
   write_control (PORT_CALIB_TARGET_DB, f);
 }
 
@@ -939,12 +933,22 @@ static LV2UI_Handle instantiate (
   return (LV2UI_Handle) ui;
 }
 
+static void save_lv2_ui_config (c_lv2_ui *ui) {
+  if (!ui || !ui->ui_ready)
+    return;
+
+  ui->write_prefs_to (ui->prefs);
+  ui->write_calib_state_if_consistent ();
+  write_prefs_to_config (ui->configfile, ui->prefs);
+}
+
 static void cleanup (LV2UI_Handle handle) { CP
   c_lv2_ui *ui = (c_lv2_ui *) handle;
   if (!ui)
     return;
   
   CP
+  save_lv2_ui_config (ui);
   delete ui;
   CP
 }

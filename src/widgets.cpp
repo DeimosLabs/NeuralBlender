@@ -2442,7 +2442,6 @@ static void filepicker_response (void *w_, void *user_data) { CP
   if (fp->ui && !fp->current_dir.empty ()) {
     fp->ui->configfile.set_item (
       cwd_config_key_for_bank (fp->bank), fp->current_dir);
-    fp->ui->configfile.write_file ();
   }
 
   fp->dialog = NULL;

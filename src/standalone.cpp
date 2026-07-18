@@ -216,6 +216,7 @@ void c_standalone_ui::on_calibrate (c_widget *w, bool b) { CP
   if (w->bank < BANK_COUNT && which < NB_NUM_MODELS)
     state.banks [w->bank].lanes [which].do_calib = b;
   apply_effective_controls ();
+  write_calib_state_if_consistent ();
   
   const _lane_bank bank =
     w->bank < BANK_COUNT ? (_lane_bank) w->bank : BANK_AMP;
@@ -233,7 +234,9 @@ void c_standalone_ui::on_muteall (c_widget *w, bool b) {
 }
 
 void c_standalone_ui::on_vu (c_widget *w, bool b) {
+  (void) w;
   debug ("b=%d", (int) b);
+  prefs.vu_on = b;
   g_blender->do_vu = b;
 }
 
@@ -247,7 +250,6 @@ void c_standalone_ui::on_noisethresh (c_widget *w, float value) {
   (void) w;
   state.noisethresh = value;
   prefs.noisethresh = value;
-  write_prefs_to_config (configfile, prefs);
   g_blender->noisegate.set_threshold (value);
 }
 
@@ -255,7 +257,6 @@ void c_standalone_ui::on_noiseattack (c_widget *w, float value) {
   (void) w;
   state.noiseattack = value;
   prefs.noiseattack = value;
-  write_prefs_to_config (configfile, prefs);
   g_blender->noisegate.set_attack (value);
 }
 
@@ -263,7 +264,6 @@ void c_standalone_ui::on_noisehold (c_widget *w, float value) {
   (void) w;
   state.noisehold = value;
   prefs.noisehold = value;
-  write_prefs_to_config (configfile, prefs);
   g_blender->noisegate.set_hold (value);
 }
 
@@ -271,7 +271,6 @@ void c_standalone_ui::on_noiserelease (c_widget *w, float value) {
   (void) w;
   state.noiserelease = value;
   prefs.noiserelease = value;
-  write_prefs_to_config (configfile, prefs);
   g_blender->noisegate.set_release (value);
 }
 
@@ -282,6 +281,7 @@ void c_standalone_ui::on_threshgain (c_widget *w, float f) {
 
 void c_standalone_ui::on_tuner (c_widget *w, bool b) {
   (void) w;
+  prefs.tuner_on = b;
   g_blender->tuner_on = b;
 }
 
@@ -289,7 +289,6 @@ void c_standalone_ui::on_tuner_base_freq (c_widget *w, float value) {
   (void) w;
   state.tuner_base_freq = value;
   prefs.tuner_base_freq = value;
-  write_prefs_to_config (configfile, prefs);
   g_blender->tuner_base_freq = value;
   g_blender->pitchtracker.set_base_freq ((int) lrintf (value));
 }
@@ -297,7 +296,6 @@ void c_standalone_ui::on_tuner_base_freq (c_widget *w, float value) {
 void c_standalone_ui::on_calib_target_db (c_widget *w, float value) {
   (void) w;
   prefs.calib_target_db = value;
-  write_prefs_to_config (configfile, prefs);
   g_blender->set_calib_target_db (value);
 }
 
@@ -453,6 +451,15 @@ static std::thread ui_thread;
 static std::atomic<bool> ui_started { false };
 
 static c_standalone_ui *g_ui = nullptr;
+
+static void save_standalone_config () {
+  if (!g_ui || !g_ui->ui_ready)
+    return;
+
+  g_ui->write_prefs_to (g_ui->prefs);
+  g_ui->write_calib_state_if_consistent ();
+  write_prefs_to_config (g_ui->configfile, g_ui->prefs);
+}
 
 static void refresh_bank_stats (c_neuralblender_ui *ui, _lane_bank bank) {
   if (!ui || !ui->blender)
@@ -638,6 +645,7 @@ int main (int argc, char **argv) {
 #ifdef HAVE_GUI
     if (ui_thread.joinable ())
       ui_thread.join ();
+    save_standalone_config ();
 #endif
     return 0;
   }
@@ -649,6 +657,7 @@ int main (int argc, char **argv) {
     g_running = false;
     if (ui_thread.joinable ())
       ui_thread.join ();
+    save_standalone_config ();
 #endif
     return 1;
   }
@@ -665,6 +674,7 @@ int main (int argc, char **argv) {
 #ifdef HAVE_GUI
   if (ui_thread.joinable ())
     ui_thread.join ();
+  save_standalone_config ();
 #endif
   CP
   return 0;

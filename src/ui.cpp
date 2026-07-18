@@ -1252,7 +1252,6 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
       if (lane < NB_NUM_MODELS && btn->bank < BANK_COUNT) {
         state.banks [btn->bank].lanes [lane].do_calib = value;
       }
-      write_calib_state_if_consistent ();
       on_calibrate (btn, value);
     break;
 
@@ -1307,7 +1306,6 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
 
     case ROLE_VUTOGGLE: CP
       prefs.vu_on = value;
-      write_prefs_to_config (configfile, prefs);
       vu_on (value);
       on_vu (btn, value);
     break;
@@ -1331,14 +1329,12 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     case ROLE_NOISEGATE: CP
       state.noisegate_on = value;
       prefs.noisegate_on = value;
-      write_prefs_to_config (configfile, prefs);
       on_noisegate (btn, value);
     break;
     
     case ROLE_TUNER: CP
       state.tuner_on = value;
       prefs.tuner_on = value;
-      write_prefs_to_config (configfile, prefs);
       on_tuner (btn, value);
       if (value)
         tuner.show ();
@@ -1462,7 +1458,6 @@ void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
   apply_ui_prefs (p);
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
     state.banks [bank].linked_calib = p.linked_calib;
-  write_prefs_to_config (configfile, p);
 }
 
 void c_neuralblender_ui::write_prefs_to (t_prefs &p) { CP
@@ -1756,7 +1751,6 @@ void c_neuralblender_ui::write_calib_state_if_consistent () {
     return;
 
   configfile.set_item (CONFIG_KEY_NAME_CALIB, all_on ? "1" : "0");
-  configfile.write_file();
 }
 
 void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &state_,
