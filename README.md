@@ -1,12 +1,14 @@
 # NeuralBlender
 
-A simple amp modeling plugin based on RTNeural and NeuralAmpModeler (NAM)
+A simple, efficient but feature-rich amp modeling plugin based on RTNeural and NeuralAmpModeler (NAM)
 
 Features:
   - Supports nam A1, nam A2, aidax, and json model files.
-  - Standalone app and LV2 plugin
-  - Can load up to 4 models simultaneously 
+  - Full IR loader for cab sim
+  - Complete stompbox->amp->cab/IR signal flow with 3 "banks" of models
+  - Can load up to 4 models on each bank simultaneously 
   - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
+  - Standalone app and LV2 plugin
   - VU meters can be disabled to save a tiny bit of DSP load
   - Calibration target dB is now a user defined setting
   - "Linked" calibration mode follows loudest model which has calib. enabled
@@ -20,10 +22,11 @@ Features:
     - pre-delay for phasing correction/effects
     - optional DC flip for more phasing effects
     - optional level calibration
+    - pitch shift for IR's
 
-On my Intel Core7 ultra, it loads 4 models in the middle of a busy live session, 64 sample buffers / 3 periods, and DSP load typically stays below 50%, no xruns. (with DSP threads pinned to p-cores)
+On my Intel Core7 ultra, it loads 5 or 6 models in the middle of a busy live session, 64 sample buffers / 3 periods, and DSP load typically stays below 50%, no xruns. (with DSP threads pinned to p-cores)
 
-Features considered for future versions: VST plugin, series mode(s), optionally more than 4 lanes, lane groups, impulse response / convolution, etc...
+Features considered for future versions: VST plugin, series mode(s), optionally more than 4 lanes per model bank, lane groups, etc...
 
 ![NeuralBlender custom UI](data/screenshot-ui.png)
 ![NeuralBlender in Ardour](data/screenshot-ardour.png)
