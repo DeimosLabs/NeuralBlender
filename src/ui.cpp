@@ -1349,17 +1349,17 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     
     case ROLE_TUNER_UP:
       state.tuner_base_freq *= SEMITONE_MULTIPLIER;
-      tuner.tuner.set_base_freq ((int) state.tuner_base_freq);
+      on_tuner_base_freq (btn, state.tuner_base_freq);
     break;
     
     case ROLE_TUNER_DOWN:
       state.tuner_base_freq /= SEMITONE_MULTIPLIER;
-      tuner.tuner.set_base_freq ((int) state.tuner_base_freq);
+      on_tuner_base_freq (btn, state.tuner_base_freq);
     break;
 
     case ROLE_TUNER_DEFAULT:
-      state.tuner_base_freq = 440.0;
-      tuner.tuner.set_base_freq (440);
+      state.tuner_base_freq = 440.0f;
+      on_tuner_base_freq (btn, state.tuner_base_freq);
     break;
 
     case ROLE_EXCL_TOGGLE: CP

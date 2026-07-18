@@ -246,9 +246,10 @@ void c_pitchtracker::process_block (float *in, int nframes_) {
     publish_snapshot ();
 }
 
-void c_pitchtracker::set_base_freq (int f) {
+void c_pitchtracker::set_base_freq (int f) { CP
   if (f >= 220 && f <= 880)
     basefreq = f;
+  CP
 }
 
 void c_pitchtracker::set_block_size (size_t sz) { CP
