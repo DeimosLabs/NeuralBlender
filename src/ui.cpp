@@ -728,10 +728,10 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   img_logo.create (this, mainwindow.widget, "", 0, 0, 256, 32);
   img_logo.set_png (data_textlogo_1024x128_png);
   
-  btn_tab_pedals.create (this, mainwindow.widget, "PEDALS", 0, 0, 86, 50);
+  btn_tab_pedals.create (this, mainwindow.widget, "PEDAL", 0, 0, 86, 50);
   btn_tab_pedals.role = ROLE_BANKSWITCH;
   btn_tab_pedals.bank = BANK_PEDAL;
-  btn_tab_models.create (this, mainwindow.widget, "AMPS", 0, 0, 86, 50);
+  btn_tab_models.create (this, mainwindow.widget, "AMP", 0, 0, 86, 50);
   btn_tab_models.role = ROLE_BANKSWITCH;
   btn_tab_models.bank = BANK_AMP;
   btn_tab_cabs.create (this, mainwindow.widget, "CAB/IR", 0, 0, 86, 50);
