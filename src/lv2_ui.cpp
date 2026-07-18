@@ -313,18 +313,27 @@ void c_lv2_ui::on_noisethresh (c_widget *w, float f) {
 void c_lv2_ui::on_noiseattack (c_widget *w, float f) {
   (void) w;
   CP
+  state.noiseattack = f;
+  prefs.noiseattack = f;
+  write_prefs_to_config (configfile, prefs);
   write_control (PORT_NOISEGATE_ATTACK, f);
 }
 
 void c_lv2_ui::on_noisehold (c_widget *w, float f) {
   (void) w;
   CP
+  state.noisehold = f;
+  prefs.noisehold = f;
+  write_prefs_to_config (configfile, prefs);
   write_control (PORT_NOISEGATE_HOLD, f);
 }
 
 void c_lv2_ui::on_noiserelease (c_widget *w, float f) {
   (void) w;
   CP
+  state.noiserelease = f;
+  prefs.noiserelease = f;
+  write_prefs_to_config (configfile, prefs);
   write_control (PORT_NOISEGATE_RELEASE, f);
 }
 
@@ -340,6 +349,21 @@ void c_lv2_ui::on_tuner (c_widget *w, bool b) {
   write_control (PORT_TUNER_ON, b ? 1.0f : 0.0f);
 }
 
+void c_lv2_ui::on_tuner_base_freq (c_widget *w, float f) {
+  (void) w;
+  state.tuner_base_freq = f;
+  prefs.tuner_base_freq = f;
+  write_prefs_to_config (configfile, prefs);
+  write_control (PORT_TUNER_BASE_FREQ, f);
+}
+
+void c_lv2_ui::on_calib_target_db (c_widget *w, float f) {
+  (void) w;
+  prefs.calib_target_db = f;
+  write_prefs_to_config (configfile, prefs);
+  write_control (PORT_CALIB_TARGET_DB, f);
+}
+
 void c_lv2_ui::apply_prefs (t_prefs &p) {
   c_neuralblender_ui::apply_prefs (p);
   write_control (PORT_LINKED_CALIB_PEDAL, p.linked_calib ? 1.0f : 0.0f);
@@ -347,6 +371,10 @@ void c_lv2_ui::apply_prefs (t_prefs &p) {
   write_control (PORT_LINKED_CALIB_CAB, p.linked_calib ? 1.0f : 0.0f);
   write_control (PORT_CALIB_SOURCE, (float) p.calib_source);
   write_control (PORT_CALIB_TARGET_DB, p.calib_target_db);
+  write_control (PORT_NOISEGATE_ATTACK, p.noiseattack);
+  write_control (PORT_NOISEGATE_HOLD, p.noisehold);
+  write_control (PORT_NOISEGATE_RELEASE, p.noiserelease);
+  write_control (PORT_TUNER_BASE_FREQ, p.tuner_base_freq);
 }
 
 bool c_lv2_ui::request_window_size (int w, int h) {
@@ -376,8 +404,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
   if (port == PORT_VU_ENABLE) {
     state.do_vu = value >= 0.5f;
     prefs.vu_on = state.do_vu;
-    if (prefswindow.widget)
-      prefswindow.btn_vu.set_value (state.do_vu);
+    btn_other_vu.set_value (state.do_vu);
     if (state.do_vu)
       vu_on ();
     else
@@ -423,10 +450,9 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     if (bank == BANK_AMP)
       prefs.linked_calib = linked;
     set_linked_calib_for_bank (bank, linked);
-    if (visible_bank == bank)
-      btn_linkcalib.set_value (linked);
-    if (prefswindow.widget)
-      prefswindow.btn_linkcalib.set_value (linked_calib_for_bank (BANK_AMP));
+    btn_other_link_pedal.set_value (linked_calib_for_bank (BANK_PEDAL));
+    btn_other_link_amp.set_value (linked_calib_for_bank (BANK_AMP));
+    btn_other_link_cab.set_value (linked_calib_for_bank (BANK_CAB));
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;
@@ -437,9 +463,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     if (source < 0)
       source = 0;
     prefs.calib_source = source;
-    btn_bass.set_value (prefs.calib_source == 1);
-    if (prefswindow.widget)
-      prefswindow.btn_bass.set_value (prefs.calib_source == 1);
+    btn_other_bass.set_value (prefs.calib_source == 1);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;
@@ -447,6 +471,8 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
   if (port == PORT_CALIB_TARGET_DB) {
     prefs.calib_target_db = value;
+    text_other_calib.set_text (
+      std::to_string (prefs.calib_target_db).c_str ());
     if (prefswindow.widget) {
       char buf [64];
       snprintf (buf, sizeof (buf), "%.6g", prefs.calib_target_db);
@@ -461,10 +487,6 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     state.noisegate_on = value >= 0.5f;
     prefs.noisegate_on = state.noisegate_on;
     btn_noisegate.set_value (state.noisegate_on);
-    if (state.noisegate_on)
-      knob_noisethresh.show ();
-    else
-      knob_noisethresh.hide ();
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;
@@ -474,6 +496,33 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     state.noisethresh = value;
     prefs.noisethresh = value;
     knob_noisethresh.set_value (value);
+    updating_from_state = old_updating_from_state;
+    updating_from_host = false;
+    return;
+  }
+
+  if (port == PORT_NOISEGATE_ATTACK) {
+    state.noiseattack = value;
+    prefs.noiseattack = value;
+    knob_noiseattack.set_value (value);
+    updating_from_state = old_updating_from_state;
+    updating_from_host = false;
+    return;
+  }
+
+  if (port == PORT_NOISEGATE_HOLD) {
+    state.noisehold = value;
+    prefs.noisehold = value;
+    knob_noisehold.set_value (value);
+    updating_from_state = old_updating_from_state;
+    updating_from_host = false;
+    return;
+  }
+
+  if (port == PORT_NOISEGATE_RELEASE) {
+    state.noiserelease = value;
+    prefs.noiserelease = value;
+    knob_noiserelease.set_value (value);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;
@@ -496,6 +545,16 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
       tuner.hide ();
       img_logo.show ();
     }
+    updating_from_state = old_updating_from_state;
+    updating_from_host = false;
+    return;
+  }
+
+  if (port == PORT_TUNER_BASE_FREQ) {
+    state.tuner_base_freq = value;
+    prefs.tuner_base_freq = value;
+    text_other_tuner.set_text (
+      std::to_string (prefs.tuner_base_freq).c_str ());
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;

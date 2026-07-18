@@ -1727,6 +1727,7 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
   state.do_vu = do_vu;
   state.mute_all = mute_all;
   state.tuner_on = tuner_on;
+  state.tuner_base_freq = tuner_base_freq;
   state.noisegate_on = noisegate_on;
   state.noisethresh = noisegate.threshold_db;
   state.noiseattack = noisegate.attack_ms;

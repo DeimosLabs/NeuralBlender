@@ -59,7 +59,7 @@
 #define MAX_DELAY_FRAMES         (MAX_DELAY_MS * 192)
 #define MAX_BLOCK_SIZE           8192
 #define DB_SILENCE               -120.0f
-#define DB_CALIB_TARGET_DEFAULT  -12.0f
+#define DB_CALIB_TARGET_DEFAULT  -18.0f
 #define GAIN_DB_MIN              -40.0f
 #define GAIN_DB_MAX              40.0f
 #define CALIB_TARGET_DB_MIN      -40.0f
@@ -155,6 +155,7 @@ struct c_neuralblender_state {
     showadvanced = other.showadvanced;
     mute_all = other.mute_all;
     tuner_on = other.tuner_on;
+    tuner_base_freq = other.tuner_base_freq;
     noisegate_on = other.noisegate_on;
     noisethresh = other.noisethresh;
     noiseattack = other.noiseattack;
@@ -174,6 +175,7 @@ struct c_neuralblender_state {
   bool showadvanced = false;
   bool mute_all = false;
   bool tuner_on = false;
+  float tuner_base_freq = 440.0f;
   bool noisegate_on = false;
   float noisethresh = -60.0f;
   float noiseattack = 2.0f;

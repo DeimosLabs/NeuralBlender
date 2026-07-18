@@ -7,6 +7,7 @@
 
 #include <string.h>
 #include <algorithm>
+#include <cstdlib>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -19,6 +20,7 @@
 #include "widgets/xknob_private.h"
 #include "xpngloader.h"
 #include "widgets/xcombobox_private.h"
+#include <X11/keysym.h>
 
 #include "data/data.h"
 
@@ -48,6 +50,17 @@ static constexpr t_statecolors sc (
     t_gradientcolors bg,
     t_gradientcolors fg) {
   return { bg, fg };
+}
+
+static bool key_is_decimal_point (XKeyEvent *key) {
+  if (!key)
+    return false;
+
+  const KeySym sym0 = XLookupKeysym (key, 0);
+  const KeySym sym1 = XLookupKeysym (key, 1);
+
+  return sym0 == XK_period || sym1 == XK_period ||
+         sym0 == XK_KP_Decimal || sym1 == XK_KP_Decimal;
 }
 
 // Floats galore. Bring a row boat.
@@ -539,6 +552,9 @@ void c_widget::clear_focus () {
     top->clear_focus ();
 }
 
+void c_widget::on_focus_lost () {
+}
+
 void c_widget::set_state (_widget_state state_) {
   wstate = state_;
   expose ();
@@ -906,6 +922,8 @@ void c_toplevelwindow::set_focused_widget (c_widget *w) {
   }
 
   if (old)
+    old->on_focus_lost ();
+  if (old)
     old->set_state (WSTATE_NORMAL);
   if (focused_widget)
     focused_widget->set_state (WSTATE_SELECTED);
@@ -1265,10 +1283,36 @@ const std::string &c_textbox::text () const {
 }
 
 void c_textbox::on_change (const std::string &s) { CP
-  (void) s;
+  if (ui && !ui->updating_from_state) {
+    char *end = NULL;
+    const float value = std::strtof (s.c_str (), &end);
+    if (end && end != s.c_str ()) {
+      switch (role) {
+        case ROLE_TUNER_BASE_FREQ:
+          ui->on_tuner_base_freq (
+            this, std::clamp (value, 400.0f, 480.0f));
+        break;
+
+        case ROLE_CALIB_TARGET_DB:
+          ui->on_calib_target_db (
+            this,
+            std::clamp (
+              value, CALIB_TARGET_DB_MIN, CALIB_TARGET_DB_MAX));
+        break;
+
+        default:
+        break;
+      }
+    }
+  }
+
   if (!widget)
     return;
   expose_widget (widget);
+}
+
+void c_textbox::on_focus_lost () {
+  on_change (value);
 }
 
 void c_textbox::cb_draw (void *w_, void *user_data) {
@@ -1374,8 +1418,9 @@ bool c_textbox::on_keydown (XKeyEvent *key) { CP
     return false;
 
   bool changed = false;
+  const int mapped_key = key_mapping (widget->app->dpy, key);
 
-  switch (key_mapping (widget->app->dpy, key)) {
+  switch (mapped_key) {
     case 10: // return
       on_change (value);
       expose_widget (widget);
@@ -1391,9 +1436,15 @@ bool c_textbox::on_keydown (XKeyEvent *key) { CP
     } break;
 
     default: {
-      
       char buf [32] = {};
-      if (os_get_keyboard_input (widget, key, buf, sizeof (buf) - 1) && buf [0]) {
+      if ((!os_get_keyboard_input (widget, key, buf, sizeof (buf) - 1) ||
+           !buf [0]) &&
+          key_is_decimal_point (key)) {
+        buf [0] = '.';
+        buf [1] = '\0';
+      }
+
+      if (buf [0]) {
         //debug ("buf [0]=%d", (int) buf [0]);
         if (buf [0] >= 32) {
           cursor = std::min (cursor, value.size ());
@@ -1408,7 +1459,6 @@ bool c_textbox::on_keydown (XKeyEvent *key) { CP
   if (changed) {
     label = value;
     widget->label = label.c_str ();
-    on_change (value);
   }
 
   expose_widget (widget);

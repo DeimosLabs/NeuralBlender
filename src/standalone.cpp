@@ -20,6 +20,7 @@
 */
 
 #include <jack/jack.h>
+#include <cmath>
 #include <signal.h>
 #include <unistd.h>
 #include "neuralblender.h"
@@ -103,6 +104,8 @@ public:
   void on_noiserelease (c_widget *w, float f);
   void on_threshgain (c_widget *w, float f);
   void on_tuner (c_widget *w, bool b);
+  void on_tuner_base_freq (c_widget *w, float f);
+  void on_calib_target_db (c_widget *w, float f);
   //void on_excl (c_widget *w, int which);
   void on_bypass (c_widget *w, bool b);
   void on_about (c_widget *w);
@@ -246,14 +249,26 @@ void c_standalone_ui::on_noisethresh (c_widget *w, float value) {
 }
 
 void c_standalone_ui::on_noiseattack (c_widget *w, float value) {
+  (void) w;
+  state.noiseattack = value;
+  prefs.noiseattack = value;
+  write_prefs_to_config (configfile, prefs);
   g_blender.noisegate.set_attack (value);
 }
 
 void c_standalone_ui::on_noisehold (c_widget *w, float value) {
+  (void) w;
+  state.noisehold = value;
+  prefs.noisehold = value;
+  write_prefs_to_config (configfile, prefs);
   g_blender.noisegate.set_hold (value);
 }
 
 void c_standalone_ui::on_noiserelease (c_widget *w, float value) {
+  (void) w;
+  state.noiserelease = value;
+  prefs.noiserelease = value;
+  write_prefs_to_config (configfile, prefs);
   g_blender.noisegate.set_release (value);
 }
 
@@ -265,6 +280,22 @@ void c_standalone_ui::on_threshgain (c_widget *w, float f) {
 void c_standalone_ui::on_tuner (c_widget *w, bool b) {
   (void) w;
   g_blender.tuner_on = b;
+}
+
+void c_standalone_ui::on_tuner_base_freq (c_widget *w, float value) {
+  (void) w;
+  state.tuner_base_freq = value;
+  prefs.tuner_base_freq = value;
+  write_prefs_to_config (configfile, prefs);
+  g_blender.tuner_base_freq = value;
+  g_blender.pitchtracker.set_base_freq ((int) lrintf (value));
+}
+
+void c_standalone_ui::on_calib_target_db (c_widget *w, float value) {
+  (void) w;
+  prefs.calib_target_db = value;
+  write_prefs_to_config (configfile, prefs);
+  g_blender.set_calib_target_db (value);
 }
 
 void c_standalone_ui::on_linked_calib (c_widget *w, bool b) {
@@ -316,6 +347,13 @@ void c_standalone_ui::apply_prefs (t_prefs &p) {
   if (blender) {
     blender->noisegate_on = p.noisegate_on;
     blender->noisegate.set_threshold (p.noisethresh);
+    blender->noisegate.set_attack (p.noiseattack);
+    blender->noisegate.set_hold (p.noisehold);
+    blender->noisegate.set_release (p.noiserelease);
+  }
+  if (blender) {
+    blender->tuner_base_freq = p.tuner_base_freq;
+    blender->pitchtracker.set_base_freq ((int) lrintf (p.tuner_base_freq));
   }
   if (blender)
     for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
@@ -337,7 +375,12 @@ void c_standalone_ui::write_prefs_to (t_prefs &p) {
   if (blender) {
     p.noisegate_on = blender->noisegate_on;
     p.noisethresh = blender->noisegate.threshold_db;
+    p.noiseattack = blender->noisegate.attack_ms;
+    p.noisehold = blender->noisegate.hold_ms;
+    p.noiserelease = blender->noisegate.release_ms;
   }
+  if (blender)
+    p.tuner_base_freq = blender->tuner_base_freq;
   if (blender)
     p.linked_calib = linked_calib_for_bank (BANK_AMP);
   if (blender)

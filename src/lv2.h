@@ -399,6 +399,8 @@ public:
   void on_noiserelease (c_widget *w, float f) override;
   void on_threshgain (c_widget *w, float f) override;
   void on_tuner (c_widget *w, bool b) override;
+  void on_tuner_base_freq (c_widget *w, float f) override;
+  void on_calib_target_db (c_widget *w, float f) override;
   void apply_prefs (t_prefs &p) override;
   bool request_window_size (int w, int h) override;
 

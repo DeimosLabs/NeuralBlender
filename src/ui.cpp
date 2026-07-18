@@ -22,7 +22,7 @@
 #define CMDLINE_DEBUG_COLOR ANSI_MAGENTA
 #include "cmdline_debug.h"
 
-#define MIN_WINDOW_HEIGHT (124 + (130 * NB_NUM_MODELS))
+#define MIN_WINDOW_HEIGHT (80 + (130 * NB_NUM_MODELS))
 //#define DEFAULT_WINDOW_HEIGHT (12 + std::min (640, (52 + (180 * NB_NUM_MODELS))))
 #define DEFAULT_WINDOW_HEIGHT MIN_WINDOW_HEIGHT
 #define MIN_WINDOW_WIDTH 640
@@ -78,6 +78,14 @@ static bool parse_config_float (const std::string &s, float &value) {
   return true;
 }
 
+static void format_db_text (char *buf, size_t size, float value) {
+  snprintf (buf, size, "%.1f", value);
+}
+
+static void format_freq_text (char *buf, size_t size, float value) {
+  snprintf (buf, size, "%.3f", value);
+}
+
 bool read_prefs_from_config (c_configfile &configfile, t_prefs &prefs) {
   float calib_target_db = prefs.calib_target_db;
   if (parse_config_float (
@@ -110,6 +118,12 @@ bool read_prefs_from_config (c_configfile &configfile, t_prefs &prefs) {
   if (!str.empty ())
     prefs.tuner_on = c_configfile::istrue (str);
 
+  float tuner_base_freq = prefs.tuner_base_freq;
+  if (parse_config_float (
+      configfile.get_item (CONFIG_KEY_NAME_TUNER_BASE),
+      tuner_base_freq))
+    prefs.tuner_base_freq = std::clamp (tuner_base_freq, 400.0f, 480.0f);
+
   str = configfile.get_item (CONFIG_KEY_NAME_NOISEGATE);
   if (!str.empty ())
     prefs.noisegate_on = c_configfile::istrue (str);
@@ -120,6 +134,24 @@ bool read_prefs_from_config (c_configfile &configfile, t_prefs &prefs) {
       noisethresh))
     prefs.noisethresh =
       std::clamp (noisethresh, NOISEGATE_THRESH_MIN, NOISEGATE_THRESH_MAX);
+
+  float noiseattack = prefs.noiseattack;
+  if (parse_config_float (
+      configfile.get_item (CONFIG_KEY_NAME_NOISEATTACK),
+      noiseattack))
+    prefs.noiseattack = std::max (0.0f, noiseattack);
+
+  float noisehold = prefs.noisehold;
+  if (parse_config_float (
+      configfile.get_item (CONFIG_KEY_NAME_NOISEHOLD),
+      noisehold))
+    prefs.noisehold = std::max (0.0f, noisehold);
+
+  float noiserelease = prefs.noiserelease;
+  if (parse_config_float (
+      configfile.get_item (CONFIG_KEY_NAME_NOISERELEASE),
+      noiserelease))
+    prefs.noiserelease = std::max (0.0f, noiserelease);
 
   return true;
 }
@@ -137,12 +169,24 @@ bool write_prefs_to_config (c_configfile &configfile, const t_prefs &prefs) {
 
   configfile.set_item (CONFIG_KEY_NAME_VU, prefs.vu_on ? "1" : "0");
   configfile.set_item (CONFIG_KEY_NAME_TUNER, prefs.tuner_on ? "1" : "0");
+  snprintf (buf, sizeof (buf), "%.6g", prefs.tuner_base_freq);
+  configfile.set_item (CONFIG_KEY_NAME_TUNER_BASE, buf);
+
   configfile.set_item (
     CONFIG_KEY_NAME_NOISEGATE,
     prefs.noisegate_on ? "1" : "0");
 
   snprintf (buf, sizeof (buf), "%.6g", prefs.noisethresh);
   configfile.set_item (CONFIG_KEY_NAME_NOISETHRESH, buf);
+
+  snprintf (buf, sizeof (buf), "%.6g", prefs.noiseattack);
+  configfile.set_item (CONFIG_KEY_NAME_NOISEATTACK, buf);
+
+  snprintf (buf, sizeof (buf), "%.6g", prefs.noisehold);
+  configfile.set_item (CONFIG_KEY_NAME_NOISEHOLD, buf);
+
+  snprintf (buf, sizeof (buf), "%.6g", prefs.noiserelease);
+  configfile.set_item (CONFIG_KEY_NAME_NOISERELEASE, buf);
 
   return configfile.write_file ();
 }
@@ -174,20 +218,11 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   btn_cancel.create (ui, widget, "Cancel", 0, 0, 128, 40);
   btn_cancel.role = ROLE_PREFSCANCEL;
   btn_cancel.set_image (data_xputty_cancel_png);
-  btn_about.create (ui, widget, "About...", 0, 0, 128, 40);
-  btn_about.role = ROLE_ABOUT;
-  btn_about.set_image (data_xputty_info_png);
-  
   label_calibdb.create (ui, frame1.widget, "Calibration target dB:", 0, 0, 120, 32);
   label_vuscale.create (ui, frame1.widget, "VU meter scale dB:", 0, 0, 120, 32);
   label_vuheadroom.create (ui, frame1.widget, "VU meter headroom dB:", 0, 0, 120, 32);
   label_spacer1.create (ui, frame1.widget, "", 0, 0, 12, 12);
-  label_linkexplain.create (ui, frame1.widget, "(trim follows loudest model)", 0, 0, 320, 36);
 
-  btn_vu.create (ui, frame1.widget, "VU meters", 0, 0, 300, 32, WSTYLE_CHECKBOX);
-  btn_linkcalib.create (ui, frame1.widget, "Linked calibration",
-                        0, 0, 300, 32, WSTYLE_CHECKBOX);
-  btn_bass.create (ui, frame1.widget, "Calibrate for bass", 0, 0, 300, 32, WSTYLE_CHECKBOX);
   btn_defaults.create (ui, frame1.widget, "Reset to defaults", 0, 0, 400, 32);
   btn_defaults.role = ROLE_PREFSDEFAULTS;
   
@@ -204,7 +239,6 @@ void c_prefswindow::on_resize () {
   // bottom about/ok/cancel buttons
   btn_ok.move_resize (w () - 140, h () - 56, 128, 40);
   btn_cancel.move_resize (w () - 280, h () - 56, 128, 40);
-  btn_about.move_resize (12, h () - 56, 128, 40);
   btn_defaults.move_resize (12, frame1.h () - 50, frame1.w () - 24, 40);
   
   int labels_x = 16;
@@ -214,10 +248,7 @@ void c_prefswindow::on_resize () {
     &label_calibdb,
     &label_vuscale,
     &label_vuheadroom,
-    &label_spacer1,
-    &btn_vu,
-    &btn_linkcalib,
-    &btn_bass
+    &label_spacer1
   };
   for (int i = 0; i < leftcontrols.size (); i++) {
     int w = 0;
@@ -231,14 +262,10 @@ void c_prefswindow::on_resize () {
   }
   controls_x += 36;
   
-  btn_vu.resize (btn_vu.w () + 30, btn_vu.h ());
-  btn_linkcalib.resize (btn_linkcalib.w () + 30, btn_linkcalib.h ());
-  btn_bass.resize (btn_bass.w () + 30, btn_bass.h ());
   debug ("controls_x=%d, label_calibdb: %d", controls_x, label_calibdb.y ());
   text_calibdb.move_resize    (controls_x, label_calibdb.y () - 4, 120, 36);
   text_vuscale.move_resize    (controls_x, label_vuscale.y () - 4, 120, 36);
   text_vuheadroom.move_resize (controls_x, label_vuheadroom.y () - 4, 120, 36);
-  label_linkexplain.move (btn_linkcalib.x () + btn_linkcalib.w (), btn_linkcalib.y ());
 }
 
 void c_prefswindow::show () { CP
@@ -256,9 +283,6 @@ void c_prefswindow::load_defaults () {
   text_calibdb.set_text ("-18");
   text_vuscale.set_text ("-48");
   text_vuheadroom.set_text ("6");
-  btn_vu.set_value (true);
-  btn_linkcalib.set_value (false);
-  btn_bass.set_value (false);
 }
 
 void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
@@ -266,18 +290,15 @@ void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
     create (ui);
 
   char buf [128];
-  snprintf (buf, 127, "%.6g", prefs.calib_target_db);
+  format_db_text (buf, sizeof (buf), prefs.calib_target_db);
   text_calibdb.set_text (buf);
 
-  snprintf (buf, 127, "%.6g", prefs.vu_scale_db);
+  format_db_text (buf, sizeof (buf), prefs.vu_scale_db);
   text_vuscale.set_text (buf);
 
-  snprintf (buf, 127, "%.6g", prefs.vu_headroom_db);
+  format_db_text (buf, sizeof (buf), prefs.vu_headroom_db);
   text_vuheadroom.set_text (buf);
 
-  btn_vu.set_value (prefs.vu_on);
-  btn_linkcalib.set_value (prefs.linked_calib);
-  btn_bass.set_value (prefs.calib_source == 1);
 }
 
 void c_prefswindow::set_prefs_to (t_prefs &prefs) {
@@ -294,9 +315,6 @@ void c_prefswindow::set_prefs_to (t_prefs &prefs) {
       vu_headroom_db <= 12.0f)
     prefs.vu_headroom_db = vu_headroom_db;
 
-  prefs.vu_on = btn_vu.value;
-  prefs.linked_calib = btn_linkcalib.value;
-  prefs.calib_source = btn_bass.value ? 1 : 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -691,8 +709,12 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   read_prefs_from_config (configfile, prefs);
   state.do_vu = prefs.vu_on;
   state.tuner_on = prefs.tuner_on;
+  state.tuner_base_freq = prefs.tuner_base_freq;
   state.noisegate_on = prefs.noisegate_on;
   state.noisethresh = prefs.noisethresh;
+  state.noiseattack = prefs.noiseattack;
+  state.noisehold = prefs.noisehold;
+  state.noiserelease = prefs.noiserelease;
   
   if (configfile.istrue (CONFIG_KEY_NAME_ADV)) {
     CP
@@ -719,6 +741,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   cont_pedals.create (this, mainwindow.widget, "", 0, 120, 640, 480);
   cont_models.create (this, mainwindow.widget, "", 0, 120, 640, 480);
   cont_cabs.create (this, mainwindow.widget, "", 0, 120, 640, 480);
+  cont_other.create (this, mainwindow.widget, "", 0, 120, 640, 480);
   
   mainwindow.set_icon_from_png (data_neuralblender_logo_512_png);
 
@@ -731,12 +754,19 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_tab_pedals.create (this, mainwindow.widget, "PEDAL", 0, 0, 86, 50);
   btn_tab_pedals.role = ROLE_BANKSWITCH;
   btn_tab_pedals.bank = BANK_PEDAL;
+  btn_tab_pedals.page = PAGE_PEDAL;
   btn_tab_models.create (this, mainwindow.widget, "AMP", 0, 0, 86, 50);
   btn_tab_models.role = ROLE_BANKSWITCH;
   btn_tab_models.bank = BANK_AMP;
+  btn_tab_models.page = PAGE_AMP;
   btn_tab_cabs.create (this, mainwindow.widget, "CAB/IR", 0, 0, 86, 50);
   btn_tab_cabs.role = ROLE_BANKSWITCH;
   btn_tab_cabs.bank = BANK_CAB;
+  btn_tab_cabs.page = PAGE_CAB;
+  btn_tab_other.create (this, mainwindow.widget, "...", 0, 0, 86, 50);
+  btn_tab_other.role = ROLE_BANKSWITCH;
+  btn_tab_other.bank = BANK_AMP; // no DSP bank, keep cached bank unchanged
+  btn_tab_other.page = PAGE_OTHER;
   
   //btn_enable.create (this, mainwindow.widget, "ON/OFF",  20, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
   btn_enable.create (this, mainwindow.widget, "",  20, 12, 40, 40, WSTYLE_IMAGE_TOGGLE);
@@ -766,35 +796,6 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_tuner.padding =     12;
   btn_noisegate.padding = 12;
   
-  knob_noisethresh.create (this, mainwindow.widget, "", 0, 0, 64, 64);
-  knob_noisethresh.set_min (-120);
-  knob_noisethresh.set_max (-6);
-  knob_noisethresh.set_value (state.noisethresh);
-  knob_noisethresh.set_default (-60);
-  knob_noisethresh.set_step (0.1);
-  knob_noisethresh.role = ROLE_NOISETHRESH;
-  
-  btn_prefs.create (this, mainwindow.widget, "Settings", 520, 600, 100, 40);
-  btn_prefs.role = ROLE_PREFS;
-  btn_prefs.set_image (data_xputty_gear_png);
-  
-  cont_checkboxes.create (this, mainwindow.widget, "", 8, 600, 550, 40);
-  cont_checkboxes.widget->scale.gravity = NONE;
-  
-  btn_linkcalib.create (this, cont_checkboxes.widget, "Linked calib.", 0, 0, 180, 32, WSTYLE_CHECKBOX);
-  btn_linkcalib.role = ROLE_LINKED_CALIB;
-  btn_linkcalib.set_value (prefs.linked_calib);
-  btn_linkcalib.set_tooltip ("Calibrate all models by same amount (loudest model / lowest trim)");
-
-  btn_exclmode.create (this, cont_checkboxes.widget, "Exclusive mode", 160, 0, 180, 32, WSTYLE_CHECKBOX);
-  btn_exclmode.set_value (state.do_excl);
-  btn_exclmode.role = ROLE_EXCL_TOGGLE;
-  btn_exclmode.set_tooltip ("Allow only one model active, seamlessly switch between them");
-
-  btn_bass.create (this, cont_checkboxes.widget, "Bass", 350, 0, 180, 32, WSTYLE_CHECKBOX);
-  btn_bass.role = ROLE_CALIBBASS;
-  btn_bass.set_tooltip ("Calibrate trim levels for bass guitar / lower freqs");
-  
   aboutwindow.create (this);
   prefswindow.create (this);
   
@@ -811,6 +812,86 @@ bool c_neuralblender_ui::create (Window parent_) { CP
     meter_in [i].set_stereo (false);
     vudata_in [i].set_l (0.0, 0.0);
   }
+  
+  frame_other_volumepresence.create (this, cont_other.widget, "", 16, 16, 512, 128);
+  knob_mastervolume.create (this, frame_other_volumepresence.widget, "Master", 16, 12, 80, 96);
+  knob_presence.create (this, frame_other_volumepresence.widget, "Presence", 116, 12, 80, 96);
+  
+  frame_other_noisegate.create (this, cont_other.widget, "", 16, 16, 512, 128);
+  label_other_noisegate.create (this, frame_other_noisegate.widget, "Noise gate:", 16, 8, 200, 24);
+  knob_noisethresh.create (this, frame_other_noisegate.widget,  "Thresh",   16, 36, 64, 72);
+  knob_noiseattack.create (this, frame_other_noisegate.widget,  "Attack",   76, 36, 64, 72);
+  knob_noisehold.create (this, frame_other_noisegate.widget,    "Hold",    136, 36, 64, 72);
+  knob_noiserelease.create (this, frame_other_noisegate.widget, "Release", 196, 36, 64, 72);
+  knob_noisethresh.set_min (-120);
+  knob_noisethresh.set_max (-6);
+  knob_noisethresh.set_value (state.noisethresh);
+  knob_noisethresh.set_default (-60);
+  knob_noisethresh.set_step (0.1);
+  knob_noisethresh.role = ROLE_NOISETHRESH;
+
+  knob_noiseattack.set_min (0);
+  knob_noiseattack.set_max (500);
+  knob_noiseattack.set_value (state.noiseattack);
+  knob_noiseattack.set_default (2);
+  knob_noiseattack.set_step (0.1);
+  knob_noiseattack.role = ROLE_NOISEATTACK;
+
+  knob_noisehold.set_min (0);
+  knob_noisehold.set_max (1000);
+  knob_noisehold.set_value (state.noisehold);
+  knob_noisehold.set_default (10);
+  knob_noisehold.set_step (0.1);
+  knob_noisehold.role = ROLE_NOISEHOLD;
+
+  knob_noiserelease.set_min (0);
+  knob_noiserelease.set_max (2000);
+  knob_noiserelease.set_value (state.noiserelease);
+  knob_noiserelease.set_default (20);
+  knob_noiserelease.set_step (0.1);
+  knob_noiserelease.role = ROLE_NOISERELEASE;
+
+  frame_other_linkexcl.create (this, cont_other.widget, "", 16, 16, 512, 128);
+  const int x0 = 16, x1 = 186, x2 = 296, x3 = 406;
+  const int y0 = 20, y1 = 68;
+  label_other_link.create (this, frame_other_linkexcl.widget, "Link calibration: ", x0, y0, 150, 32);
+  label_other_excl.create (this, frame_other_linkexcl.widget, "Exclusive mode: ", x0, y1, 150, 32);
+  btn_other_link_pedal.create (this, frame_other_linkexcl.widget, "Pedal", x1, y0, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_link_amp.create (this, frame_other_linkexcl.widget, "Amp", x2, y0, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_link_cab.create (this, frame_other_linkexcl.widget, "Cab/IR", x3, y0, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_excl_pedal.create (this, frame_other_linkexcl.widget, "Pedal", x1, y1, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_excl_amp.create (this, frame_other_linkexcl.widget, "Amp", x2, y1, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_excl_cab.create (this, frame_other_linkexcl.widget, "Cab/IR", x3, y1, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_link_pedal.role = ROLE_LINKED_CALIB;
+  btn_other_link_amp.role = ROLE_LINKED_CALIB;
+  btn_other_link_cab.role = ROLE_LINKED_CALIB;
+  btn_other_link_pedal.bank = BANK_PEDAL;
+  btn_other_link_amp.bank = BANK_AMP;
+  btn_other_link_cab.bank = BANK_CAB;
+  btn_other_excl_pedal.role = ROLE_EXCL_TOGGLE;
+  btn_other_excl_amp.role = ROLE_EXCL_TOGGLE;
+  btn_other_excl_cab.role = ROLE_EXCL_TOGGLE;
+  btn_other_excl_pedal.bank = BANK_PEDAL;
+  btn_other_excl_amp.bank = BANK_AMP;
+  btn_other_excl_cab.bank = BANK_CAB;
+  
+  frame_other_misc.create (this, cont_other.widget, "", 16, 16, 512, 128);
+  label_other_tuner.create (this, frame_other_misc.widget, "Tuner base frequency: ", 16, 20, 200, 32);
+  label_other_calib.create (this, frame_other_misc.widget, "Calibration target dB: ", 16, 60, 200, 32);
+  btn_other_vu.create (this, frame_other_misc.widget, "VU meters", 16, 100, 200, 32, WSTYLE_CHECKBOX);
+  btn_other_bass.create (this, frame_other_misc.widget, "Calibrate for bass", 16, 140, 200, 32, WSTYLE_CHECKBOX);
+  text_other_tuner.create (this, frame_other_misc.widget, "", 250, 14, 150, 40);
+  text_other_calib.create (this, frame_other_misc.widget, "", 250, 60, 150, 40);
+  btn_other_prefs.create (this, frame_other_misc.widget, "Settings", 0, 130, 120, 40, WSTYLE_IMAGE_BUTTON);
+  btn_other_prefs.set_image_default (data_xputty_gear_png);
+  btn_other_about.create (this, frame_other_misc.widget, "About...", 0, 130, 120, 40, WSTYLE_IMAGE_BUTTON);
+  btn_other_about.set_image_default (data_xputty_info_png);
+  btn_other_vu.role = ROLE_VUTOGGLE;
+  btn_other_bass.role = ROLE_CALIBBASS;
+  btn_other_prefs.role = ROLE_PREFS;
+  btn_other_about.role = ROLE_ABOUT;
+  text_other_tuner.role = ROLE_TUNER_BASE_FREQ;
+  text_other_calib.role = ROLE_CALIB_TARGET_DB;
   
   tuner.create (this, mainwindow.widget, "", 0, 0, 400, 24);
   if (blender)
@@ -868,11 +949,19 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     //if (do_set_min_size)
     mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
     
-    cont_pedals.move_resize (0, 128, window_width, window_height - 120 - 56);
-    cont_models.move_resize (0, 128, window_width, window_height - 120 - 56);
-    cont_cabs.move_resize (0, 128, window_width, window_height - 120 - 56);
-    cont_checkboxes.move_resize (16, window_height - 44, 450, 40);
-    sync_bank_visibility ();
+    cont_pedals.move_resize (0, 128, window_width, window_height - 80 - 56);
+    cont_models.move_resize (0, 128, window_width, window_height - 80 - 56);
+    cont_cabs.move_resize (0, 128, window_width, window_height - 80 - 56);
+    cont_other.move_resize (0, 128, window_width, window_height - 80 - 56);
+    
+    const int panelwidth = window_width - 32;
+    frame_other_volumepresence.move_resize (16, 0, panelwidth / 2 - 8, 120);
+    frame_other_noisegate.move_resize (panelwidth / 2 + 24, 0, panelwidth / 2 - 8, 120);
+    frame_other_linkexcl.move_resize (16, 136, panelwidth, 120);
+    frame_other_misc.move_resize (16, 272, panelwidth, window_height - 416);
+    btn_other_prefs.move (frame_other_misc.w () - 280, btn_other_prefs.y ());
+    btn_other_about.move (frame_other_misc.w () - 140, btn_other_prefs.y ());
+    sync_page_visibility ();
     
     int lane_width = window_width - 32;
     const int lane_top = 0;
@@ -888,17 +977,14 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     btn_tab_pedals.move (16, 66);
     btn_tab_models.move (106, 66);
     btn_tab_cabs.move (196, 66);
+    btn_tab_other.move (286, 66);
     
     btn_enable.move_resize    (window_width - 12 - 54,     66, 50, 50);
     btn_muteall.move_resize   (window_width - 12 - 54 * 2, 66, 50, 50);
     btn_tuner.move_resize     (window_width - 12 - 54 * 3, 66, 50, 50);
     btn_noisegate.move_resize (window_width - 12 - 54 * 4, 66, 50, 50);
     
-    knob_noisethresh.move_resize (btn_noisegate.x () - 52, 72, 48, 48);
-    btn_prefs.move_resize (window_width - 136, window_height - 48, 120, 40);
     tuner.move_resize (4, 4, window_width - 8, 56);
-    
-    //label_exclmode.set_label ("Exclusive mode");
     
     size_t i;
     for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
@@ -985,43 +1071,80 @@ void c_neuralblender_ui::set_linked_calib_for_bank (_lane_bank bank, bool b) {
   state.banks [bank].linked_calib = b;
 }
 
+static bool page_has_bank (_ui_page page);
+static _lane_bank bank_for_page (_ui_page page);
+
 void c_neuralblender_ui::on_bank_switch (c_widget *w, int n) { CP
   (void) w;
-  if (n >= BANK_PEDAL && n < BANK_COUNT)
-    visible_bank = (_lane_bank) n;
+  if (n >= PAGE_PEDAL && n < PAGE_COUNT) {
+    visible_page = (_ui_page) n;
+    if (page_has_bank (visible_page))
+      visible_bank = bank_for_page (visible_page);
+  }
 
   sync_widgets_from_state (state);
 }
 
-void c_neuralblender_ui::sync_bank_visibility () {
-  switch (visible_bank) {
-    case BANK_PEDAL:
+void c_neuralblender_ui::sync_page_visibility () {
+  switch (visible_page) {
+    case PAGE_PEDAL:
       cont_pedals.show ();
       cont_models.hide ();
       cont_cabs.hide ();
+      cont_other.hide ();
       btn_tab_pedals.set_value (true);
       btn_tab_models.set_value (false);
       btn_tab_cabs.set_value (false);
+      btn_tab_other.set_value (false);
     break;
     
-    case BANK_CAB:
+    case PAGE_CAB:
       cont_pedals.hide ();
       cont_models.hide ();
       cont_cabs.show ();
+      cont_other.hide ();
       btn_tab_pedals.set_value (false);
       btn_tab_models.set_value (false);
       btn_tab_cabs.set_value (true);
+      btn_tab_other.set_value (false);
+    break;
+
+    case PAGE_OTHER:
+      cont_pedals.hide ();
+      cont_models.hide ();
+      cont_cabs.hide ();
+      cont_other.show ();
+      btn_tab_pedals.set_value (false);
+      btn_tab_models.set_value (false);
+      btn_tab_cabs.set_value (false);
+      btn_tab_other.set_value (true);
     break;
     
-    case BANK_AMP:
+    case PAGE_AMP:
     default:
       cont_pedals.hide ();
       cont_models.show ();
       cont_cabs.hide ();
+      cont_other.hide ();
       btn_tab_pedals.set_value (false);
       btn_tab_models.set_value (true);
       btn_tab_cabs.set_value (false);
+      btn_tab_other.set_value (false);
     break;
+  }
+}
+
+static bool page_has_bank (_ui_page page) {
+  return page >= PAGE_PEDAL && page <= PAGE_CAB;
+}
+
+static _lane_bank bank_for_page (_ui_page page) {
+  switch (page) {
+    case PAGE_PEDAL:   return BANK_PEDAL;
+    case PAGE_AMP:     return BANK_AMP;
+    case PAGE_CAB:     return BANK_CAB;
+    case PAGE_OTHER:
+    default:           return BANK_AMP;
   }
 }
 
@@ -1052,11 +1175,9 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     break;
 
     case ROLE_BANKSWITCH: CP
-      debug ("visible bank: %d", btn->bank);
-      if (btn->bank >= BANK_PEDAL && btn->bank <= BANK_CAB) {
-        visible_bank = (_lane_bank) btn->bank;
-        on_bank_switch (btn, visible_bank);
-      }
+      debug ("visible page: %d", btn->page);
+      if (btn->page >= PAGE_PEDAL && btn->page < PAGE_COUNT)
+        on_bank_switch (btn, btn->page);
     break;
 
     case ROLE_CALIBRATE: CP
@@ -1117,15 +1238,21 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     break;
 
     case ROLE_VUTOGGLE: CP
+      prefs.vu_on = value;
+      write_prefs_to_config (configfile, prefs);
       vu_on (value);
       on_vu (btn, value);
     break;
 
     case ROLE_LINKED_CALIB: CP
-      set_linked_calib_for_bank (visible_bank, value);
-      if (visible_bank == BANK_AMP)
-        prefs.linked_calib = value;
-      on_linked_calib (btn, value);
+      if (btn->bank < BANK_COUNT)
+        visible_bank = (_lane_bank) btn->bank;
+      if (page_has_bank (visible_page) || btn->bank < BANK_COUNT) {
+        const _lane_bank bank = btn->bank < BANK_COUNT ?
+          (_lane_bank) btn->bank : visible_bank;
+        set_linked_calib_for_bank (bank, value);
+        on_linked_calib (btn, value);
+      }
     break;
 
     case ROLE_CALIBBASS: CP
@@ -1153,6 +1280,8 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     break;
 
     case ROLE_EXCL_TOGGLE: CP
+      if (btn->bank < BANK_COUNT)
+        visible_bank = (_lane_bank) btn->bank;
       if (value) {
         size_t exclusive_lane = choose_exclusive_lane ();
         on_excl (btn, exclusive_lane); // this is 1-BASED, 0 = normal mode
@@ -1176,8 +1305,9 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
 }
 
 void c_neuralblender_ui::set_threshgain (float f) {
-  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
-    meter_in [bank].set_compression_gain (f);
+  meter_in [BANK_PEDAL].set_compression_gain (f);
+  for (size_t bank = BANK_PEDAL + 1; bank < BANK_COUNT; ++bank)
+    meter_in [bank].set_compression_gain (1.0f);
 }
 
 void c_neuralblender_ui::on_about () { CP }
@@ -1188,6 +1318,7 @@ void c_neuralblender_ui::on_prefs_ok () {
 }
 
 void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
+  char buf [128];
   const float scale_db = p.vu_scale_db <= 0.0f ? p.vu_scale_db : DEFAULT_VU_DB;
   const float headroom_db = std::clamp (p.vu_headroom_db, 0.0f, 12.0f);
 
@@ -1208,20 +1339,31 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
     }
   }
 
-  btn_bass.set_value (p.calib_source == 1);
-  if (prefswindow.widget)
-    prefswindow.btn_bass.set_value (p.calib_source == 1);
+  btn_other_bass.set_value (p.calib_source == 1);
 
   vu_on (p.vu_on);
 
   state.noisegate_on = p.noisegate_on;
   state.noisethresh = p.noisethresh;
+  state.noiseattack = p.noiseattack;
+  state.noisehold = p.noisehold;
+  state.noiserelease = p.noiserelease;
+  state.tuner_base_freq = p.tuner_base_freq;
   btn_noisegate.set_value (p.noisegate_on);
   knob_noisethresh.set_value (p.noisethresh);
-  if (p.noisegate_on)
+  knob_noiseattack.set_value (p.noiseattack);
+  knob_noisehold.set_value (p.noisehold);
+  knob_noiserelease.set_value (p.noiserelease);
+
+  format_freq_text (buf, sizeof (buf), p.tuner_base_freq);
+  text_other_tuner.set_text (buf);
+  format_db_text (buf, sizeof (buf), p.calib_target_db);
+  text_other_calib.set_text (buf);
+
+  /*if (p.noisegate_on)
     knob_noisethresh.show ();
   else
-    knob_noisethresh.hide ();
+    knob_noisethresh.hide ();*/
 
   state.tuner_on = p.tuner_on;
   btn_tuner.set_value (p.tuner_on);
@@ -1384,7 +1526,18 @@ void c_neuralblender_ui::on_excl (c_widget *w, int n) {
   if (!w)
     return;
 
-  btn_exclmode.set_value (exclusive_lane_for_bank (visible_bank) != 0);
+  switch (visible_bank) {
+    case BANK_PEDAL:
+      btn_other_excl_pedal.set_value (exclusive_lane_for_bank (BANK_PEDAL) != 0);
+    break;
+    case BANK_CAB:
+      btn_other_excl_cab.set_value (exclusive_lane_for_bank (BANK_CAB) != 0);
+    break;
+    case BANK_AMP:
+    default:
+      btn_other_excl_amp.set_value (exclusive_lane_for_bank (BANK_AMP) != 0);
+    break;
+  }
   apply_effective_controls();
   //sync_widgets_from_state (state);
 }
@@ -1519,14 +1672,22 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
 
   updating_from_state = true;
   
-  sync_bank_visibility ();
+  sync_page_visibility ();
   
   btn_noisegate.set_value (state.noisegate_on);
   knob_noisethresh.set_value (state.noisethresh);
-  if (state.noisegate_on)
+  knob_noiseattack.set_value (state.noiseattack);
+  knob_noisehold.set_value (state.noisehold);
+  knob_noiserelease.set_value (state.noiserelease);
+  char buf [128];
+  format_freq_text (buf, sizeof (buf), state.tuner_base_freq);
+  text_other_tuner.set_text (buf);
+  format_db_text (buf, sizeof (buf), prefs.calib_target_db);
+  text_other_calib.set_text (buf);
+  /*if (state.noisegate_on)
     knob_noisethresh.show ();
   else
-    knob_noisethresh.hide ();
+    knob_noisethresh.hide ();*/
 
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     c_lane_widgets *bank_lanes = lanes_for_bank ((_lane_bank) bank);
@@ -1575,8 +1736,11 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   /*btn_advanced.set_value (state.showadvanced);
   show_advanced_settings (state.showadvanced);*/
 
-  btn_bass.set_value (prefs.calib_source == 0 ? false : true);
-  btn_linkcalib.set_value (linked_calib_for_bank (visible_bank));
+  btn_other_bass.set_value (prefs.calib_source == 0 ? false : true);
+  btn_other_link_pedal.set_value (linked_calib_for_bank (BANK_PEDAL));
+  btn_other_link_amp.set_value (linked_calib_for_bank (BANK_AMP));
+  btn_other_link_cab.set_value (linked_calib_for_bank (BANK_CAB));
+  btn_other_vu.set_value (state.do_vu);
   if (state.do_vu) {
     for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
       meter_in [bank].show ();
@@ -1594,7 +1758,9 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   }
 
   const int visible_exclusive_lane = exclusive_lane_for_bank (visible_bank);
-  btn_exclmode.set_value (visible_exclusive_lane > 0);
+  btn_other_excl_pedal.set_value (exclusive_lane_for_bank (BANK_PEDAL) > 0);
+  btn_other_excl_amp.set_value (exclusive_lane_for_bank (BANK_AMP) > 0);
+  btn_other_excl_cab.set_value (exclusive_lane_for_bank (BANK_CAB) > 0);
 
   c_lane_widgets *visible_lanes = lanes_for_bank (visible_bank);
   const c_neuralblender_bank_state &visible_bank_state = state.banks [visible_bank];

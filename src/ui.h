@@ -33,6 +33,14 @@
 #define UI_FRAME_RADIUS      12.0
 #define UI_STATS_PER_LANE    NB_STATS_PER_LANE
 
+enum _ui_page {
+  PAGE_PEDAL = 0,
+  PAGE_AMP,
+  PAGE_CAB,
+  PAGE_OTHER,
+  PAGE_COUNT
+};
+
 class c_neuralblender;
 struct c_neuralblender_state;
 class c_neuralblender_ui;
@@ -44,8 +52,12 @@ typedef struct {
   float vu_headroom_db  = 6.0f;
   bool vu_on = true;
   bool tuner_on = false;
+  float tuner_base_freq = 440.0f;
   bool noisegate_on = false;
   float noisethresh = -60.0f;
+  float noiseattack = 2.0f;
+  float noisehold = 10.0f;
+  float noiserelease = 20.0f;
   bool linked_calib = false;
   int calib_source = 0; // 0=guitar, 1=bass
 } t_prefs;
@@ -65,7 +77,6 @@ public:
   void load_defaults ();
   
   c_frame frame1;
-  c_button btn_about;
   c_button btn_cancel;
   c_button btn_ok;
   c_button btn_defaults;
@@ -74,14 +85,10 @@ public:
   c_label label_vuscale;
   c_label label_vuheadroom;
   c_label label_spacer1;
-  c_label label_linkexplain;
   
   c_textbox text_calibdb;
   c_textbox text_vuscale;
   c_textbox text_vuheadroom;
-  c_button btn_vu;
-  c_button btn_linkcalib;
-  c_button btn_bass;
 };
 
 class c_aboutwindow : public c_toplevelwindow {
@@ -216,12 +223,14 @@ public:
   virtual void on_noisehold (c_widget *w, float f)             = 0;
   virtual void on_noiserelease (c_widget *w, float f)          = 0;
   virtual void on_tuner (c_widget *w, bool b)                  = 0;
+  virtual void on_tuner_base_freq (c_widget *w, float f)       = 0;
+  virtual void on_calib_target_db (c_widget *w, float f)       = 0;
   virtual void on_threshgain (c_widget *w, float f)            = 0;
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;
           void on_button (c_button *btn, bool value)              ;
           void on_bank_switch (c_widget *w, int n)                ;
-          void sync_bank_visibility ()                            ;
+          void sync_page_visibility ()                            ;
   virtual void on_window_resize (int w, int h)                    ;
   virtual bool request_window_size (int w, int h)                 ;
           void on_about ()                                        ;
@@ -244,25 +253,45 @@ public:
   c_container    cont_pedals;
   c_container    cont_models;
   c_container    cont_cabs;
-  c_container    cont_checkboxes;
-  //c_label        label_big;
+  c_container    cont_other;
   c_image        img_logo;
   c_button       btn_tab_pedals;
   c_button       btn_tab_models;
   c_button       btn_tab_cabs;
+  c_button       btn_tab_other;
   c_button       btn_enable;
   c_button       btn_muteall;
   c_button       btn_noisegate;
   c_button       btn_tuner;
-  c_button       btn_prefs;
-  c_button       btn_linkcalib;
-  c_button       btn_exclmode;
-  c_button       btn_advanced;
-  c_button       btn_bass;
+  
+  c_frame        frame_other_volumepresence;
+  c_knob         knob_mastervolume;
+  c_knob         knob_presence;
+  c_frame        frame_other_noisegate;
+  c_label        label_other_noisegate;
   c_knob         knob_noisethresh;
-  //c_label        label_vu;
-  //c_label        label_exclmode;
-  //c_label        label_advanced;
+  c_knob         knob_noiseattack;
+  c_knob         knob_noisehold;
+  c_knob         knob_noiserelease;
+  c_frame        frame_other_linkexcl;
+  c_label        label_other_link;
+  c_label        label_other_excl;
+  c_button       btn_other_link_pedal;
+  c_button       btn_other_link_amp;
+  c_button       btn_other_link_cab;
+  c_button       btn_other_excl_pedal;
+  c_button       btn_other_excl_amp;
+  c_button       btn_other_excl_cab;
+  c_frame        frame_other_misc;
+  c_label        label_other_tuner;
+  c_label        label_other_calib;
+  c_textbox      text_other_tuner;
+  c_textbox      text_other_calib;
+  c_button       btn_other_vu;
+  c_button       btn_other_bass;
+  c_button       btn_other_prefs;
+  c_button       btn_other_about;
+  
   c_lane_widgets lanes_pedals [NB_NUM_MODELS];
   c_lane_widgets lanes_models [NB_NUM_MODELS];
   c_lane_widgets lanes_cabs [NB_NUM_MODELS];
@@ -276,23 +305,18 @@ public:
   
   c_vudata vudata_in [BANK_COUNT];
   c_configfile configfile;
-  //size_t exclusive_lane = 0; // 0: normal mode, 1-4: exclusive mode with lane [n - 1]
-  //bool user_bypass = false;
-  //bool do_vu = true;
-  //bool do_excl = false;
   c_neuralblender_state state;
   _lane_bank visible_bank = BANK_AMP;
+  _ui_page visible_page = PAGE_AMP;
   size_t last_exclusive_lane [BANK_COUNT] = {0, 0, 0}; // 1-based lane remembered when exclusive mode is off
   bool ui_ready;
   bool updating_from_state = false;
   bool calib_default = false;
   bool config_file_read = false;
   bool config_file_written = false;
-  //bool show_advanced = false;
   bool ui_resize_lock = false;
   bool ui_resize_pending = false;
   int pending_resize_w = 0;
   int pending_resize_h = 0;
   float stats [BANK_COUNT] [NB_NUM_MODELS * UI_STATS_PER_LANE];
-  //inline void move_resize () { show_advanced_settings (show_advanced); }
 };

@@ -1258,7 +1258,7 @@ nb:CabD
 	        lv2:index 110 ;
 	        lv2:symbol "calib_target_db" ;
 	        lv2:name "Calibration Target (dB)" ;
-	        lv2:default -12.0 ;
+	        lv2:default -18.0 ;
 	        lv2:minimum -40.0 ;
 	        lv2:maximum 0.0
 	    ] , [

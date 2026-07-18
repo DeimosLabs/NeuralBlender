@@ -50,6 +50,8 @@ enum _widget_role {
   ROLE_NOISEHOLD,
   ROLE_NOISERELEASE,
   ROLE_TUNER,
+  ROLE_TUNER_BASE_FREQ,
+  ROLE_CALIB_TARGET_DB,
   ROLE_UNKNOWN
 };
 
@@ -149,6 +151,7 @@ public:
   virtual void hide ();
   virtual void focus ();
   virtual void clear_focus ();
+  virtual void on_focus_lost ();
   
   void set_state (_widget_state state);
   static void draw_text_centered (Widget_t *w, 
@@ -174,6 +177,7 @@ public:
   uint64_t id              = -1;
   uint64_t lane            = -1;
   uint64_t bank            = -1;
+  uint64_t page            = 0;
   int corner_radius        = 4;
   float text_size          = 1.0;
   float text_r             = 1.0;
@@ -355,6 +359,7 @@ public:
   const std::string &text () const;
 
   virtual void on_change (const std::string &s);
+  void on_focus_lost () override;
   bool on_keydown (XKeyEvent *key) override;
 
   static void cb_draw (void *w, void *user_data);
