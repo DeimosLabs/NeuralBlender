@@ -2519,10 +2519,8 @@ void c_filepicker::show () { CP
     dialog = NULL;
   }
   parent->func.dialog_callback = filepicker_response;
-  if (ui) {
-    ui->configfile.read_file ();
+  if (ui)
     current_dir = ui->configfile.get_item (cwd_config_key_for_bank (bank));
-  }
   debug ("current_dir='%s'", current_dir.c_str ());
   const char *path = current_dir.empty () ? CONFIG_DEFAULT_DIR : current_dir.c_str ();
   dialog = open_file_dialog (parent, path, ".nam|.json|.aidax|.wav");
