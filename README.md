@@ -9,6 +9,7 @@ Features:
   - Can load up to 4 models on each bank simultaneously 
   - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
   - Standalone app and LV2 plugin
+  - Proper multithreading with UI and loader threads separate from DSP
   - VU meters can be disabled to save a tiny bit of DSP load
   - Calibration target dB is now a user defined setting
   - "Linked" calibration mode follows loudest model which has calib. enabled
@@ -26,7 +27,7 @@ Features:
 
 On my Intel Core7 ultra, it loads 5 or 6 models in the middle of a busy live session, 64 sample buffers / 3 periods, and DSP load typically stays below 50%, no xruns. (with DSP threads pinned to p-cores)
 
-Features considered for future versions: VST plugin, series mode(s), optionally more than 4 lanes per model bank, lane groups, etc...
+Features considered for future versions: VST plugin, series mode(s), optionally more than 4 lanes per model bank, lane groups, DSP load-splitting/balancing etc...
 
 ![NeuralBlender custom UI](data/screenshot-ui.png)
 ![NeuralBlender in Ardour](data/screenshot-ardour.png)
