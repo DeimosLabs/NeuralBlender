@@ -4,7 +4,7 @@ A simple, efficient but feature-rich amp modeling plugin based on RTNeural and N
 
 Features:
   - Supports nam A1, nam A2, aidax, and json model files.
-  - Full IR loader for cab sim
+  - Full impulse response (convolution) for cab sim
   - Complete stompbox->amp->cab/IR signal flow with 3 "banks" of models
   - Can load up to 4 models on each bank simultaneously 
   - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
