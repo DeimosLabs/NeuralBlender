@@ -22,7 +22,7 @@
 #define CMDLINE_DEBUG_COLOR ANSI_MAGENTA
 #include "cmdline_debug.h"
 
-#define MIN_WINDOW_HEIGHT (64 + (130 * NB_NUM_MODELS))
+#define MIN_WINDOW_HEIGHT (124 + (130 * NB_NUM_MODELS))
 //#define DEFAULT_WINDOW_HEIGHT (12 + std::min (640, (52 + (180 * NB_NUM_MODELS))))
 #define DEFAULT_WINDOW_HEIGHT MIN_WINDOW_HEIGHT
 #define MIN_WINDOW_WIDTH 640
@@ -402,17 +402,29 @@ void c_aboutwindow::on_resize () { CP
 void c_lane_widgets::create (
     c_neuralblender_ui *ui_,
     Widget_t *parent,
-    size_t which,
+    size_t bank_id_,
+    size_t lane_id_,
     int x, int y, int w, int h) { CP
   
   move_resize (x, y, w, h);
   //knob_top = (h - knob_size) / 2;
   
-  char label [64];
   ui = ui_;
-  snprintf (label, 31, "Amp %c", (char) ('A' + which));
-  lane_id = which;
+  lane_id = lane_id_;
+  bank_id = bank_id_;
+
+  char label [64];
+  const char *bank_name = "Amp";
+  switch (bank_id) {
+    case BANK_PEDAL: bank_name = "Pedal"; break;
+    case BANK_CAB:   bank_name = "Cab/IR"; break;
+    case BANK_AMP:
+    default:         bank_name = "Amp"; break;
+  }
+  snprintf (label, 31, "%s %c", bank_name, (char) ('A' + lane_id));
   lane_widget.create (ui, parent, label, x, y, w, h);
+  lane_widget.lane = lane_id;
+  lane_widget.bank = bank_id;
   lane_widget.widget->scale.gravity = NONE;
   
   Widget_t *wp = lane_widget.widget;
@@ -427,17 +439,30 @@ void c_lane_widgets::create (
   // regular controls
   menu_list.create (ui, wp, label, 0, 0, 320, 32);
   menu_list.widget->func.value_changed_callback = combobox_selected_callback;
-  menu_list.lane = which;
+  menu_list.lane = lane_id;
+  menu_list.bank = bank_id;
 
   int knobs_right = w - 180;
   knob_gain_in.create (ui, wp, "Input", 0, 0, 64, 64);
-  knob_gain_in.lane = knob_gain_out.lane = knob_dry_out.lane = knob_delay.lane = which;
+  knob_ir_pitch.create (ui, wp, "Pitch", 0, 0, 64, 64);
+  knob_gain_in.lane = knob_ir_pitch.lane =
+    knob_gain_out.lane = knob_dry_out.lane = knob_delay.lane = lane_id;
+  knob_gain_in.bank = knob_ir_pitch.bank =
+    knob_gain_out.bank = knob_dry_out.bank = knob_delay.bank = bank_id;
   knob_gain_in.set_min (-40);
   knob_gain_in.set_max (40);
   knob_gain_in.set_default (0);
   knob_gain_in.set_value (0);
   knob_gain_in.set_step (0.1);
   knob_gain_in.role = ROLE_GAIN_IN;
+
+  knob_ir_pitch.set_min (-12.0);
+  knob_ir_pitch.set_max (12.0);
+  knob_ir_pitch.set_default (0);
+  knob_ir_pitch.set_value (0);
+  knob_ir_pitch.set_step (0.01);
+  knob_ir_pitch.role = ROLE_IR_PITCH;
+  knob_ir_pitch.hide ();
   
   knob_gain_out.create (ui, wp, "Output", 0, 0, 64, 64);
   knob_gain_out.set_min (-40);
@@ -464,17 +489,33 @@ void c_lane_widgets::create (
   btn_clear.create  (ui, wp, "",     0, 0, 100, 40, WSTYLE_IMAGE_BUTTON);
   btn_excl.create   (ui, wp, "Use",       0, 0, 100, 40, WSTYLE_TOGGLE);
   btn_mute.create   (ui, wp, "Mute",      0, 0, 100, 40, WSTYLE_IMAGE_TOGGLE);
-  btn_browse.set_tooltip ("Load a model capture file");
-  btn_clear.set_tooltip ("Clear this model");
+  switch (bank_id) {
+    case BANK_PEDAL:
+      btn_browse.set_tooltip ("Load a pedal capture file");
+      btn_clear.set_tooltip ("Clear this pedal model");
+    break;
+    case BANK_AMP:
+      btn_browse.set_tooltip ("Load an amp capture file");
+      btn_clear.set_tooltip ("Clear this amp model");
+    break;
+    case BANK_CAB:
+      btn_browse.set_tooltip ("Load an IR");
+      btn_clear.set_tooltip ("Clear this IR");
+    break;
+  }
   btn_mute.set_value (false);
-  btn_browse.lane = which;
-  btn_clear.lane = which;
-  btn_mute.lane = which;
+  btn_browse.lane = lane_id;
+  btn_clear.lane = lane_id;
+  btn_mute.lane = lane_id;
+  btn_browse.bank = bank_id;
+  btn_clear.bank = bank_id;
+  btn_mute.bank = bank_id;
   btn_browse.role = ROLE_BROWSE;
   btn_clear.role = ROLE_CLEAR;
   btn_mute.role = ROLE_MUTE;
   btn_excl.role = ROLE_EXCL_USE;
-  btn_excl.lane = which;
+  btn_excl.lane = lane_id;
+  btn_excl.bank = bank_id;
   btn_mute.set_image (data_icon_speaker_off_big_png, WSTATE_ON);
   btn_mute.set_image (data_icon_speaker_on_big_png, WSTATE_OFF);
   btn_mute.padding = 16;
@@ -496,10 +537,12 @@ void c_lane_widgets::create (
   btn_calib.set_tooltip ("Calibrate (normalize) output level");
   btn_flip.role = ROLE_DCFLIP;
   btn_calib.role = ROLE_CALIBRATE;
-  btn_flip.lane = which;
-  btn_calib.lane = which;
-  if (ui && which < NB_NUM_MODELS)
-    btn_calib.set_value (ui->state.lanes [which].do_calib);
+  btn_flip.lane = lane_id;
+  btn_calib.lane = lane_id;
+  btn_flip.bank = bank_id;
+  btn_calib.bank = bank_id;
+  if (ui && lane_id < NB_NUM_MODELS && bank_id < BANK_COUNT)
+    btn_calib.set_value (ui->state.banks [bank_id].lanes [lane_id].do_calib);
   //label_flip.create (ui, wp, "DC flip", 0, 0, 75, 32);
   //label_calib.create (ui, wp, "Calib.", 0, 0, 75, 32);
   label_frames.create (ui, wp, "(not loaded)", 0, 0, 75, 24);
@@ -508,7 +551,7 @@ void c_lane_widgets::create (
   label_trim.create (ui, wp, "1.0", 0, 0, 75, 24);
   label_trim.textsize = 0.75;
   label_trim.align = TEXT_CENTER;
-  label_engine.create (ui,wp, "Engine: none", 0, 0, 120, 24);
+  label_engine.create (ui,wp, "(none)", 0, 0, 120, 24);
   label_engine.textsize = 0.75;
   label_engine.align = TEXT_CENTER;
   
@@ -517,11 +560,13 @@ void c_lane_widgets::create (
   btn_calib.set_image_default (data_icon_calib_big_png);
   btn_flip.set_image_default (data_icon_phase_big_png);
   
-  if (ui && which < NB_NUM_MODELS) {
-    ui->filepickers [which].create (ui, btn_browse.widget, which, "Select file");
-    btn_browse.filepicker = &ui->filepickers [which];
-    btn_browse.lane = which;
-    ui->filepickers [which].lane = which;
+  if (ui && lane_id < NB_NUM_MODELS) {
+    filepicker.create (ui, btn_browse.widget, lane_id, "Select file");
+    btn_browse.filepicker = &filepicker;
+    btn_browse.lane = lane_id;
+    btn_browse.bank = bank_id;
+    filepicker.lane = lane_id;
+    filepicker.bank = bank_id;
   }
   
 }
@@ -579,6 +624,8 @@ void c_lane_widgets::move_resize (
   btn_calib.padding = btnpadding;
   
   knob_gain_in.move_resize (knob_right, knob_top, knob_size, knob_size + 16);
+  knob_ir_pitch.move_resize (knob_gain_in.x (), knob_gain_in.y (),
+                             knob_gain_in.w (), knob_gain_in.h ());
   knob_gain_out.move_resize (knob_right + (knob_size + 1) * 2, knob_top, knob_size, knob_size + 16);
   knob_dry_out.move_resize (knob_right + knob_size + 1, knob_top, knob_size, knob_size + 16);
   
@@ -601,11 +648,13 @@ void c_lane_widgets::move_resize (
 
 c_neuralblender_ui::c_neuralblender_ui () { CP
   memset (&app, 0, sizeof (app));
-  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-    const size_t n = i * UI_STATS_PER_LANE;
-    stats [n] = 0.0f;
-    stats [n + 1] = 1.0f;
-    stats [n + 2] = (float) ENGINE_NONE;
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+      const size_t n = i * UI_STATS_PER_LANE;
+      stats [bank] [n] = 0.0f;
+      stats [bank] [n + 1] = 1.0f;
+      stats [bank] [n + 2] = (float) ENGINE_NONE;
+    }
   }
   display = NULL;
   window = 0;
@@ -616,10 +665,16 @@ c_neuralblender_ui::~c_neuralblender_ui () { CP
   destroy ();
 }
 
-void c_neuralblender_ui::update_cwd (std::string path) {
+void c_neuralblender_ui::update_model_cwd (std::string path) {
   CP
   debug ("path='%s'", path.c_str ());
-  configfile.set_item (CONFIG_KEY_NAME_CWD, path_dirname (path));
+  configfile.set_item (CONFIG_KEY_NAME_MODEL_CWD, path_dirname (path));
+}
+
+void c_neuralblender_ui::update_ir_cwd (std::string path) {
+  CP
+  debug ("path='%s'", path.c_str ());
+  configfile.set_item (CONFIG_KEY_NAME_IR_CWD, path_dirname (path));
 }
 
 bool c_neuralblender_ui::create (Window parent_) { CP
@@ -646,8 +701,9 @@ bool c_neuralblender_ui::create (Window parent_) { CP
 
   if (configfile.istrue (CONFIG_KEY_NAME_CALIB)) {
     calib_default = true;
-    for (i = 0; i < NB_NUM_MODELS && i < NB_NUM_MODELS; ++i)
-      state.lanes [i].do_calib = true;
+    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
+      for (i = 0; i < NB_NUM_MODELS; ++i)
+        state.banks [bank].lanes [i].do_calib = true;
   }
 
   parent = parent_;
@@ -660,6 +716,10 @@ bool c_neuralblender_ui::create (Window parent_) { CP
     return false;
   }
   
+  cont_pedals.create (this, mainwindow.widget, "", 0, 120, 640, 480);
+  cont_models.create (this, mainwindow.widget, "", 0, 120, 640, 480);
+  cont_cabs.create (this, mainwindow.widget, "", 0, 120, 640, 480);
+  
   mainwindow.set_icon_from_png (data_neuralblender_logo_512_png);
 
   //label_big.create (this, mainwindow.widget, "NeuralBlender", 120, 24, 400, 40);
@@ -668,14 +728,26 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   img_logo.create (this, mainwindow.widget, "", 0, 0, 256, 32);
   img_logo.set_png (data_textlogo_1024x128_png);
   
-  btn_enable.create (this, mainwindow.widget, "ON/OFF",  20, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
+  btn_tab_pedals.create (this, mainwindow.widget, "PEDALS", 0, 0, 86, 50);
+  btn_tab_pedals.role = ROLE_BANKSWITCH;
+  btn_tab_pedals.bank = BANK_PEDAL;
+  btn_tab_models.create (this, mainwindow.widget, "AMPS", 0, 0, 86, 50);
+  btn_tab_models.role = ROLE_BANKSWITCH;
+  btn_tab_models.bank = BANK_AMP;
+  btn_tab_cabs.create (this, mainwindow.widget, "CAB/IR", 0, 0, 86, 50);
+  btn_tab_cabs.role = ROLE_BANKSWITCH;
+  btn_tab_cabs.bank = BANK_CAB;
+  
+  //btn_enable.create (this, mainwindow.widget, "ON/OFF",  20, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
+  btn_enable.create (this, mainwindow.widget, "",  20, 12, 40, 40, WSTYLE_IMAGE_TOGGLE);
   btn_enable.set_value (true);
   btn_enable.role = ROLE_BYPASS;
   btn_enable.set_image (data_icon_power_on_png, WSTATE_ON);
   btn_enable.set_image (data_icon_power_grey_png, WSTATE_OFF);
   //btn_enable.set_tooltip ("BYPASS SWITCH");
   
-  btn_muteall.create (this, mainwindow.widget, "Mute all", 500, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
+  //btn_muteall.create (this, mainwindow.widget, "Mute all", 500, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
+  btn_muteall.create (this, mainwindow.widget, "", 500, 12, 40, 40, WSTYLE_IMAGE_TOGGLE);
   btn_muteall.role = ROLE_MUTEALL;
   btn_muteall.set_image (data_icon_speaker_off_big_png, WSTATE_ON);
   btn_muteall.set_image (data_icon_speaker_on_big_png, WSTATE_OFF);
@@ -688,6 +760,11 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_tuner.set_image_default (data_icon_tuner_png);
   btn_tuner.set_tooltip ("Tuner");
   btn_tuner.role = ROLE_TUNER;
+  
+  btn_enable.padding =    12;
+  btn_muteall.padding =   12;
+  btn_tuner.padding =     12;
+  btn_noisegate.padding = 12;
   
   knob_noisethresh.create (this, mainwindow.widget, "", 0, 0, 64, 64);
   knob_noisethresh.set_min (-120);
@@ -722,12 +799,18 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   prefswindow.create (this);
   
   for (i = 0; i < NB_NUM_MODELS; i++) {
-    lanes [i].create (this, mainwindow.widget, i, 0, 0, DEFAULT_WINDOW_WIDTH, 130);
+    lanes_pedals [i].create (this, cont_pedals.widget, BANK_PEDAL, i, 0, 0, 1, 1);
+    lanes_models [i].create (this, cont_models.widget, BANK_AMP, i, 0, 0, 1, 1);
+    lanes_cabs [i].create (this, cont_cabs.widget, BANK_CAB, i, 0, 0, 1, 1);
   }
-  meter_in.create (this, mainwindow.widget, "", 6, 70, 5, 520);
-  meter_in.set_vudata (&vudata_in);
-  meter_in.set_stereo (false);
-  vudata_in.set_l (0.0, 0.0);
+  meter_in [BANK_PEDAL].create (this, cont_pedals.widget, "", 6, 70, 5, 520);
+  meter_in [BANK_AMP].create (this, cont_models.widget, "", 6, 70, 5, 520);
+  meter_in [BANK_CAB].create (this, cont_cabs.widget, "", 6, 70, 5, 520);
+  for (i = 0; i < BANK_COUNT; i++) {
+    meter_in [i].set_vudata (&vudata_in [i]);
+    meter_in [i].set_stereo (false);
+    vudata_in [i].set_l (0.0, 0.0);
+  }
   
   tuner.create (this, mainwindow.widget, "", 0, 0, 400, 24);
   if (blender)
@@ -736,9 +819,13 @@ bool c_neuralblender_ui::create (Window parent_) { CP
 
   if (blender) {
     for (i = 0; i < NB_NUM_MODELS; i++) {
-      blender->meters_out [i] = &lanes [i].vudata_out;
+      blender->banks [BANK_PEDAL].meters_out [i] = &lanes_pedals [i].vudata_out;
+      blender->banks [BANK_AMP].meters_out [i]   = &lanes_models [i].vudata_out;
+      blender->banks [BANK_CAB].meters_out [i]   = &lanes_cabs [i].vudata_out;
     }
-    blender->meter_in = &vudata_in;
+    blender->banks [BANK_PEDAL].meter_in = &vudata_in [BANK_PEDAL];
+    blender->banks [BANK_AMP].meter_in   = &vudata_in [BANK_AMP];
+    blender->banks [BANK_CAB].meter_in   = &vudata_in [BANK_CAB];
   }
 
   apply_ui_prefs (prefs);
@@ -781,37 +868,52 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     //if (do_set_min_size)
     mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
     
+    cont_pedals.move_resize (0, 128, window_width, window_height - 120 - 56);
+    cont_models.move_resize (0, 128, window_width, window_height - 120 - 56);
+    cont_cabs.move_resize (0, 128, window_width, window_height - 120 - 56);
+    cont_checkboxes.move_resize (16, window_height - 44, 450, 40);
+    sync_bank_visibility ();
+    
     int lane_width = window_width - 32;
-    const int lane_top = 60;
+    const int lane_top = 0;
     const int lane_gap = 12;
-    const int bottom_reserve = 56;
     const int lane_count = NB_NUM_MODELS;
     const int total_gap = (lane_count > 1) ? (lane_count - 1) * lane_gap : 0;
-    const int lane_area = window_height - lane_top - bottom_reserve - total_gap;
+    //const int lane_area = window_height - lane_top - bottom_reserve - total_gap;
+    const int lane_area = cont_models.h () - total_gap;
     int lane_height = std::max (1, lane_area / lane_count);
     
     debug ("window w/h %d,%d", window_width, window_height);
     
-    cont_checkboxes.move_resize (16, window_height - 44, 450, 40);
+    btn_tab_pedals.move (16, 66);
+    btn_tab_models.move (106, 66);
+    btn_tab_cabs.move (196, 66);
     
-    btn_enable.move_resize (16, 12, 120, 40);
-    btn_muteall.move_resize (window_width - 136, 12, 120, 40);
-    btn_prefs.move_resize (btn_muteall.x (), window_height - 48, 120, 40);
-    btn_noisegate.move_resize (btn_enable.x () + btn_enable.w () + 8, 12, 40, 40);
-    knob_noisethresh.move_resize (btn_noisegate.x () + btn_noisegate.w () + 16, 8, 48, 64);
-    btn_tuner.move_resize (btn_muteall.x () - 48, 12, 40, 40);
-    tuner.move_resize (btn_noisegate.x () + btn_noisegate.w () + 4, 2, 
-                       btn_tuner. x () - 8 - btn_noisegate.x () - btn_noisegate.w (), 56);
+    btn_enable.move_resize    (window_width - 12 - 54,     66, 50, 50);
+    btn_muteall.move_resize   (window_width - 12 - 54 * 2, 66, 50, 50);
+    btn_tuner.move_resize     (window_width - 12 - 54 * 3, 66, 50, 50);
+    btn_noisegate.move_resize (window_width - 12 - 54 * 4, 66, 50, 50);
+    
+    knob_noisethresh.move_resize (btn_noisegate.x () - 52, 72, 48, 48);
+    btn_prefs.move_resize (window_width - 136, window_height - 48, 120, 40);
+    tuner.move_resize (4, 4, window_width - 8, 56);
     
     //label_exclmode.set_label ("Exclusive mode");
     
     size_t i;
-    for (i = 0; i < NB_NUM_MODELS; i++) {
-      lanes [i].move_resize (16, lane_top + i * (lane_height + lane_gap), lane_width, lane_height);
+    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+      c_lane_widgets *bank_lanes = lanes_for_bank ((_lane_bank) bank);
+      for (i = 0; i < NB_NUM_MODELS; i++) {
+        bank_lanes [i].move_resize (
+          16, lane_top + i * (lane_height + lane_gap), lane_width, lane_height);
+      }
     }
     
     const int lane_bottom = lane_top + lane_count * lane_height + total_gap;
-    meter_in.move_resize (5, lane_top + 4, 5, std::max (1, lane_bottom - lane_top - 8));
+    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+      meter_in [bank].move_resize (
+        5, lane_top + 4, 5, std::max (1, lane_bottom - lane_top - 8));
+    }
     
     ui_resize_lock = false;
   }
@@ -829,6 +931,100 @@ void c_neuralblender_ui::destroy () { CP
   ui_ready = false;
 }
 
+c_lane_widgets *c_neuralblender_ui::lanes_for_bank (_lane_bank bank) {
+  switch (bank) {
+    case BANK_PEDAL: return lanes_pedals;
+    case BANK_CAB:   return lanes_cabs;
+    case BANK_AMP:
+    default:         return lanes_models;
+  }
+}
+
+const c_lane_widgets *c_neuralblender_ui::lanes_for_bank (_lane_bank bank) const {
+  switch (bank) {
+    case BANK_PEDAL: return lanes_pedals;
+    case BANK_CAB:   return lanes_cabs;
+    case BANK_AMP:
+    default:         return lanes_models;
+  }
+}
+
+c_meter &c_neuralblender_ui::input_meter_for_bank (_lane_bank bank) {
+  if (bank < BANK_PEDAL || bank >= BANK_COUNT)
+    bank = BANK_AMP;
+  return meter_in [bank];
+}
+
+c_vudata &c_neuralblender_ui::input_vudata_for_bank (_lane_bank bank) {
+  if (bank < BANK_PEDAL || bank >= BANK_COUNT)
+    bank = BANK_AMP;
+  return vudata_in [bank];
+}
+
+int c_neuralblender_ui::exclusive_lane_for_bank (_lane_bank bank) const {
+  if (bank < BANK_PEDAL || bank >= BANK_COUNT)
+    bank = BANK_AMP;
+  return state.banks [bank].exclusive_lane;
+}
+
+void c_neuralblender_ui::set_exclusive_lane_for_bank (_lane_bank bank, int lane) {
+  if (bank < BANK_PEDAL || bank >= BANK_COUNT)
+    bank = BANK_AMP;
+  state.banks [bank].exclusive_lane = std::clamp (lane, 0, (int) NB_NUM_MODELS);
+}
+
+bool c_neuralblender_ui::linked_calib_for_bank (_lane_bank bank) const {
+  if (bank < BANK_PEDAL || bank >= BANK_COUNT)
+    bank = BANK_AMP;
+  return state.banks [bank].linked_calib;
+}
+
+void c_neuralblender_ui::set_linked_calib_for_bank (_lane_bank bank, bool b) {
+  if (bank < BANK_PEDAL || bank >= BANK_COUNT)
+    bank = BANK_AMP;
+  state.banks [bank].linked_calib = b;
+}
+
+void c_neuralblender_ui::on_bank_switch (c_widget *w, int n) { CP
+  (void) w;
+  if (n >= BANK_PEDAL && n < BANK_COUNT)
+    visible_bank = (_lane_bank) n;
+
+  sync_widgets_from_state (state);
+}
+
+void c_neuralblender_ui::sync_bank_visibility () {
+  switch (visible_bank) {
+    case BANK_PEDAL:
+      cont_pedals.show ();
+      cont_models.hide ();
+      cont_cabs.hide ();
+      btn_tab_pedals.set_value (true);
+      btn_tab_models.set_value (false);
+      btn_tab_cabs.set_value (false);
+    break;
+    
+    case BANK_CAB:
+      cont_pedals.hide ();
+      cont_models.hide ();
+      cont_cabs.show ();
+      btn_tab_pedals.set_value (false);
+      btn_tab_models.set_value (false);
+      btn_tab_cabs.set_value (true);
+    break;
+    
+    case BANK_AMP:
+    default:
+      cont_pedals.hide ();
+      cont_models.show ();
+      cont_cabs.hide ();
+      btn_tab_pedals.set_value (false);
+      btn_tab_models.set_value (true);
+      btn_tab_cabs.set_value (false);
+    break;
+  }
+}
+
 void c_neuralblender_ui::on_button (c_button *btn, bool value) {
   if (!btn || updating_from_state)
     return;
@@ -843,21 +1039,29 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
 
     case ROLE_MUTE: CP
       on_mute (btn, value);
-      if (lane >= 0 && lane < NB_NUM_MODELS) {
-        state.lanes [lane].lane_mute = value;
+      if (lane < NB_NUM_MODELS && btn->bank < BANK_COUNT) {
+        state.banks [btn->bank].lanes [lane].lane_mute = value;
       }
     break;
 
     case ROLE_DCFLIP: CP
       on_dcflip (btn, value);
-      if (lane >= 0 && lane < NB_NUM_MODELS) {
-        state.lanes [lane].dcflip = value;
+      if (lane < NB_NUM_MODELS && btn->bank < BANK_COUNT) {
+        state.banks [btn->bank].lanes [lane].dcflip = value;
+      }
+    break;
+
+    case ROLE_BANKSWITCH: CP
+      debug ("visible bank: %d", btn->bank);
+      if (btn->bank >= BANK_PEDAL && btn->bank <= BANK_CAB) {
+        visible_bank = (_lane_bank) btn->bank;
+        on_bank_switch (btn, visible_bank);
       }
     break;
 
     case ROLE_CALIBRATE: CP
-      if (lane >= 0 && lane < NB_NUM_MODELS) {
-        state.lanes [lane].do_calib = value;
+      if (lane < NB_NUM_MODELS && btn->bank < BANK_COUNT) {
+        state.banks [btn->bank].lanes [lane].do_calib = value;
       }
       write_calib_state_if_consistent ();
       on_calibrate (btn, value);
@@ -918,7 +1122,9 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     break;
 
     case ROLE_LINKED_CALIB: CP
-      prefs.linked_calib = value;
+      set_linked_calib_for_bank (visible_bank, value);
+      if (visible_bank == BANK_AMP)
+        prefs.linked_calib = value;
       on_linked_calib (btn, value);
     break;
 
@@ -970,7 +1176,8 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
 }
 
 void c_neuralblender_ui::set_threshgain (float f) {
-  meter_in.set_compression_gain (f);
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
+    meter_in [bank].set_compression_gain (f);
 }
 
 void c_neuralblender_ui::on_about () { CP }
@@ -984,16 +1191,21 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
   const float scale_db = p.vu_scale_db <= 0.0f ? p.vu_scale_db : DEFAULT_VU_DB;
   const float headroom_db = std::clamp (p.vu_headroom_db, 0.0f, 12.0f);
 
-  meter_in.set_db_scale (scale_db);
-  meter_in.set_headroom (headroom_db);
-  vudata_in.set_db_scale (scale_db);
-  vudata_in.set_headroom (headroom_db);
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    meter_in [bank].set_db_scale (scale_db);
+    meter_in [bank].set_headroom (headroom_db);
+    vudata_in [bank].set_db_scale (scale_db);
+    vudata_in [bank].set_headroom (headroom_db);
+  }
 
-  for (size_t i = 0; i < NB_NUM_MODELS; i++) {
-    lanes [i].meter_out.set_db_scale (scale_db);
-    lanes [i].meter_out.set_headroom (headroom_db);
-    lanes [i].vudata_out.set_db_scale (scale_db);
-    lanes [i].vudata_out.set_headroom (headroom_db);
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    c_lane_widgets *bank_lanes = lanes_for_bank ((_lane_bank) bank);
+    for (size_t i = 0; i < NB_NUM_MODELS; i++) {
+      bank_lanes [i].meter_out.set_db_scale (scale_db);
+      bank_lanes [i].meter_out.set_headroom (headroom_db);
+      bank_lanes [i].vudata_out.set_db_scale (scale_db);
+      bank_lanes [i].vudata_out.set_headroom (headroom_db);
+    }
   }
 
   btn_bass.set_value (p.calib_source == 1);
@@ -1021,6 +1233,8 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
 
 void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
   apply_ui_prefs (p);
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
+    state.banks [bank].linked_calib = p.linked_calib;
   write_prefs_to_config (configfile, p);
 }
 
@@ -1045,31 +1259,36 @@ void c_neuralblender_ui::update_stats () {
     NULL
   };
   
-  for (size_t i = 0; i < NB_NUM_MODELS; i++) {
-    const size_t n = i * UI_STATS_PER_LANE;
-    int nframes = stats [n];
-    float trim = stats [n + 1];
-    int eng = (int) stats [n + 2];
-    if (eng < ENGINE_NONE || eng > ENGINE_UNKNOWN)
-      eng = ENGINE_UNKNOWN;
-    
-    lanes [i].label_engine.set_label (engine_names [eng]);
-    /*if (trim != 1.0f) {
-      snprintf (buf, 127, "%d frames, trim=%.02f", nframes, trim);
-    } else {
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    c_lane_widgets *bank_lanes = lanes_for_bank ((_lane_bank) bank);
+
+    for (size_t i = 0; i < NB_NUM_MODELS; i++) {
+      const size_t n = i * UI_STATS_PER_LANE;
+      int nframes = stats [bank] [n];
+      float trim = stats [bank] [n + 1];
+      int eng = (int) stats [bank] [n + 2];
+      if (eng < ENGINE_NONE || eng > ENGINE_UNKNOWN)
+        eng = ENGINE_UNKNOWN;
+      
+      bank_lanes [i].label_engine.set_label (engine_names [eng]);
+      if (eng == ENGINE_IR) {
+        bank_lanes [i].knob_gain_in.hide ();
+        bank_lanes [i].knob_ir_pitch.show ();
+      } else {
+        bank_lanes [i].knob_ir_pitch.hide ();
+        bank_lanes [i].knob_gain_in.show ();
+      }
+
       snprintf (buf, 127, "%d frames", nframes);
-    } */
-    
-    snprintf (buf, 127, "%d frames", nframes);
-    lanes [i].label_frames.set_label (buf);
-    if (trim == 1.00) {
-      lanes [i].label_trim.set_label ("");
-    } else {
-      float db = gain_to_db (trim);
-      snprintf (buf, 127, "Trim: %s%.02fdB", db > 0.0 ? "+" : "", db);
-      lanes [i].label_trim.set_label (buf);
+      bank_lanes [i].label_frames.set_label (buf);
+      if (trim == 1.00) {
+        bank_lanes [i].label_trim.set_label ("");
+      } else {
+        float db = gain_to_db (trim);
+        snprintf (buf, 127, "Trim: %s%.02fdB", db > 0.0 ? "+" : "", db);
+        bank_lanes [i].label_trim.set_label (buf);
+      }
     }
-    
   }
 }
 
@@ -1091,9 +1310,11 @@ void c_neuralblender_ui::vu_on (bool b) { CP
 
   state.do_vu = true;
 
-  meter_in.show ();
-  for (size_t i = 0; i < NB_NUM_MODELS; i++) {
-    lanes [i].meter_out.show ();
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    meter_in [bank].show ();
+    c_lane_widgets *bank_lanes = lanes_for_bank ((_lane_bank) bank);
+    for (size_t i = 0; i < NB_NUM_MODELS; i++)
+      bank_lanes [i].meter_out.show ();
   }
   //on_vu (&btn_vu, b);
 }
@@ -1101,35 +1322,41 @@ void c_neuralblender_ui::vu_on (bool b) { CP
 void c_neuralblender_ui::vu_off () { CP
   state.do_vu = false;
 
-  meter_in.hide ();
-  for (size_t i = 0; i < NB_NUM_MODELS; i++) {
-    lanes [i].meter_out.hide ();
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    meter_in [bank].hide ();
+    c_lane_widgets *bank_lanes = lanes_for_bank ((_lane_bank) bank);
+    for (size_t i = 0; i < NB_NUM_MODELS; i++)
+      bank_lanes [i].meter_out.hide ();
   }
   //on_vu (&btn_vu, false);
 }
 
 size_t c_neuralblender_ui::choose_exclusive_lane () const {
-  if (state.exclusive_lane > 0 &&
-      state.exclusive_lane <= (int) NB_NUM_MODELS)
-    return (size_t) state.exclusive_lane;
+  const c_neuralblender_bank_state &bank_state = state.banks [visible_bank];
 
-  if (last_exclusive_lane > 0 && last_exclusive_lane <= NB_NUM_MODELS)
-    return last_exclusive_lane;
+  const int current_exclusive = exclusive_lane_for_bank (visible_bank);
+  if (current_exclusive > 0 &&
+      current_exclusive <= (int) NB_NUM_MODELS)
+    return (size_t) current_exclusive;
+
+  if (last_exclusive_lane [visible_bank] > 0 &&
+      last_exclusive_lane [visible_bank] <= NB_NUM_MODELS)
+    return last_exclusive_lane [visible_bank];
 
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-    if (!state.lanes [i].filename.empty () &&
-        !state.lanes [i].lane_mute)
+    if (!bank_state.lanes [i].filename.empty () &&
+        !bank_state.lanes [i].lane_mute)
       return i + 1;
   }
 
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     //if (!filepickers [i].selected_file.empty ())
-    if (!state.lanes [i].filename.empty ())
+    if (!bank_state.lanes [i].filename.empty ())
       return i + 1;
   }
 
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-    if (!state.lanes [i].lane_mute)
+    if (!bank_state.lanes [i].lane_mute)
       return i + 1;
   }
 
@@ -1151,13 +1378,13 @@ bool c_neuralblender_ui::request_window_size (int w, int h) {
 
 void c_neuralblender_ui::on_excl (c_widget *w, int n) {
   debug ("n=%d", n);
-  state.exclusive_lane = n;
+  set_exclusive_lane_for_bank (visible_bank, n);
   if (n > 0 && n <= (int) NB_NUM_MODELS)
-    last_exclusive_lane = (size_t) n;
+    last_exclusive_lane [visible_bank] = (size_t) n;
   if (!w)
     return;
 
-  btn_exclmode.set_value (state.exclusive_lane != 0);
+  btn_exclmode.set_value (exclusive_lane_for_bank (visible_bank) != 0);
   apply_effective_controls();
   //sync_widgets_from_state (state);
 }
@@ -1192,10 +1419,10 @@ int c_neuralblender_ui::idle () {
   }
 
   if (state.do_vu) {
-    meter_in.on_ui_timer ();
-    for (int i = 0; i < NB_NUM_MODELS; i++) {
-      lanes [i].meter_out.on_ui_timer ();
-    }
+    meter_in [visible_bank].on_ui_timer ();
+    c_lane_widgets *bank_lanes = lanes_for_bank (visible_bank);
+    for (int i = 0; i < NB_NUM_MODELS; i++)
+      bank_lanes [i].meter_out.on_ui_timer ();
   }
   
   if (state.tuner_on) {
@@ -1213,27 +1440,46 @@ void c_neuralblender_ui::draw () {
   widget_draw (mainwindow.widget, NULL);
 }
 
-void c_neuralblender_ui::clear_lane_model_ui (size_t which) {
+bool c_neuralblender_ui::load_model (size_t which, const char *filename) {
+  return load_model (BANK_AMP, which, filename);
+}
+
+void c_neuralblender_ui::clear_lane_model_ui (_lane_bank bank, size_t which) {
   if (which >= NB_NUM_MODELS)
     return;
 
   //filepickers [which].selected_file.clear ();
-  state.lanes [which].filename.clear ();
-  lanes [which].menu_list.clear ();
+  if (bank < BANK_PEDAL || bank >= BANK_COUNT)
+    bank = BANK_AMP;
+
+  state.banks [bank].lanes [which].filename.clear ();
+  lanes_for_bank (bank) [which].menu_list.clear ();
 }
 
-void c_neuralblender_ui::set_lane_mute (size_t which, bool b) {
+void c_neuralblender_ui::clear_lane_model_ui (size_t which) {
+  clear_lane_model_ui (BANK_AMP, which);
+}
+
+void c_neuralblender_ui::set_lane_mute (_lane_bank bank, size_t which, bool b) {
   debug ("which=%d, b=%d", (int) which, (int) b);
   if (which >= NB_NUM_MODELS)
     return;
 
+  if (bank < BANK_PEDAL || bank >= BANK_COUNT)
+    bank = BANK_AMP;
+
   const bool old_updating = updating_from_state;
   updating_from_state = true;
 
+  c_lane_widgets *lanes = lanes_for_bank (bank);
   lanes [which].btn_mute.value = b;
   lanes [which].btn_mute.set_value (b);
 
   updating_from_state = old_updating;
+}
+
+void c_neuralblender_ui::set_lane_mute (size_t which, bool b) {
+  set_lane_mute (BANK_AMP, which, b);
 }
 
 void c_neuralblender_ui::apply_effective_controls () {
@@ -1244,10 +1490,11 @@ void c_neuralblender_ui::apply_effective_controls () {
 void c_neuralblender_ui::write_calib_state_if_consistent () {
   bool all_on = true;
   bool all_off = true;
+  const c_neuralblender_bank_state &bank_state = state.banks [visible_bank];
 
   for (size_t i = 0; i < NB_NUM_MODELS && i < NB_NUM_MODELS; ++i) {
-    all_on  &= state.lanes [i].do_calib;
-    all_off &= !state.lanes [i].do_calib;
+    all_on  &= bank_state.lanes [i].do_calib;
+    all_off &= !bank_state.lanes [i].do_calib;
   }
 
   if (!all_on && !all_off)
@@ -1264,11 +1511,15 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   const bool showadvanced = state.showadvanced;
   this->state = state_;
   this->state.showadvanced = showadvanced;
-  if (state.exclusive_lane > 0 &&
-      state.exclusive_lane <= (int) NB_NUM_MODELS)
-    last_exclusive_lane = (size_t) state.exclusive_lane;
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    const int n = this->state.banks [bank].exclusive_lane;
+    if (n > 0 && n <= (int) NB_NUM_MODELS)
+      last_exclusive_lane [bank] = (size_t) n;
+  }
 
   updating_from_state = true;
+  
+  sync_bank_visibility ();
   
   btn_noisegate.set_value (state.noisegate_on);
   knob_noisethresh.set_value (state.noisethresh);
@@ -1277,30 +1528,36 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   else
     knob_noisethresh.hide ();
 
-  const size_t nlanes = NB_NUM_MODELS < NB_NUM_MODELS ? NB_NUM_MODELS : NB_NUM_MODELS;
-  for (size_t i = 0; i < nlanes; ++i) {
-    const c_neuralblender_lane_state &lane = state.lanes [i];
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    c_lane_widgets *bank_lanes = lanes_for_bank ((_lane_bank) bank);
+    const c_neuralblender_bank_state &bank_state = state.banks [bank];
 
-    lanes [i].knob_gain_in.set_value (gain_to_db (lane.gain_in));
-    lanes [i].knob_gain_out.set_value (gain_to_db (lane.gain_out));
-    lanes [i].knob_dry_out.set_value (
-      lane.dry_out > 0.0f ? gain_to_db (lane.dry_out) : DB_SILENCE);
-    lanes [i].knob_delay.set_value (lane.delay_ms);
-    lanes [i].btn_flip.set_value (lane.dcflip);
-    lanes [i].btn_calib.set_value (lane.do_calib);
+    for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+      const c_neuralblender_lane_state &lane = bank_state.lanes [i];
 
-    //filepickers [i].selected_file = lane.filename;
-    if (scan_dirs) {
-      if (state.lanes [i].filename.empty ()) {
-        lanes [i].menu_list.clear ();
-      } else {
-        filepickers [i].current_dir = path_dirname (state.lanes [i].filename);
-        filepickers [i].scan_current_dir ();
-        filepickers [i].add_files_from_dir (&lanes [i].menu_list);
+      bank_lanes [i].knob_gain_in.set_value (gain_to_db (lane.gain_in));
+      bank_lanes [i].knob_ir_pitch.set_value (lane.ir_pitch_semitones);
+      bank_lanes [i].knob_gain_out.set_value (gain_to_db (lane.gain_out));
+      bank_lanes [i].knob_dry_out.set_value (
+        lane.dry_out > 0.0f ? gain_to_db (lane.dry_out) : DB_SILENCE);
+      bank_lanes [i].knob_delay.set_value (lane.delay_ms);
+      bank_lanes [i].btn_flip.set_value (lane.dcflip);
+      bank_lanes [i].btn_calib.set_value (lane.do_calib);
+
+      //filepickers [i].selected_file = lane.filename;
+      if (scan_dirs) {
+        if (lane.filename.empty ()) {
+          bank_lanes [i].menu_list.clear ();
+        } else {
+          c_filepicker &fp = bank_lanes [i].filepicker;
+          fp.current_dir = path_dirname (lane.filename);
+          fp.scan_current_dir ();
+          fp.add_files_from_dir (&bank_lanes [i].menu_list);
+        }
       }
     }
-    update_stats ();
   }
+  update_stats ();
   
   const bool enabled = !state.bypass;
   btn_enable.set_value (enabled);
@@ -1319,45 +1576,54 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   show_advanced_settings (state.showadvanced);*/
 
   btn_bass.set_value (prefs.calib_source == 0 ? false : true);
-  btn_linkcalib.set_value (prefs.linked_calib);
+  btn_linkcalib.set_value (linked_calib_for_bank (visible_bank));
   if (state.do_vu) {
-    meter_in.show ();
-    for (size_t i = 0; i < NB_NUM_MODELS; ++i)
-      lanes [i].meter_out.show ();
+    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+      meter_in [bank].show ();
+      c_lane_widgets *bank_lanes = lanes_for_bank ((_lane_bank) bank);
+      for (size_t i = 0; i < NB_NUM_MODELS; ++i)
+        bank_lanes [i].meter_out.show ();
+    }
   } else {
-    meter_in.hide ();
-    for (size_t i = 0; i < NB_NUM_MODELS; ++i)
-      lanes [i].meter_out.hide ();
+    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+      meter_in [bank].hide ();
+      c_lane_widgets *bank_lanes = lanes_for_bank ((_lane_bank) bank);
+      for (size_t i = 0; i < NB_NUM_MODELS; ++i)
+        bank_lanes [i].meter_out.hide ();
+    }
   }
 
-  btn_exclmode.set_value (state.exclusive_lane > 0);
+  const int visible_exclusive_lane = exclusive_lane_for_bank (visible_bank);
+  btn_exclmode.set_value (visible_exclusive_lane > 0);
 
-  const bool exclusive_on = state.exclusive_lane > 0;
+  c_lane_widgets *visible_lanes = lanes_for_bank (visible_bank);
+  const c_neuralblender_bank_state &visible_bank_state = state.banks [visible_bank];
+  const bool exclusive_on = visible_exclusive_lane > 0;
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+    const c_neuralblender_lane_state &lane = visible_bank_state.lanes [i];
     const bool selected =
-      exclusive_on && state.exclusive_lane == i + 1;
+      exclusive_on && visible_exclusive_lane == (int) i + 1;
 
-    lanes [i].btn_mute.set_value (state.lanes [i].lane_mute);
-    lanes [i].btn_excl.set_value (selected);
+    visible_lanes [i].btn_mute.set_value (lane.lane_mute);
+    visible_lanes [i].btn_excl.set_value (selected);
 
-    if (state.lanes [i].lane_mute || state.mute_all || !enabled) { CP
-      lanes [i].lane_widget.set_state (WSTATE_DISABLED);
+    if (lane.lane_mute || state.mute_all || !enabled) { CP
+      visible_lanes [i].lane_widget.set_state (WSTATE_DISABLED);
     } else {
-      lanes [i].lane_widget.set_state (WSTATE_NORMAL);
+      visible_lanes [i].lane_widget.set_state (WSTATE_NORMAL);
     }
 
     if (exclusive_on) { CP
-      lanes [i].lane_widget.set_state (WSTATE_DISABLED);
-      widget_hide (lanes [i].btn_mute.widget);
-      widget_show (lanes [i].btn_excl.widget);
+      visible_lanes [i].lane_widget.set_state (WSTATE_DISABLED);
+      widget_hide (visible_lanes [i].btn_mute.widget);
+      widget_show (visible_lanes [i].btn_excl.widget);
     } else { CP
-      widget_show (lanes [i].btn_mute.widget);
-      widget_hide (lanes [i].btn_excl.widget);
+      widget_show (visible_lanes [i].btn_mute.widget);
+      widget_hide (visible_lanes [i].btn_excl.widget);
     }
   }
   if (exclusive_on && !state.mute_all && enabled) {
-    //lanes [state.exclusive_lane - 1].lane_widget.set_fg_color (0.1, 0.4, 0.4);
-    lanes [state.exclusive_lane - 1].lane_widget.set_state (WSTATE_SELECTED);
+    visible_lanes [visible_exclusive_lane - 1].lane_widget.set_state (WSTATE_SELECTED);
   }
 
   updating_from_state = false;

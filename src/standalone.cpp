@@ -80,8 +80,9 @@ public:
   : c_neuralblender_ui () {
     blender = b;
   }
-  bool load_model (size_t which, const char *filename);
+  bool load_model (_lane_bank bank, size_t which, const char *filename) override;
   void on_gain_in (c_widget *w, float f);
+  void on_ir_pitch (c_widget *w, float f);
   void on_gain_out (c_widget *w, float f);
   void on_dry_out (c_widget *w, float f);
   void on_delay (c_widget *w, float f);
@@ -111,26 +112,28 @@ public:
   int idle () override;
 };
 
-bool c_standalone_ui::load_model (size_t which, const char *filename) {
-  debug ("which=%d, filename='%s'", (int) which, filename);
-  const bool loaded = blender->load_model (which, filename);
+static void refresh_bank_stats (c_neuralblender_ui *ui, _lane_bank bank);
+
+bool c_standalone_ui::load_model (
+    _lane_bank bank, size_t which, const char *filename) {
+  debug ("bank=%d, which=%d, filename='%s'",
+         (int) bank, (int) which, filename);
+  if (bank < BANK_PEDAL || bank >= BANK_COUNT)
+    bank = BANK_AMP;
+
+  const bool loaded = blender->load_model (bank, which, filename);
   if (which < NB_NUM_MODELS) {
-    state.lanes [which].loaded = loaded;
-    state.lanes [which].filename = loaded && filename ? filename : "";
+    state.banks [bank].lanes [which].loaded = loaded;
+    state.banks [bank].lanes [which].filename =
+      loaded && filename ? filename : "";
   }
   apply_effective_controls ();
   if (which < NB_NUM_MODELS) {
-    if (blender->linked_calib)
-      blender->calibrate_linked (blender->calib_source == 1);
+    if (linked_calib_for_bank (bank))
+      blender->calibrate_linked (bank, blender->calib_source == 1);
     else
-      blender->calibrate (which, blender->calib_source == 1);
-    stats [which * UI_STATS_PER_LANE] =
-      (float) blender->delays [which].frames ();
-    for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-      const size_t n = i * UI_STATS_PER_LANE;
-      stats [n + 1] = blender->amps [i].trim;
-      stats [n + 2] = (float) blender->amps [i].engine ();
-    }
+      blender->calibrate (bank, which, blender->calib_source == 1);
+    refresh_bank_stats (this, bank);
   }
   sync_widgets_from_state (state);
   return loaded;
@@ -138,25 +141,30 @@ bool c_standalone_ui::load_model (size_t which, const char *filename) {
 
 void c_standalone_ui::on_gain_in (c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
-  g_blender.set_gain_in (w->lane, f);
+  g_blender.set_gain_in ((_lane_bank) w->bank, w->lane, f);
+}
+
+void c_standalone_ui::on_ir_pitch (c_widget *w, float f) {
+  debug ("lane %d, f=%f", w->lane, f);
+  g_blender.set_ir_pitch ((_lane_bank) w->bank, w->lane, f);
 }
 
 void c_standalone_ui::on_gain_out (c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
-  g_blender.set_gain_out (w->lane, f);
+  g_blender.set_gain_out ((_lane_bank) w->bank, w->lane, f);
 }
 
 void c_standalone_ui::on_dry_out (c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
-  g_blender.set_dry_out (w->lane, f);
+  g_blender.set_dry_out ((_lane_bank) w->bank, w->lane, f);
 }
 
 void c_standalone_ui::on_delay (c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
-  g_blender.set_delay_ms (w->lane, f);
-  if (w->lane < NB_NUM_MODELS)
-    stats [w->lane * UI_STATS_PER_LANE] =
-      (float) g_blender.delays [w->lane].frames ();
+  const _lane_bank bank =
+    w->bank < BANK_COUNT ? (_lane_bank) w->bank : BANK_AMP;
+  g_blender.set_delay_ms (bank, w->lane, f);
+  refresh_bank_stats (this, bank);
   update_stats ();
 }
 
@@ -167,25 +175,29 @@ void c_standalone_ui::on_filebrowse (c_widget *w) {
 void c_standalone_ui::on_fileselected (c_widget *w, const char *path) {
   debug ("lane %d, path='%s'", w->lane, path);
   // is this the right place for this?
-  //g_blender.amps [w->lane].calibrate (NULL, 0);
+  //g_blender.banks [BANK_AMP].lanes [w->lane].calibrate (NULL, 0);
 }
 
 void c_standalone_ui::on_fileclear (c_widget *w) {
   debug ("lane %d", w->lane);
-  g_blender.unload_model (w->lane);
-  clear_lane_model_ui (w->lane);
+  const _lane_bank bank =
+    w->bank < BANK_COUNT ? (_lane_bank) w->bank : BANK_AMP;
+  g_blender.unload_model (bank, w->lane);
+  clear_lane_model_ui (bank, w->lane);
   if (w->lane >= 0 && w->lane < (int) NB_NUM_MODELS)
-    state.lanes [w->lane].loaded = false;
+    state.banks [bank].lanes [w->lane].loaded = false;
   apply_effective_controls ();
 }
 
 void c_standalone_ui::on_mute (c_widget *w, bool b) {
-  state.lanes [w->lane].lane_mute = b;
+  if (w->bank < BANK_COUNT && w->lane < NB_NUM_MODELS)
+    state.banks [w->bank].lanes [w->lane].lane_mute = b;
   apply_effective_controls ();
 }
 
 void c_standalone_ui::on_dcflip (c_widget *w, bool b) {
-  state.lanes [w->lane].dcflip = b;
+  if (w->bank < BANK_COUNT && w->lane < NB_NUM_MODELS)
+    state.banks [w->bank].lanes [w->lane].dcflip = b;
   apply_effective_controls ();
 }
 
@@ -195,18 +207,17 @@ void c_standalone_ui::on_calibrate (c_widget *w, bool b) { CP
     
   size_t which = w->lane;
   
-  state.lanes [which].do_calib = b;
+  if (w->bank < BANK_COUNT && which < NB_NUM_MODELS)
+    state.banks [w->bank].lanes [which].do_calib = b;
   apply_effective_controls ();
   
-  if (g_blender.linked_calib)
-    g_blender.calibrate_linked (g_blender.calib_source == 1);
+  const _lane_bank bank =
+    w->bank < BANK_COUNT ? (_lane_bank) w->bank : BANK_AMP;
+  if (linked_calib_for_bank (bank))
+    g_blender.calibrate_linked (bank, g_blender.calib_source == 1);
   else
-    g_blender.calibrate (which, g_blender.calib_source == 1);
-  for (size_t i = 0; i < NB_NUM_MODELS; i++) {
-    const size_t n = i * UI_STATS_PER_LANE;
-    stats [n + 1] = g_blender.amps [i].trim;
-    stats [n + 2] = (float) g_blender.amps [i].engine ();
-  }
+    g_blender.calibrate (bank, which, g_blender.calib_source == 1);
+  refresh_bank_stats (this, bank);
   update_stats ();
 }
 
@@ -258,8 +269,12 @@ void c_standalone_ui::on_tuner (c_widget *w, bool b) {
 
 void c_standalone_ui::on_linked_calib (c_widget *w, bool b) {
   (void) w;
-  prefs.linked_calib = b;
-  g_blender.linked_calib = b;
+  set_linked_calib_for_bank (visible_bank, b);
+  if (visible_bank == BANK_AMP)
+    prefs.linked_calib = b;
+  if (visible_bank >= BANK_PEDAL && visible_bank < BANK_COUNT)
+    g_blender.banks [visible_bank].linked_calib = b;
+  g_blender.linked_calib = g_blender.banks [BANK_AMP].linked_calib;
 }
 
 void c_standalone_ui::on_calib_bass (c_widget *w, bool b) {
@@ -303,7 +318,11 @@ void c_standalone_ui::apply_prefs (t_prefs &p) {
     blender->noisegate.set_threshold (p.noisethresh);
   }
   if (blender)
-    blender->linked_calib = p.linked_calib;
+    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
+      blender->banks [bank].linked_calib =
+        linked_calib_for_bank ((_lane_bank) bank);
+  if (blender)
+    blender->linked_calib = blender->banks [BANK_AMP].linked_calib;
   if (blender)
     blender->calib_source = p.calib_source;
 }
@@ -312,7 +331,7 @@ void c_standalone_ui::write_prefs_to (t_prefs &p) {
   c_neuralblender_ui::write_prefs_to (p);
 
   if (blender)
-    p.calib_target_db = blender->amps [0].calib_target_db;
+    p.calib_target_db = blender->banks [BANK_AMP].lanes [0].calib_target_db;
   if (blender)
     p.tuner_on = blender->tuner_on;
   if (blender) {
@@ -320,7 +339,7 @@ void c_standalone_ui::write_prefs_to (t_prefs &p) {
     p.noisethresh = blender->noisegate.threshold_db;
   }
   if (blender)
-    p.linked_calib = blender->linked_calib;
+    p.linked_calib = linked_calib_for_bank (BANK_AMP);
   if (blender)
     p.calib_source = blender->calib_source;
 }
@@ -329,22 +348,34 @@ void c_standalone_ui::apply_effective_controls () {
   if (!blender)
     return;
 
-  const bool exclusive_on = state.exclusive_lane > 0;
-  const size_t excl = exclusive_on ? (size_t) (state.exclusive_lane - 1) : 0;
-  const bool exclusive_empty =
-    exclusive_on &&
-    (excl >= NB_NUM_MODELS ||
-     (!state.lanes [excl].loaded && state.lanes [excl].filename.empty ()));
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    const _lane_bank b = (_lane_bank) bank;
+    c_neuralblender_bank_state &bank_state = state.banks [bank];
+    blender->banks [bank].linked_calib = bank_state.linked_calib;
+    blender->set_exclusive_lane (b, bank_state.exclusive_lane);
 
-  blender->set_bypass (state.bypass || exclusive_empty);
+    const int exclusive_lane = exclusive_lane_for_bank (b);
+    const bool exclusive_on = exclusive_lane > 0;
+    const size_t excl = exclusive_on ? (size_t) (exclusive_lane - 1) : 0;
+    const bool exclusive_empty =
+      exclusive_on &&
+      (excl >= NB_NUM_MODELS ||
+       (!bank_state.lanes [excl].loaded &&
+        bank_state.lanes [excl].filename.empty ()));
 
-  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-    const bool mute =
-      exclusive_on && !exclusive_empty ? i != excl : state.lanes [i].lane_mute;
-    blender->set_lane_mute (i, mute);
-    blender->dcflip (i, state.lanes [i].dcflip);
-    blender->calib_on (i, state.lanes [i].do_calib);
+    for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+      const bool mute =
+        exclusive_on && !exclusive_empty
+          ? i != excl
+          : bank_state.lanes [i].lane_mute;
+      blender->set_lane_mute (b, i, mute);
+      blender->dcflip (b, i, bank_state.lanes [i].dcflip);
+      blender->calib_on (b, i, bank_state.lanes [i].do_calib);
+    }
   }
+
+  blender->linked_calib = blender->banks [BANK_AMP].linked_calib;
+  blender->set_bypass (state.bypass);
 }
 
 int c_standalone_ui::idle () {
@@ -364,6 +395,21 @@ static std::thread ui_thread;
 
 static c_standalone_ui g_ui (&g_blender);
 
+static void refresh_bank_stats (c_neuralblender_ui *ui, _lane_bank bank) {
+  if (!ui || !ui->blender)
+    return;
+  if (bank < BANK_PEDAL || bank >= BANK_COUNT)
+    bank = BANK_AMP;
+
+  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+    const size_t n = i * UI_STATS_PER_LANE;
+    c_neuralamp &amp = ui->blender->banks [bank].lanes [i];
+    ui->stats [bank] [n] = (float) amp.delay.frames ();
+    ui->stats [bank] [n + 1] = amp.trim.load (std::memory_order_acquire);
+    ui->stats [bank] [n + 2] = (float) amp.engine ();
+  }
+}
+
 static void ui_main () {
   fprintf (stderr, "Creating UI...\n");
   g_ui.create (0);        // no LV2 parent, so root/toplevel
@@ -375,8 +421,9 @@ static void ui_main () {
   c_neuralblender_state state;
   g_blender.get_state (state);
   if (g_ui.calib_default) {
-    for (size_t i = 0; i < NB_NUM_MODELS; ++i)
-      state.lanes [i].do_calib = true;
+    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
+      for (size_t i = 0; i < NB_NUM_MODELS; ++i)
+        state.banks [bank].lanes [i].do_calib = true;
   }
   g_ui.sync_widgets_from_state (state);
   g_ui.apply_effective_controls ();
@@ -419,14 +466,14 @@ bool parse_args (int argc, char **argv, c_neuralblender *blender) {
       exit (0);
     } else if (!strcmp (argv [i], "-a")) {
       if (argv [i + 1]) {
-        blender->amps [0].filename = argv [++i];
+        blender->banks [BANK_AMP].lanes [0].filename = argv [++i];
       } else {
         printf ("-a needs a filename argument\n");
         return false;
       }
     } else if (!strcmp (argv [i], "-b")) {
       if (argv [i + 1]) {
-        blender->amps [1].filename = argv [++i];
+        blender->banks [BANK_AMP].lanes [1].filename = argv [++i];
       } else {
         printf ("-b needs a filename argument\n");
         return false;
@@ -469,10 +516,10 @@ int main (int argc, char **argv) {
     return 1;
   }
   
-  if (g_blender.amps [0].filename != "")
-    g_blender.load_model (0, g_blender.amps [0].filename.c_str ());
-  if (g_blender.amps [1].filename != "")
-    g_blender.load_model (1, g_blender.amps [1].filename.c_str ());
+  if (g_blender.banks [BANK_AMP].lanes [0].filename != "")
+    g_blender.load_model (BANK_AMP, 0, g_blender.banks [BANK_AMP].lanes [0].filename.c_str ());
+  if (g_blender.banks [BANK_AMP].lanes [1].filename != "")
+    g_blender.load_model (BANK_AMP, 1, g_blender.banks [BANK_AMP].lanes [1].filename.c_str ());
 
   jack_client = jack_client_open ("NeuralBlender", JackNullOption, nullptr);
   if (!jack_client) {

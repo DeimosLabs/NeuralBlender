@@ -49,8 +49,11 @@
 #undef min
 #endif
 
+#define NB_NUM_PEDALS            4
 #define NB_NUM_MODELS            4
-#define NB_STATS_PER_LANE        3
+#define NB_NUM_CABS              4
+#define NB_MAX_LANES             4
+#define NB_STATS_PER_LANE        3 // dsp->ui: delay frames, model type, trim
 
 #define MAX_DELAY_MS             30
 #define MAX_DELAY_FRAMES         (MAX_DELAY_MS * 192)
@@ -67,6 +70,13 @@
 #define NB_XFADE_MS              10.0f
 #define NB_LANE_XFADE_MS         NB_XFADE_MS
 #define TUNER_THRESH_DB          -40.0f
+
+enum _lane_bank {
+  BANK_PEDAL = 0,
+  BANK_AMP,
+  BANK_CAB,
+  BANK_COUNT
+};
 
 enum _engine_mode {
   ENGINE_NONE,
@@ -112,6 +122,7 @@ static inline float gain_to_db (float gain) {
 struct c_neuralblender_lane_state {
   std::string filename;
   float gain_in = 1.0f;
+  float ir_pitch_semitones = 0.0f;
   float gain_out = 1.0f;
   float dry_out = 0.0f;
   float delay_ms = 0.0f;
@@ -121,21 +132,55 @@ struct c_neuralblender_lane_state {
   bool do_calib = false;
 };
 
+struct c_neuralblender_bank_state {
+  c_neuralblender_lane_state lanes [NB_NUM_MODELS];
+  int  exclusive_lane = 0;
+  bool linked_calib = false;
+};
+
 struct c_neuralblender_state {
+  c_neuralblender_state () : lanes (banks [BANK_AMP].lanes) { }
+  c_neuralblender_state (const c_neuralblender_state &other)
+      : lanes (banks [BANK_AMP].lanes) {
+    *this = other;
+  }
+  c_neuralblender_state &operator= (const c_neuralblender_state &other) {
+    if (this == &other)
+      return *this;
+
+    current_dir = other.current_dir;
+    bypass = other.bypass;
+    do_excl = other.do_excl;
+    do_vu = other.do_vu;
+    showadvanced = other.showadvanced;
+    mute_all = other.mute_all;
+    tuner_on = other.tuner_on;
+    noisegate_on = other.noisegate_on;
+    noisethresh = other.noisethresh;
+    noiseattack = other.noiseattack;
+    noisehold = other.noisehold;
+    noiserelease = other.noiserelease;
+
+    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
+      banks [bank] = other.banks [bank];
+
+    return *this;
+  }
+
   std::string current_dir;
   bool bypass = false;
   bool do_excl = false;
   bool do_vu = true;
   bool showadvanced = false;
   bool mute_all = false;
-  int  exclusive_lane = 0;
   bool tuner_on = false;
   bool noisegate_on = false;
   float noisethresh = -60.0f;
   float noiseattack = 2.0f;
   float noisehold = 10.0f;
   float noiserelease = 20.0f;
-  c_neuralblender_lane_state lanes [NB_NUM_MODELS];
+  c_neuralblender_bank_state banks [BANK_COUNT];
+  c_neuralblender_lane_state (&lanes) [NB_NUM_MODELS];
 };
 
 // a simple but effective noise gate
@@ -211,12 +256,16 @@ public:
   bool loaded () const;
   bool ready () const;
   void process_block (const float *in, float *out, uint32_t nframes);
+  void set_samplerate (uint32_t samplerate);
   void set_blocksize (uint32_t nframes);
+  bool set_pitch_semitones (float semitones);
   
 private:
   bool rebuild_for_blocksize (uint32_t nframes);
+  bool rebuild_resampled_ir ();
   
-  std::vector<float> m_ir;              // canonical/resampled IR
+  std::vector<float> m_ir_source;       // cleaned source IR
+  std::vector<float> m_ir;              // current pitch-resampled IR
   std::vector<float> m_overlap;
 
   std::vector<cpx> m_fft_out;
@@ -225,7 +274,9 @@ private:
 
   bool               m_loaded           = false;
   bool               m_ready            = false;
+  float              m_pitch_semitones  = 0.0f;
   uint32_t           m_ir_samplerate    = 0;
+  uint32_t           m_samplerate       = 48000;
   uint32_t           m_blocksize        = 0;
   uint32_t           m_partition_size   = 0;
   uint32_t           m_num_partitions   = 0;
@@ -264,7 +315,9 @@ public:
     for (uint32_t i = 0; i < nframes; ++i)
       out [i] = in [i];
   }
+  void set_samplerate (uint32_t) { }
   void set_blocksize (uint32_t) { }
+  bool set_pitch_semitones (float) { return false; }
 };
 
 #endif
@@ -275,6 +328,7 @@ public:
   ~c_neuralamp ();
   void set_samplerate (uint32_t sr);
   void set_blocksize (uint32_t bs);
+  bool set_ir_pitch (float semitones);
 
   bool request_load_model (const std::string &filename = "");
   bool load_model ();
@@ -291,11 +345,14 @@ public:
   std::string model_filename () const;
   std::atomic<float> trim { 1.0f };
 
-  size_t      which           = -1;
+  size_t      bank            = -1;
+  size_t      lane            = -1;
   std::string filename        = "";
   float       gain_in         = 1.0f;
+  float       ir_pitch_semitones = 0.0f;
   float       gain_out        = 1.0f;
   float       dry_out         = 0.0f;
+  c_delayline delay;
   float       calib_target_db = DB_CALIB_TARGET_DEFAULT;
   uint32_t    samplerate      = 48000;
   uint32_t    blocksize       = 0;
@@ -330,6 +387,20 @@ private:
   _engine_mode m_engine_mode = ENGINE_NONE;
 };
 
+struct c_model_bank {
+  size_t num_lanes = NB_NUM_MODELS;
+  c_neuralamp lanes [NB_NUM_MODELS];
+
+  c_vudata *meter_in = nullptr;
+  c_vudata *meters_out [NB_NUM_MODELS] = {};
+
+  std::atomic<bool> lane_mute [NB_NUM_MODELS] = {};
+  int exclusive_lane = 0;       // 0 off, 1..N selected
+  bool linked_calib = false;
+
+  uint32_t active_mask = 0;
+};
+
 // creates NB_NUM_MODELS instances of c_delayline and c_neuralamp
 class c_neuralblender {
 public:
@@ -338,43 +409,52 @@ public:
   void set_samplerate (uint32_t sr);
   void set_blocksize (uint32_t bs);
   //void process_block_main (float *in, float *out, uint32_t nframes);
-  uint32_t make_active_lane_mask () const;
+  uint32_t make_active_lane_mask (_lane_bank bank) const;
   float *prepare_input_buffer (float *in, float *out, uint32_t nframes);
-  void render_lane (size_t lane, float *in, uint32_t nframes);
-  void render_mix (float *in, float *out, uint32_t nframes,
+  void render_lane (_lane_bank bank, size_t lane, float *in, uint32_t nframes);
+  void render_mix (float *in, float *out, uint32_t nframes, _lane_bank bank,
                    uint32_t old_mask, uint32_t new_mask,
                    uint32_t xfade_pos, uint32_t xfade_len);
   void process_block (float *in, float *out, uint32_t nframes);
-  bool load_model (size_t which, const char *filename);
-  bool unload_model (size_t which);
-  bool set_delay_frames (size_t which, uint32_t frames);
-  bool set_delay_ms (size_t which, float ms);
-  bool set_gain_in (size_t which, float g);
-  bool set_gain_out (size_t which, float g);
-  bool set_dry_out (size_t which, float g);
-  bool set_lane_mute (size_t which, bool muted);
+  bool load_model (_lane_bank bank, size_t which, const char *filename);
+  bool unload_model (_lane_bank bank, size_t which);
+  bool set_delay_frames (_lane_bank bank, size_t which, uint32_t frames);
+  bool set_delay_ms (_lane_bank bank, size_t which, float ms);
+  bool set_gain_in (_lane_bank bank, size_t which, float g);
+  bool set_ir_pitch (_lane_bank bank, size_t which, float semitones);
+  bool set_gain_out (_lane_bank bank, size_t which, float g);
+  bool set_dry_out (_lane_bank bank, size_t which, float g);
+  bool set_lane_mute (_lane_bank bank, size_t which, bool muted);
+  bool set_exclusive_lane (_lane_bank bank, int lane);
   void set_bypass (bool bypass);
-  bool lane_mute (size_t which) const;
+  bool lane_mute (_lane_bank bank, size_t which) const;
   bool bypass () const;
+  float delay_ms (_lane_bank bank, size_t which) const;
   float delay_ms (size_t which) const;
   void get_state (c_neuralblender_state &state) const;
-  bool dcflip (size_t which, bool b);
-  bool calib_on (size_t which, bool b);
-  bool is_dcflipped (size_t which);
-  bool is_calib_on (size_t which);
+  bool dcflip (_lane_bank bank, size_t which, bool b);
+  bool calib_on (_lane_bank bank, size_t which, bool b);
+  bool is_dcflipped (_lane_bank bank, size_t which);
+  bool is_calib_on (_lane_bank bank, size_t which);
   bool set_calib_target_db (float f);
-  bool calibrate (size_t which, bool bass);
-  bool calibrate_linked (bool bass);
-  void update_input_meter (float *in, uint32_t nframes);
+  bool calibrate (_lane_bank bank, size_t which, bool bass);
+  bool calibrate_linked (_lane_bank bank, bool bass);
+  void update_input_meter (_lane_bank bank, float *in, uint32_t nframes);
+  void update_loaded_output_meters (_lane_bank bank);
+  void render_bank (_lane_bank bank,
+                    float *in,
+                    float *out,
+                    uint32_t nframes,
+                    uint32_t old_mask,
+                    uint32_t new_mask,
+                    uint32_t xfade_pos,
+                    uint32_t xfade_len);
   int tuner_freq ();
   
   //static void get_calib_data (std::vector<float> &v, bool bass);
   
   c_noisegate noisegate;
-  c_delayline delays [NB_NUM_MODELS];
-  c_neuralamp amps [NB_NUM_MODELS];
-  c_vudata *meter_in;
-  c_vudata *meters_out [NB_NUM_MODELS];
+  c_model_bank banks [BANK_COUNT];
   c_pitchtracker pitchtracker;
   
   bool do_vu = true;
@@ -389,6 +469,10 @@ public:
   std::atomic<_ramp_state> ramp = RAMP_PLAYING;
 
 private:
+  c_model_bank &which_bank (_lane_bank bank);
+  const c_model_bank &which_bank (_lane_bank bank) const;
+  c_neuralamp &which_amp (_lane_bank bank, size_t lane);
+  const c_neuralamp &which_amp (_lane_bank bank, size_t lane) const;
   void update_mutes ();
   void request_mix_update ();
   bool consistent_calib_state (bool &enabled,
@@ -396,7 +480,8 @@ private:
   std::vector <float> m_delay_bufs [NB_NUM_MODELS];
   std::vector <float> m_model_bufs [NB_NUM_MODELS];
   std::vector <float> m_input_buf;
-  std::atomic<bool> m_lane_mute [NB_NUM_MODELS];
+  std::vector <float> m_stage_buf_a;
+  std::vector <float> m_stage_buf_b;
   std::atomic<bool> m_bypass { false };
   std::atomic<bool> xfade_pending { false };
   std::atomic<uint32_t> active_lane_mask { 0 };

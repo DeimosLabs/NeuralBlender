@@ -22,6 +22,7 @@ find_package(Threads REQUIRED)
 
 pkg_check_modules(FFTW3F REQUIRED IMPORTED_TARGET fftw3f)
 pkg_check_modules(SNDFILE REQUIRED IMPORTED_TARGET sndfile)
+pkg_check_modules(SAMPLERATE REQUIRED IMPORTED_TARGET samplerate)
 
 include(cmake/NeuralBlenderGui.cmake)
 
@@ -187,13 +188,14 @@ target_compile_definitions(neuralblender_core PUBLIC
   DSP_SAMPLE_FLOAT
   HAVE_FFTW
   HAVE_SNDFILE
+  HAVE_SAMPLERATE
 )
 
 target_compile_definitions(neuralblender_meter_data PRIVATE
   METER_DATA_ONLY
 )
 
-target_link_libraries(neuralblender_core PUBLIC Eigen3::Eigen z PkgConfig::FFTW3F PkgConfig::SNDFILE neuralblender_cmdline_debug neuralblender_config)
+target_link_libraries(neuralblender_core PUBLIC Eigen3::Eigen z PkgConfig::FFTW3F PkgConfig::SNDFILE PkgConfig::SAMPLERATE neuralblender_cmdline_debug neuralblender_config)
 
 if (DEBUG)
   message(STATUS "Debug enabled")

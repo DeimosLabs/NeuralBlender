@@ -16,7 +16,8 @@ struct s_option {
   std::string name;
   std::string value;
 } g_options [] = {
-  { CONFIG_KEY_NAME_CWD, "" },
+  { CONFIG_KEY_NAME_MODEL_CWD, "" },
+  { CONFIG_KEY_NAME_IR_CWD, "" },
   { CONFIG_KEY_NAME_ADV, "" },
   { CONFIG_KEY_NAME_CALIB, "" },
   { CONFIG_KEY_NAME_CALIB_TARGET, "" },

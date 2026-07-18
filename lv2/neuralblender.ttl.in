@@ -35,6 +35,54 @@ nb:ModelD
     rdfs:label "Model D" ;
     rdfs:range atom:Path .
 
+nb:PedalA
+    a lv2:Parameter ;
+    mod:fileTypes "nam,aidax,json,wav,flac,aiff,aif" ;
+    rdfs:label "Pedal A" ;
+    rdfs:range atom:Path .
+
+nb:PedalB
+    a lv2:Parameter ;
+    mod:fileTypes "nam,aidax,json,wav,flac,aiff,aif" ;
+    rdfs:label "Pedal B" ;
+    rdfs:range atom:Path .
+
+nb:PedalC
+    a lv2:Parameter ;
+    mod:fileTypes "nam,aidax,json,wav,flac,aiff,aif" ;
+    rdfs:label "Pedal C" ;
+    rdfs:range atom:Path .
+
+nb:PedalD
+    a lv2:Parameter ;
+    mod:fileTypes "nam,aidax,json,wav,flac,aiff,aif" ;
+    rdfs:label "Pedal D" ;
+    rdfs:range atom:Path .
+
+nb:CabA
+    a lv2:Parameter ;
+    mod:fileTypes "wav,flac,aiff,aif,nam,aidax,json" ;
+    rdfs:label "Cab/IR A" ;
+    rdfs:range atom:Path .
+
+nb:CabB
+    a lv2:Parameter ;
+    mod:fileTypes "wav,flac,aiff,aif,nam,aidax,json" ;
+    rdfs:label "Cab/IR B" ;
+    rdfs:range atom:Path .
+
+nb:CabC
+    a lv2:Parameter ;
+    mod:fileTypes "wav,flac,aiff,aif,nam,aidax,json" ;
+    rdfs:label "Cab/IR C" ;
+    rdfs:range atom:Path .
+
+nb:CabD
+    a lv2:Parameter ;
+    mod:fileTypes "wav,flac,aiff,aif,nam,aidax,json" ;
+    rdfs:label "Cab/IR D" ;
+    rdfs:range atom:Path .
+
 <http://deimos.ca/neuralblender>
     a lv2:Plugin ,
       lv2:AmplifierPlugin ;
@@ -46,11 +94,27 @@ nb:ModelD
 	    patch:readable nb:ModelA ,
 		                   nb:ModelB ,
 		                   nb:ModelC ,
-		                   nb:ModelD ;
-		    patch:writable nb:ModelA ,
+		                   nb:ModelD ,
+		                   nb:PedalA ,
+		                   nb:PedalB ,
+		                   nb:PedalC ,
+		                   nb:PedalD ,
+		                   nb:CabA ,
+		                   nb:CabB ,
+		                   nb:CabC ,
+		                   nb:CabD ;
+	    patch:writable nb:ModelA ,
 		                   nb:ModelB ,
 		                   nb:ModelC ,
-		                   nb:ModelD ;
+		                   nb:ModelD ,
+		                   nb:PedalA ,
+		                   nb:PedalB ,
+		                   nb:PedalC ,
+		                   nb:PedalD ,
+		                   nb:CabA ,
+		                   nb:CabB ,
+		                   nb:CabC ,
+		                   nb:CabD ;
     
     doap:name "NeuralBlender" ;
     doap:developer [
@@ -94,257 +158,988 @@ nb:ModelD
         lv2:default 0.0 ;
         lv2:minimum -40.0 ;
         lv2:maximum 40.0
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
         lv2:index 4 ;
+        lv2:symbol "a_ir_pitch" ;
+        lv2:name "A IR Pitch" ;
+        lv2:default 0.0 ;
+        lv2:minimum -12.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 5 ;
         lv2:symbol "a_gain_out" ;
         lv2:name "A Output Gain" ;
         lv2:default 0.0 ;
         lv2:minimum -40.0 ;
         lv2:maximum 40.0
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 5 ;
+        lv2:index 6 ;
         lv2:symbol "a_dry_out" ;
         lv2:name "A Dry Out" ;
         lv2:default -120.0 ;
         lv2:minimum -120.0 ;
         lv2:maximum 12.0
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 6 ;
+        lv2:index 7 ;
         lv2:symbol "a_delay" ;
         lv2:name "A Delay (ms)" ;
         lv2:default 0.0 ;
         lv2:minimum 0.0 ;
         lv2:maximum 30
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 7 ;
+        lv2:index 8 ;
         lv2:symbol "a_mute" ;
         lv2:name "A Mute" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 8 ;
+        lv2:index 9 ;
         lv2:symbol "a_dcflip" ;
         lv2:name "A Phase Flip" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 9 ;
+        lv2:index 10 ;
         lv2:symbol "a_calibrate" ;
         lv2:name "A Normalize Level" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 10 ;
+        lv2:index 11 ;
         lv2:symbol "b_gain_in" ;
         lv2:name "B Input Gain" ;
         lv2:default 0.0 ;
         lv2:minimum -40.0 ;
         lv2:maximum 40.0
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 11 ;
+        lv2:index 12 ;
+        lv2:symbol "b_ir_pitch" ;
+        lv2:name "B IR Pitch" ;
+        lv2:default 0.0 ;
+        lv2:minimum -12.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 13 ;
         lv2:symbol "b_gain_out" ;
         lv2:name "B Output Gain" ;
         lv2:default 0.0 ;
         lv2:minimum -40.0 ;
         lv2:maximum 40.0
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 12 ;
+        lv2:index 14 ;
         lv2:symbol "b_dry_out" ;
         lv2:name "B Dry Out" ;
         lv2:default -120.0 ;
         lv2:minimum -120.0 ;
         lv2:maximum 12.0
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 13 ;
+        lv2:index 15 ;
         lv2:symbol "b_delay" ;
         lv2:name "B Delay (ms)" ;
         lv2:default 0.0 ;
         lv2:minimum 0.0 ;
         lv2:maximum 30
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 14 ;
+        lv2:index 16 ;
         lv2:symbol "b_mute" ;
         lv2:name "B Mute" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 15 ;
+        lv2:index 17 ;
         lv2:symbol "b_dcflip" ;
         lv2:name "B Phase Flip" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 16 ;
+        lv2:index 18 ;
         lv2:symbol "b_calibrate" ;
         lv2:name "B Normalize Level" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 17 ;
+        lv2:index 19 ;
         lv2:symbol "c_gain_in" ;
         lv2:name "C Input Gain" ;
         lv2:default 0.0 ;
         lv2:minimum -40.0 ;
         lv2:maximum 40.0
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 18 ;
+        lv2:index 20 ;
+        lv2:symbol "c_ir_pitch" ;
+        lv2:name "C IR Pitch" ;
+        lv2:default 0.0 ;
+        lv2:minimum -12.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 21 ;
         lv2:symbol "c_gain_out" ;
         lv2:name "C Output Gain" ;
         lv2:default 0.0 ;
         lv2:minimum -40.0 ;
         lv2:maximum 40.0
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 19 ;
+        lv2:index 22 ;
         lv2:symbol "c_dry_out" ;
         lv2:name "C Dry Out" ;
         lv2:default -120.0 ;
         lv2:minimum -120.0 ;
         lv2:maximum 12.0
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 20 ;
+        lv2:index 23 ;
         lv2:symbol "c_delay" ;
         lv2:name "C Delay (ms)" ;
         lv2:default 0.0 ;
         lv2:minimum 0.0 ;
         lv2:maximum 30
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 21 ;
+        lv2:index 24 ;
         lv2:symbol "c_mute" ;
         lv2:name "C Mute" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 22 ;
+        lv2:index 25 ;
         lv2:symbol "c_dcflip" ;
         lv2:name "C Phase Flip" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 23 ;
+        lv2:index 26 ;
         lv2:symbol "c_calibrate" ;
         lv2:name "C Normalize Level" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 24 ;
+        lv2:index 27 ;
         lv2:symbol "d_gain_in" ;
         lv2:name "D Input Gain" ;
         lv2:default 0.0 ;
         lv2:minimum -40.0 ;
         lv2:maximum 40.0
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 25 ;
+        lv2:index 28 ;
+        lv2:symbol "d_ir_pitch" ;
+        lv2:name "D IR Pitch" ;
+        lv2:default 0.0 ;
+        lv2:minimum -12.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 29 ;
         lv2:symbol "d_gain_out" ;
         lv2:name "D Output Gain" ;
         lv2:default 0.0 ;
         lv2:minimum -40.0 ;
         lv2:maximum 40.0
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 26 ;
+        lv2:index 30 ;
         lv2:symbol "d_dry_out" ;
         lv2:name "D Dry Out" ;
         lv2:default -120.0 ;
         lv2:minimum -120.0 ;
         lv2:maximum 12.0
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 27 ;
+        lv2:index 31 ;
         lv2:symbol "d_delay" ;
         lv2:name "D Delay (ms)" ;
         lv2:default 0.0 ;
         lv2:minimum 0.0 ;
         lv2:maximum 30
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 28 ;
+        lv2:index 32 ;
         lv2:symbol "d_mute" ;
         lv2:name "D Mute" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 29 ;
+        lv2:index 33 ;
         lv2:symbol "d_dcflip" ;
         lv2:name "D Phase Flip" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1
-    ] , [
+    ] ,
+    [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 30 ;
+        lv2:index 34 ;
         lv2:symbol "d_calibrate" ;
         lv2:name "D Normalize Level" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 35 ;
+        lv2:symbol "pedal_a_gain_in" ;
+        lv2:name "Pedal A Input Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 36 ;
+        lv2:symbol "pedal_a_ir_pitch" ;
+        lv2:name "Pedal A IR Pitch" ;
+        lv2:default 0.0 ;
+        lv2:minimum -12.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 37 ;
+        lv2:symbol "pedal_a_gain_out" ;
+        lv2:name "Pedal A Output Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 38 ;
+        lv2:symbol "pedal_a_dry_out" ;
+        lv2:name "Pedal A Dry Out" ;
+        lv2:default -120.0 ;
+        lv2:minimum -120.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 39 ;
+        lv2:symbol "pedal_a_delay" ;
+        lv2:name "Pedal A Delay (ms)" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 30
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 40 ;
+        lv2:symbol "pedal_a_mute" ;
+        lv2:name "Pedal A Mute" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 41 ;
+        lv2:symbol "pedal_a_dcflip" ;
+        lv2:name "Pedal A Phase Flip" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 42 ;
+        lv2:symbol "pedal_a_calibrate" ;
+        lv2:name "Pedal A Normalize Level" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 43 ;
+        lv2:symbol "pedal_b_gain_in" ;
+        lv2:name "Pedal B Input Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 44 ;
+        lv2:symbol "pedal_b_ir_pitch" ;
+        lv2:name "Pedal B IR Pitch" ;
+        lv2:default 0.0 ;
+        lv2:minimum -12.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 45 ;
+        lv2:symbol "pedal_b_gain_out" ;
+        lv2:name "Pedal B Output Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 46 ;
+        lv2:symbol "pedal_b_dry_out" ;
+        lv2:name "Pedal B Dry Out" ;
+        lv2:default -120.0 ;
+        lv2:minimum -120.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 47 ;
+        lv2:symbol "pedal_b_delay" ;
+        lv2:name "Pedal B Delay (ms)" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 30
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 48 ;
+        lv2:symbol "pedal_b_mute" ;
+        lv2:name "Pedal B Mute" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 49 ;
+        lv2:symbol "pedal_b_dcflip" ;
+        lv2:name "Pedal B Phase Flip" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 50 ;
+        lv2:symbol "pedal_b_calibrate" ;
+        lv2:name "Pedal B Normalize Level" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 51 ;
+        lv2:symbol "pedal_c_gain_in" ;
+        lv2:name "Pedal C Input Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 52 ;
+        lv2:symbol "pedal_c_ir_pitch" ;
+        lv2:name "Pedal C IR Pitch" ;
+        lv2:default 0.0 ;
+        lv2:minimum -12.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 53 ;
+        lv2:symbol "pedal_c_gain_out" ;
+        lv2:name "Pedal C Output Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 54 ;
+        lv2:symbol "pedal_c_dry_out" ;
+        lv2:name "Pedal C Dry Out" ;
+        lv2:default -120.0 ;
+        lv2:minimum -120.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 55 ;
+        lv2:symbol "pedal_c_delay" ;
+        lv2:name "Pedal C Delay (ms)" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 30
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 56 ;
+        lv2:symbol "pedal_c_mute" ;
+        lv2:name "Pedal C Mute" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 57 ;
+        lv2:symbol "pedal_c_dcflip" ;
+        lv2:name "Pedal C Phase Flip" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 58 ;
+        lv2:symbol "pedal_c_calibrate" ;
+        lv2:name "Pedal C Normalize Level" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 59 ;
+        lv2:symbol "pedal_d_gain_in" ;
+        lv2:name "Pedal D Input Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 60 ;
+        lv2:symbol "pedal_d_ir_pitch" ;
+        lv2:name "Pedal D IR Pitch" ;
+        lv2:default 0.0 ;
+        lv2:minimum -12.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 61 ;
+        lv2:symbol "pedal_d_gain_out" ;
+        lv2:name "Pedal D Output Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 62 ;
+        lv2:symbol "pedal_d_dry_out" ;
+        lv2:name "Pedal D Dry Out" ;
+        lv2:default -120.0 ;
+        lv2:minimum -120.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 63 ;
+        lv2:symbol "pedal_d_delay" ;
+        lv2:name "Pedal D Delay (ms)" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 30
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 64 ;
+        lv2:symbol "pedal_d_mute" ;
+        lv2:name "Pedal D Mute" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 65 ;
+        lv2:symbol "pedal_d_dcflip" ;
+        lv2:name "Pedal D Phase Flip" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 66 ;
+        lv2:symbol "pedal_d_calibrate" ;
+        lv2:name "Pedal D Normalize Level" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 67 ;
+        lv2:symbol "cab_a_gain_in" ;
+        lv2:name "Cab/IR A Input Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 68 ;
+        lv2:symbol "cab_a_ir_pitch" ;
+        lv2:name "Cab/IR A IR Pitch" ;
+        lv2:default 0.0 ;
+        lv2:minimum -12.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 69 ;
+        lv2:symbol "cab_a_gain_out" ;
+        lv2:name "Cab/IR A Output Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 70 ;
+        lv2:symbol "cab_a_dry_out" ;
+        lv2:name "Cab/IR A Dry Out" ;
+        lv2:default -120.0 ;
+        lv2:minimum -120.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 71 ;
+        lv2:symbol "cab_a_delay" ;
+        lv2:name "Cab/IR A Delay (ms)" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 30
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 72 ;
+        lv2:symbol "cab_a_mute" ;
+        lv2:name "Cab/IR A Mute" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 73 ;
+        lv2:symbol "cab_a_dcflip" ;
+        lv2:name "Cab/IR A Phase Flip" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 74 ;
+        lv2:symbol "cab_a_calibrate" ;
+        lv2:name "Cab/IR A Normalize Level" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 75 ;
+        lv2:symbol "cab_b_gain_in" ;
+        lv2:name "Cab/IR B Input Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 76 ;
+        lv2:symbol "cab_b_ir_pitch" ;
+        lv2:name "Cab/IR B IR Pitch" ;
+        lv2:default 0.0 ;
+        lv2:minimum -12.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 77 ;
+        lv2:symbol "cab_b_gain_out" ;
+        lv2:name "Cab/IR B Output Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 78 ;
+        lv2:symbol "cab_b_dry_out" ;
+        lv2:name "Cab/IR B Dry Out" ;
+        lv2:default -120.0 ;
+        lv2:minimum -120.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 79 ;
+        lv2:symbol "cab_b_delay" ;
+        lv2:name "Cab/IR B Delay (ms)" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 30
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 80 ;
+        lv2:symbol "cab_b_mute" ;
+        lv2:name "Cab/IR B Mute" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 81 ;
+        lv2:symbol "cab_b_dcflip" ;
+        lv2:name "Cab/IR B Phase Flip" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 82 ;
+        lv2:symbol "cab_b_calibrate" ;
+        lv2:name "Cab/IR B Normalize Level" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 83 ;
+        lv2:symbol "cab_c_gain_in" ;
+        lv2:name "Cab/IR C Input Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 84 ;
+        lv2:symbol "cab_c_ir_pitch" ;
+        lv2:name "Cab/IR C IR Pitch" ;
+        lv2:default 0.0 ;
+        lv2:minimum -12.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 85 ;
+        lv2:symbol "cab_c_gain_out" ;
+        lv2:name "Cab/IR C Output Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 86 ;
+        lv2:symbol "cab_c_dry_out" ;
+        lv2:name "Cab/IR C Dry Out" ;
+        lv2:default -120.0 ;
+        lv2:minimum -120.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 87 ;
+        lv2:symbol "cab_c_delay" ;
+        lv2:name "Cab/IR C Delay (ms)" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 30
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 88 ;
+        lv2:symbol "cab_c_mute" ;
+        lv2:name "Cab/IR C Mute" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 89 ;
+        lv2:symbol "cab_c_dcflip" ;
+        lv2:name "Cab/IR C Phase Flip" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 90 ;
+        lv2:symbol "cab_c_calibrate" ;
+        lv2:name "Cab/IR C Normalize Level" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 91 ;
+        lv2:symbol "cab_d_gain_in" ;
+        lv2:name "Cab/IR D Input Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 92 ;
+        lv2:symbol "cab_d_ir_pitch" ;
+        lv2:name "Cab/IR D IR Pitch" ;
+        lv2:default 0.0 ;
+        lv2:minimum -12.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 93 ;
+        lv2:symbol "cab_d_gain_out" ;
+        lv2:name "Cab/IR D Output Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -40.0 ;
+        lv2:maximum 40.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 94 ;
+        lv2:symbol "cab_d_dry_out" ;
+        lv2:name "Cab/IR D Dry Out" ;
+        lv2:default -120.0 ;
+        lv2:minimum -120.0 ;
+        lv2:maximum 12.0
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 95 ;
+        lv2:symbol "cab_d_delay" ;
+        lv2:name "Cab/IR D Delay (ms)" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 30
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 96 ;
+        lv2:symbol "cab_d_mute" ;
+        lv2:name "Cab/IR D Mute" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 97 ;
+        lv2:symbol "cab_d_dcflip" ;
+        lv2:name "Cab/IR D Phase Flip" ;
+        lv2:portProperty lv2:toggled ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1
+    ] ,
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 98 ;
+        lv2:symbol "cab_d_calibrate" ;
+        lv2:name "Cab/IR D Normalize Level" ;
         lv2:portProperty lv2:toggled ;
         lv2:default 0 ;
         lv2:minimum 0 ;
@@ -355,7 +1150,7 @@ nb:ModelD
         atom:bufferType atom:Sequence ;
         atom:supports patch:Message ;
         lv2:designation lv2:control ;
-        lv2:index 31 ;
+        lv2:index 99 ;
         lv2:symbol "CONTROL" ;
         lv2:name "Control"
     ] , [
@@ -364,13 +1159,13 @@ nb:ModelD
         atom:bufferType atom:Sequence ;
         atom:supports patch:Message ;
         lv2:designation lv2:control ;
-        lv2:index 32 ;
+        lv2:index 100 ;
         lv2:symbol "NOTIFY" ;
         lv2:name "Notify"
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 33 ;
+        lv2:index 101 ;
         lv2:symbol "vu_enable" ;
         lv2:name "VU Meters" ;
         lv2:default 1 ;
@@ -380,7 +1175,7 @@ nb:ModelD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 34 ;
+        lv2:index 102 ;
         lv2:symbol "mute_all" ;
         lv2:name "Mute All" ;
         lv2:default 0 ;
@@ -390,9 +1185,9 @@ nb:ModelD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 35 ;
-        lv2:symbol "exclusive_lane" ;
-        lv2:name "Exclusive Lane" ;
+        lv2:index 103 ;
+        lv2:symbol "pedal_exclusive_lane" ;
+        lv2:name "Pedal Exclusive Lane" ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 4 ;
@@ -400,9 +1195,29 @@ nb:ModelD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 36 ;
-        lv2:symbol "linked_calib" ;
-	        lv2:name "Linked Calibration" ;
+        lv2:index 104 ;
+        lv2:symbol "exclusive_lane" ;
+        lv2:name "Amp Exclusive Lane" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 4 ;
+        lv2:portProperty lv2:integer
+    ] , [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index 105 ;
+        lv2:symbol "cab_exclusive_lane" ;
+        lv2:name "Cab/IR Exclusive Lane" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 4 ;
+        lv2:portProperty lv2:integer
+	    ] , [
+	        a lv2:InputPort ,
+	          lv2:ControlPort ;
+        lv2:index 106 ;
+	        lv2:symbol "pedal_linked_calib" ;
+	        lv2:name "Pedal Linked Calibration" ;
 	        lv2:default 0 ;
 	        lv2:minimum 0 ;
 	        lv2:maximum 1 ;
@@ -410,7 +1225,27 @@ nb:ModelD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 37 ;
+        lv2:index 107 ;
+	        lv2:symbol "linked_calib" ;
+	        lv2:name "Amp Linked Calibration" ;
+	        lv2:default 0 ;
+	        lv2:minimum 0 ;
+	        lv2:maximum 1 ;
+	        lv2:portProperty lv2:toggled
+	    ] , [
+	        a lv2:InputPort ,
+	          lv2:ControlPort ;
+        lv2:index 108 ;
+	        lv2:symbol "cab_linked_calib" ;
+	        lv2:name "Cab/IR Linked Calibration" ;
+	        lv2:default 0 ;
+	        lv2:minimum 0 ;
+	        lv2:maximum 1 ;
+	        lv2:portProperty lv2:toggled
+	    ] , [
+	        a lv2:InputPort ,
+	          lv2:ControlPort ;
+	        lv2:index 109 ;
 	        lv2:symbol "calib_source" ;
 	        lv2:name "Calibration Source" ;
 	        lv2:default 0 ;
@@ -420,7 +1255,7 @@ nb:ModelD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 38 ;
+	        lv2:index 110 ;
 	        lv2:symbol "calib_target_db" ;
 	        lv2:name "Calibration Target (dB)" ;
 	        lv2:default -12.0 ;
@@ -429,7 +1264,7 @@ nb:ModelD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 39 ;
+	        lv2:index 111 ;
 	        lv2:symbol "noisegate_enabled" ;
 	        lv2:name "Noisegate Enable" ;
 	        lv2:default 0 ;
@@ -439,7 +1274,7 @@ nb:ModelD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 40 ;
+	        lv2:index 112 ;
 	        lv2:symbol "noisegate_threshold" ;
 	        lv2:name "Noisegate Threshold (dB)" ;
 	        lv2:default -60.0 ;
@@ -448,7 +1283,7 @@ nb:ModelD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 41 ;
+	        lv2:index 113 ;
 	        lv2:symbol "noisegate_attack" ;
 	        lv2:name "Noisegate Attack (ms)" ;
 	        lv2:default 2.0 ;
@@ -457,7 +1292,7 @@ nb:ModelD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 42 ;
+	        lv2:index 114 ;
 	        lv2:symbol "noisegate_hold" ;
 	        lv2:name "Noisegate Hold (ms)" ;
 	        lv2:default 10.0 ;
@@ -466,7 +1301,7 @@ nb:ModelD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 43 ;
+	        lv2:index 115 ;
 	        lv2:symbol "noisegate_release" ;
 	        lv2:name "Noisegate Release (ms)" ;
 	        lv2:default 20.0 ;
@@ -475,7 +1310,7 @@ nb:ModelD
 	    ] , [
 	        a lv2:OutputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 44 ;
+	        lv2:index 116 ;
 	        lv2:symbol "noisegate_gain" ;
 	        lv2:name "Noisegate Gain" ;
 	        lv2:minimum 0.0 ;
@@ -483,7 +1318,7 @@ nb:ModelD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 45 ;
+	        lv2:index 117 ;
 	        lv2:symbol "tuner_on" ;
 	        lv2:name "Tuner Enable" ;
 	        lv2:default 0 ;
@@ -493,7 +1328,7 @@ nb:ModelD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 46 ;
+	        lv2:index 118 ;
 	        lv2:symbol "tuner_base_freq" ;
 	        lv2:name "Tuner Base Frequency" ;
 	        lv2:default 440.0 ;
@@ -502,7 +1337,7 @@ nb:ModelD
 	    ] , [
 	        a lv2:OutputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 47 ;
+	        lv2:index 119 ;
 	        lv2:symbol "tuner_note" ;
 	        lv2:name "Tuner Note" ;
 	        lv2:minimum 0.0 ;
@@ -510,7 +1345,7 @@ nb:ModelD
 	    ] , [
 	        a lv2:OutputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 48 ;
+	        lv2:index 120 ;
 	        lv2:symbol "tuner_cents_off" ;
 	        lv2:name "Tuner Cents Off" ;
 	        lv2:minimum -50.0 ;
@@ -518,7 +1353,7 @@ nb:ModelD
 	    ] , [
 	        a lv2:OutputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 49 ;
+	        lv2:index 121 ;
 	        lv2:symbol "tuner_freq" ;
 	        lv2:name "Tuner Frequency" ;
 	        lv2:minimum 0.0 ;

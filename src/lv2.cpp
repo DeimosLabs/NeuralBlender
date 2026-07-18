@@ -53,18 +53,19 @@ struct Plugin : public c_lv2_urids {
   float *audio_out          = NULL;
   
   // controls
-  const float *gain_in_db   [NB_NUM_MODELS] = { NULL };
-  const float *gain_out_db  [NB_NUM_MODELS] = { NULL };
-  const float *dry_out_db   [NB_NUM_MODELS] = { NULL };
-  const float *delay        [NB_NUM_MODELS] = { NULL };
-  const float *lane_mute    [NB_NUM_MODELS] = { NULL };
-  const float *dcflip       [NB_NUM_MODELS] = { NULL };
-  const float *calibrate    [NB_NUM_MODELS] = { NULL };
+  const float *gain_in_db   [BANK_COUNT] [NB_NUM_MODELS] = {};
+  const float *ir_pitch     [BANK_COUNT] [NB_NUM_MODELS] = {};
+  const float *gain_out_db  [BANK_COUNT] [NB_NUM_MODELS] = {};
+  const float *dry_out_db   [BANK_COUNT] [NB_NUM_MODELS] = {};
+  const float *delay        [BANK_COUNT] [NB_NUM_MODELS] = {};
+  const float *lane_mute    [BANK_COUNT] [NB_NUM_MODELS] = {};
+  const float *dcflip       [BANK_COUNT] [NB_NUM_MODELS] = {};
+  const float *calibrate    [BANK_COUNT] [NB_NUM_MODELS] = {};
   const float *bypass       = NULL;
   const float *vu_enable    = NULL;
   const float *mute_all     = NULL;
-  const float *exclusive_lane = NULL;
-  const float *linked_calib = NULL;
+  const float *exclusive_lane [BANK_COUNT] = { NULL };
+  const float *linked_calib [BANK_COUNT] = { NULL };
   const float *calib_source = NULL;
   const float *calib_target_db = NULL;
   const float *noisegate_enabled = NULL;
@@ -79,20 +80,19 @@ struct Plugin : public c_lv2_urids {
   float *tuner_cents_off = NULL;
   float *tuner_freq = NULL;
   
-  float last_delay          [NB_NUM_MODELS] = { 0.0 };
-  float last_gain_in_db     [NB_NUM_MODELS] = { 0.0 };
-  float last_gain_out_db    [NB_NUM_MODELS] = { 0.0 };
-  float last_dry_out_db     [NB_NUM_MODELS] = {
-    DB_SILENCE, DB_SILENCE, DB_SILENCE, DB_SILENCE
-  };
-  float last_lane_mute      [NB_NUM_MODELS] = { 0.0 };
-  float last_dcflip         [NB_NUM_MODELS] = { 0.0 };
-  float last_calibrate      [NB_NUM_MODELS] = { 0.0 };
+  float last_delay          [BANK_COUNT] [NB_NUM_MODELS] = {};
+  float last_gain_in_db     [BANK_COUNT] [NB_NUM_MODELS] = {};
+  float last_ir_pitch       [BANK_COUNT] [NB_NUM_MODELS] = {};
+  float last_gain_out_db    [BANK_COUNT] [NB_NUM_MODELS] = {};
+  float last_dry_out_db     [BANK_COUNT] [NB_NUM_MODELS] = {};
+  float last_lane_mute      [BANK_COUNT] [NB_NUM_MODELS] = {};
+  float last_dcflip         [BANK_COUNT] [NB_NUM_MODELS] = {};
+  float last_calibrate      [BANK_COUNT] [NB_NUM_MODELS] = {};
   float last_bypass         = 1.0;
   float last_vu_enable      = 1.0;
   float last_mute_all       = 0.0;
-  float last_exclusive_lane = 0.0;
-  float last_linked_calib   = 0.0;
+  float last_exclusive_lane [BANK_COUNT] = { 0.0 };
+  float last_linked_calib   [BANK_COUNT] = { 0.0 };
   float last_calib_source   = 0.0;
   float last_calib_target_db = DB_CALIB_TARGET_DEFAULT;
   float last_noisegate_enabled = 0.0;
@@ -102,7 +102,7 @@ struct Plugin : public c_lv2_urids {
   float last_noisegate_release = 20.0;
   float last_tuner_on = 0.0;
   float last_tuner_base_freq = 440.0;
-  bool base_lane_mute [NB_NUM_MODELS] = { false };
+  bool base_lane_mute [BANK_COUNT] [NB_NUM_MODELS] = {};
   bool host_bypass = false;
 
   // dsp
@@ -122,21 +122,22 @@ struct Plugin : public c_lv2_urids {
   std::atomic<bool> load_requested { false };
   
   // hehe what a mess
-  bool pending_calibrate [NB_NUM_MODELS] = { false };
-  bool pending_calibrate_all = false;
-  std::atomic<bool> pending_calib_enabled [NB_NUM_MODELS] = {};
-  bool pending_load [NB_NUM_MODELS] = { false };
-  //size_t pending_which         = 0;
-  std::string pending_path [NB_NUM_MODELS];
-  std::string current_model [NB_NUM_MODELS];
+  bool pending_calibrate [BANK_COUNT] [NB_NUM_MODELS] = {};
+  bool pending_calibrate_all [BANK_COUNT] = {};
+  std::atomic<bool> pending_calib_enabled [BANK_COUNT] [NB_NUM_MODELS] = {};
+  bool pending_ir_pitch [BANK_COUNT] [NB_NUM_MODELS] = {};
+  float pending_ir_pitch_value [BANK_COUNT] [NB_NUM_MODELS] = {};
+  bool pending_load [BANK_COUNT] [NB_NUM_MODELS] = {};
+  std::string pending_path [BANK_COUNT] [NB_NUM_MODELS];
+  std::string current_model [BANK_COUNT] [NB_NUM_MODELS];
   
   // to get notified back when model is loaded from session restore
-  bool notify_path [NB_NUM_MODELS] = { false };
-  std::string current_path [NB_NUM_MODELS];
+  bool notify_path [BANK_COUNT] [NB_NUM_MODELS] = {};
+  std::string current_path [BANK_COUNT] [NB_NUM_MODELS];
   bool restored_from_state = false;
   
-  c_vudata meter_in;
-  c_vudata meters_out [NB_NUM_MODELS];
+  c_vudata meter_in [BANK_COUNT];
+  c_vudata meters_out [BANK_COUNT] [NB_NUM_MODELS];
   uint32_t meter_notify_samples = 0;
   std::atomic<bool> stats_dirty { true };
   std::atomic<bool> controls_dirty { false };
@@ -168,45 +169,64 @@ static bool read_changed_bool (const float *port, float &last, bool &value) {
   return true;
 }
 
+static bool calib_enabled_for_lane (
+    Plugin *self, _lane_bank bank, size_t which) {
+  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT ||
+      which >= NB_NUM_MODELS)
+    return false;
+
+  if (self->calibrate [bank] [which])
+    return *self->calibrate [bank] [which] >= 0.5f;
+
+  return self->blender.banks [bank].lanes [which].do_calib;
+}
+
 static void apply_effective_controls (Plugin *self) {
   if (!self)
     return;
 
-  const int exclusive_lane = (int) lrintf (self->last_exclusive_lane);
-  const bool exclusive_on =
-    exclusive_lane > 0 && exclusive_lane <= (int) NB_NUM_MODELS;
-  const size_t excl = exclusive_on ? (size_t) (exclusive_lane - 1) : 0;
-  const bool exclusive_empty =
-    exclusive_on && !self->blender.amps [excl].loaded ();
+  self->blender.set_bypass (self->host_bypass);
 
-  self->blender.set_bypass (self->host_bypass || exclusive_empty);
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    const _lane_bank b = (_lane_bank) bank;
+    const int exclusive_lane = (int) lrintf (self->last_exclusive_lane [bank]);
+    self->blender.banks [bank].exclusive_lane =
+      std::clamp (exclusive_lane, 0, (int) NB_NUM_MODELS);
+    const bool exclusive_on =
+      exclusive_lane > 0 && exclusive_lane <= (int) NB_NUM_MODELS;
+    const size_t excl = exclusive_on ? (size_t) (exclusive_lane - 1) : 0;
+    const bool exclusive_empty =
+      exclusive_on && !self->blender.banks [bank].lanes [excl].loaded ();
 
-  for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-    const bool mute =
-      exclusive_on && !exclusive_empty ? i != excl : self->base_lane_mute [i];
-    self->blender.set_lane_mute (i, mute);
+    for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+      const bool mute =
+        exclusive_on && !exclusive_empty ? i != excl : self->base_lane_mute [bank] [i];
+      self->blender.set_lane_mute (b, i, mute);
+    }
   }
 }
 
-static void run_calibration (Plugin *self, size_t which, bool enabled) {
-  if (!self || which >= NB_NUM_MODELS)
+static void run_calibration (
+    Plugin *self, _lane_bank bank, size_t which, bool enabled) {
+  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT ||
+      which >= NB_NUM_MODELS)
     return;
 
-  self->blender.calib_on (which, enabled);
+  self->blender.calib_on (bank, which, enabled);
 
-  if (self->blender.linked_calib)
-    self->blender.calibrate_linked (self->blender.calib_source == 1);
+  if (self->blender.banks [bank].linked_calib)
+    self->blender.calibrate_linked (bank, self->blender.calib_source == 1);
   else
-    self->blender.calibrate (which, self->blender.calib_source == 1);
+    self->blender.calibrate (bank, which, self->blender.calib_source == 1);
 
   self->stats_dirty.store (true, std::memory_order_release);
 }
 
-static void run_linked_calibration (Plugin *self) {
-  if (!self)
+static void run_linked_calibration (Plugin *self, _lane_bank bank) {
+  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT)
     return;
 
-  self->blender.calibrate_linked (self->blender.calib_source == 1);
+  self->blender.calibrate_linked (bank, self->blender.calib_source == 1);
   self->stats_dirty.store (true, std::memory_order_release);
 }
 
@@ -214,96 +234,140 @@ static void run_linked_calibration (Plugin *self) {
 // keeps these tasks OFF the dsp thread
 static void loader_main (Plugin *self) { CP
   while (true) {
+    _lane_bank bank = BANK_AMP;
     size_t which = 0;
     bool do_load = false;
     bool do_calib = false;
     bool do_calib_all = false;
     bool calib_enabled = false;
+    bool do_ir_pitch = false;
+    float ir_pitch_value = 0.0f;
     bool do_tuner = false;
     std::string path;
     { // scope: only hold this lock while moving pending jobs into locals
       std::unique_lock<std::mutex> lock (self->loader_mutex);
 
       self->loader_cv.wait_for(lock, std::chrono::milliseconds (50), [&] {
-        for (size_t i = 0; i < NB_NUM_MODELS; ++i)
-          if (self->pending_load [i] || self->pending_calibrate [i])
+        for (size_t b = BANK_PEDAL; b < BANK_COUNT; ++b) {
+          if (self->pending_calibrate_all [b])
             return true;
-        if (self->pending_calibrate_all)
-          return true;
+          for (size_t i = 0; i < NB_NUM_MODELS; ++i)
+            if (self->pending_load [b] [i] ||
+                self->pending_calibrate [b] [i] ||
+                self->pending_ir_pitch [b] [i])
+              return true;
+        }
         return !self->loader_running;
       });
 
       if (!self->loader_running)
         break;
 
-      for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-        if (self->pending_load [i]) {
-          which = i;
-          path = self->pending_path[i];
-          self->pending_load [i] = false;
-          do_load = true;
-          break;
-        }
-      }
-
-      if (!do_load) {
-        if (self->pending_calibrate_all) {
-          self->pending_calibrate_all = false;
-          do_calib_all = true;
-        }
-      }
-
-      if (!do_load && !do_calib_all) {
+      for (size_t b = BANK_PEDAL; b < BANK_COUNT && !do_load; ++b) {
         for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-          if (self->pending_calibrate [i]) {
+          if (self->pending_load [b] [i]) {
+            bank = (_lane_bank) b;
             which = i;
-            calib_enabled = self->pending_calib_enabled [i].load (std::memory_order_acquire);
-            self->pending_calibrate [i] = false;
-            do_calib = true;
+            path = self->pending_path [b] [i];
+            self->pending_load [b] [i] = false;
+            do_load = true;
             break;
           }
         }
       }
 
-      if (!do_load && !do_calib_all && !do_calib)
+      if (!do_load) {
+        for (size_t b = BANK_PEDAL; b < BANK_COUNT; ++b) {
+          if (self->pending_calibrate_all [b]) {
+            bank = (_lane_bank) b;
+            self->pending_calibrate_all [b] = false;
+            do_calib_all = true;
+            break;
+          }
+        }
+      }
+
+      if (!do_load && !do_calib_all) {
+        for (size_t b = BANK_PEDAL; b < BANK_COUNT && !do_calib; ++b) {
+          for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+            if (self->pending_calibrate [b] [i]) {
+              bank = (_lane_bank) b;
+              which = i;
+              calib_enabled =
+                self->pending_calib_enabled [b] [i].load (
+                  std::memory_order_acquire);
+              self->pending_calibrate [b] [i] = false;
+              do_calib = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!do_load && !do_calib_all && !do_calib) {
+        for (size_t b = BANK_PEDAL; b < BANK_COUNT && !do_ir_pitch; ++b) {
+          for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+            if (self->pending_ir_pitch [b] [i]) {
+              bank = (_lane_bank) b;
+              which = i;
+              ir_pitch_value = self->pending_ir_pitch_value [b] [i];
+              self->pending_ir_pitch [b] [i] = false;
+              do_ir_pitch = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!do_load && !do_calib_all && !do_calib && !do_ir_pitch)
         do_tuner = self->tuner_enabled.load (std::memory_order_acquire);
     } // unlocks here
 
     if (do_load) {
-      fprintf (stderr, "loader: load_model(%zu, \"%s\")\n", which, path.c_str ());
+      fprintf (stderr, "loader: load_model(%d, %zu, \"%s\")\n",
+               (int) bank, which, path.c_str ());
       self->load_requested = false;
 
-      fprintf (stderr, "NeuralBlender: loading model %zu: %s\n",
-               which, path.c_str ());
+      fprintf (stderr, "NeuralBlender: loading model %d:%zu: %s\n",
+               (int) bank, which, path.c_str ());
 
-      if (self->blender.load_model (which, path.c_str ())) {
-        self->current_model [which] = path;
-        self->notify_path [which] = true;
+      if (self->blender.load_model (bank, which, path.c_str ())) {
+        self->current_model [bank] [which] = path;
+        self->notify_path [bank] [which] = true;
       } else {
-        self->current_model [which].clear ();
-        self->notify_path [which] = true;
+        self->current_model [bank] [which].clear ();
+        self->notify_path [bank] [which] = true;
       }
 
       bool calib_after_load =
-        self->calibrate [which] && *self->calibrate [which] >= 0.5f;
-      self->pending_calib_enabled [which].store (calib_after_load, std::memory_order_release);
+        calib_enabled_for_lane (self, bank, which);
+      self->pending_calib_enabled [bank] [which].store (
+        calib_after_load, std::memory_order_release);
       {
         std::lock_guard<std::mutex> lock (self->loader_mutex);
-        self->pending_calibrate [which] = false;
+        self->pending_calibrate [bank] [which] = false;
       }
 
-      run_calibration (self, which, calib_after_load);
+      run_calibration (self, bank, which, calib_after_load);
       self->controls_dirty.store (true, std::memory_order_release);
     }
     
     // here calibration runs in the loader thread
     if (do_calib) {
-      run_calibration (self, which, calib_enabled);
+      run_calibration (self, bank, which, calib_enabled);
       self->controls_dirty.store (true, std::memory_order_release);
     }
 
     if (do_calib_all) {
-      run_linked_calibration (self);
+      run_linked_calibration (self, bank);
+      self->controls_dirty.store (true, std::memory_order_release);
+    }
+
+    if (do_ir_pitch) {
+      self->blender.set_ir_pitch (bank, which, ir_pitch_value);
+      if (self->blender.banks [bank].lanes [which].do_calib)
+        run_calibration (self, bank, which, true);
+      self->stats_dirty.store (true, std::memory_order_release);
       self->controls_dirty.store (true, std::memory_order_release);
     }
 
@@ -323,8 +387,11 @@ static void loader_main (Plugin *self) { CP
 }
 
 // THIS RUNS IN DSP THREAD
-static void request_load (Plugin *self, size_t which, const char *path) {
-  if (!self || !path || !path [0] || which >= NB_NUM_MODELS)
+static void request_load (
+    Plugin *self, _lane_bank bank, size_t which, const char *path) {
+  if (!self || !path || !path [0] ||
+      bank < BANK_PEDAL || bank >= BANK_COUNT ||
+      which >= NB_NUM_MODELS)
     return;
     
   std::lock_guard<std::mutex> lock (self->loader_mutex);
@@ -337,34 +404,49 @@ static void request_load (Plugin *self, size_t which, const char *path) {
   if (which == 1 && self->current_model_b == path)
     return;*/
 
-  self->pending_load [which] = true;
-  self->pending_path [which] = path;
-  self->pending_calibrate_all = false;
+  self->pending_load [bank] [which] = true;
+  self->pending_path [bank] [which] = path;
+  self->pending_calibrate_all [bank] = false;
 
 	self->loader_cv.notify_one();
 }
 
-static void request_calibrate_linked (Plugin *self);
+static void request_calibrate_linked (Plugin *self, _lane_bank bank);
 
-static void clear_model_slot (Plugin *self, size_t which, bool notify) {
-  if (!self || which >= NB_NUM_MODELS)
+static void request_ir_pitch (
+    Plugin *self, _lane_bank bank, size_t which, float semitones) {
+  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT ||
+      which >= NB_NUM_MODELS)
+    return;
+
+  std::lock_guard<std::mutex> lock (self->loader_mutex);
+  self->pending_ir_pitch [bank] [which] = true;
+  self->pending_ir_pitch_value [bank] [which] =
+    std::clamp (semitones, -12.0f, 12.0f);
+  self->loader_cv.notify_one ();
+}
+
+static void clear_model_slot (
+    Plugin *self, _lane_bank bank, size_t which, bool notify) {
+  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT ||
+      which >= NB_NUM_MODELS)
     return;
 
   { // scope
     std::lock_guard<std::mutex> lock (self->loader_mutex);
-    self->pending_load [which] = false;
-    self->pending_path [which].clear ();
-    self->pending_calibrate [which] = false;
-    self->pending_calibrate_all = false;
+    self->pending_load [bank] [which] = false;
+    self->pending_path [bank] [which].clear ();
+    self->pending_calibrate [bank] [which] = false;
+    self->pending_calibrate_all [bank] = false;
   }
 
-  self->blender.unload_model (which);
-  self->current_model [which].clear ();
-  self->notify_path [which] = notify;
+  self->blender.unload_model (bank, which);
+  self->current_model [bank] [which].clear ();
+  self->notify_path [bank] [which] = notify;
   self->stats_dirty.store (true, std::memory_order_release);
   apply_effective_controls (self);
-  if (self->blender.linked_calib)
-    request_calibrate_linked (self);
+  if (self->blender.banks [bank].linked_calib)
+    request_calibrate_linked (self, bank);
 }
 
 static void get_state_path_features (
@@ -384,27 +466,30 @@ static void get_state_path_features (
   }
 }
 
-static void request_calibrate (Plugin *self, size_t which, bool enabled) {
-  if (!self || which >= NB_NUM_MODELS)
+static void request_calibrate (
+    Plugin *self, _lane_bank bank, size_t which, bool enabled) {
+  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT ||
+      which >= NB_NUM_MODELS)
     return;
 
   {
     // scope
     std::lock_guard<std::mutex> lock (self->loader_mutex);
-    self->pending_calibrate [which] = true;
-    self->pending_calib_enabled [which].store (enabled, std::memory_order_release);
+    self->pending_calibrate [bank] [which] = true;
+    self->pending_calib_enabled [bank] [which].store (
+      enabled, std::memory_order_release);
   }
 
   self->loader_cv.notify_one ();
 }
 
-static void request_calibrate_linked (Plugin *self) {
-  if (!self)
+static void request_calibrate_linked (Plugin *self, _lane_bank bank) {
+  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT)
     return;
 
   {
     std::lock_guard<std::mutex> lock (self->loader_mutex);
-    self->pending_calibrate_all = true;
+    self->pending_calibrate_all [bank] = true;
   }
 
   self->loader_cv.notify_one ();
@@ -414,22 +499,23 @@ static void set_calib_target_db (Plugin *self, float db) {
   if (!self)
     return;
 
-  const float old_db = self->blender.amps [0].calib_target_db;
+  const float old_db = self->blender.banks [BANK_AMP].lanes [0].calib_target_db;
   self->blender.set_calib_target_db (db);
-  const bool changed = self->blender.amps [0].calib_target_db != old_db;
+  const bool changed = self->blender.banks [BANK_AMP].lanes [0].calib_target_db != old_db;
   if (!changed)
     return;
 
-  self->last_calib_target_db = self->blender.amps [0].calib_target_db;
+  self->last_calib_target_db = self->blender.banks [BANK_AMP].lanes [0].calib_target_db;
 
-  if (self->blender.linked_calib) {
-    request_calibrate_linked (self);
-  } else {
-    for (size_t i = 0; i < NB_NUM_MODELS; i++) {
-      const bool enabled =
-        self->calibrate [i] && *self->calibrate [i] >= 0.5f;
-      if (enabled)
-        request_calibrate (self, i, true);
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    const _lane_bank b = (_lane_bank) bank;
+    if (self->blender.banks [bank].linked_calib) {
+      request_calibrate_linked (self, b);
+    } else {
+      for (size_t i = 0; i < NB_NUM_MODELS; i++) {
+        if (calib_enabled_for_lane (self, b, i))
+          request_calibrate (self, b, i, true);
+      }
     }
   }
 }
@@ -445,28 +531,33 @@ static LV2_State_Status save (
 	    LV2_State_Free_Path *free_path = NULL;
 	    get_state_path_features (features, &map_path, &free_path);
 	    
-		    for (int i = 0; i < NB_NUM_MODELS; i++) {
-		      const std::string filename = self->blender.amps [i].model_filename ();
-		      const bool empty = filename.empty ();
-		      char *abstract_path = NULL;
-		      const char *stored_path = filename.c_str ();
-		      if (!empty && map_path && map_path->abstract_path)
-		        abstract_path = map_path->abstract_path (map_path->handle, filename.c_str ());
-		      if (abstract_path)
-		        stored_path = abstract_path;
+		    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+		      for (int i = 0; i < NB_NUM_MODELS; i++) {
+		        const std::string filename =
+		          self->blender.banks [bank].lanes [i].model_filename ();
+		        const bool empty = filename.empty ();
+		        char *abstract_path = NULL;
+		        const char *stored_path = filename.c_str ();
+		        if (!empty && map_path && map_path->abstract_path)
+		          abstract_path =
+		            map_path->abstract_path (map_path->handle, filename.c_str ());
+		        if (abstract_path)
+		          stored_path = abstract_path;
 
-	      store (handle,
-	             self->urid_model [i],
-	             stored_path,
-	             strlen (stored_path) + 1,
-	             empty ? self->urid_atom_String : self->urid_atom_Path,
-	             LV2_STATE_IS_POD);
+	        store (handle,
+	               self->urid_bank_model [bank] [i],
+	               stored_path,
+	               strlen (stored_path) + 1,
+	               empty ? self->urid_atom_String : self->urid_atom_Path,
+	               LV2_STATE_IS_POD);
 
-	      if (abstract_path && free_path && free_path->free_path)
-	        free_path->free_path (free_path->handle, abstract_path);
+	        if (abstract_path && free_path && free_path->free_path)
+	          free_path->free_path (free_path->handle, abstract_path);
+			      }
 			    }
-	    return LV2_STATE_SUCCESS;
-	}
+
+		    return LV2_STATE_SUCCESS;
+		}
 
 static LV2_State_Status restore (
     LV2_Handle instance,
@@ -496,28 +587,35 @@ static LV2_State_Status restore (
 	        (*(const int32_t *) calib_bass) != 0 ? 1 : 0;
 	    self->restored_from_state = true;
 
-		    for (int i = 0; i < NB_NUM_MODELS; i++) {
-		      const void *p =
-	          retrieve (handle,
-                    self->urid_model [i],
-                    &size,
-                    &type,
-                    &valflags);
+			    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+		      for (int i = 0; i < NB_NUM_MODELS; i++) {
+		        const void *p =
+	            retrieve (handle,
+                      self->urid_bank_model [bank] [i],
+                      &size,
+                      &type,
+                      &valflags);
 
-		      if (p && type == self->urid_atom_Path && size > 1) {
-		        const char *path = (const char *) p;
-		        char *absolute_path = NULL;
-		        if (map_path && map_path->absolute_path)
-		          absolute_path = map_path->absolute_path (map_path->handle, path);
+		        if (p && type == self->urid_atom_Path && size > 1) {
+		          const char *path = (const char *) p;
+		          char *absolute_path = NULL;
+		          if (map_path && map_path->absolute_path)
+		            absolute_path =
+		              map_path->absolute_path (map_path->handle, path);
 
-		        clear_model_slot (self, i, false);
-		        request_load (self, i, absolute_path ? absolute_path : path);
+		          clear_model_slot (self, (_lane_bank) bank, i, false);
+		          request_load (
+		            self,
+		            (_lane_bank) bank,
+		            i,
+		            absolute_path ? absolute_path : path);
 
-		        if (absolute_path && free_path && free_path->free_path)
-		          free_path->free_path (free_path->handle, absolute_path);
-		      } else {
-			        clear_model_slot (self, i, true);
-			      }
+		          if (absolute_path && free_path && free_path->free_path)
+		            free_path->free_path (free_path->handle, absolute_path);
+		        } else {
+			          clear_model_slot (self, (_lane_bank) bank, i, true);
+			        }
+		      }
 			    }
 
 		    return LV2_STATE_SUCCESS;
@@ -565,15 +663,17 @@ static void forge_int_notify (Plugin *self, LV2_URID property, int32_t value) {
 }
 
 static void forge_meter_notify (Plugin *self) {
-  float values [(1 + NB_NUM_MODELS) * 2];
+  float values [BANK_COUNT * (1 + NB_NUM_MODELS) * 2];
   size_t n = 0;
 
-  values [n++] = self->meter_in.linear_l ();
-  values [n++] = self->meter_in.linear_peak_l ();
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    values [n++] = self->meter_in [bank].linear_l ();
+    values [n++] = self->meter_in [bank].linear_peak_l ();
 
-  for (int i = 0; i < NB_NUM_MODELS; i++) {
-    values [n++] = self->meters_out [i].linear_l ();
-    values [n++] = self->meters_out [i].linear_peak_l ();
+    for (int i = 0; i < NB_NUM_MODELS; i++) {
+      values [n++] = self->meters_out [bank] [i].linear_l ();
+      values [n++] = self->meters_out [bank] [i].linear_peak_l ();
+    }
   }
 
   LV2_Atom_Forge_Frame frame;
@@ -597,13 +697,16 @@ static void forge_meter_notify (Plugin *self) {
 }
 
 static void forge_stats_notify (Plugin *self) {
-  float values [NB_NUM_MODELS * NB_STATS_PER_LANE];
+  float values [BANK_COUNT * NB_NUM_MODELS * NB_STATS_PER_LANE];
   size_t n = 0;
 
-  for (int i = 0; i < NB_NUM_MODELS; i++) {
-    values [n++] = (float) self->blender.delays [i].frames ();
-    values [n++] = self->blender.amps [i].trim.load (std::memory_order_acquire);
-    values [n++] = (float) self->blender.amps [i].engine ();
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    for (size_t i = 0; i < NB_NUM_MODELS; i++) {
+      c_neuralamp &lane = self->blender.banks [bank].lanes [i];
+      values [n++] = (float) lane.delay.frames ();
+      values [n++] = lane.trim.load (std::memory_order_acquire);
+      values [n++] = (float) lane.engine ();
+    }
   }
 
   LV2_Atom_Forge_Frame frame;
@@ -636,12 +739,14 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   self->blocksize = 0;
   
   self->blender.set_samplerate ((uint32_t)rate);
-  self->last_calib_target_db = self->blender.amps [0].calib_target_db;
-  self->meter_in.samplerate = (int) rate;
-  self->meter_in.redraw_interval = 1.0f / LV2_METER_FPS;
-  for (int i = 0; i < NB_NUM_MODELS; i++) {
-    self->meters_out [i].samplerate = (int) rate;
-    self->meters_out [i].redraw_interval = 1.0f / LV2_METER_FPS;
+  self->last_calib_target_db = self->blender.banks [BANK_AMP].lanes [0].calib_target_db;
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    self->meter_in [bank].samplerate = (int) rate;
+    self->meter_in [bank].redraw_interval = 1.0f / LV2_METER_FPS;
+    for (int i = 0; i < NB_NUM_MODELS; i++) {
+      self->meters_out [bank] [i].samplerate = (int) rate;
+      self->meters_out [bank] [i].redraw_interval = 1.0f / LV2_METER_FPS;
+    }
   }
   //self->blender.load_model (0, "/tmp/a.nam");
   //self->blender.load_model (1, "/tmp/b.nam");
@@ -669,9 +774,12 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
     return NULL;
   }
 
-  self->blender.meter_in = &self->meter_in;
-  for (int i = 0; i < NB_NUM_MODELS; i++)
-    self->blender.meters_out [i] = &self->meters_out [i];
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    self->blender.banks [bank].meter_in = &self->meter_in [bank];
+    for (int i = 0; i < NB_NUM_MODELS; i++)
+      self->blender.banks [bank].meters_out [i] =
+        &self->meters_out [bank] [i];
+  }
   
   // start loader thread LAST
   self->loader_running = true;
@@ -681,38 +789,43 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
 }
 
 static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
-  Plugin *self = (Plugin *) instance;
+	Plugin *self = (Plugin *) instance;
 
+  _lane_bank bank = BANK_AMP;
   size_t lane = 0;
   uint32_t param = 0;
-  if (nb_lv2_decode_lane_port (port, &lane, &param)) {
+  if (nb_lv2_decode_bank_lane_port (port, &bank, &lane, &param)) {
     switch (param) {
       case NB_LV2_LANE_GAIN_IN:
-        self->gain_in_db [lane] = (const float *) data;
+        self->gain_in_db [bank] [lane] = (const float *) data;
+      break;
+
+      case NB_LV2_LANE_IR_PITCH:
+        self->ir_pitch [bank] [lane] = (const float *) data;
       break;
 
       case NB_LV2_LANE_GAIN_OUT:
-        self->gain_out_db [lane] = (const float *) data;
+        self->gain_out_db [bank] [lane] = (const float *) data;
       break;
 
       case NB_LV2_LANE_DRY_OUT:
-        self->dry_out_db [lane] = (const float *) data;
+        self->dry_out_db [bank] [lane] = (const float *) data;
       break;
 
       case NB_LV2_LANE_DELAY:
-        self->delay [lane] = (const float *) data;
+        self->delay [bank] [lane] = (const float *) data;
       break;
 
       case NB_LV2_LANE_MUTE:
-        self->lane_mute [lane] = (const float *) data;
+        self->lane_mute [bank] [lane] = (const float *) data;
       break;
 
       case NB_LV2_LANE_DCFLIP:
-        self->dcflip [lane] = (const float *) data;
+        self->dcflip [bank] [lane] = (const float *) data;
       break;
 
       case NB_LV2_LANE_CALIBRATE:
-        self->calibrate [lane] = (const float *) data;
+        self->calibrate [bank] [lane] = (const float *) data;
       break;
     }
     return;
@@ -747,12 +860,28 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
       self->mute_all = (const float *) data;
     break;
 
-    case PORT_EXCLUSIVE_LANE:
-      self->exclusive_lane = (const float *) data;
+    case PORT_EXCLUSIVE_LANE_PEDAL:
+      self->exclusive_lane [BANK_PEDAL] = (const float *) data;
     break;
 
-    case PORT_LINKED_CALIB:
-      self->linked_calib = (const float *) data;
+    case PORT_EXCLUSIVE_LANE_AMP:
+      self->exclusive_lane [BANK_AMP] = (const float *) data;
+    break;
+
+    case PORT_EXCLUSIVE_LANE_CAB:
+      self->exclusive_lane [BANK_CAB] = (const float *) data;
+    break;
+
+    case PORT_LINKED_CALIB_PEDAL:
+      self->linked_calib [BANK_PEDAL] = (const float *) data;
+    break;
+
+    case PORT_LINKED_CALIB_AMP:
+      self->linked_calib [BANK_AMP] = (const float *) data;
+    break;
+
+    case PORT_LINKED_CALIB_CAB:
+      self->linked_calib [BANK_CAB] = (const float *) data;
     break;
 
     case PORT_CALIB_SOURCE:
@@ -813,8 +942,7 @@ static void activate (LV2_Handle instance) {
   Plugin *self = (Plugin *) instance;
 
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-    self->blender.delays [i].clear();
-    self->blender.amps [i].reset();
+    self->blender.banks [BANK_AMP].lanes [i].reset();
   }
 }
 
@@ -835,18 +963,22 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     
     // model loaded from UI?
     bool sent_path_notify = false;
-    for (i = 0; i < NB_NUM_MODELS; i++) {
-      if (self->notify_path [i]) {
-        debug ("notify_path [%d]", i);
-        forge_model_path_notify (
-          self,
-          self->urid_model [i],
-          self->current_model [i].c_str());
+    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+      for (i = 0; i < NB_NUM_MODELS; i++) {
+        if (self->notify_path [bank] [i]) {
+          debug ("notify_path [%d][%d]", (int) bank, i);
+          forge_model_path_notify (
+            self,
+            self->urid_bank_model [bank] [i],
+            self->current_model [bank] [i].c_str());
 
-        self->notify_path [i] = false;
-        sent_path_notify = true;
-        break; // throttle to 1 per cycle
+          self->notify_path [bank] [i] = false;
+          sent_path_notify = true;
+          break; // throttle to 1 per cycle
+        }
       }
+      if (sent_path_notify)
+        break;
     }
 
 	    const bool sent_stats_notify =
@@ -871,8 +1003,9 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       const LV2_Atom_Object *obj = (const LV2_Atom_Object *)&ev->body;
       
 	      if (obj->body.otype == self->urid_patch_Get) {
-	        for (i = 0; i < NB_NUM_MODELS; i++)
-	          self->notify_path [i] = true;
+	        for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
+	          for (i = 0; i < NB_NUM_MODELS; i++)
+	            self->notify_path [bank] [i] = true;
 	        self->restored_from_state = false;
 	        self->stats_dirty.store (true, std::memory_order_release);
 	
@@ -906,20 +1039,22 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	        continue;
 	      }
 
-	      if (value->type != self->urid_atom_Path &&
-          value->type != self->urid_atom_String)
-        continue;
+			      if (value->type != self->urid_atom_Path &&
+		          value->type != self->urid_atom_String)
+		        continue;
 
       const char *path =
         (const char *) LV2_ATOM_BODY_CONST (value);
       
-      for (i = 0; i < NB_NUM_MODELS; i++) {
-        if (prop == self->urid_model [i]) {
-          if (path && path [0])
-            request_load (self, i, path);
-          else
-            clear_model_slot (self, i, true);
-          break;
+      for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+        for (i = 0; i < NB_NUM_MODELS; i++) {
+          if (prop == self->urid_bank_model [bank] [i]) {
+            if (path && path [0])
+              request_load (self, (_lane_bank) bank, i, path);
+            else
+              clear_model_slot (self, (_lane_bank) bank, i, true);
+            break;
+          }
         }
       }
     }
@@ -928,9 +1063,11 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   if (nframes != self->blocksize) {
     self->blocksize = nframes;
     self->blender.set_blocksize(nframes);
-    self->meter_in.bufsize = (int) nframes;
-    for (i = 0; i < NB_NUM_MODELS; i++)
-      self->meters_out [i].bufsize = (int) nframes;
+    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+      self->meter_in [bank].bufsize = (int) nframes;
+      for (i = 0; i < NB_NUM_MODELS; i++)
+        self->meters_out [bank] [i].bufsize = (int) nframes;
+    }
   }
 
   float v = 0.0f;
@@ -949,27 +1086,33 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     self->blender.mute_all = b;
   }
 
-  if (read_changed (self->exclusive_lane, self->last_exclusive_lane, v)) { CP
-    apply_effective_controls (self);
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    if (read_changed (
+          self->exclusive_lane [bank], self->last_exclusive_lane [bank], v)) { CP
+      self->blender.set_exclusive_lane ((_lane_bank) bank, (int) lrintf (v));
+      if (bank == BANK_AMP)
+        apply_effective_controls (self);
+    }
   }
 
-	  if (self->linked_calib) {
-	    const float v = *self->linked_calib;
-	    if (v != self->last_linked_calib) { CP
-	      self->last_linked_calib = v;
-	      self->blender.linked_calib = v >= 0.5f;
-	      if (self->blender.linked_calib) {
-	        request_calibrate_linked (self);
-	      } else {
-	        for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-	          const bool enabled =
-	            self->calibrate [i] && *self->calibrate [i] >= 0.5f;
-	          if (enabled)
-	            request_calibrate (self, i, true);
-	        }
-	      }
-	    }
-	  }
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    if (read_changed_bool (
+          self->linked_calib [bank], self->last_linked_calib [bank], b)) { CP
+      self->blender.banks [bank].linked_calib = b;
+      self->blender.linked_calib =
+        self->blender.banks [BANK_AMP].linked_calib;
+
+      const _lane_bank bank_id = (_lane_bank) bank;
+      if (self->blender.banks [bank].linked_calib) {
+        request_calibrate_linked (self, bank_id);
+      } else {
+        for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
+          if (calib_enabled_for_lane (self, bank_id, i))
+            request_calibrate (self, bank_id, i, true);
+        }
+      }
+    }
+  }
 
 	  if (self->calib_source) {
 	    float v = *self->calib_source;
@@ -978,14 +1121,14 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	    if (v != self->last_calib_source) { CP
 	      self->last_calib_source = v;
 	      self->blender.calib_source = (int) lrintf (v);
-	      if (self->blender.linked_calib) {
-	        request_calibrate_linked (self);
-	      } else {
-	        for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
-	          const bool enabled =
-	            self->calibrate [i] && *self->calibrate [i] >= 0.5f;
-	          if (enabled)
-	            request_calibrate (self, i, true);
+	      for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+	        const _lane_bank bank_id = (_lane_bank) bank;
+	        if (self->blender.banks [bank].linked_calib) {
+	          request_calibrate_linked (self, bank_id);
+	        } else {
+	          for (size_t i = 0; i < NB_NUM_MODELS; ++i)
+	            if (calib_enabled_for_lane (self, bank_id, i))
+	              request_calibrate (self, bank_id, i, true);
 	        }
 	      }
 	    }
@@ -1029,50 +1172,72 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	    self->blender.pitchtracker.set_base_freq ((int) lrintf (v));
 	  }
 	  
-	  // check all parameters
-  for (i = 0; i < NB_NUM_MODELS; i++) {
-    if (read_changed (self->gain_in_db [i], self->last_gain_in_db [i], v)) {
-      CP
-      self->blender.set_gain_in (i, db_to_gain (v));
-    }
-    
-	    if (read_changed (
-          self->gain_out_db [i], self->last_gain_out_db [i], v)) {
-	      CP
-	      self->blender.set_gain_out (i, db_to_gain (v));
-	    }
+  // check all lane parameters
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    const _lane_bank bnk = (_lane_bank) bank;
 
-	    if (read_changed (
-          self->dry_out_db [i], self->last_dry_out_db [i], v)) {
-	      CP
-	      self->blender.set_dry_out (
-	        i, v <= DB_SILENCE ? 0.0f : db_to_gain (v));
-	    }
+    for (i = 0; i < NB_NUM_MODELS; i++) {
+      if (read_changed (
+          self->gain_in_db [bank] [i],
+          self->last_gain_in_db [bank] [i], v)) {
+        CP
+        self->blender.set_gain_in (bnk, i, db_to_gain (v));
+      }
 
-	    if (read_changed (self->delay [i], self->last_delay [i], v)) {
-      CP
-      self->blender.set_delay_ms (i, v);
-      self->stats_dirty.store (true, std::memory_order_release);
-    }
+      if (read_changed (
+          self->ir_pitch [bank] [i],
+          self->last_ir_pitch [bank] [i], v)) {
+        CP
+        request_ir_pitch (self, bnk, i, v);
+      }
 
-    if (read_changed_bool (self->lane_mute [i], self->last_lane_mute [i], b)) {
-      CP
-      self->base_lane_mute [i] = b;
-      apply_effective_controls (self);
-    }
+      if (read_changed (
+          self->gain_out_db [bank] [i],
+          self->last_gain_out_db [bank] [i], v)) {
+        CP
+        self->blender.set_gain_out (bnk, i, db_to_gain (v));
+      }
 
-    if (read_changed_bool (self->dcflip [i], self->last_dcflip [i], b)) {
-      CP
-      self->blender.dcflip (i, b);
-    }
+      if (read_changed (
+          self->dry_out_db [bank] [i],
+          self->last_dry_out_db [bank] [i], v)) {
+        CP
+        self->blender.set_dry_out (
+          bnk, i, v <= DB_SILENCE ? 0.0f : db_to_gain (v));
+      }
 
-    if (self->calibrate [i]) {
-      const float v = *self->calibrate [i];
-      const bool enabled = v >= 0.5f;
-      self->pending_calib_enabled [i].store (enabled, std::memory_order_release);
-      if (v != self->last_calibrate [i]) { CP
-        self->last_calibrate [i] = v;
-        request_calibrate (self, i, enabled);
+      if (read_changed (
+          self->delay [bank] [i],
+          self->last_delay [bank] [i], v)) {
+        CP
+        self->blender.set_delay_ms (bnk, i, v);
+        self->stats_dirty.store (true, std::memory_order_release);
+      }
+
+      if (read_changed_bool (
+          self->lane_mute [bank] [i],
+          self->last_lane_mute [bank] [i], b)) {
+        CP
+        self->base_lane_mute [bank] [i] = b;
+        apply_effective_controls (self);
+      }
+
+      if (read_changed_bool (
+          self->dcflip [bank] [i],
+          self->last_dcflip [bank] [i], b)) {
+        CP
+        self->blender.dcflip (bnk, i, b);
+      }
+
+      if (self->calibrate [bank] [i]) {
+        const float v = *self->calibrate [bank] [i];
+        const bool enabled = v >= 0.5f;
+        self->pending_calib_enabled [bank] [i].store (
+          enabled, std::memory_order_release);
+        if (v != self->last_calibrate [bank] [i]) { CP
+          self->last_calibrate [bank] [i] = v;
+          request_calibrate (self, bnk, i, enabled);
+        }
       }
     }
   }

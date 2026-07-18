@@ -29,6 +29,10 @@ static constexpr float DEFAULT_BG_R = 0.125f;
 static constexpr float DEFAULT_BG_G = 0.125f;
 static constexpr float DEFAULT_BG_B = 0.125f;
 
+static const char *cwd_config_key_for_bank (uint64_t bank) {
+  return bank == BANK_CAB ? CONFIG_KEY_NAME_IR_CWD : CONFIG_KEY_NAME_MODEL_CWD;
+}
+
 static constexpr t_gradientcolors grad (
     float r1, float g1, float b1, float a1,
     float r2, float g2, float b2, float a2) {
@@ -1000,6 +1004,16 @@ void c_container::create (
   c_widget::create (ui_, parent, label_, x, y, w, h);
 }
 
+void c_container::show () {
+  if (widget)
+    os_widget_show (widget);
+}
+
+void c_container::hide () {
+  if (widget)
+    os_widget_hide (widget);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // c_meter
 
@@ -1878,6 +1892,42 @@ float c_knob::knob_angle_from_value () {
   return start + t * sweep;
 }
 
+static int knob_label_height (Widget_t *widget, const c_knob *knob) {
+  if (!widget || !widget->app || !knob || knob->label.empty ())
+    return 0;
+
+  return widget->app->small_font + 7;
+}
+
+static void draw_knob_value (Widget_t *widget, int width, int height) {
+  if (!widget || !widget->crb || !widget->state)
+    return;
+
+  use_text_color_scheme (widget, get_color_state (widget));
+
+  char s [64];
+  const float value = adj_get_value (widget->adj);
+  if (fabs (widget->adj->step) > 0.99f)
+    snprintf (s, sizeof (s), "%d", (int) value);
+  else if (fabs (widget->adj->step) > 0.09f)
+    snprintf (s, sizeof (s), "%.1f", value);
+  else
+    snprintf (s, sizeof (s), "%.2f", value);
+
+  cairo_set_font_size (
+    widget->crb, widget->app->small_font / widget->scale.ascale);
+
+  cairo_text_extents_t extents;
+  cairo_text_extents (widget->crb, s, &extents);
+  cairo_move_to (
+    widget->crb,
+    (width * 0.5) - (extents.width / 2.0),
+    (height * 0.5) + (extents.height / 2.0));
+  cairo_text_path (widget->crb, s);
+  cairo_fill (widget->crb);
+  cairo_new_path (widget->crb);
+}
+
 bool c_knob::get_circle_geometry (int *r_x, int *r_y, int *r_radius) {
 
   if (!widget)
@@ -1890,13 +1940,13 @@ bool c_knob::get_circle_geometry (int *r_x, int *r_y, int *r_radius) {
 
   // match xputty's _draw_knob(): the knob circle is drawn in a smaller
   // rectangle, leaving room below for the value/label text.
-  const int knob_w = std::max (1, w - 2);
-  const int knob_h = std::max (1, h - (widget->app->small_font + 7));
+  const int knob_w = std::max (1, w - 1);
+  const int knob_h = std::max (1, h - 1 - knob_label_height (widget, this));
   const int d = std::min (knob_w, knob_h);
 
   if (r_x) *r_x = knob_w / 2 - 1; // TODO: figure out wtf
   if (r_y) *r_y = knob_h / 2;
-  if (r_radius) *r_radius = 1 + std::max (1, (d / 2) - std::max (2, d / 16));
+  if (r_radius) *r_radius = std::max (1, (d / 2) - std::max (2, d / 16));
 
   return true;
 }
@@ -1911,8 +1961,24 @@ void c_knob::cb_draw (void *w, void *user_data) {
   if (g_knob_image && g_knob_image->image && widget->image != g_knob_image->image)
     widget_get_surface_ptr (widget, g_knob_image);
 
-  // xputty function
-  _draw_knob (widget, user_data);
+  if (knob->label.empty ()) {
+    Metrics_t metrics;
+    os_get_window_metrics (widget, &metrics);
+    if (!metrics.visible)
+      return;
+
+    const int width = std::max (1, metrics.width - 1);
+    const int height = std::max (1, metrics.height - 1);
+    if (widget->image)
+      _draw_image_knob (widget, width - 1, height - 1);
+    else
+      _draw_knob (widget, user_data);
+
+    draw_knob_value (widget, width, height);
+  } else {
+    // xputty function
+    _draw_knob (widget, user_data);
+  }
   
   if (widget->crb) {
     int cx, cy, radius;
@@ -1920,6 +1986,7 @@ void c_knob::cb_draw (void *w, void *user_data) {
     float a1 = knob->knob_angle_from_value ();
     
     if (knob->get_circle_geometry (&cx, &cy, &radius)) {
+      cairo_set_source_rgba (widget->crb, 1, 1, 1, 1);
       // simplified: arc around knob
       cairo_arc (widget->crb, cx, cy, radius, a0, a1);
       cairo_stroke (widget->crb);
@@ -1970,25 +2037,44 @@ void c_knob::on_change () {
   if (ui && ui->updating_from_state)
     return;
 
+  c_neuralblender_lane_state *lane_state = NULL;
+  if (ui && bank < BANK_COUNT && lane < NB_NUM_MODELS)
+    lane_state = &ui->state.banks [bank].lanes [lane];
+
   float g = db_to_gain (value);
   switch (role) {
     case ROLE_GAIN_IN:
       debug ("lane %d gain in %f", lane, g);
+      if (lane_state)
+        lane_state->gain_in = g;
       ui->on_gain_in (this, g);
+    break;
+
+    case ROLE_IR_PITCH:
+      debug ("lane %d IR pitch %f", lane, value);
+      if (lane_state)
+        lane_state->ir_pitch_semitones = value;
+      ui->on_ir_pitch (this, value);
     break;
 
     case ROLE_GAIN_OUT:
       debug ("lane %d gain out %f", lane, g);
+      if (lane_state)
+        lane_state->gain_out = g;
       ui->on_gain_out (this, g);
     break;
 
     case ROLE_DRY_OUT:
       debug ("lane %d dry out %f", lane, g);
+      if (lane_state)
+        lane_state->dry_out = value <= DB_SILENCE ? 0.0f : g;
       ui->on_dry_out (this, g);
     break;
 
     case ROLE_DELAY:
       debug ("lane %d delay %f", lane, value);
+      if (lane_state)
+        lane_state->delay_ms = value;
       ui->on_delay (this, value);
     break;
 
@@ -2097,12 +2183,15 @@ void c_combobox::on_change (int x) {
     return;
   }
   std::string fullpath;
-  if (strip_directories) // yay spaghetti
-    fullpath = ui->filepickers [lane].current_dir + "/" + items [x];
-  else
+  if (strip_directories) { // yay spaghetti
+    c_lane_widgets *lanes =
+      ui->lanes_for_bank ((_lane_bank) bank);
+    fullpath = lanes [lane].filepicker.current_dir + "/" + items [x];
+  } else {
     fullpath = items [x];
+  }
 
-  ui->load_model (lane, fullpath.c_str ());
+  ui->load_model ((_lane_bank) bank, lane, fullpath.c_str ());
 }
 
 void c_combobox::set_selection (int n) {
@@ -2217,7 +2306,8 @@ static void filepicker_response (void *w_, void *user_data) { CP
   }
 
   if (fp->ui && !fp->current_dir.empty ()) {
-    fp->ui->configfile.set_item (CONFIG_KEY_NAME_CWD, fp->current_dir);
+    fp->ui->configfile.set_item (
+      cwd_config_key_for_bank (fp->bank), fp->current_dir);
     fp->ui->configfile.write_file ();
   }
 
@@ -2236,6 +2326,7 @@ static void filepicker_response (void *w_, void *user_data) { CP
 
   c_neuralblender_ui *ui = fp->ui;
   size_t lane = fp->lane;
+  _lane_bank bank = (fp->bank < BANK_COUNT) ? (_lane_bank) fp->bank : BANK_AMP;
 
   //std::string selected (filename);
   //fp->on_file_select(cw, selected);
@@ -2253,15 +2344,16 @@ static void filepicker_response (void *w_, void *user_data) { CP
   debug ("current_dir: '%s'", ui->state.current_dir.c_str ());
 
   //fp->selected_file = std::string (filename);
-  ui->state.lanes [lane].filename = std::string (filename);
-  ui->state.current_dir = path_dirname (ui->state.lanes [lane].filename);
+  ui->state.banks [bank].lanes [lane].filename = std::string (filename);
+  ui->state.current_dir =
+    path_dirname (ui->state.banks [bank].lanes [lane].filename);
   fp->scan_current_dir ();
   for (int i = 0; i < fp->filelist.size (); i++) {
     debug ("filelist [%d]: '%s'", i, fp->filelist [i].c_str ());
   }
-  ui->load_model (cw->lane, filename);
+  ui->load_model (bank, cw->lane, filename);
 
-  c_combobox *cb = &ui->lanes [lane].menu_list;
+  c_combobox *cb = &ui->lanes_for_bank (bank) [lane].menu_list;
   cb->clear ();
   //cb->add (filename);
   fp->add_files_from_dir (cb);
@@ -2296,7 +2388,7 @@ void c_filepicker::show () { CP
   parent->func.dialog_callback = filepicker_response;
   if (ui) {
     ui->configfile.read_file ();
-    current_dir = ui->configfile.get_item (CONFIG_KEY_NAME_CWD);
+    current_dir = ui->configfile.get_item (cwd_config_key_for_bank (bank));
   }
   debug ("current_dir='%s'", current_dir.c_str ());
   const char *path = current_dir.empty () ? CONFIG_DEFAULT_DIR : current_dir.c_str ();
@@ -2366,7 +2458,8 @@ void c_filepicker::add_files_from_dir (c_combobox *cb) {
   cb->items.clear();
 
   int sel = -1;
-  std::string selected_file = ui->state.lanes [lane].filename;
+  _lane_bank bank = (this->bank < BANK_COUNT) ? (_lane_bank) this->bank : BANK_AMP;
+  std::string selected_file = ui->state.banks [bank].lanes [lane].filename;
 
   for (size_t i = 0; i < filelist.size (); i++) {
     cb->items.push_back (filelist [i]);

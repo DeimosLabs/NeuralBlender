@@ -17,6 +17,7 @@ enum _textalign {
 
 enum _widget_role {
   ROLE_NONE = 0,
+  ROLE_BANKSWITCH,
   ROLE_ABOUT,
   ROLE_ABOUTOK,
   ROLE_PREFS,
@@ -29,6 +30,7 @@ enum _widget_role {
   ROLE_LOADFILE,
   ROLE_CLEAR,
   ROLE_GAIN_IN,
+  ROLE_IR_PITCH,
   ROLE_GAIN_OUT,
   ROLE_DRY_OUT,
   ROLE_DELAY,
@@ -171,6 +173,7 @@ public:
   _widget_state wstate     = WSTATE_UNKNOWN;
   uint64_t id              = -1;
   uint64_t lane            = -1;
+  uint64_t bank            = -1;
   int corner_radius        = 4;
   float text_size          = 1.0;
   float text_r             = 1.0;
@@ -258,6 +261,9 @@ public:
       Widget_t *parent,
       const char *label,
       int x, int y, int w, int h);
+
+  void show () override;
+  void hide () override;
 };
 
 class c_meter : public c_widget {
@@ -470,7 +476,7 @@ public:
   bool updating_widget = false;
 };
 
-class c_filepicker : c_widget {
+class c_filepicker : public c_widget {
 public:
   void create (c_neuralblender_ui *ui, Widget_t *parent, size_t lane, const char *title);
 

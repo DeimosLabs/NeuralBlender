@@ -111,13 +111,15 @@ public:
   void create (
       c_neuralblender_ui *ui,
       Widget_t *parent,
-      size_t which,
+      size_t bank_id,
+      size_t lane_id,
       int x, int y, int w, int h);
       
   void move_resize (int x, int y, int w, int h);
   
   //bool user_mute = false;
   size_t lane_id = -1;
+  size_t bank_id = -1;
   c_neuralblender_ui *ui = NULL;
   size_t which_lane = 0;
   Widget_t *main_widget = NULL;
@@ -128,6 +130,7 @@ public:
   //c_container cont_advcontrols;
   
   c_knob knob_gain_in;
+  c_knob knob_ir_pitch;
   c_knob knob_gain_out;
   c_knob knob_dry_out;
   c_knob knob_delay;
@@ -146,6 +149,8 @@ public:
   c_label label_trim;
   c_label label_engine;
   
+  c_filepicker filepicker;
+  
   //c_meterwidget meter_in; // we only have one input
   c_meter meter_out;
   c_vudata vudata_out;
@@ -159,9 +164,12 @@ public:
   void destroy ();
   virtual int idle ();
   void draw ();
+  void clear_lane_model_ui (_lane_bank bank, size_t which);
   void clear_lane_model_ui (size_t which);
-  void update_cwd (std::string path);
+  void update_ir_cwd (std::string path);
+  void update_model_cwd (std::string path);
 
+  void set_lane_mute (_lane_bank bank, size_t which, bool b);
   void set_lane_mute (size_t which, bool b);
   void vu_on (bool b = true);
   void vu_off ();
@@ -169,6 +177,14 @@ public:
   //void hide_advanced_settings ();
   void move_resize (bool default_size = false);
   size_t choose_exclusive_lane () const;
+  c_lane_widgets *lanes_for_bank (_lane_bank bank);
+  const c_lane_widgets *lanes_for_bank (_lane_bank bank) const;
+  c_meter &input_meter_for_bank (_lane_bank bank);
+  c_vudata &input_vudata_for_bank (_lane_bank bank);
+  int exclusive_lane_for_bank (_lane_bank bank) const;
+  void set_exclusive_lane_for_bank (_lane_bank bank, int lane);
+  bool linked_calib_for_bank (_lane_bank bank) const;
+  void set_linked_calib_for_bank (_lane_bank bank, bool b);
   void update_stats ();
   //void excl_select (size_t which);
   void sync_widgets_from_state (const c_neuralblender_state &state, bool scan_dirs = false);
@@ -176,32 +192,36 @@ public:
   virtual void apply_effective_controls ();
   void set_threshgain (float f);
 
-  virtual bool load_model (size_t which, const char *filename)  = 0;
-  virtual void on_gain_in (c_widget *w, float f)                = 0;
-  virtual void on_gain_out (c_widget *w, float f)               = 0;
-  virtual void on_dry_out (c_widget *w, float f)                = 0;
-  virtual void on_delay (c_widget *w, float f)                  = 0;
-  virtual void on_filebrowse (c_widget *w)                      = 0;
-  virtual void on_fileselected (c_widget *w, const char *path)  = 0;
-  virtual void on_fileclear (c_widget *w)                       = 0;
-  virtual void on_mute (c_widget *w, bool b)                    = 0;
-  virtual void on_muteall (c_widget *w, bool b)                 = 0;
-  virtual void on_dcflip (c_widget *w, bool b)                  = 0;
-  virtual void on_calibrate (c_widget *w, bool b)               = 0;
-  virtual void on_vu (c_widget *w, bool b)                      = 0;
-  virtual void on_linked_calib (c_widget *w, bool b)            = 0;
-  virtual void on_calib_bass (c_widget *w, bool b)              = 0;
-  virtual void on_bypass (c_widget *w, bool b)                  = 0;
-  virtual void on_noisegate (c_widget *w, bool b)               = 0;
-  virtual void on_noisethresh (c_widget *w, float f)            = 0;
-  virtual void on_noiseattack (c_widget *w, float f)            = 0;
-  virtual void on_noisehold (c_widget *w, float f)              = 0;
-  virtual void on_noiserelease (c_widget *w, float f)           = 0;
-  virtual void on_tuner (c_widget *w, bool b)                   = 0;
-  virtual void on_threshgain (c_widget *w, float f)             = 0;
+  bool load_model (size_t which, const char *filename);
+  virtual bool load_model (_lane_bank bank, size_t which, const char *filename) = 0;
+  virtual void on_gain_in (c_widget *w, float f)               = 0;
+  virtual void on_ir_pitch (c_widget *w, float f)              = 0;
+  virtual void on_gain_out (c_widget *w, float f)              = 0;
+  virtual void on_dry_out (c_widget *w, float f)               = 0;
+  virtual void on_delay (c_widget *w, float f)                 = 0;
+  virtual void on_filebrowse (c_widget *w)                     = 0;
+  virtual void on_fileselected (c_widget *w, const char *path) = 0;
+  virtual void on_fileclear (c_widget *w)                      = 0;
+  virtual void on_mute (c_widget *w, bool b)                   = 0;
+  virtual void on_muteall (c_widget *w, bool b)                = 0;
+  virtual void on_dcflip (c_widget *w, bool b)                 = 0;
+  virtual void on_calibrate (c_widget *w, bool b)              = 0;
+  virtual void on_vu (c_widget *w, bool b)                     = 0;
+  virtual void on_linked_calib (c_widget *w, bool b)           = 0;
+  virtual void on_calib_bass (c_widget *w, bool b)             = 0;
+  virtual void on_bypass (c_widget *w, bool b)                 = 0;
+  virtual void on_noisegate (c_widget *w, bool b)              = 0;
+  virtual void on_noisethresh (c_widget *w, float f)           = 0;
+  virtual void on_noiseattack (c_widget *w, float f)           = 0;
+  virtual void on_noisehold (c_widget *w, float f)             = 0;
+  virtual void on_noiserelease (c_widget *w, float f)          = 0;
+  virtual void on_tuner (c_widget *w, bool b)                  = 0;
+  virtual void on_threshgain (c_widget *w, float f)            = 0;
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;
           void on_button (c_button *btn, bool value)              ;
+          void on_bank_switch (c_widget *w, int n)                ;
+          void sync_bank_visibility ()                            ;
   virtual void on_window_resize (int w, int h)                    ;
   virtual bool request_window_size (int w, int h)                 ;
           void on_about ()                                        ;
@@ -221,9 +241,15 @@ public:
   Window parent;
   bool do_set_min_size = false; // ugly hack for ardour's window size shenanigans
   
+  c_container    cont_pedals;
+  c_container    cont_models;
+  c_container    cont_cabs;
   c_container    cont_checkboxes;
   //c_label        label_big;
   c_image        img_logo;
+  c_button       btn_tab_pedals;
+  c_button       btn_tab_models;
+  c_button       btn_tab_cabs;
   c_button       btn_enable;
   c_button       btn_muteall;
   c_button       btn_noisegate;
@@ -237,21 +263,26 @@ public:
   //c_label        label_vu;
   //c_label        label_exclmode;
   //c_label        label_advanced;
-  c_lane_widgets lanes [NB_NUM_MODELS];
-  c_filepicker   filepickers [NB_NUM_MODELS];
-  c_meter        meter_in;
+  c_lane_widgets lanes_pedals [NB_NUM_MODELS];
+  c_lane_widgets lanes_models [NB_NUM_MODELS];
+  c_lane_widgets lanes_cabs [NB_NUM_MODELS];
+  //c_filepicker   filepicker_pedals [NB_NUM_MODELS];
+  //c_filepicker   filepicker_models [NB_NUM_MODELS];
+  //c_filepicker   filepicker_cabs [NB_NUM_MODELS];
+  c_meter        meter_in [BANK_COUNT];
   c_tuner        tuner;
   
   t_prefs        prefs;
   
-  c_vudata vudata_in;
+  c_vudata vudata_in [BANK_COUNT];
   c_configfile configfile;
   //size_t exclusive_lane = 0; // 0: normal mode, 1-4: exclusive mode with lane [n - 1]
   //bool user_bypass = false;
   //bool do_vu = true;
   //bool do_excl = false;
   c_neuralblender_state state;
-  size_t last_exclusive_lane = 0; // 1-based lane remembered when exclusive mode is off
+  _lane_bank visible_bank = BANK_AMP;
+  size_t last_exclusive_lane [BANK_COUNT] = {0, 0, 0}; // 1-based lane remembered when exclusive mode is off
   bool ui_ready;
   bool updating_from_state = false;
   bool calib_default = false;
@@ -262,6 +293,6 @@ public:
   bool ui_resize_pending = false;
   int pending_resize_w = 0;
   int pending_resize_h = 0;
-  float stats [NB_NUM_MODELS * UI_STATS_PER_LANE];
+  float stats [BANK_COUNT] [NB_NUM_MODELS * UI_STATS_PER_LANE];
   //inline void move_resize () { show_advanced_settings (show_advanced); }
 };

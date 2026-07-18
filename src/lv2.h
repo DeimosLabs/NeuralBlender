@@ -24,6 +24,7 @@ enum nb_lv2_port {
   PORT_BYPASS,
 
   PORT_A_GAIN_IN,
+  PORT_A_IR_PITCH,
   PORT_A_GAIN_OUT,
   PORT_A_DRY_OUT,
   PORT_A_DELAY,
@@ -32,6 +33,7 @@ enum nb_lv2_port {
   PORT_A_CALIBRATE,
 
   PORT_B_GAIN_IN,
+  PORT_B_IR_PITCH,
   PORT_B_GAIN_OUT,
   PORT_B_DRY_OUT,
   PORT_B_DELAY,
@@ -40,6 +42,7 @@ enum nb_lv2_port {
   PORT_B_CALIBRATE,
 
   PORT_C_GAIN_IN,
+  PORT_C_IR_PITCH,
   PORT_C_GAIN_OUT,
   PORT_C_DRY_OUT,
   PORT_C_DELAY,
@@ -48,19 +51,96 @@ enum nb_lv2_port {
   PORT_C_CALIBRATE,
 
   PORT_D_GAIN_IN,
+  PORT_D_IR_PITCH,
   PORT_D_GAIN_OUT,
   PORT_D_DRY_OUT,
   PORT_D_DELAY,
   PORT_D_MUTE,
-  PORT_D_DCFLIP,
-  PORT_D_CALIBRATE,
+	  PORT_D_DCFLIP,
+	  PORT_D_CALIBRATE,
 
-  PORT_CONTROL,
+  PORT_PEDAL_A_GAIN_IN,
+  PORT_PEDAL_A_IR_PITCH,
+  PORT_PEDAL_A_GAIN_OUT,
+  PORT_PEDAL_A_DRY_OUT,
+  PORT_PEDAL_A_DELAY,
+  PORT_PEDAL_A_MUTE,
+  PORT_PEDAL_A_DCFLIP,
+  PORT_PEDAL_A_CALIBRATE,
+
+  PORT_PEDAL_B_GAIN_IN,
+  PORT_PEDAL_B_IR_PITCH,
+  PORT_PEDAL_B_GAIN_OUT,
+  PORT_PEDAL_B_DRY_OUT,
+  PORT_PEDAL_B_DELAY,
+  PORT_PEDAL_B_MUTE,
+  PORT_PEDAL_B_DCFLIP,
+  PORT_PEDAL_B_CALIBRATE,
+
+  PORT_PEDAL_C_GAIN_IN,
+  PORT_PEDAL_C_IR_PITCH,
+  PORT_PEDAL_C_GAIN_OUT,
+  PORT_PEDAL_C_DRY_OUT,
+  PORT_PEDAL_C_DELAY,
+  PORT_PEDAL_C_MUTE,
+  PORT_PEDAL_C_DCFLIP,
+  PORT_PEDAL_C_CALIBRATE,
+
+  PORT_PEDAL_D_GAIN_IN,
+  PORT_PEDAL_D_IR_PITCH,
+  PORT_PEDAL_D_GAIN_OUT,
+  PORT_PEDAL_D_DRY_OUT,
+  PORT_PEDAL_D_DELAY,
+  PORT_PEDAL_D_MUTE,
+  PORT_PEDAL_D_DCFLIP,
+  PORT_PEDAL_D_CALIBRATE,
+
+  PORT_CAB_A_GAIN_IN,
+  PORT_CAB_A_IR_PITCH,
+  PORT_CAB_A_GAIN_OUT,
+  PORT_CAB_A_DRY_OUT,
+  PORT_CAB_A_DELAY,
+  PORT_CAB_A_MUTE,
+  PORT_CAB_A_DCFLIP,
+  PORT_CAB_A_CALIBRATE,
+
+  PORT_CAB_B_GAIN_IN,
+  PORT_CAB_B_IR_PITCH,
+  PORT_CAB_B_GAIN_OUT,
+  PORT_CAB_B_DRY_OUT,
+  PORT_CAB_B_DELAY,
+  PORT_CAB_B_MUTE,
+  PORT_CAB_B_DCFLIP,
+  PORT_CAB_B_CALIBRATE,
+
+  PORT_CAB_C_GAIN_IN,
+  PORT_CAB_C_IR_PITCH,
+  PORT_CAB_C_GAIN_OUT,
+  PORT_CAB_C_DRY_OUT,
+  PORT_CAB_C_DELAY,
+  PORT_CAB_C_MUTE,
+  PORT_CAB_C_DCFLIP,
+  PORT_CAB_C_CALIBRATE,
+
+  PORT_CAB_D_GAIN_IN,
+  PORT_CAB_D_IR_PITCH,
+  PORT_CAB_D_GAIN_OUT,
+  PORT_CAB_D_DRY_OUT,
+  PORT_CAB_D_DELAY,
+  PORT_CAB_D_MUTE,
+  PORT_CAB_D_DCFLIP,
+  PORT_CAB_D_CALIBRATE,
+
+	  PORT_CONTROL,
   PORT_NOTIFY,
   PORT_VU_ENABLE,
   PORT_MUTE_ALL,
-  PORT_EXCLUSIVE_LANE,
-  PORT_LINKED_CALIB,
+  PORT_EXCLUSIVE_LANE_PEDAL,
+  PORT_EXCLUSIVE_LANE_AMP,
+  PORT_EXCLUSIVE_LANE_CAB,
+  PORT_LINKED_CALIB_PEDAL,
+  PORT_LINKED_CALIB_AMP,
+  PORT_LINKED_CALIB_CAB,
   PORT_CALIB_SOURCE,
   PORT_CALIB_TARGET_DB,
   PORT_NOISEGATE_ENABLED,
@@ -75,11 +155,14 @@ enum nb_lv2_port {
   PORT_TUNER_CENTS_OFF,
   PORT_TUNER_FREQ,
 
-  PORT_COUNT
+  PORT_COUNT,
+
+  PORT_LINKED_CALIB = PORT_LINKED_CALIB_AMP
 };
 
 enum nb_lv2_lane_param {
   NB_LV2_LANE_GAIN_IN = 0,
+  NB_LV2_LANE_IR_PITCH,
   NB_LV2_LANE_GAIN_OUT,
   NB_LV2_LANE_DRY_OUT,
   NB_LV2_LANE_DELAY,
@@ -94,27 +177,69 @@ static inline uint32_t nb_lv2_lane_port (size_t lane, uint32_t first) {
   return first + (uint32_t) lane * NB_LV2_LANE_PORT_COUNT;
 }
 
-static inline bool nb_lv2_decode_lane_port (
+static inline uint32_t nb_lv2_bank_lane_port (
+    _lane_bank bank, size_t lane, uint32_t param) {
+  uint32_t first = PORT_A_GAIN_IN;
+  switch (bank) {
+    case BANK_PEDAL: first = PORT_PEDAL_A_GAIN_IN; break;
+    case BANK_CAB:   first = PORT_CAB_A_GAIN_IN;   break;
+    case BANK_AMP:
+    default:         first = PORT_A_GAIN_IN;       break;
+  }
+  return nb_lv2_lane_port (lane, first) + param;
+}
+
+static inline bool nb_lv2_decode_bank_lane_port (
     uint32_t port,
+    _lane_bank *bank,
     size_t *lane,
     uint32_t *param) {
 
-  if (port < PORT_A_GAIN_IN || port > PORT_D_CALIBRATE)
-    return false;
+  uint32_t first = 0;
+  _lane_bank b = BANK_AMP;
 
-  const uint32_t offset = port - PORT_A_GAIN_IN;
+  if (port >= PORT_A_GAIN_IN && port <= PORT_D_CALIBRATE) {
+    first = PORT_A_GAIN_IN;
+    b = BANK_AMP;
+  } else if (port >= PORT_PEDAL_A_GAIN_IN &&
+             port <= PORT_PEDAL_D_CALIBRATE) {
+    first = PORT_PEDAL_A_GAIN_IN;
+    b = BANK_PEDAL;
+  } else if (port >= PORT_CAB_A_GAIN_IN &&
+             port <= PORT_CAB_D_CALIBRATE) {
+    first = PORT_CAB_A_GAIN_IN;
+    b = BANK_CAB;
+  } else {
+    return false;
+  }
+
+  const uint32_t offset = port - first;
   const uint32_t p = offset % NB_LV2_LANE_PORT_COUNT;
   const size_t l = (size_t) (offset / NB_LV2_LANE_PORT_COUNT);
 
-  if (l >= 4)
+  if (l >= NB_NUM_MODELS)
     return false;
 
+  if (bank)
+    *bank = b;
   if (lane)
     *lane = l;
   if (param)
     *param = p;
 
   return true;
+}
+
+static inline bool nb_lv2_decode_lane_port (
+    uint32_t port,
+    size_t *lane,
+    uint32_t *param) {
+
+  _lane_bank bank = BANK_AMP;
+  if (!nb_lv2_decode_bank_lane_port (port, &bank, lane, param))
+    return false;
+
+  return bank == BANK_AMP;
 }
 
 class c_lv2_urids {
@@ -135,6 +260,7 @@ public:
   LV2_URID urid_atom_Vector = 0;
   LV2_URID urid_atom_URID = 0;
   LV2_URID urid_model [NB_NUM_MODELS] = { 0 };
+  LV2_URID urid_bank_model [BANK_COUNT] [NB_NUM_MODELS] = {};
   LV2_URID urid_meters = 0;
   LV2_URID urid_stats = 0;
   LV2_URID urid_calib_target_db = 0;
@@ -183,6 +309,27 @@ public:
       map->map (map->handle, NB_URI "#ModelC");
     urid_model [3] =
       map->map (map->handle, NB_URI "#ModelD");
+    for (size_t i = 0; i < NB_NUM_MODELS; ++i)
+      urid_bank_model [BANK_AMP] [i] = urid_model [i];
+
+    urid_bank_model [BANK_PEDAL] [0] =
+      map->map (map->handle, NB_URI "#PedalA");
+    urid_bank_model [BANK_PEDAL] [1] =
+      map->map (map->handle, NB_URI "#PedalB");
+    urid_bank_model [BANK_PEDAL] [2] =
+      map->map (map->handle, NB_URI "#PedalC");
+    urid_bank_model [BANK_PEDAL] [3] =
+      map->map (map->handle, NB_URI "#PedalD");
+
+    urid_bank_model [BANK_CAB] [0] =
+      map->map (map->handle, NB_URI "#CabA");
+    urid_bank_model [BANK_CAB] [1] =
+      map->map (map->handle, NB_URI "#CabB");
+    urid_bank_model [BANK_CAB] [2] =
+      map->map (map->handle, NB_URI "#CabC");
+    urid_bank_model [BANK_CAB] [3] =
+      map->map (map->handle, NB_URI "#CabD");
+
     urid_meters =
       map->map (map->handle, NB_URI "#Meters");
     urid_stats =
@@ -221,13 +368,14 @@ public:
 
   void write_control (uint32_t port, float value);
   uint32_t lane_port (size_t lane, uint32_t first) const;
-  bool write_model_path (size_t which, const char *filename);
+  bool write_model_path (_lane_bank bank, size_t which, const char *filename);
   bool write_float_property (LV2_URID property, float value);
   bool write_int_property (LV2_URID property, int32_t value);
   void request_current_state ();
 
-  bool load_model (size_t which, const char *filename) override;
+  bool load_model (_lane_bank bank, size_t which, const char *filename) override;
   void on_gain_in (c_widget *w, float f) override;
+  void on_ir_pitch (c_widget *w, float f) override;
   void on_gain_out (c_widget *w, float f) override;
   void on_dry_out (c_widget *w, float f) override;
   void on_delay (c_widget *w, float f) override;
@@ -255,7 +403,7 @@ public:
   bool request_window_size (int w, int h) override;
 
   void set_port_value (uint32_t port, float value);
-  void set_model_path (size_t which, const char *path);
+  void set_model_path (_lane_bank bank, size_t which, const char *path);
   void set_model_property (LV2_URID property, const char *path);
   void redraw_meters_now ();
   void set_ui_values (const LV2_Atom *value, _ui_feedback_type type);

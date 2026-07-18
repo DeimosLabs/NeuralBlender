@@ -11,7 +11,8 @@
 #include <stdio.h>
 
 #define CONFIG_FILE_NAME             ".config/neuralblender.conf"
-#define CONFIG_KEY_NAME_CWD          "modelpath"
+#define CONFIG_KEY_NAME_MODEL_CWD    "modelpath"
+#define CONFIG_KEY_NAME_IR_CWD       "irpath"
 #define CONFIG_KEY_NAME_ADV          "showadvanced"
 #define CONFIG_KEY_NAME_EXCL         "excldefault"
 #define CONFIG_KEY_NAME_CALIB        "calibdefault"
