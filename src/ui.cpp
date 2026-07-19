@@ -1001,8 +1001,8 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_other_tuner_up.create (this, frame_other_misc.widget, "", 468, 14, 40, 40, WSTYLE_IMAGE_BUTTON);
   btn_other_tuner_up.set_image_default (data_icon_sharp_png);
   btn_other_tuner_up.role = ROLE_TUNER_UP;
-  btn_other_tuner_default.create (this, frame_other_misc.widget, "", 512, 14, 40, 40, WSTYLE_IMAGE_BUTTON);
-  btn_other_tuner_default.set_image_default (data_icon_x_big_png);
+  btn_other_tuner_default.create (this, frame_other_misc.widget, "", 516, 14, 40, 40, WSTYLE_IMAGE_BUTTON);
+  btn_other_tuner_default.set_image_default (data_icon_tuner_png);
   btn_other_tuner_default.role = ROLE_TUNER_DEFAULT;
   
   //tuner.create (this, mainwindow.widget, "", 0, 0, 400, 24);
