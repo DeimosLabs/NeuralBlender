@@ -35,6 +35,7 @@ Features considered for future versions: VST plugin, series mode(s), optionally 
 
 ![NeuralBlender in Ardour](data/screenshot-ardour.png)
 
+
 Compiles and installs with cmake.
 
 Required libraries:
