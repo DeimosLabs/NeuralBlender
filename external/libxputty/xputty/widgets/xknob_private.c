@@ -36,6 +36,7 @@ static void _show_label(Widget_t *w, int width, int height) {
 void _draw_image_knob(Widget_t *w, int width_t, int height_t) {
     int width, height;
     os_get_surface_size(w->image, &width, &height);
+    if (width <= 0 || height <= 0 || width_t <= 0 || height_t <= 0) return;
     double x = (double)width_t/(double)height;
     double y = (double)height/(double)width_t;
     double knobstate = adj_get_state(w->adj_y);

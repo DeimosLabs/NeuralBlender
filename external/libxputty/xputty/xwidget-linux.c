@@ -118,8 +118,13 @@ void os_resize_window(Display *dpy, Widget_t *w, int x, int y) {
 }
 
 void os_get_surface_size(cairo_surface_t *surface, int *width, int *height) {
-    *width = cairo_xlib_surface_get_width(surface);
-    *height = cairo_xlib_surface_get_height(surface);
+    if (cairo_surface_get_type(surface) == CAIRO_SURFACE_TYPE_IMAGE) {
+        *width = cairo_image_surface_get_width(surface);
+        *height = cairo_image_surface_get_height(surface);
+    } else {
+        *width = cairo_xlib_surface_get_width(surface);
+        *height = cairo_xlib_surface_get_height(surface);
+    }
 }
 
 void os_set_widget_surface_size(Widget_t *w, int width, int height) {

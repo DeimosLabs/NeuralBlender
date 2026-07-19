@@ -158,6 +158,8 @@ public:
   virtual void on_focus_lost ();
   
   void set_state (_widget_state state);
+  const t_gradientcolors *bg_override_for_state (_widget_state state) const;
+  const t_gradientcolors *fg_override_for_state (_widget_state state) const;
   static void draw_text_centered (Widget_t *w, 
       const char *text,
       float r, float g, float b);
@@ -188,6 +190,13 @@ public:
   float text_g             = 1.0;
   float text_b             = 1.0;
   float padding            = 8.0;
+  const t_gradientcolors *bg_colors = NULL;
+  const t_gradientcolors *active_bg_colors = NULL;
+  const t_gradientcolors *active_fg_colors = NULL;
+  const t_gradientcolors *highlight_bg_colors = NULL;
+  const t_gradientcolors *highlight_fg_colors = NULL;
+  const t_gradientcolors *disabled_bg_colors = NULL;
+  const t_gradientcolors *disabled_fg_colors = NULL;
   Widget_t *widget         = NULL;
   
   void *userdata1          = NULL;
@@ -278,7 +287,9 @@ public:
       Widget_t *parent,
       const char *label,
       int x, int y, int w, int h);
-
+      
+  static void cb_draw (void *w, void *userdata);
+  
   void show () override;
   void hide () override;
 };

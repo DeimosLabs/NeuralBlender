@@ -729,6 +729,36 @@ void c_neuralblender_ui::update_ir_cwd (std::string path) {
 }
 
 bool c_neuralblender_ui::create (Window parent_) { CP
+  static t_gradientcolors frame_pedal_active_bg = {
+    0.50f, 0.30f, 0.10f, 0.25f,
+    0.25f, 0.18f, 0.05f, 0.25f
+  };
+
+  static t_gradientcolors frame_pedal_active_fg = {
+    0.75f, 0.60f, 0.50f, 0.55f,
+    0.00f, 0.00f, 0.00f, 0.95f
+  };
+
+  static t_gradientcolors frame_amp_active_bg = {
+    0.50f, 0.10f, 0.10f, 0.25f,
+    0.25f, 0.05f, 0.05f, 0.25f
+  };
+
+  static t_gradientcolors frame_amp_active_fg = {
+    0.75f, 0.50f, 0.50f, 0.55f,
+    0.00f, 0.00f, 0.00f, 0.95f
+  };
+
+  static t_gradientcolors frame_cab_active_bg = {
+    0.00f, 0.45f, 0.50f, 0.25f,
+    0.00f, 0.22f, 0.25f, 0.25f
+  };
+
+  static t_gradientcolors frame_cab_active_fg = {
+    0.05f, 0.65f, 0.75f, 0.55f,
+    0.00f, 0.00f, 0.00f, 0.95f
+  };
+
   size_t i;
   destroy ();
   
@@ -809,13 +839,11 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_tab_other.bank = BANK_AMP; // no DSP bank, keep cached bank unchanged
   btn_tab_other.page = PAGE_OTHER;
   
-  //btn_enable.create (this, mainwindow.widget, "ON/OFF",  20, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
   btn_enable.create (this, mainwindow.widget, "",  20, 12, 40, 40, WSTYLE_IMAGE_TOGGLE);
   btn_enable.set_value (true);
   btn_enable.role = ROLE_BYPASS;
   btn_enable.set_image (data_icon_power_on_png, WSTATE_ON);
   btn_enable.set_image (data_icon_power_grey_png, WSTATE_OFF);
-  //btn_enable.set_tooltip ("BYPASS SWITCH");
   
   //btn_muteall.create (this, mainwindow.widget, "Mute all", 500, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
   btn_muteall.create (this, mainwindow.widget, "", 500, 12, 40, 40, WSTYLE_IMAGE_TOGGLE);
@@ -842,8 +870,15 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   
   for (i = 0; i < NB_NUM_MODELS; i++) {
     lanes_pedals [i].create (this, cont_pedals.widget, BANK_PEDAL, i, 0, 0, 1, 1);
-    lanes_models [i].create (this, cont_models.widget, BANK_AMP, i, 0, 0, 1, 1);
-    lanes_cabs [i].create (this, cont_cabs.widget, BANK_CAB, i, 0, 0, 1, 1);
+    lanes_models [i].create (this, cont_models.widget, BANK_AMP,   i, 0, 0, 1, 1);
+    lanes_cabs   [i].create (this, cont_cabs.widget,   BANK_CAB,   i, 0, 0, 1, 1);
+    
+    //lanes_pedals [i].lane_widget.active_bg_colors = &frame_pedal_active_bg;
+    //lanes_pedals [i].lane_widget.active_fg_colors = &frame_pedal_active_fg;
+    //lanes_models [i].lane_widget.active_bg_colors = &frame_amp_active_bg;
+    //lanes_models [i].lane_widget.active_fg_colors = &frame_amp_active_fg;
+    //lanes_cabs   [i].lane_widget.active_bg_colors = &frame_cab_active_bg;
+    //lanes_cabs   [i].lane_widget.active_fg_colors = &frame_cab_active_fg;
   }
   meter_in [BANK_PEDAL].create (this, cont_pedals.widget, "", 6, 70, 5, 520);
   meter_in [BANK_AMP].create (this, cont_models.widget, "", 6, 70, 5, 520);

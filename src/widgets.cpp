@@ -485,7 +485,7 @@ void c_widget::create (
   }
   add_tooltip (widget, ""); // creates initial tooltip
   set_tooltip ("");         // our function below hides it
-  set_x11_window_background (widget, g_colors->window_bg);
+  set_x11_window_background (widget, bg_colors ? *bg_colors : g_colors->window_bg);
   widget->flags |= USE_TRANSPARENCY;
 
   // no callback func because it would overwrite the ones from
@@ -558,6 +558,44 @@ void c_widget::on_focus_lost () {
 void c_widget::set_state (_widget_state state_) {
   wstate = state_;
   expose ();
+}
+
+const t_gradientcolors *c_widget::bg_override_for_state (
+    _widget_state state) const {
+
+  switch (state) {
+    case WSTATE_SELECTED:
+    case WSTATE_HOVER:
+      return highlight_bg_colors;
+
+    case WSTATE_DISABLED:
+    case WSTATE_OFF:
+      return disabled_bg_colors;
+
+    case WSTATE_NORMAL:
+    case WSTATE_ON:
+    default:
+      return active_bg_colors;
+  }
+}
+
+const t_gradientcolors *c_widget::fg_override_for_state (
+    _widget_state state) const {
+
+  switch (state) {
+    case WSTATE_SELECTED:
+    case WSTATE_HOVER:
+      return highlight_fg_colors;
+
+    case WSTATE_DISABLED:
+    case WSTATE_OFF:
+      return disabled_fg_colors;
+
+    case WSTATE_NORMAL:
+    case WSTATE_ON:
+    default:
+      return active_fg_colors;
+  }
 }
 
 void c_widget::draw_text_centered (Widget_t *w,
@@ -997,7 +1035,7 @@ void c_mainwindow::show_children () {
   children_mapped = true;
   if (ui)
     ui->sync_page_visibility ();
-  widget_draw (widget, NULL);
+  transparent_draw (widget, NULL);
 }
 
 void c_mainwindow::on_expose () {
@@ -1059,6 +1097,23 @@ void c_frame::create (
 ////////////////////////////////////////////////////////////////////////////////
 // c_frame, c_container
 
+void c_container::cb_draw (void *w_, void *userdata) {
+  (void) userdata;
+
+  Widget_t *w = (Widget_t *) w_;
+  if (!w || !w->parent_struct)
+    return;
+
+  c_container *self = (c_container *) w->parent_struct;
+  
+  const t_gradientcolors &bg =
+    self->bg_colors ? *self->bg_colors : g_colors->window_bg;
+  
+  //debug ("bg: %f,%f,%f,%f to %f,%f,%f,%f", bg.r1, bg.g1, bg.b1, bg.a1, bg.r2, bg.g2, bg.b2, bg.a2);
+
+  fill_rounded_rect (w, 0.0, bg);
+}
+
 void c_frame::cb_draw (void *w_, void *user_data) {
   (void) user_data;
 
@@ -1073,12 +1128,16 @@ void c_frame::cb_draw (void *w_, void *user_data) {
     state = WSTATE_NORMAL;
 
   const t_statecolors &c = colors_for (self->wstyle, state);
+  const t_gradientcolors *bg_override = self->bg_override_for_state (state);
+  const t_gradientcolors *fg_override = self->fg_override_for_state (state);
+  const t_gradientcolors &bg = bg_override ? *bg_override : c.bg;
+  const t_gradientcolors &fg = fg_override ? *fg_override : c.fg;
   
   //debug ("c.bg: %f,%f,%f,%f to %f,%f,%f,%f", c.bg.r1, c.bg.g1, c.bg.b1, c.bg.a1, c.bg.r2, c.bg.g2, c.bg.b2, c.bg.a2);
   //debug ("c.fg: %f,%f,%f,%f to %f,%f,%f,%f", c.fg.r1, c.fg.g1, c.fg.b1, c.fg.a1, c.fg.r2, c.fg.g2, c.fg.b2, c.fg.a2);
 
-  fill_rounded_rect (w, UI_FRAME_RADIUS, c.bg);
-  draw_rounded_rect (w, UI_FRAME_RADIUS, c.fg, 2.0f);
+  fill_rounded_rect (w, UI_FRAME_RADIUS, bg);
+  draw_rounded_rect (w, UI_FRAME_RADIUS, fg, 2.0f);
 }
 
 
@@ -1086,10 +1145,11 @@ void c_container::create (
     c_neuralblender_ui *ui_,
     Widget_t *parent,
     const char *label_,
-    int x, int y, int w, int h) {
+  int x, int y, int w, int h) {
   
   widget = create_widget (parent->app, parent, x, y, w, h);
   c_widget::create (ui_, parent, label_, x, y, w, h);
+  //widget->func.expose_callback = c_container::cb_draw;
 }
 
 void c_container::show () {
@@ -1977,7 +2037,40 @@ void knob_value_changed (void *w_, void *value_) {
   }
 }
 
-Widget_t *g_knob_image = NULL;
+static cairo_surface_t *g_knob_image_surface = NULL;
+
+static cairo_surface_t *get_knob_image_surface () {
+  if (!g_knob_image_surface) {
+    g_knob_image_surface = cairo_image_surface_create_from_stream (data_knob_png);
+
+    if (cairo_surface_status (g_knob_image_surface) != CAIRO_STATUS_SUCCESS) {
+      cairo_surface_destroy (g_knob_image_surface);
+      g_knob_image_surface = NULL;
+    }
+  }
+
+  return g_knob_image_surface;
+}
+
+static void set_knob_image_surface (Widget_t *widget) {
+  if (!widget)
+    return;
+
+  cairo_surface_t *surface = get_knob_image_surface ();
+  if (!surface)
+    return;
+
+  if (widget->image == surface) {
+    widget->flags &= ~REUSE_IMAGE;
+    return;
+  }
+
+  if (widget->image && !(widget->flags & REUSE_IMAGE))
+    cairo_surface_destroy (widget->image);
+
+  widget->image = cairo_surface_reference (surface);
+  widget->flags &= ~REUSE_IMAGE;
+}
 
 void c_knob::create (
     c_neuralblender_ui *ui_,
@@ -1985,11 +2078,6 @@ void c_knob::create (
     const char *label_,
     int x, int y, int w, int h) {
   
-  if (!g_knob_image) {
-    g_knob_image = create_widget (parent->app, parent, 0, 0, 1, 1);
-    widget_get_png (g_knob_image, data_knob_png);
-    widget_hide (g_knob_image);
-  }
   label = label_;
   widget = add_knob (parent, label.c_str (), x, y, w, h);
   widget->func.expose_callback = c_knob::cb_draw;
@@ -2078,8 +2166,7 @@ void c_knob::cb_draw (void *w, void *user_data) {
     
   c_knob *knob = (c_knob *) widget->parent_struct;
 
-  if (g_knob_image && g_knob_image->image && widget->image != g_knob_image->image)
-    widget_get_surface_ptr (widget, g_knob_image);
+  set_knob_image_surface (widget);
 
   if (knob->label.empty ()) {
     Metrics_t metrics;
