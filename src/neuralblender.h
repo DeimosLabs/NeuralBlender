@@ -492,6 +492,8 @@ public:
   bool linked_calib = false;
   int calib_source = 0; // 0=guitar, 1=bass
   std::atomic<_ramp_state> ramp = RAMP_PLAYING;
+  c_vudata *meter_masterin  = NULL;
+  c_vudata *meter_masterout = NULL;
 
 private:
   c_model_bank &which_bank (_lane_bank bank);

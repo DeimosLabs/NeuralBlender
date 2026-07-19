@@ -146,6 +146,8 @@ struct Plugin : public c_lv2_urids {
   
   c_vudata meter_in [BANK_COUNT];
   c_vudata meters_out [BANK_COUNT] [NB_NUM_MODELS];
+  c_vudata meter_masterin;
+  c_vudata meter_masterout;
   uint32_t meter_notify_samples = 0;
   std::atomic<bool> stats_dirty { true };
   std::atomic<bool> controls_dirty { false };
@@ -666,7 +668,7 @@ static void forge_int_notify (Plugin *self, LV2_URID property, int32_t value) {
 }
 
 static void forge_meter_notify (Plugin *self) {
-  float values [BANK_COUNT * (1 + NB_NUM_MODELS) * 2];
+  float values [BANK_COUNT * (1 + NB_NUM_MODELS) * 2 + 4];
   size_t n = 0;
 
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
@@ -678,6 +680,10 @@ static void forge_meter_notify (Plugin *self) {
       values [n++] = self->meters_out [bank] [i].linear_peak_l ();
     }
   }
+  values [n++] = self->meter_masterin.linear_l ();
+  values [n++] = self->meter_masterin.linear_peak_l ();
+  values [n++] = self->meter_masterout.linear_l ();
+  values [n++] = self->meter_masterout.linear_peak_l ();
 
   LV2_Atom_Forge_Frame frame;
   lv2_atom_forge_frame_time (&self->forge, 0);
@@ -751,6 +757,10 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
       self->meters_out [bank] [i].redraw_interval = 1.0f / LV2_METER_FPS;
     }
   }
+  self->meter_masterin.samplerate = (int) rate;
+  self->meter_masterin.redraw_interval = 1.0f / LV2_METER_FPS;
+  self->meter_masterout.samplerate = (int) rate;
+  self->meter_masterout.redraw_interval = 1.0f / LV2_METER_FPS;
   //self->blender.load_model (0, "/tmp/a.nam");
   //self->blender.load_model (1, "/tmp/b.nam");
   
@@ -783,6 +793,8 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
       self->blender.banks [bank].meters_out [i] =
         &self->meters_out [bank] [i];
   }
+  self->blender.meter_masterin = &self->meter_masterin;
+  self->blender.meter_masterout = &self->meter_masterout;
   
   // start loader thread LAST
   self->loader_running = true;
@@ -1098,6 +1110,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       for (i = 0; i < NB_NUM_MODELS; i++)
         self->meters_out [bank] [i].bufsize = (int) nframes;
     }
+    self->meter_masterin.bufsize = (int) nframes;
+    self->meter_masterout.bufsize = (int) nframes;
   }
 
   float v = 0.0f;

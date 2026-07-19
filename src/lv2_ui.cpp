@@ -744,6 +744,16 @@ void c_lv2_ui::set_model_property (LV2_URID property, const char *path) {
 }
 
 void c_lv2_ui::redraw_meters_now () {
+  if (visible_page == PAGE_OTHER) {
+    if (meter_in [PAGE_OTHER].needs_redraw () &&
+        meter_in [PAGE_OTHER].widget)
+      transparent_draw (meter_in [PAGE_OTHER].widget, NULL);
+    if (meter_masterout.needs_redraw () &&
+        meter_masterout.widget)
+      transparent_draw (meter_masterout.widget, NULL);
+    return;
+  }
+
   if (meter_in [visible_bank].needs_redraw () && meter_in [visible_bank].widget)
     transparent_draw (meter_in [visible_bank].widget, NULL);
 
@@ -793,6 +803,11 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
               values [n], values [n + 1]);
             n += 2;
           }
+        }
+        if (count >= banked_need + 4) {
+          vudata_masterin.set_l_smooth (values [n], values [n + 1]);
+          n += 2;
+          vudata_masterout.set_l_smooth (values [n], values [n + 1]);
         }
       } else {
         size_t n = 0;

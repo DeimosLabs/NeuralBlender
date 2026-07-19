@@ -1107,6 +1107,8 @@ void c_container::cb_draw (void *w_, void *userdata) {
     return;
 
   c_container *self = (c_container *) w->parent_struct;
+  if (!self->draw_background)
+    return;
   
   const t_gradientcolors &bg =
     self->bg_colors ? *self->bg_colors : g_colors->window_bg;
@@ -1151,7 +1153,7 @@ void c_container::create (
   
   widget = create_widget (parent->app, parent, x, y, w, h);
   c_widget::create (ui_, parent, label_, x, y, w, h);
-  //widget->func.expose_callback = c_container::cb_draw;
+  widget->func.expose_callback = c_container::cb_draw;
 }
 
 void c_container::show () {

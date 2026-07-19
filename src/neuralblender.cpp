@@ -1584,6 +1584,10 @@ void c_neuralblender::set_samplerate (uint32_t sr) { CP
         banks [bank].meters_out [i]->samplerate = (int) sr;
     }
   }
+  if (meter_masterin)
+    meter_masterin->samplerate = (int) sr;
+  if (meter_masterout)
+    meter_masterout->samplerate = (int) sr;
   
   m_conv_presence.set_samplerate (sr);
   debug ("end");
@@ -1605,6 +1609,10 @@ void c_neuralblender::set_blocksize (uint32_t bs) { CP
         banks [bank].meters_out [i]->bufsize = (int) bs;
     }
   }
+  if (meter_masterin)
+    meter_masterin->bufsize = (int) bs;
+  if (meter_masterout)
+    meter_masterout->bufsize = (int) bs;
 
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     m_delay_bufs [i].resize (MAX_BLOCK_SIZE);
@@ -2088,6 +2096,15 @@ float *c_neuralblender::prepare_input_buffer (
   return m_input_buf.data ();
 }
 
+static void update_meter_data (c_vudata *meter, const float *in, uint32_t nframes) {
+  if (!meter || !in)
+    return;
+
+  for (uint32_t i = 0; i < nframes; i++)
+    meter->sample (in [i], 0.0f);
+  meter->update ();
+}
+
 void c_neuralblender::update_input_meter (_lane_bank bank, float *in, uint32_t nframes) {
   c_vudata *meter = nullptr;
   switch (bank) {
@@ -2097,12 +2114,8 @@ void c_neuralblender::update_input_meter (_lane_bank bank, float *in, uint32_t n
     default:         meter = nullptr;         break;
   }
 
-  if (!do_vu || !meter || !in)
-    return;
-
-  for (uint32_t i = 0; i < nframes; i++)
-    meter->sample (in [i], 0.0f);
-  meter->update ();
+  if (do_vu)
+    update_meter_data (meter, in, nframes);
 }
 
 void c_neuralblender::render_lane (_lane_bank bank,
@@ -2229,6 +2242,9 @@ void c_neuralblender::render_bank (
 void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
   if (!in || !out || !nframes)
     return;
+
+  if (do_vu)
+    update_meter_data (meter_masterin, in, nframes);
   
   if (tuner_on) {
     pitchtracker.process_block (in, nframes);
@@ -2281,6 +2297,8 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     update_loaded_output_meters (BANK_PEDAL);
     update_loaded_output_meters (BANK_AMP);
     update_loaded_output_meters (BANK_CAB);
+    if (do_vu)
+      update_meter_data (meter_masterout, out, nframes);
     return;
   }
   
@@ -2343,4 +2361,6 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
   }
 
   final_clamp (out, nframes, master_gain);
+  if (do_vu)
+    update_meter_data (meter_masterout, out, nframes);
 }

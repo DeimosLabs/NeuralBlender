@@ -283,6 +283,8 @@ public:
 
 class c_container : public c_widget {
 public:
+  bool draw_background = false;
+
   void create (
       c_neuralblender_ui *ui,
       Widget_t *parent,

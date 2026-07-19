@@ -256,6 +256,7 @@ public:
   Window parent;
   bool do_set_min_size = false; // ugly hack for ardour's window size shenanigans
   
+  c_container    cont_toparea;
   c_container    cont_pedals;
   c_container    cont_models;
   c_container    cont_cabs;
@@ -307,12 +308,15 @@ public:
   //c_filepicker   filepicker_pedals [NB_NUM_MODELS];
   //c_filepicker   filepicker_models [NB_NUM_MODELS];
   //c_filepicker   filepicker_cabs [NB_NUM_MODELS];
-  c_meter        meter_in [BANK_COUNT];
+  c_meter        meter_in [PAGE_COUNT];
+  c_meter        meter_masterout;
   c_tuner        tuner;
   
   t_prefs        prefs;
   
   c_vudata vudata_in [BANK_COUNT];
+  c_vudata vudata_masterin;
+  c_vudata vudata_masterout;
   c_configfile configfile;
   c_neuralblender_state state;
   _lane_bank visible_bank = BANK_AMP;
