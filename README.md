@@ -43,6 +43,7 @@ Required libraries:
   - lv2 (for LV2 plugin)
   - jack (for standalone)
   - cairo/x11 (for GUI)
+  - libsoundfile/libsamplerate (for IR support)
   
 See CMakeLists.txt for more details.
 
