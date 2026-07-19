@@ -25,7 +25,7 @@
 #define MIN_WINDOW_HEIGHT (80 + (130 * NB_NUM_MODELS))
 //#define DEFAULT_WINDOW_HEIGHT (12 + std::min (640, (52 + (180 * NB_NUM_MODELS))))
 #define DEFAULT_WINDOW_HEIGHT MIN_WINDOW_HEIGHT
-#define MIN_WINDOW_WIDTH 640
+#define MIN_WINDOW_WIDTH 600
 #define DEFAULT_WINDOW_WIDTH MIN_WINDOW_WIDTH
 
 #define METER_WIDTH 5
@@ -802,25 +802,25 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   img_logo.set_png (data_textlogo_1024x128_png);
   
   const int tabbutton_padding = 14;
-  btn_tab_pedals.create (this, cont_toparea.widget, "PDL", 0, 0, 86, 50);
+  btn_tab_pedals.create (this, cont_toparea.widget, "PDL", 0, 0, 84, 50);
   btn_tab_pedals.role = ROLE_BANKSWITCH;
   btn_tab_pedals.bank = BANK_PEDAL;
   btn_tab_pedals.page = PAGE_PEDAL;
   btn_tab_pedals.set_image_default (data_icon_power_on_png);
   btn_tab_pedals.padding = tabbutton_padding;
-  btn_tab_models.create (this, cont_toparea.widget, "AMP", 0, 0, 86, 50);
+  btn_tab_models.create (this, cont_toparea.widget, "AMP", 0, 0, 84, 50);
   btn_tab_models.role = ROLE_BANKSWITCH;
   btn_tab_models.bank = BANK_AMP;
   btn_tab_models.page = PAGE_AMP;
   btn_tab_models.set_image_default (data_icon_power_on_png);
   btn_tab_models.padding = tabbutton_padding;
-  btn_tab_cabs.create (this, cont_toparea.widget, "CAB", 0, 0, 86, 50);
+  btn_tab_cabs.create (this, cont_toparea.widget, "CAB", 0, 0, 84, 50);
   btn_tab_cabs.role = ROLE_BANKSWITCH;
   btn_tab_cabs.bank = BANK_CAB;
   btn_tab_cabs.page = PAGE_CAB;
   btn_tab_cabs.set_image_default (data_icon_power_on_png);
   btn_tab_cabs.padding = tabbutton_padding;
-  btn_tab_other.create (this, cont_toparea.widget, "...", 0, 0, 86, 50);
+  btn_tab_other.create (this, cont_toparea.widget, "...", 0, 0, 84, 50);
   btn_tab_other.role = ROLE_BANKSWITCH;
   btn_tab_other.bank = BANK_AMP; // no DSP bank, keep cached bank unchanged
   btn_tab_other.page = PAGE_OTHER;
@@ -1075,10 +1075,11 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     const int btnl = 16;
     const int btnr = window_width - 54 * 4 - 66;
     const int btnt = 66;
+    const int btnw = 88;
     btn_tab_pedals.move       (btnl + 0,   btnt);
-    btn_tab_models.move       (btnl + 90,  btnt);
-    btn_tab_cabs.move         (btnl + 180, btnt);
-    btn_tab_other.move        (btnl + 270, btnt);
+    btn_tab_models.move       (btnl + btnw,     btnt);
+    btn_tab_cabs.move         (btnl + btnw * 2, btnt);
+    btn_tab_other.move        (btnl + btnw * 3, btnt);
     btn_enable.move_resize    (btnr + 54,     btnt, 50, 50);
     btn_muteall.move_resize   (btnr + 54 * 2, btnt, 50, 50);
     btn_tuner.move_resize     (btnr + 54 * 3, btnt, 50, 50);
@@ -1515,7 +1516,7 @@ void c_neuralblender_ui::set_threshgain (float f) {
   meter_in [BANK_PEDAL].set_compression_gain (f);
   for (size_t bank = BANK_PEDAL + 1; bank < BANK_COUNT; ++bank)
     meter_in [bank].set_compression_gain (1.0f);
-  meter_in [PAGE_OTHER].set_compression_gain (1.0f);
+  meter_in [PAGE_OTHER].set_compression_gain (f);
   meter_masterout.set_compression_gain (1.0f);
 }
 
