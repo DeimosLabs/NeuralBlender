@@ -1587,7 +1587,11 @@ void c_neuralblender::set_samplerate (uint32_t sr) { CP
 }
 
 void c_neuralblender::set_blocksize (uint32_t bs) { CP
-  //m_blocksize = bs;
+  if (m_blocksize == bs)
+    return;
+
+  m_blocksize = bs;
+
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     if (banks [bank].meter_in)
       banks [bank].meter_in->bufsize = (int) bs;

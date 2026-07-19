@@ -509,5 +509,5 @@ private:
 
   bool       m_ready = false;
   uint32_t   m_samplerate = 48000;
-  //uint32_t   m_blocksize = 256;
+  uint32_t   m_blocksize = 256;
 };

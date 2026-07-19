@@ -1067,9 +1067,12 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     }
   }
   
-  if (nframes != self->blocksize) {
+  if (self->blocksize == 0 || nframes > self->blocksize) {
     self->blocksize = nframes;
     self->blender.set_blocksize(nframes);
+  }
+
+  {
     for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
       self->meter_in [bank].bufsize = (int) nframes;
       for (i = 0; i < NB_NUM_MODELS; i++)
