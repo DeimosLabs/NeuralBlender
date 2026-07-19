@@ -77,6 +77,8 @@ struct Plugin : public c_lv2_urids {
   const float *tuner_base_freq = NULL;
   const float *master_gain = NULL;
   const float *presence = NULL;
+  const float *active_page = NULL;
+  const float *bank_bypass [BANK_COUNT] = { NULL };
   float *noisegate_gain = NULL;
   float *tuner_note = NULL;
   float *tuner_cents_off = NULL;
@@ -106,6 +108,8 @@ struct Plugin : public c_lv2_urids {
   float last_tuner_base_freq = 440.0;
   float last_master_gain = 0.0;
   float last_presence = 0.0;
+  float last_active_page = 1.0;
+  float last_bank_bypass [BANK_COUNT] = { 0.0 };
   bool base_lane_mute [BANK_COUNT] [NB_NUM_MODELS] = {};
   bool host_bypass = false;
 
@@ -927,6 +931,22 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
       self->presence = (const float *) data;
     break;
 
+    case PORT_ACTIVE_PAGE:
+      self->active_page = (const float *) data;
+    break;
+
+    case PORT_PEDAL_BYPASS:
+      self->bank_bypass [BANK_PEDAL] = (const float *) data;
+    break;
+
+    case PORT_AMP_BYPASS:
+      self->bank_bypass [BANK_AMP] = (const float *) data;
+    break;
+
+    case PORT_CAB_BYPASS:
+      self->bank_bypass [BANK_CAB] = (const float *) data;
+    break;
+
     case PORT_NOISEGATE_GAIN:
       self->noisegate_gain = (float *) data;
     break;
@@ -1094,6 +1114,30 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 
   if (read_changed_bool (self->mute_all, self->last_mute_all, b)) { CP
     self->blender.mute_all = b;
+  }
+
+  if (read_changed (self->active_page, self->last_active_page, v)) { CP
+    (void) v;
+  }
+
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    if (read_changed_bool (
+          self->bank_bypass [bank], self->last_bank_bypass [bank], b)) { CP
+      switch (bank) {
+        case BANK_PEDAL:
+          self->blender.set_pedal_bypass (b);
+        break;
+
+        case BANK_CAB:
+          self->blender.set_cab_bypass (b);
+        break;
+
+        case BANK_AMP:
+        default:
+          self->blender.set_amp_bypass (b);
+        break;
+      }
+    }
   }
 
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {

@@ -1427,6 +1427,9 @@ c_neuralblender::c_neuralblender () { CP
                            48000);
   
   m_bypass.store (false, std::memory_order_relaxed);
+  m_pedal_bypass.store (false, std::memory_order_relaxed);
+  m_amp_bypass.store (false, std::memory_order_relaxed);
+  m_cab_bypass.store (false, std::memory_order_relaxed);
   update_mutes ();
 }
 
@@ -1694,8 +1697,23 @@ bool c_neuralblender::set_exclusive_lane (_lane_bank bank, int lane) {
   return true;
 }
 
-void c_neuralblender::set_bypass (bool bypass) {
-  m_bypass.store (bypass, std::memory_order_relaxed);
+void c_neuralblender::set_bypass (bool b) {
+  m_bypass.store (b, std::memory_order_relaxed);
+  request_mix_update ();
+}
+
+void c_neuralblender::set_pedal_bypass (bool b) {
+  m_pedal_bypass.store (b, std::memory_order_relaxed);
+  request_mix_update ();
+}
+
+void c_neuralblender::set_amp_bypass (bool b) {
+  m_amp_bypass.store (b, std::memory_order_relaxed);
+  request_mix_update ();
+}
+
+void c_neuralblender::set_cab_bypass (bool b) {
+  m_cab_bypass.store (b, std::memory_order_relaxed);
   request_mix_update ();
 }
 
@@ -1709,6 +1727,18 @@ bool c_neuralblender::lane_mute (_lane_bank bank, size_t which) const {
 
 bool c_neuralblender::bypass () const {
   return m_bypass.load (std::memory_order_relaxed);
+}
+
+bool c_neuralblender::pedal_bypass () const {
+  return m_pedal_bypass.load (std::memory_order_relaxed);
+}
+
+bool c_neuralblender::amp_bypass () const {
+  return m_amp_bypass.load (std::memory_order_relaxed);
+}
+
+bool c_neuralblender::cab_bypass () const {
+  return m_cab_bypass.load (std::memory_order_relaxed);
 }
 
 float c_neuralblender::delay_ms (_lane_bank bank, size_t which) const {
@@ -1752,18 +1782,22 @@ bool c_neuralblender::consistent_calib_state (bool &enabled,
 }
 
 void c_neuralblender::get_state (c_neuralblender_state &state) const {
-  state.bypass = bypass ();
-  state.do_vu = do_vu;
-  state.mute_all = mute_all;
-  state.master_gain = master_gain;
-  state.presence = presence;
-  state.tuner_on = tuner_on;
+  state.bypass          = bypass ();
+  state.pedal_bypass    = pedal_bypass ();
+  state.amp_bypass      = amp_bypass ();
+  state.cab_bypass      = cab_bypass ();
+  state.do_vu           = do_vu;
+  state.mute_all        = mute_all;
+  state.master_gain     = master_gain;
+  state.presence        = presence;
+  state.tuner_on        = tuner_on;
   state.tuner_base_freq = tuner_base_freq;
-  state.noisegate_on = noisegate_on;
-  state.noisethresh = noisegate.threshold_db;
-  state.noiseattack = noisegate.attack_ms;
-  state.noisehold = noisegate.hold_ms;
-  state.noiserelease = noisegate.release_ms;
+  state.noisegate_on    = noisegate_on;
+  state.noisethresh     = noisegate.threshold_db;
+  state.noiseattack     = noisegate.attack_ms;
+  state.noisehold       = noisegate.hold_ms;
+  state.noiserelease    = noisegate.release_ms;
+  
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     state.banks [bank].exclusive_lane = banks [bank].exclusive_lane;
     state.banks [bank].linked_calib = banks [bank].linked_calib;
@@ -1949,6 +1983,21 @@ static void final_clamp (float *out, uint32_t n, float master_gain) {
     out [i] = std::clamp (out [i] * master_gain, -1.0f, 1.0f);
 }
 
+static bool bank_is_bypassed (
+    const c_neuralblender &blender,
+    _lane_bank bank) {
+
+  switch (bank) {
+    case BANK_PEDAL:
+      return blender.pedal_bypass ();
+    case BANK_AMP:
+      return blender.amp_bypass ();
+    case BANK_CAB:
+      return blender.cab_bypass ();
+    default:
+      return false;
+  }
+}
 
 uint32_t c_neuralblender::make_active_lane_mask (_lane_bank bank) const {
   if (m_bypass.load (std::memory_order_relaxed))
@@ -1956,7 +2005,19 @@ uint32_t c_neuralblender::make_active_lane_mask (_lane_bank bank) const {
 
   if (mute_all)
     return 0;
-
+  
+  if (bank == BANK_PEDAL &&
+      m_pedal_bypass.load (std::memory_order_relaxed))
+    return 0;
+    
+  if (bank == BANK_AMP &&
+      m_amp_bypass.load (std::memory_order_relaxed))
+    return 0;
+    
+  if (bank == BANK_CAB &&
+      m_cab_bypass.load (std::memory_order_relaxed))
+    return 0;
+    
   const c_model_bank &b = which_bank (bank);
   if (b.exclusive_lane > 0) {
     const size_t lane = (size_t) (b.exclusive_lane - 1);
@@ -2124,6 +2185,13 @@ void c_neuralblender::render_bank (
 
   update_input_meter (bank, in, nframes);
   std::fill (out, out + nframes, 0.0f);
+
+  if (bank_is_bypassed (*this, bank)) {
+    if (in != out)
+      memcpy (out, in, nframes * sizeof (float));
+    update_loaded_output_meters (bank);
+    return;
+  }
 
   if (!banks [bank].active_mask) {
     if (in != out)

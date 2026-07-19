@@ -35,6 +35,13 @@ extern const char *g_build_timestamp;
 void combobox_selected_callback (void *w_, void *user_data);
 static bool page_has_bank (_ui_page page);
 static _lane_bank bank_for_page (_ui_page page);
+static bool bank_bypass_for_state (
+    const c_neuralblender_state &state,
+    _lane_bank bank);
+static void sync_bank_tab_icon (
+    c_button &button,
+    const c_neuralblender_state &state,
+    _lane_bank bank);
 
 static bool get_parent_window_size (
     Display *display, Window parent,
@@ -822,18 +829,25 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   img_logo.create (this, mainwindow.widget, "", 0, 0, 256, 32);
   img_logo.set_png (data_textlogo_1024x128_png);
   
-  btn_tab_pedals.create (this, mainwindow.widget, "PEDAL", 0, 0, 86, 50);
+  const int tabbutton_padding = 14;
+  btn_tab_pedals.create (this, mainwindow.widget, "PDL", 0, 0, 86, 50);
   btn_tab_pedals.role = ROLE_BANKSWITCH;
   btn_tab_pedals.bank = BANK_PEDAL;
   btn_tab_pedals.page = PAGE_PEDAL;
+  btn_tab_pedals.set_image_default (data_icon_power_on_png);
+  btn_tab_pedals.padding = tabbutton_padding;
   btn_tab_models.create (this, mainwindow.widget, "AMP", 0, 0, 86, 50);
   btn_tab_models.role = ROLE_BANKSWITCH;
   btn_tab_models.bank = BANK_AMP;
   btn_tab_models.page = PAGE_AMP;
-  btn_tab_cabs.create (this, mainwindow.widget, "CAB/IR", 0, 0, 86, 50);
+  btn_tab_models.set_image_default (data_icon_power_on_png);
+  btn_tab_models.padding = tabbutton_padding;
+  btn_tab_cabs.create (this, mainwindow.widget, "CAB", 0, 0, 86, 50);
   btn_tab_cabs.role = ROLE_BANKSWITCH;
   btn_tab_cabs.bank = BANK_CAB;
   btn_tab_cabs.page = PAGE_CAB;
+  btn_tab_cabs.set_image_default (data_icon_power_on_png);
+  btn_tab_cabs.padding = tabbutton_padding;
   btn_tab_other.create (this, mainwindow.widget, "...", 0, 0, 86, 50);
   btn_tab_other.role = ROLE_BANKSWITCH;
   btn_tab_other.bank = BANK_AMP; // no DSP bank, keep cached bank unchanged
@@ -890,7 +904,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   }
   
   frame_other_volumepresence.create (this, cont_other.widget, "", 16, 16, 512, 128);
-  knob_mastervolume.create (this, frame_other_volumepresence.widget, "Master", 16, 12, 80, 96);
+  knob_mastervolume.create (this, frame_other_volumepresence.widget, "Master out", 16, 12, 80, 96);
   knob_presence.create (this, frame_other_volumepresence.widget, "Presence", 116, 12, 80, 96);
   knob_mastervolume.set_min (-40);
   knob_mastervolume.set_max (12);
@@ -1235,6 +1249,10 @@ void c_neuralblender_ui::sync_page_visibility () {
       btn_tab_other.set_value (false);
     break;
   }
+
+  sync_bank_tab_icon (btn_tab_pedals, state, BANK_PEDAL);
+  sync_bank_tab_icon (btn_tab_models, state, BANK_AMP);
+  sync_bank_tab_icon (btn_tab_cabs, state, BANK_CAB);
 }
 
 static bool page_has_bank (_ui_page page) {
@@ -1249,6 +1267,50 @@ static _lane_bank bank_for_page (_ui_page page) {
     case PAGE_OTHER:
     default:           return BANK_AMP;
   }
+}
+
+static bool bank_bypass_for_state (
+    const c_neuralblender_state &state,
+    _lane_bank bank) {
+
+  switch (bank) {
+    case BANK_PEDAL: return state.pedal_bypass;
+    case BANK_CAB:   return state.cab_bypass;
+    case BANK_AMP:
+    default:         return state.amp_bypass;
+  }
+}
+
+static void set_bank_bypass_for_state (
+    c_neuralblender_state &state,
+    _lane_bank bank,
+    bool bypass) {
+
+  switch (bank) {
+    case BANK_PEDAL:
+      state.pedal_bypass = bypass;
+    break;
+
+    case BANK_CAB:
+      state.cab_bypass = bypass;
+    break;
+
+    case BANK_AMP:
+    default:
+      state.amp_bypass = bypass;
+    break;
+  }
+}
+
+static void sync_bank_tab_icon (
+    c_button &button,
+    const c_neuralblender_state &state,
+    _lane_bank bank) {
+
+  button.set_image_default (
+    bank_bypass_for_state (state, bank)
+      ? data_icon_power_grey_png
+      : data_icon_power_on_png);
 }
 
 void c_neuralblender_ui::on_button (c_button *btn, bool value) {
@@ -1279,8 +1341,19 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
 
     case ROLE_BANKSWITCH: CP
       debug ("visible page: %d", btn->page);
-      if (btn->page >= PAGE_PEDAL && btn->page < PAGE_COUNT)
-        on_bank_switch (btn, btn->page);
+      if (btn->page >= PAGE_PEDAL && btn->page < PAGE_COUNT) {
+        const _ui_page page = (_ui_page) btn->page;
+        if (page_has_bank (page) &&
+            (btn->last_mouse_button == Button3 || visible_page == page)) {
+          const _lane_bank bank = bank_for_page (page);
+          const bool bypass = !bank_bypass_for_state (state, bank);
+          set_bank_bypass_for_state (state, bank, bypass);
+          on_bank_bypass (btn, bank, bypass);
+          sync_widgets_from_state (state);
+        } else {
+          on_bank_switch (btn, btn->page);
+        }
+      }
     break;
 
     case ROLE_CALIBRATE: CP
@@ -1898,6 +1971,8 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   c_lane_widgets *visible_lanes = lanes_for_bank (visible_bank);
   const c_neuralblender_bank_state &visible_bank_state = state.banks [visible_bank];
   const bool exclusive_on = visible_exclusive_lane > 0;
+  const bool visible_bank_bypassed =
+    bank_bypass_for_state (state, visible_bank);
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     const c_neuralblender_lane_state &lane = visible_bank_state.lanes [i];
     const bool selected =
@@ -1906,7 +1981,8 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     visible_lanes [i].btn_mute.set_value (lane.lane_mute);
     visible_lanes [i].btn_excl.set_value (selected);
 
-    if (lane.lane_mute || state.mute_all || !enabled) { CP
+    if (lane.lane_mute || state.mute_all || !enabled ||
+        visible_bank_bypassed) { CP
       visible_lanes [i].lane_widget.set_state (WSTATE_DISABLED);
     } else {
       visible_lanes [i].lane_widget.set_state (WSTATE_NORMAL);
@@ -1921,7 +1997,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
       widget_hide (visible_lanes [i].btn_excl.widget);
     }
   }
-  if (exclusive_on && !state.mute_all && enabled) {
+  if (exclusive_on && !state.mute_all && enabled && !visible_bank_bypassed) {
     visible_lanes [visible_exclusive_lane - 1].lane_widget.set_state (WSTATE_SELECTED);
   }
 

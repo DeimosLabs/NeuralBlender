@@ -1649,7 +1649,6 @@ static _widget_state button_state_from_xputty (Widget_t *w) {
 }
 
 static void button_double_click (void *w_, void *event, void *user_data) {
-  (void) event;
   (void) user_data;
 
   Widget_t *w = (Widget_t *) w_;
@@ -1661,12 +1660,13 @@ static void button_double_click (void *w_, void *event, void *user_data) {
     adj_set_value (w->adj_y, 0.0);
   expose_widget (w);
   auto *b = (c_button *) w->parent_struct;
+  XButtonEvent *button = (XButtonEvent *) event;
+  b->last_mouse_button = button ? button->button : Button1;
   b->clear_focus ();
   b->on_mouseup ();
 }
 
 static void button_mouse_down (void *w_, void *event, void *user_data) {
-  (void) event;
   (void) user_data;
 
   auto *w = (Widget_t *) w_;
@@ -1674,11 +1674,12 @@ static void button_mouse_down (void *w_, void *event, void *user_data) {
     return;
 
   auto *b = (c_button *) w->parent_struct;
+  XButtonEvent *button = (XButtonEvent *) event;
+  b->last_mouse_button = button ? button->button : Button1;
   b->clear_focus ();
 }
 
 static void button_mouse_up (void *w_, void *event, void *user_data) {
-  (void) event;
   (void) user_data;
 
   auto *w = (Widget_t *) w_;
@@ -1688,6 +1689,8 @@ static void button_mouse_up (void *w_, void *event, void *user_data) {
   expose_widget (w);
 
   auto *b = (c_button *) w->parent_struct;
+  XButtonEvent *button = (XButtonEvent *) event;
+  b->last_mouse_button = button ? button->button : Button1;
   b->clear_focus ();
   b->on_mouseup ();
 }
@@ -1947,7 +1950,11 @@ void c_button::set_image (const unsigned char *pngdata, _widget_state which) {
     case WSTATE_DOWN:       csp = &img_down; break;
     case WSTATE_DOWN_HOVER: csp = &img_down_hover; break;
     case WSTATE_OFF_HOVER:  csp = &img_off_hover; break;
-    case WSTATE_DEFAULT:    csp = &img_default; break;
+    case WSTATE_DEFAULT:
+      if (img_default_source == pngdata)
+        return;
+      csp = &img_default;
+    break;
     case WSTATE_ALL:
       set_image (pngdata, WSTATE_OFF);
       set_image (pngdata, WSTATE_ON);
@@ -1968,15 +1975,24 @@ void c_button::set_image (const unsigned char *pngdata, _widget_state which) {
     *csp = nullptr;
   }
 
-  if (!pngdata)
+  if (!pngdata) {
+    if (which == WSTATE_DEFAULT)
+      img_default_source = NULL;
     return;
+  }
 
   *csp = cairo_image_surface_create_from_stream(pngdata);
 
   if (cairo_surface_status(*csp) != CAIRO_STATUS_SUCCESS) {
     cairo_surface_destroy(*csp);
     *csp = nullptr;
+    if (which == WSTATE_DEFAULT)
+      img_default_source = NULL;
+    return;
   }
+
+  if (which == WSTATE_DEFAULT)
+    img_default_source = pngdata;
 }
 
 void c_button::on_mouseup () {

@@ -111,6 +111,7 @@ public:
   void on_presence (c_widget *w, float f);
   //void on_excl (c_widget *w, int which);
   void on_bypass (c_widget *w, bool b);
+  void on_bank_bypass (c_widget *w, _lane_bank bank, bool b);
   void on_about (c_widget *w);
   void apply_prefs (t_prefs &p) override;
   void write_prefs_to (t_prefs &p) override;
@@ -343,6 +344,27 @@ void c_standalone_ui::on_bypass(c_widget *w, bool b) {
   apply_effective_controls();
 }
 
+void c_standalone_ui::on_bank_bypass (c_widget *w, _lane_bank bank, bool b) {
+  (void) w;
+  if (!blender)
+    return;
+
+  switch (bank) {
+    case BANK_PEDAL:
+      blender->set_pedal_bypass (b);
+    break;
+
+    case BANK_CAB:
+      blender->set_cab_bypass (b);
+    break;
+
+    case BANK_AMP:
+    default:
+      blender->set_amp_bypass (b);
+    break;
+  }
+}
+
 void c_standalone_ui::on_about (c_widget *w) {
   debug ("lane %d", w->lane);
 }
@@ -432,6 +454,9 @@ void c_standalone_ui::apply_effective_controls () {
 
   blender->linked_calib = blender->banks [BANK_AMP].linked_calib;
   blender->set_bypass (state.bypass);
+  blender->set_pedal_bypass (state.pedal_bypass);
+  blender->set_amp_bypass (state.amp_bypass);
+  blender->set_cab_bypass (state.cab_bypass);
 }
 
 int c_standalone_ui::idle () {

@@ -164,6 +164,10 @@ struct c_neuralblender_state {
     noiseattack = other.noiseattack;
     noisehold = other.noisehold;
     noiserelease = other.noiserelease;
+    
+    pedal_bypass = other.pedal_bypass;
+    amp_bypass   = other.amp_bypass;
+    cab_bypass   = other.cab_bypass;
 
     for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
       banks [bank] = other.banks [bank];
@@ -172,20 +176,24 @@ struct c_neuralblender_state {
   }
 
   std::string current_dir;
-  bool bypass = false;
-  bool do_excl = false;
-  bool do_vu = true;
-  bool showadvanced = false;
-  bool mute_all = false;
-  float master_gain = 1.0f;
-  float presence = 0.0f;
-  bool tuner_on = false;
-  float tuner_base_freq = 440.0f;
-  bool noisegate_on = false;
-  float noisethresh = -60.0f;
-  float noiseattack = 2.0f;
-  float noisehold = 10.0f;
-  float noiserelease = 20.0f;
+  bool bypass             = false;
+  bool pedal_bypass       = false;
+  bool amp_bypass         = false;
+  bool cab_bypass         = false;
+  bool mute_all           = false;
+  bool do_excl            = false;
+  bool do_vu              = true;
+  bool showadvanced       = false;
+  float master_gain       = 1.0f;
+  float presence          = 0.0f;
+  bool tuner_on           = false;
+  float tuner_base_freq   = 440.0f;
+  bool noisegate_on       = false;
+  float noisethresh       = -60.0f;
+  float noiseattack       = 2.0f;
+  float noisehold         = 10.0f;
+  float noiserelease      = 20.0f;
+  
   c_neuralblender_bank_state banks [BANK_COUNT];
   c_neuralblender_lane_state (&lanes) [NB_NUM_MODELS];
 };
@@ -434,8 +442,14 @@ public:
   bool set_lane_mute (_lane_bank bank, size_t which, bool muted);
   bool set_exclusive_lane (_lane_bank bank, int lane);
   void set_bypass (bool bypass);
+  void set_pedal_bypass (bool bypass);
+  void set_amp_bypass (bool bypass);
+  void set_cab_bypass (bool bypass);
   bool lane_mute (_lane_bank bank, size_t which) const;
   bool bypass () const;
+  bool pedal_bypass () const;
+  bool amp_bypass () const;
+  bool cab_bypass () const;
   float delay_ms (_lane_bank bank, size_t which) const;
   float delay_ms (size_t which) const;
   void get_state (c_neuralblender_state &state) const;
@@ -496,11 +510,14 @@ private:
   std::vector<float>    m_stage_buf_a;
   std::vector<float>    m_stage_buf_b;
   std::vector<float>    m_presence_buf;
-  std::atomic<bool>     m_bypass { false };
-  std::atomic<bool>     xfade_pending { false };
-  std::atomic<uint32_t> active_lane_mask { 0 };
+  std::atomic<bool>     m_bypass          { false };
+  std::atomic<bool>     m_pedal_bypass    { false };
+  std::atomic<bool>     m_amp_bypass      { false };
+  std::atomic<bool>     m_cab_bypass      { false };
+  std::atomic<bool>     xfade_pending     { false };
+  std::atomic<uint32_t> active_lane_mask  { 0 };
   std::atomic<uint32_t> pending_lane_mask { 0 };
-  std::atomic<uint32_t> loaded_lane_mask { 0 };
+  std::atomic<uint32_t> loaded_lane_mask  { 0 };
   bool xfade_active = false;
   uint32_t xfade_old_mask = 0;
   uint32_t xfade_new_mask = 0;

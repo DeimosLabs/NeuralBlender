@@ -255,6 +255,25 @@ void c_lv2_ui::on_bypass (c_widget *w, bool b) {
   write_control (PORT_BYPASS, b ? 1.0f : 0.0f);
 }
 
+void c_lv2_ui::on_bank_bypass (c_widget *w, _lane_bank bank, bool b) {
+  (void) w;
+  CP
+  switch (bank) {
+    case BANK_PEDAL:
+      write_control (PORT_PEDAL_BYPASS, b ? 1.0f : 0.0f);
+    break;
+
+    case BANK_CAB:
+      write_control (PORT_CAB_BYPASS, b ? 1.0f : 0.0f);
+    break;
+
+    case BANK_AMP:
+    default:
+      write_control (PORT_AMP_BYPASS, b ? 1.0f : 0.0f);
+    break;
+  }
+}
+
 void c_lv2_ui::on_about (c_widget *w) {
   (void) w;
   CP
@@ -368,6 +387,11 @@ void c_lv2_ui::on_presence (c_widget *w, float f) {
   (void) w;
   state.presence = f;
   write_control (PORT_PRESENCE, f);
+}
+
+void c_lv2_ui::on_bank_switch (c_widget *w, int n) {
+  c_neuralblender_ui::on_bank_switch (w, n);
+  write_control (PORT_ACTIVE_PAGE, (float) visible_page);
 }
 
 void c_lv2_ui::apply_prefs (t_prefs &p) {
@@ -578,6 +602,34 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
   if (port == PORT_PRESENCE) {
     state.presence = value;
     knob_presence.set_value (value);
+    updating_from_state = old_updating_from_state;
+    updating_from_host = false;
+    return;
+  }
+
+  if (port == PORT_ACTIVE_PAGE) {
+    int page = (int) lrintf (value);
+    if (page < PAGE_PEDAL)
+      page = PAGE_PEDAL;
+    if (page >= PAGE_COUNT)
+      page = PAGE_COUNT - 1;
+    c_neuralblender_ui::on_bank_switch (nullptr, page);
+    updating_from_state = old_updating_from_state;
+    updating_from_host = false;
+    return;
+  }
+
+  if (port == PORT_PEDAL_BYPASS ||
+      port == PORT_AMP_BYPASS ||
+      port == PORT_CAB_BYPASS) {
+    const bool bypassed = value >= 0.5f;
+    if (port == PORT_PEDAL_BYPASS)
+      state.pedal_bypass = bypassed;
+    else if (port == PORT_CAB_BYPASS)
+      state.cab_bypass = bypassed;
+    else
+      state.amp_bypass = bypassed;
+    sync_widgets_from_state (state);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;
@@ -865,6 +917,10 @@ void c_lv2_ui::subscribe_ports () {
     PORT_TUNER_FREQ,
     PORT_MASTER_GAIN,
     PORT_PRESENCE,
+    PORT_ACTIVE_PAGE,
+    PORT_PEDAL_BYPASS,
+    PORT_AMP_BYPASS,
+    PORT_CAB_BYPASS,
   };
 
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {

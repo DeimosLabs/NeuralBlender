@@ -156,6 +156,10 @@ enum nb_lv2_port {
   PORT_TUNER_FREQ,
   PORT_MASTER_GAIN,
   PORT_PRESENCE,
+  PORT_ACTIVE_PAGE,
+  PORT_PEDAL_BYPASS,
+  PORT_AMP_BYPASS,
+  PORT_CAB_BYPASS,
 
   PORT_COUNT,
 
@@ -390,6 +394,7 @@ public:
   void on_muteall (c_widget *w, bool b) override;
   void on_excl (c_widget *w, int n) override;
   void on_bypass (c_widget *w, bool b) override;
+  void on_bank_bypass (c_widget *w, _lane_bank bank, bool b) override;
   void on_about (c_widget *w);
   void on_vu (c_widget *w, bool b) override;
   void on_linked_calib (c_widget *w, bool b) override;
@@ -405,6 +410,7 @@ public:
   void on_calib_target_db (c_widget *w, float f) override;
   void on_master_gain (c_widget *w, float f) override;
   void on_presence (c_widget *w, float f) override;
+  void on_bank_switch (c_widget *w, int n) override;
   void apply_prefs (t_prefs &p) override;
   bool request_window_size (int w, int h) override;
 

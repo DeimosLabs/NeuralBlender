@@ -217,6 +217,7 @@ public:
   virtual void on_linked_calib (c_widget *w, bool b)           = 0;
   virtual void on_calib_bass (c_widget *w, bool b)             = 0;
   virtual void on_bypass (c_widget *w, bool b)                 = 0;
+  virtual void on_bank_bypass (c_widget *w, _lane_bank bank, bool b) = 0;
   virtual void on_noisegate (c_widget *w, bool b)              = 0;
   virtual void on_noisethresh (c_widget *w, float f)           = 0;
   virtual void on_noiseattack (c_widget *w, float f)           = 0;
@@ -231,7 +232,7 @@ public:
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;
           void on_button (c_button *btn, bool value)              ;
-          void on_bank_switch (c_widget *w, int n)                ;
+  virtual void on_bank_switch (c_widget *w, int n)                ;
           void sync_page_visibility ()                            ;
   virtual void on_window_resize (int w, int h)                    ;
           void on_window_configured ()                            ;

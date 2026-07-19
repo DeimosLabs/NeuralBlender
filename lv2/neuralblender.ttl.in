@@ -1376,4 +1376,44 @@ nb:CabD
 	        lv2:default 0.0 ;
 	        lv2:minimum 0.0 ;
 	        lv2:maximum 1.0
+	    ] , [
+	        a lv2:InputPort ,
+	          lv2:ControlPort ;
+	        lv2:index 124 ;
+	        lv2:symbol "active_page" ;
+	        lv2:name "Active Page" ;
+	        lv2:default 1 ;
+	        lv2:minimum 0 ;
+	        lv2:maximum 3 ;
+	        lv2:portProperty lv2:integer
+	    ] , [
+	        a lv2:InputPort ,
+	          lv2:ControlPort ;
+	        lv2:index 125 ;
+	        lv2:symbol "pedal_bypass" ;
+	        lv2:name "Pedal Bypass" ;
+	        lv2:default 0 ;
+	        lv2:minimum 0 ;
+	        lv2:maximum 1 ;
+	        lv2:portProperty lv2:toggled
+	    ] , [
+	        a lv2:InputPort ,
+	          lv2:ControlPort ;
+	        lv2:index 126 ;
+	        lv2:symbol "amp_bypass" ;
+	        lv2:name "Amp Bypass" ;
+	        lv2:default 0 ;
+	        lv2:minimum 0 ;
+	        lv2:maximum 1 ;
+	        lv2:portProperty lv2:toggled
+	    ] , [
+	        a lv2:InputPort ,
+	          lv2:ControlPort ;
+	        lv2:index 127 ;
+	        lv2:symbol "cab_bypass" ;
+	        lv2:name "Cab/IR Bypass" ;
+	        lv2:default 0 ;
+	        lv2:minimum 0 ;
+	        lv2:maximum 1 ;
+	        lv2:portProperty lv2:toggled
 	    ].

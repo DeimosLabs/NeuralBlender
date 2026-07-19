@@ -419,6 +419,7 @@ public:
 
   bool set_value (bool value);
   virtual void on_mouseup ();
+  int last_mouse_button = Button1;
   
   static void cb_draw (void *w, void *userdata);
   static bool draw_button_image (Widget_t *w, c_button *b);
@@ -452,6 +453,7 @@ public:
   cairo_surface_t *img_off_hover    = NULL;
   cairo_surface_t *img_all          = NULL;
   cairo_surface_t *img_default      = NULL;
+  const unsigned char *img_default_source = NULL;
 };
 
 class c_knob : public c_widget {
