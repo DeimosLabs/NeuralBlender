@@ -1005,7 +1005,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   btn_other_tuner_default.set_image_default (data_icon_x_big_png);
   btn_other_tuner_default.role = ROLE_TUNER_DEFAULT;
   
-  tuner.create (this, mainwindow.widget, "", 0, 0, 400, 24);
+  //tuner.create (this, mainwindow.widget, "", 0, 0, 400, 24);
   if (blender)
     tuner.set_pitchtracker (&blender->pitchtracker);
   tuner.hide ();
@@ -1032,6 +1032,7 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   ui_ready = true;
   move_resize ();
   mainwindow.show ();
+  sync_tuner_visibility ();
   CP
   //XFlush (display);
   CP
@@ -1096,7 +1097,8 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     btn_tuner.move_resize     (window_width - 12 - 54 * 3, 66, 50, 50);
     btn_noisegate.move_resize (window_width - 12 - 54 * 4, 66, 50, 50);
     
-    tuner.move_resize (4, 4, window_width - 8, 56);
+    if (tuner.created)
+      tuner.move_resize (4, 4, window_width - 8, 56);
     
     if (page_has_bank (visible_page)) {
       size_t i;
@@ -1253,6 +1255,36 @@ void c_neuralblender_ui::sync_page_visibility () {
   sync_bank_tab_icon (btn_tab_pedals, state, BANK_PEDAL);
   sync_bank_tab_icon (btn_tab_models, state, BANK_AMP);
   sync_bank_tab_icon (btn_tab_cabs, state, BANK_CAB);
+}
+
+void c_neuralblender_ui::ensure_tuner_created () {
+  if (tuner.created || !mainwindow.widget)
+    return;
+
+  Metrics_t metrics;
+  os_get_window_metrics (mainwindow.widget, &metrics);
+  const int w = std::max (1, metrics.width - 8);
+  tuner.create (this, mainwindow.widget, "", 4, 4, w, 56);
+  if (blender)
+    tuner.set_pitchtracker (&blender->pitchtracker);
+}
+
+void c_neuralblender_ui::sync_tuner_visibility () {
+  btn_tuner.set_value (state.tuner_on);
+  if (state.tuner_on) {
+    ensure_tuner_created ();
+    tuner.show ();
+    img_logo.hide ();
+    if (tuner.widget)
+      tuner.expose ();
+    if (tuner.tuner.widget)
+      expose_widget (tuner.tuner.widget);
+  } else {
+    tuner.hide ();
+    img_logo.show ();
+    if (img_logo.widget)
+      img_logo.expose ();
+  }
 }
 
 static bool page_has_bank (_ui_page page) {
@@ -1444,10 +1476,7 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
       state.tuner_on = value;
       prefs.tuner_on = value;
       on_tuner (btn, value);
-      if (value)
-        tuner.show ();
-      else
-        tuner.hide ();
+      sync_tuner_visibility ();
         
     break;
     
@@ -1555,11 +1584,7 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
     knob_noisethresh.hide ();*/
 
   state.tuner_on = p.tuner_on;
-  btn_tuner.set_value (p.tuner_on);
-  if (p.tuner_on)
-    tuner.show ();
-  else
-    tuner.hide ();
+  sync_tuner_visibility ();
 }
 
 void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
@@ -1712,6 +1737,7 @@ void c_neuralblender_ui::on_window_configured () {
   ui_resize_pending = false;
   move_resize ();
   mainwindow.show_children ();
+  sync_tuner_visibility ();
   pending_resize_w = 0;
   pending_resize_h = 0;
 }
@@ -1929,14 +1955,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   const bool enabled = !state.bypass;
   btn_enable.set_value (enabled);
   
-  btn_tuner.set_value (state.tuner_on);
-  if (state.tuner_on) {
-    tuner.show ();
-    img_logo.hide ();
-  } else {
-    tuner.hide ();
-    img_logo.show ();
-  }
+  sync_tuner_visibility ();
   //btn_enable.set_label (enabled ? "Enabled" : " Bypass ");
 
   /*btn_advanced.set_value (state.showadvanced);

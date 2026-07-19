@@ -234,6 +234,8 @@ public:
           void on_button (c_button *btn, bool value)              ;
   virtual void on_bank_switch (c_widget *w, int n)                ;
           void sync_page_visibility ()                            ;
+          void ensure_tuner_created ()                            ;
+          void sync_tuner_visibility ()                           ;
   virtual void on_window_resize (int w, int h)                    ;
           void on_window_configured ()                            ;
   virtual bool request_window_size (int w, int h)                 ;

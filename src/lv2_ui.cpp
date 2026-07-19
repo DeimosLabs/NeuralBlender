@@ -567,14 +567,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
   if (port == PORT_TUNER_ON) {
     state.tuner_on = value >= 0.5f;
-    btn_tuner.set_value (state.tuner_on);
-    if (state.tuner_on) {
-      tuner.show ();
-      img_logo.hide ();
-    } else {
-      tuner.hide ();
-      img_logo.show ();
-    }
+    sync_tuner_visibility ();
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;

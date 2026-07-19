@@ -494,6 +494,8 @@ void c_widget::create (
   widget->scale.gravity = NONE;
   widget->parent_struct = this;
   widget->label = label.c_str ();
+  
+  created = true;
 }
 
 bool c_widget::set_label (const char *label_) {

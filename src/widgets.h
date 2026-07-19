@@ -180,6 +180,7 @@ public:
   _widget_role role        = ROLE_UNKNOWN;
   _widget_style wstyle     = WSTYLE_UNKNOWN;
   _widget_state wstate     = WSTATE_UNKNOWN;
+  bool created             = false;
   uint64_t id              = -1;
   uint64_t lane            = -1;
   uint64_t bank            = -1;
