@@ -1373,7 +1373,16 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
       debug ("visible page: %d", btn->page);
       if (btn->page >= PAGE_PEDAL && btn->page < PAGE_COUNT) {
         const _ui_page page = (_ui_page) btn->page;
-        if (page_has_bank (page) &&
+        if (page == PAGE_OTHER) {
+          if (visible_page != PAGE_OTHER && btn->last_mouse_button == Button3) {
+            const int exclusive_lane =
+              exclusive_lane_for_bank (visible_bank) ? 0 : (int) choose_exclusive_lane ();
+            on_excl (btn, exclusive_lane);
+            sync_widgets_from_state (state);
+          } else if (visible_page != PAGE_OTHER) {
+            on_bank_switch (btn, btn->page);
+          }
+        } else if (page_has_bank (page) &&
             (btn->last_mouse_button == Button3 || visible_page == page)) {
           const _lane_bank bank = bank_for_page (page);
           const bool bypass = !bank_bypass_for_state (state, bank);
