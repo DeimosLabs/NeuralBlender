@@ -1241,6 +1241,7 @@ void c_neuralamp::unload_model () {
   m_engine_mode = ENGINE_NONE;
   filename = "";
   trim = 1.0f;
+  effective_trim = 1.0f;
   delay.clear ();
   warmup = WARMUP_BLOCKS;
   ramp_pos = 0;
@@ -1281,7 +1282,7 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
       }
 
       {
-        const float out_gain = output_gain * trim;
+        const float out_gain = output_gain * effective_trim;
         for (uint32_t i = 0; i < nframes; ++i) {
           float input [1] = { in [i] * input_gain };
           float y = m_rtneural_model->forward (input);
@@ -1312,7 +1313,7 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
 
         m_nam_model->process (inputs, outputs, (int) nframes);
 
-        const float out_gain = output_gain * trim;
+        const float out_gain = output_gain * effective_trim;
         for (uint32_t i = 0; i < nframes; ++i)
           if (dcflip)
             out [i] = -1.0f * std::clamp (out [i] * out_gain, -1.0f, 1.0f);
@@ -1336,7 +1337,7 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
 
         m_convolver.process_block (in, out, nframes);
 
-        const float out_gain = output_gain * trim;
+        const float out_gain = output_gain * effective_trim;
         for (uint32_t i = 0; i < nframes; ++i)
           if (dcflip)
             out [i] = -1.0f * std::clamp (out [i] * out_gain, -1.0f, 1.0f);
@@ -1526,7 +1527,8 @@ bool c_neuralblender::calibrate (_lane_bank bank, size_t which, bool bass) {
   } else {
     amp.calibrate (NULL, 0);
   }
-
+  
+  update_effective_trim ();
   return true;
 }
 
@@ -1564,8 +1566,51 @@ bool c_neuralblender::calibrate_linked (_lane_bank bank, bool bass) {
     if (amp.do_calib && amp.loaded ())
       amp.trim.store (linked_trim, std::memory_order_release);
   }
-
+  
+  update_effective_trim ();
   return true;
+}
+
+void c_neuralblender::update_effective_trim () {
+  size_t active_calibrated_banks = 0;
+
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    const uint32_t active_mask = make_active_lane_mask ((_lane_bank) bank);
+    if (!active_mask)
+      continue;
+
+    bool bank_has_calib = false;
+    for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
+      if (!(active_mask & (1u << lane)))
+        continue;
+
+      if (banks [bank].lanes [lane].do_calib) {
+        bank_has_calib = true;
+        break;
+      }
+    }
+
+    if (bank_has_calib)
+      ++active_calibrated_banks;
+  }
+
+  const float divisor = active_calibrated_banks > 0 ?
+    (float) active_calibrated_banks : 1.0f;
+
+  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
+      c_neuralamp &amp = banks [bank].lanes [lane];
+      const float trim = amp.trim.load (std::memory_order_acquire);
+      if (!amp.do_calib || !std::isfinite (trim) || trim <= 0.0f) {
+        amp.effective_trim.store (1.0f, std::memory_order_release);
+        continue;
+      }
+
+      amp.effective_trim.store (
+        db_to_gain (gain_to_db (trim) / divisor),
+        std::memory_order_release);
+    }
+  }
 }
 
 void c_neuralblender::set_samplerate (uint32_t sr) { CP
@@ -2061,6 +2106,7 @@ uint32_t c_neuralblender::make_active_lane_mask (_lane_bank bank) const {
 void c_neuralblender::request_mix_update () {
   pending_lane_mask.store (make_active_lane_mask (BANK_AMP),
                            std::memory_order_release);
+  update_effective_trim ();
   xfade_pending.store (true, std::memory_order_release);
 }
 

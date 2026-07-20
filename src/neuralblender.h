@@ -359,6 +359,7 @@ public:
   bool loaded () const;
   std::string model_filename () const;
   std::atomic<float> trim { 1.0f };
+  std::atomic<float> effective_trim { 1.0f };
 
   size_t      bank            = -1;
   size_t      lane            = -1;
@@ -473,6 +474,7 @@ public:
   int tuner_freq ();
   bool set_master_gain (float db);
   bool set_presence (float pres);
+  void update_effective_trim ();
   
   //static void get_calib_data (std::vector<float> &v, bool bass);
   
