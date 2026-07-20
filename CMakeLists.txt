@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(neuralblender
+project(neuralblender 
   VERSION 0.1.0
   DESCRIPTION "Amp modeling plugin based on RTNeural and NAM"
   LANGUAGES C CXX)
