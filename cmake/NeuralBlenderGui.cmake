@@ -109,7 +109,7 @@ function(add_neuralblender_gui_library target_name)
     neuralblender_config
     xputty
   )
-
+  
   if (ARGN)
     target_compile_definitions(${target_name} PRIVATE ${ARGN})
   endif()

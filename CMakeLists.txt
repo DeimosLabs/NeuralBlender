@@ -56,6 +56,7 @@ set(INLINE_DATA_INPUTS
   "${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.sh"
   "${CMAKE_CURRENT_SOURCE_DIR}/data/generate_inline_data.list"
 )
+
 foreach(INLINE_DATA_LINE ${INLINE_DATA_LIST_LINES})
   string(REGEX REPLACE "#.*$" "" INLINE_DATA_LINE "${INLINE_DATA_LINE}")
   string(STRIP "${INLINE_DATA_LINE}" INLINE_DATA_LINE)
