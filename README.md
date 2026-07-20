@@ -63,6 +63,7 @@ Should compile and work fine on any POSIX-compliant OS including Linux, MacOS (t
 
 Tested on:
   - Void Linux
+  - MX Moksha
   - Linux Mint
   - FreeBSD
 
