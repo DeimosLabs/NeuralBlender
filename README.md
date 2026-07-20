@@ -38,12 +38,14 @@ Features considered for future versions: VST plugin, series mode(s), optionally 
 
 Compiles and installs with cmake.
 
-Required libraries:
+Required libs / utilities:
   - eigen3 (for core, required)
   - lv2 (for LV2 plugin)
   - jack (for standalone app)
   - cairo/x11 (for GUI)
-  - libsoundfile/libsamplerate (for IR support)
+  - libsoundfile, libsamplerate (for IR support)
+  - xxd utility, for inline data
+  
   
 See CMakeLists.txt for more details.
 
