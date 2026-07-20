@@ -545,7 +545,7 @@ void c_lane_widgets::create (
   
   btn_browse.create (ui, wp, "", 0, 0, 100, 40, WSTYLE_IMAGE_BUTTON);
   btn_clear.create  (ui, wp, "",     0, 0, 100, 40, WSTYLE_IMAGE_BUTTON);
-  btn_excl.create   (ui, wp, "Use",       0, 0, 100, 40, WSTYLE_TOGGLE);
+  btn_excl.create   (ui, wp, "Use",       0, 0, 100, 40, WSTYLE_IMAGE_TOGGLE);
   btn_mute.create   (ui, wp, "Mute",      0, 0, 100, 40, WSTYLE_IMAGE_TOGGLE);
   switch (bank_id) {
     case BANK_PEDAL:
@@ -577,6 +577,9 @@ void c_lane_widgets::create (
   btn_mute.set_image (data_icon_speaker_off_big_png, WSTATE_ON);
   btn_mute.set_image (data_icon_speaker_on_big_png, WSTATE_OFF);
   btn_mute.padding = 16;
+  btn_excl.set_image (data_icon_radiobutton_on_png, WSTATE_ON);
+  btn_excl.set_image (data_icon_radiobutton_off_png, WSTATE_OFF);
+  btn_excl.padding = 0;
   
   // advanced controls
   knob_delay.role = ROLE_DELAY;
@@ -668,10 +671,13 @@ void c_lane_widgets::move_resize (
   int mute_width = std::max (24, menu_list.x () + menu_list.w () - mute_x);
   btn_mute.move_resize (mute_x,
                          button_top, mute_width, button_width);
-  if (btn_mute.w () > 80)
+  if (btn_mute.w () > 80) {
     btn_mute.set_label ("Mute");
-  else
+    btn_excl.set_label ("Use");
+  } else {
     btn_mute.set_label ("");
+    btn_excl.set_label ("");
+  }
   btn_excl.move_resize (btn_mute.x (), btn_mute.y (), btn_mute.w (), btn_mute.h ());
   btn_mute.padding = btn_mute.h () / 4;
   
