@@ -46,13 +46,20 @@ Required libs / utilities:
   - libsoundfile, libsamplerate (for IR support)
   - xxd utility, for inline data
   
-  
+On ubuntu/mint, just run:
+```bash
+sudo apt install git cmake libeigen3-dev lv2-dev libjack-dev libcairo2-dev libsndfile1-dev libsamplerate0-dev xxd
+```
 See CMakeLists.txt for more details.
 
-To build and install, from an empty build directory run something like:
+To build and install, grab the code and compile it, by running something like:
 ```
-cmake wherver/is/src/neuralblender
-make -j `nproc`
+git clone https://github.com/DeimosLabs/NeuralBlender
+cd NeuralBlender
+mkdir build
+cd build
+cmake ..
+make                 # or make -j$(nproc) to build faster
 sudo make install
 ```
 For the standalone version, see --help text for more info/options
