@@ -579,7 +579,7 @@ void c_lane_widgets::create (
   btn_mute.padding = 16;
   btn_excl.set_image (data_icon_radiobutton_on_png, WSTATE_ON);
   btn_excl.set_image (data_icon_radiobutton_off_png, WSTATE_OFF);
-  btn_excl.padding = 0;
+  btn_excl.padding = 4;
   
   // advanced controls
   knob_delay.role = ROLE_DELAY;
@@ -1096,6 +1096,11 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     btn_tuner.move_resize       (btnr - (btnh + 4) * 2, btnt, btnh, btnh);
     btn_noisegate.move_resize   (btnr - (btnh + 4)    , btnt, btnh, btnh);
     
+    int btnpad = btn_tab_pedals.h () / 4;
+    btn_tab_pedals.padding = btnpad;
+    btn_tab_models.padding = btnpad;
+    btn_tab_cabs.padding = btnpad;
+    
     tuner_height = toparea - btnh - 8;
     img_logo.move_resize (window_width / 2 - 128, tuner_height / 2- 16, 256, 32);
     cont_toparea.expose ();
@@ -1122,7 +1127,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
       frame_other_volumepresence.move_resize (16, 0, panelwidth / 2 - 8, 120);
       frame_other_noisegate.move_resize (panelwidth / 2 + 24, 0, panelwidth / 2 - 8, 120);
       frame_other_linkexcl.move_resize (16, 136, panelwidth, 120);
-      frame_other_misc.move_resize (16, 272, panelwidth, window_height - 412);
+      frame_other_misc.move_resize (16, 272, panelwidth, cont_other.h () - 272);
       const int about_y = frame_other_misc.h () - 60;
       btn_other_prefs.move (frame_other_misc.w () - 280, about_y);
       btn_other_about.move (frame_other_misc.w () - 140, about_y);
