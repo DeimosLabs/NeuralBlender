@@ -52,7 +52,7 @@ sudo apt install git cmake libeigen3-dev lv2-dev libjack-dev libcairo2-dev libsn
 ```
 See CMakeLists.txt for more details.
 
-To build and install, grab the code and compile it, by running something like:
+To grab the code, build and install, run something like:
 ```
 git clone https://github.com/DeimosLabs/NeuralBlender
 cd NeuralBlender
