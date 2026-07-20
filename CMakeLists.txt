@@ -19,6 +19,7 @@ option(NOASAN         "Disable asan on debug build" ON)
 find_package(PkgConfig REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(Threads REQUIRED)
+find_program(XXD_EXECUTABLE xxd REQUIRED)
 
 pkg_check_modules(FFTW3F REQUIRED IMPORTED_TARGET fftw3f)
 pkg_check_modules(SNDFILE REQUIRED IMPORTED_TARGET sndfile)
