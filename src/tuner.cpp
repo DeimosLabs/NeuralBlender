@@ -372,6 +372,7 @@ static const char *note_names [] = {
 
 void c_tunerwidget::on_paint (cairo_t *cr) {
   char buf [32];
+  cairo_text_extents_t ext;
   
   bool valid = true;
   if (current_note < 20 || current_note > 108)
@@ -387,7 +388,7 @@ void c_tunerwidget::on_paint (cairo_t *cr) {
   if (hist_notes.size () > INTUNE_DELAY) hist_notes.pop_front ();
   if (hist_cents.size () > INTUNE_DELAY) hist_cents.pop_front ();
   
-  int side = height / 4;
+  int side = height / 5;
   int bracketsize = std::max (height / 5, width * INTUNE_THRESHOLD / 100);
   bool stable_tuning = true;
   float a = 1.0 - ((float) abscents / 100.0);
@@ -407,7 +408,7 @@ void c_tunerwidget::on_paint (cairo_t *cr) {
       cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, a);
   
     cairo_move_to (cr, x - side, height);
-    cairo_line_to (cr, x, height / 3);
+    cairo_line_to (cr, x, height / 2);
     cairo_line_to (cr, x + side, height);
     cairo_close_path (cr);
     cairo_fill (cr);
@@ -415,7 +416,7 @@ void c_tunerwidget::on_paint (cairo_t *cr) {
     snprintf (buf, 31, "---");
   }
   
-  cairo_set_line_width (cr, 2.0);
+  cairo_set_line_width (cr, height / 20);
   
   if (valid && stable_tuning) {
     cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 1.0);
@@ -423,29 +424,31 @@ void c_tunerwidget::on_paint (cairo_t *cr) {
     cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 0.2);
   }
   
-  cairo_move_to (cr, width / 2 - bracketsize, 12);
+  cairo_move_to (cr, width / 2 - bracketsize, height / 6);
   cairo_line_to (cr, width / 2 - bracketsize, 4);
   cairo_line_to (cr, width / 2 + bracketsize, 4);
-  cairo_line_to (cr, width / 2 + bracketsize, 12);
+  cairo_line_to (cr, width / 2 + bracketsize, height / 6);
   cairo_stroke (cr);
   
   cairo_set_source_rgba (cr, 0.5, 1.0, 0.5, 1.0);
-  cairo_set_font_size (cr, 40.0);
-  cairo_move_to (cr, 8, 44);
+  cairo_set_font_size (cr, (float) height * 2.0 / 3.0);
+  cairo_text_extents (cr, "A", &ext);
+  cairo_move_to (cr, 8, ext.height + (height - ext.height) / 2);
   cairo_show_text (cr, buf);
-  cairo_set_font_size (cr, 14.0);
-  cairo_move_to (cr, width - 72, height - 4);
+  cairo_set_font_size (cr, height / 4);
+  cairo_text_extents (cr, "999.00 Hz ", &ext);
+  cairo_move_to (cr, width - ext.width, height - (height / 10));
   if (valid)
     snprintf (buf, 31, "%.2f Hz", current_freq);
   else
-    snprintf (buf, 31, "--- Hz");
+    snprintf (buf, 31, "0.00 Hz");
   cairo_show_text (cr, buf);
   
   if (valid)
     snprintf (buf, 31, "%s%d", current_cents >= 0 ? "+" : "-", abscents);
   else
-    snprintf (buf, 31, "---");
-  cairo_move_to (cr, width - 72, 16);
+    snprintf (buf, 31, "+0");
+  cairo_move_to (cr, width - ext.width, height / 10 + ext.height);
   cairo_show_text (cr, buf);
   
 }

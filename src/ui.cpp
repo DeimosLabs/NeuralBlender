@@ -1051,19 +1051,19 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
       window_height = std::max (MIN_WINDOW_HEIGHT, (int) (metrics.height / mw->app->hdpi));
     }
     
-    img_logo.move_resize (window_width / 2 - 128, 12, 256, 32);
-    
     //if (do_set_min_size)
     mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
     
-    cont_toparea.move_resize (0, 0, window_width, 116);
-    const int page_y = 128;
-    const int page_h = window_height - 138;
+    int toparea = std::max (window_height / 5, 116);
+    if (toparea < 32) toparea = 32;
+    cont_toparea.move_resize (0, 0, window_width, toparea);
+    const int page_y = toparea + 8;
+    const int page_h = window_height - toparea - 16;
     cont_pedals.move_resize (0, page_y, window_width, page_h);
     cont_models.move_resize (0, page_y, window_width, page_h);
-    cont_cabs.move_resize (0, page_y, window_width, page_h);
-    cont_other.move_resize (0, page_y, window_width, page_h);
-    cont_toparea.expose ();
+    cont_cabs.move_resize   (0, page_y, window_width, page_h);
+    cont_other.move_resize  (0, page_y, window_width, page_h);
+
     
     sync_page_visibility ();
     
@@ -1079,20 +1079,28 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     debug ("window w/h %d,%d", window_width, window_height);
     
     const int btnl = 16;
-    const int btnr = window_width - 54 * 4 - 66;
-    const int btnt = 66;
-    const int btnw = 88;
-    btn_tab_pedals.move       (btnl + 0,   btnt);
-    btn_tab_models.move       (btnl + btnw,     btnt);
-    btn_tab_cabs.move         (btnl + btnw * 2, btnt);
-    btn_tab_other.move        (btnl + btnw * 3, btnt);
-    btn_enable.move_resize    (btnr + 54,     btnt, 50, 50);
-    btn_muteall.move_resize   (btnr + 54 * 2, btnt, 50, 50);
-    btn_tuner.move_resize     (btnr + 54 * 3, btnt, 50, 50);
-    btn_noisegate.move_resize (btnr + 54 * 4, btnt, 50, 50);
+          int btnh = std::max (50, toparea / 2 - 12);
+          int btnw = std::min (88, btnh * 2);
+              btnw = std::max (btnw, window_width / 8);
+    if (btnh > window_width / 12)
+      btnh = window_width / 12;
+    const int btnr = window_width - 12;
+    const int btnt = toparea - btnh; //toparea / 2 + 8;
     
+    btn_tab_pedals.move_resize  (btnl,                  btnt, btnw, btnh);
+    btn_tab_models.move_resize  (btnl + (btnw + 4),     btnt, btnw, btnh);
+    btn_tab_cabs.move_resize    (btnl + (btnw + 4) * 2, btnt, btnw, btnh);
+    btn_tab_other.move_resize   (btnl + (btnw + 4) * 3, btnt, btnw, btnh);
+    btn_enable.move_resize      (btnr - (btnh + 4) * 4, btnt, btnh, btnh);
+    btn_muteall.move_resize     (btnr - (btnh + 4) * 3, btnt, btnh, btnh);
+    btn_tuner.move_resize       (btnr - (btnh + 4) * 2, btnt, btnh, btnh);
+    btn_noisegate.move_resize   (btnr - (btnh + 4)    , btnt, btnh, btnh);
+    
+    tuner_height = toparea - btnh - 8;
+    img_logo.move_resize (window_width / 2 - 128, tuner_height / 2- 16, 256, 32);
+    cont_toparea.expose ();
     if (tuner.created)
-      tuner.move_resize (4, 4, window_width - 8, 56);
+      tuner.move_resize (4, 4, window_width - 8, tuner_height);
     
     if (page_has_bank (visible_page)) {
       size_t i;
@@ -1262,7 +1270,7 @@ void c_neuralblender_ui::ensure_tuner_created () {
   Metrics_t metrics;
   os_get_window_metrics (mainwindow.widget, &metrics);
   const int w = std::max (1, metrics.width - 8);
-  tuner.create (this, cont_toparea.widget, "", 4, 4, w, 56);
+  tuner.create (this, cont_toparea.widget, "", 4, 4, w, tuner_height);
   if (blender)
     tuner.set_pitchtracker (&blender->pitchtracker);
 }

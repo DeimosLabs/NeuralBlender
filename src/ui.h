@@ -254,6 +254,7 @@ public:
   c_aboutwindow aboutwindow;
   c_prefswindow prefswindow;
   Window parent;
+  int tuner_height = 64;
   bool do_set_min_size = false; // ugly hack for ardour's window size shenanigans
   
   c_container    cont_toparea;
