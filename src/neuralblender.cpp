@@ -27,7 +27,7 @@
 #include <iostream>
 #include "neuralblender.h"
 #include "data.h"
-#include "config.h"
+#include "configfile.h"
 
 #ifdef HAVE_SNDFILE
 #include <sndfile.h>

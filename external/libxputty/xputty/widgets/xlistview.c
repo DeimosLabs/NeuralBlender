@@ -24,9 +24,6 @@
 #include "xtooltip.h"
 #include "xslider.h"
 
-#ifdef BUILD_NEURALBLENDER
-#include "xputty_res.h"
-#endif
 
 void listview_set_active_entry(Widget_t *w, int active) {
     if(active<0) return;

@@ -24,8 +24,8 @@
 #include <string>
 #include <vector>
 
+#include "configfile.h"
 #include "xputty_compat.h"
-#include "config.h"
 #include "widgets.h"
 
 #define UI_BUTTON_RADIUS     12.0
@@ -254,7 +254,7 @@ public:
   c_aboutwindow aboutwindow;
   c_prefswindow prefswindow;
   Window parent;
-  int tuner_height = 64;
+  int tuner_height = 56;
   bool do_set_min_size = false; // ugly hack for ardour's window size shenanigans
   
   c_container    cont_toparea;
@@ -282,11 +282,15 @@ public:
   c_knob         knob_noisehold;
   c_knob         knob_noiserelease;
   c_frame        frame_other_linkexcl;
+  c_label        label_other_byp;
   c_label        label_other_link;
   c_label        label_other_excl;
   c_button       btn_other_link_pedal;
   c_button       btn_other_link_amp;
   c_button       btn_other_link_cab;
+  c_button       btn_other_byp_pedal;
+  c_button       btn_other_byp_amp;
+  c_button       btn_other_byp_cab;
   c_button       btn_other_excl_pedal;
   c_button       btn_other_excl_amp;
   c_button       btn_other_excl_cab;

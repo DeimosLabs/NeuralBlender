@@ -486,7 +486,7 @@ void c_widget::create (
   add_tooltip (widget, ""); // creates initial tooltip
   set_tooltip ("");         // our function below hides it
   set_x11_window_background (widget, bg_colors ? *bg_colors : g_colors->window_bg);
-  widget->flags |= USE_TRANSPARENCY;
+  widget->flags |= USE_TRANSPARENCY /*| DONT_PROPAGATE*/;
 
   // no callback func because it would overwrite the ones from
   // child widget classes if they call this func. after their own
@@ -868,6 +868,10 @@ void c_toplevelwindow::cb_close (void *w_, void *user_data) { CP
     return;
 
   window->on_close ();
+
+  Widget_t *widget = (Widget_t *) w_;
+  if (widget && widget->app)
+    widget->app->run = false;
 }
 
 bool c_mainwindow::create (
@@ -2197,7 +2201,10 @@ void c_knob::cb_draw (void *w, void *user_data) {
     const int width = std::max (1, metrics.width - 1);
     const int height = std::max (1, metrics.height - 1);
     if (widget->image)
-      _draw_image_knob (widget, width - 1, height - 1);
+      _draw_image_knob (
+        widget,
+        std::max (1, width - 1),
+        std::max (1, height - 1));
     else
       _draw_knob (widget, user_data);
 

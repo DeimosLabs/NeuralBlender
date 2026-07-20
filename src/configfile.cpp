@@ -7,7 +7,7 @@
 #include <string>
 #include <cctype>
 #include <vector>
-#include "config.h"
+#include "configfile.h"
 
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_YELLOW
 #include "cmdline_debug.h"

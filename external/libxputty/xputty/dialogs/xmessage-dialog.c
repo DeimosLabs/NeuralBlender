@@ -20,10 +20,6 @@
 
 #include "xmessage-dialog.h"
 
-#ifdef BUILD_NEURALBLENDER
-#include "xputty_res.h"
-#endif
-
 void hyperlink_pressed(void *w_, void* button_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;
     XButtonEvent *xbutton = (XButtonEvent*)button_;

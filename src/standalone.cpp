@@ -25,7 +25,7 @@
 #include <unistd.h>
 #include "neuralblender.h"
 //#include "timestamp.h"
-#include "config.h"
+#include "configfile.h"
 
 #ifdef HAVE_GUI
 #include <atomic>

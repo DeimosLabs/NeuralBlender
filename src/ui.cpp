@@ -22,7 +22,7 @@
 #define CMDLINE_DEBUG_COLOR ANSI_MAGENTA
 #include "cmdline_debug.h"
 
-#define MIN_WINDOW_HEIGHT (80 + (130 * NB_NUM_MODELS))
+#define MIN_WINDOW_HEIGHT (100 + (130 * NB_NUM_MODELS))
 //#define DEFAULT_WINDOW_HEIGHT (12 + std::min (640, (52 + (180 * NB_NUM_MODELS))))
 #define DEFAULT_WINDOW_HEIGHT MIN_WINDOW_HEIGHT
 #define MIN_WINDOW_WIDTH 620
@@ -942,15 +942,25 @@ bool c_neuralblender_ui::create (Window parent_) { CP
 
   frame_other_linkexcl.create (this, cont_other.widget, "", 16, 16, 512, 128);
   const int x0 = 16, x1 = 186, x2 = 296, x3 = 406;
-  const int y0 = 20, y1 = 68;
-  label_other_link.create (this, frame_other_linkexcl.widget, "Link calibration: ", x0, y0, 150, 32);
-  label_other_excl.create (this, frame_other_linkexcl.widget, "Exclusive mode: ", x0, y1, 150, 32);
-  btn_other_link_pedal.create (this, frame_other_linkexcl.widget, "Pedal", x1, y0, 150, 32, WSTYLE_CHECKBOX);
-  btn_other_link_amp.create (this, frame_other_linkexcl.widget, "Amp", x2, y0, 150, 32, WSTYLE_CHECKBOX);
-  btn_other_link_cab.create (this, frame_other_linkexcl.widget, "Cab/IR", x3, y0, 150, 32, WSTYLE_CHECKBOX);
-  btn_other_excl_pedal.create (this, frame_other_linkexcl.widget, "Pedal", x1, y1, 150, 32, WSTYLE_CHECKBOX);
-  btn_other_excl_amp.create (this, frame_other_linkexcl.widget, "Amp", x2, y1, 150, 32, WSTYLE_CHECKBOX);
-  btn_other_excl_cab.create (this, frame_other_linkexcl.widget, "Cab/IR", x3, y1, 150, 32, WSTYLE_CHECKBOX);
+  const int y0 = 16, y1 = 56, y2 = 96;
+  label_other_byp.create (this, frame_other_linkexcl.widget, "Bypass: ",  x0, y0, 150, 32);
+  label_other_link.create (this, frame_other_linkexcl.widget, "Link calibration: ", x0, y1, 150, 32);
+  label_other_excl.create (this, frame_other_linkexcl.widget, "Exclusive mode: ",   x0, y2, 150, 32);  
+  btn_other_byp_pedal.create (this, frame_other_linkexcl.widget, "Pedal",           x1, y0, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_byp_amp.create (this, frame_other_linkexcl.widget, "Amp",               x2, y0, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_byp_cab.create (this, frame_other_linkexcl.widget, "Cab/IR",            x3, y0, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_link_pedal.create (this, frame_other_linkexcl.widget, "Pedal",          x1, y1, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_link_amp.create (this, frame_other_linkexcl.widget, "Amp",              x2, y1, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_link_cab.create (this, frame_other_linkexcl.widget, "Cab/IR",           x3, y1, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_excl_pedal.create (this, frame_other_linkexcl.widget, "Pedal",          x1, y2, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_excl_amp.create (this, frame_other_linkexcl.widget, "Amp",              x2, y2, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_excl_cab.create (this, frame_other_linkexcl.widget, "Cab/IR",           x3, y2, 150, 32, WSTYLE_CHECKBOX);
+  btn_other_byp_pedal.role = ROLE_BANK_BYPASS;
+  btn_other_byp_amp.role = ROLE_BANK_BYPASS;
+  btn_other_byp_cab.role = ROLE_BANK_BYPASS;
+  btn_other_byp_pedal.bank = BANK_PEDAL;
+  btn_other_byp_amp.bank = BANK_AMP;
+  btn_other_byp_cab.bank = BANK_CAB;
   btn_other_link_pedal.role = ROLE_LINKED_CALIB;
   btn_other_link_amp.role = ROLE_LINKED_CALIB;
   btn_other_link_cab.role = ROLE_LINKED_CALIB;
@@ -1124,10 +1134,11 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
       meter_in [PAGE_OTHER].move_resize (5, 4, METER_WIDTH, meter_h);
       meter_masterout.move_resize (
         window_width - 5 - METER_WIDTH, 4, METER_WIDTH, meter_h);
-      frame_other_volumepresence.move_resize (16, 0, panelwidth / 2 - 8, 120);
-      frame_other_noisegate.move_resize (panelwidth / 2 + 24, 0, panelwidth / 2 - 8, 120);
-      frame_other_linkexcl.move_resize (16, 136, panelwidth, 120);
-      frame_other_misc.move_resize (16, 272, panelwidth, cont_other.h () - 272);
+      frame_other_volumepresence.move_resize (16, 0, panelwidth / 2 - 12, 120);
+      frame_other_noisegate.move_resize (panelwidth / 2 + 16, 0, panelwidth / 2, 120);
+      frame_other_linkexcl.move_resize (16, 132, panelwidth, 140);
+      int frameothersize = frame_other_linkexcl.y () + frame_other_linkexcl.h () + 12;
+      frame_other_misc.move_resize (16, frameothersize, panelwidth, cont_other.h () - frameothersize);
       const int about_y = frame_other_misc.h () - 60;
       btn_other_prefs.move (frame_other_misc.w () - 280, about_y);
       btn_other_about.move (frame_other_misc.w () - 140, about_y);
@@ -1418,6 +1429,14 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
     case ROLE_MUTEALL: CP
       state.mute_all = value;
       on_muteall (btn, value);
+    break;
+
+    case ROLE_BANK_BYPASS: CP
+      if (btn->bank < BANK_COUNT) {
+        const _lane_bank bank = (_lane_bank) btn->bank;
+        set_bank_bypass_for_state (state, bank, value);
+        on_bank_bypass (btn, bank, value);
+      }
     break;
 
     case ROLE_BROWSE: CP
@@ -2001,6 +2020,9 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   show_advanced_settings (state.showadvanced);*/
 
   btn_other_bass.set_value (prefs.calib_source == 0 ? false : true);
+  btn_other_byp_pedal.set_value (state.pedal_bypass);
+  btn_other_byp_amp.set_value (state.amp_bypass);
+  btn_other_byp_cab.set_value (state.cab_bypass);
   btn_other_link_pedal.set_value (linked_calib_for_bank (BANK_PEDAL));
   btn_other_link_amp.set_value (linked_calib_for_bank (BANK_AMP));
   btn_other_link_cab.set_value (linked_calib_for_bank (BANK_CAB));

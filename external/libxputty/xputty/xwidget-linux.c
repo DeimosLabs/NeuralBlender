@@ -118,13 +118,8 @@ void os_resize_window(Display *dpy, Widget_t *w, int x, int y) {
 }
 
 void os_get_surface_size(cairo_surface_t *surface, int *width, int *height) {
-    if (cairo_surface_get_type(surface) == CAIRO_SURFACE_TYPE_IMAGE) {
-        *width = cairo_image_surface_get_width(surface);
-        *height = cairo_image_surface_get_height(surface);
-    } else {
-        *width = cairo_xlib_surface_get_width(surface);
-        *height = cairo_xlib_surface_get_height(surface);
-    }
+    *width = cairo_xlib_surface_get_width(surface);
+    *height = cairo_xlib_surface_get_height(surface);
 }
 
 void os_set_widget_surface_size(Widget_t *w, int width, int height) {
@@ -805,11 +800,6 @@ void os_get_dpi(Xputty *main) {
     XrmValue ret;
     char *resource_string;
     char *type;
-    
-    if (!main->hdpi)
-      main->hdpi = 96;
-    
-    return;
 
     XrmInitialize();
     resource_string = XResourceManagerString(main->dpy);
@@ -1081,12 +1071,11 @@ void os_run_embedded(Xputty *main) {
             if (xev.xclient.data.l[0] == (long int)XInternAtom(main->dpy, "WM_DELETE_WINDOW", True) ) {
                 int i = childlist_find_widget(main->childlist, xev.xclient.window);
                 if(i<0) return;
-                if(i==0) {
-                    main->run = false;
-                    return;
-                }
                 Widget_t *w = main->childlist->childs[i];
-                if(w->flags & HIDE_ON_DELETE) widget_hide(w);
+                if(i == 0) {
+                    w->func.unmap_notify_callback(w, NULL);
+                    main->run = false;
+                } else if(w->flags & HIDE_ON_DELETE) widget_hide(w);
                 else destroy_widget(w, main);
             }
         break;

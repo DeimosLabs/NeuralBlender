@@ -34,13 +34,25 @@ static void _show_label(Widget_t *w, int width, int height) {
 }
 
 void _draw_image_knob(Widget_t *w, int width_t, int height_t) {
+    if (!w || !w->image || width_t <= 0 || height_t <= 0) return;
+
     int width, height;
-    os_get_surface_size(w->image, &width, &height);
-    if (width <= 0 || height <= 0 || width_t <= 0 || height_t <= 0) return;
+    if (cairo_surface_get_type(w->image) == CAIRO_SURFACE_TYPE_IMAGE) {
+        width = cairo_image_surface_get_width(w->image);
+        height = cairo_image_surface_get_height(w->image);
+    } else {
+        os_get_surface_size(w->image, &width, &height);
+    }
+
+    if (width <= 0 || height <= 0) return;
+
+    int frames = width / height;
+    if (frames <= 0) return;
+
     double x = (double)width_t/(double)height;
     double y = (double)height/(double)width_t;
     double knobstate = adj_get_state(w->adj_y);
-    int findex = (int)(((width/height)-1) * knobstate);
+    int findex = (int)((frames - 1) * knobstate);
     int posx = 0;
     int posy = (height_t/2 - ((height*x)/2));
     if (width_t > height_t) {
