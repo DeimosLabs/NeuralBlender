@@ -31,6 +31,8 @@ static constexpr float DEFAULT_BG_R = 0.125f;
 static constexpr float DEFAULT_BG_G = 0.125f;
 static constexpr float DEFAULT_BG_B = 0.125f;
 
+//uint64_t now_ms ();
+
 static const char *cwd_config_key_for_bank (uint64_t bank) {
   return bank == BANK_CAB ? CONFIG_KEY_NAME_IR_CWD : CONFIG_KEY_NAME_MODEL_CWD;
 }
@@ -976,6 +978,9 @@ void c_toplevelwindow::on_expose () {
          widget->scale.init_width, widget->scale.init_height);
   fill_rounded_rect (widget, 0, 0, metrics.width, metrics.height,
                      0.0f, g_colors->window_bg);
+  
+  //static c_printfps fps("c_toplevelwindow::on_expose ");
+  //fps.tick ();
 }
 
 void c_toplevelwindow::on_resize () { CP

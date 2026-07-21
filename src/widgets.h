@@ -6,6 +6,7 @@
  */
 
 #include "ui.h"
+#include <chrono>
 
 struct t_gradient;
 
@@ -126,6 +127,32 @@ typedef struct {
   t_statecolors frame_selected;
   t_statecolors frame_disabled;
 } t_colortheme;
+
+inline uint64_t now_ms () {
+  using clock = std::chrono::steady_clock;
+  return std::chrono::duration_cast<std::chrono::milliseconds> (
+    clock::now ().time_since_epoch ()
+  ).count ();
+}
+
+struct c_printfps {
+  std::string m_str;
+  uint64_t count = 0;
+  uint64_t last = now_ms ();
+
+  c_printfps (std::string str) : m_str (std::move (str)) { }
+
+  inline void tick () {
+    count++;
+
+    uint64_t now = now_ms ();
+    if (now - last >= 1000) {
+      std::cout << m_str << count << "\n";
+      count = 0;
+      last = now;
+    }
+  }
+};
 
 const t_colortheme *get_colortheme ();
 void set_x11_window_background (Widget_t *w, const t_gradientcolors &colors);

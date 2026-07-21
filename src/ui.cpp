@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <chrono>
 
 #include <X11/cursorfont.h>
 
@@ -579,7 +580,7 @@ void c_lane_widgets::create (
   btn_mute.padding = 16;
   btn_excl.set_image (data_icon_radiobutton_on_png, WSTATE_ON);
   btn_excl.set_image (data_icon_radiobutton_off_png, WSTATE_OFF);
-  btn_excl.padding = 4;
+  btn_excl.padding = 8;
   
   // advanced controls
   knob_delay.role = ROLE_DELAY;
@@ -1880,6 +1881,11 @@ int c_neuralblender_ui::idle () {
   }
   
   run_embedded (&app);
+  int pending = XPending(app.dpy);
+  
+  //static c_printfps fps ("UI idle: ");
+  //fps.tick ();
+
   return 0;
 }
 
