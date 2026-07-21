@@ -379,6 +379,36 @@ if (STANDALONE)
   endif()
 endif()
 
+set(UNINSTALL_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
+file(WRITE "${UNINSTALL_SCRIPT}" [=[
+if (NOT CMAKE_INSTALL_MANIFEST)
+  message(FATAL_ERROR "CMAKE_INSTALL_MANIFEST is not set")
+endif()
+
+if (NOT EXISTS "${CMAKE_INSTALL_MANIFEST}")
+  message(FATAL_ERROR "Install manifest not found: ${CMAKE_INSTALL_MANIFEST}")
+endif()
+
+file(STRINGS "${CMAKE_INSTALL_MANIFEST}" files)
+foreach (file ${files})
+  if (EXISTS "${file}" OR IS_SYMLINK "${file}")
+    message(STATUS "Removing ${file}")
+    file(REMOVE "${file}")
+  else()
+    message(STATUS "Already removed ${file}")
+  endif()
+endforeach()
+]=])
+
+if (NOT TARGET uninstall)
+  add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND}
+      -D CMAKE_INSTALL_MANIFEST=${CMAKE_CURRENT_BINARY_DIR}/install_manifest.txt
+      -P ${UNINSTALL_SCRIPT}
+    COMMENT "Uninstalling files from install_manifest.txt"
+  )
+endif()
+
 if (GUI)
   pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11)
   pkg_check_modules(CAIRO REQUIRED IMPORTED_TARGET cairo)
