@@ -339,7 +339,7 @@ bool c_tunerwidget::needs_redraw () {
 }
 
 void c_tunerwidget::render_base (cairo_t *cr) {
-  cairo_set_line_width (cr, 1.0);
+  cairo_set_line_width (cr, height / 50);
 
   cairo_set_source_rgba (cr, 0.5, 0.5, 1.0, 0.3);
   for (int i = 0; i < 5; i++) {
@@ -389,7 +389,7 @@ void c_tunerwidget::on_paint (cairo_t *cr) {
   if (hist_cents.size () > INTUNE_DELAY) hist_cents.pop_front ();
   
   int side = height / 5;
-  int bracketsize = std::max (height / 5, width * INTUNE_THRESHOLD / 100);
+  int bracketsize = std::max (height / 10, width * INTUNE_THRESHOLD / 100);
   bool stable_tuning = true;
   float a = 1.0 - ((float) abscents / 100.0);
   
@@ -424,10 +424,10 @@ void c_tunerwidget::on_paint (cairo_t *cr) {
     cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 0.2);
   }
   
-  cairo_move_to (cr, width / 2 - bracketsize, height / 6);
-  cairo_line_to (cr, width / 2 - bracketsize, 4);
-  cairo_line_to (cr, width / 2 + bracketsize, 4);
-  cairo_line_to (cr, width / 2 + bracketsize, height / 6);
+  cairo_move_to (cr, width / 2 - bracketsize, height / 4);
+  cairo_line_to (cr, width / 2 - bracketsize, height / 7);
+  cairo_line_to (cr, width / 2 + bracketsize, height / 7);
+  cairo_line_to (cr, width / 2 + bracketsize, height / 4);
   cairo_stroke (cr);
   
   cairo_set_source_rgba (cr, 0.5, 1.0, 0.5, 1.0);
