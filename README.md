@@ -62,6 +62,13 @@ cmake ..
 make                 # or make -j$(nproc) to build faster
 sudo make install
 ```
+
+To uninstall:
+
+```
+sudo make uninstall
+```
+
 For the standalone version, see --help text for more info/options
 
 ## Supported systems
