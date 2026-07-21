@@ -637,6 +637,14 @@ void c_lane_widgets::move_resize (
   
   if (!main_widget)
     return;
+    
+  if (x == last_x && y == last_y && w == last_w && h == last_h)
+    return;
+  
+  last_x = x;
+  last_y = y;
+  last_w = w;
+  last_h = h;
 
   lane_widget.move_resize (x, y, w, h);
 

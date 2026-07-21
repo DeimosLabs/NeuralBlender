@@ -677,22 +677,12 @@ int c_widget::x () {
   if (!widget || !widget->app)
     return 0;
 
-  Metrics_t metrics;
-  os_get_window_metrics (widget, &metrics);
-  if (metrics.visible)
-    return (int) (metrics.x / widget->app->hdpi);
-
   return (int) (widget->scale.init_x / widget->app->hdpi);
 }
 
 int c_widget::y () {
   if (!widget || !widget->app)
     return 0;
-
-  Metrics_t metrics;
-  os_get_window_metrics (widget, &metrics);
-  if (metrics.visible)
-    return (int) (metrics.y / widget->app->hdpi);
 
   return (int) (widget->scale.init_y / widget->app->hdpi);
 }
@@ -701,11 +691,6 @@ int c_widget::w () {
   if (!widget || !widget->app)
     return 0;
 
-  Metrics_t metrics;
-  os_get_window_metrics (widget, &metrics);
-  if (metrics.visible)
-    return (int) (metrics.width / widget->app->hdpi);
-
   return (int) (widget->scale.init_width / widget->app->hdpi);
 }
 
@@ -713,22 +698,23 @@ int c_widget::h () {
   if (!widget || !widget->app)
     return 0;
 
-  Metrics_t metrics;
-  os_get_window_metrics (widget, &metrics);
-  if (metrics.visible)
-    return (int) (metrics.height / widget->app->hdpi);
-
   return (int) (widget->scale.init_height / widget->app->hdpi);
 }
 
 void c_widget::move_resize (int x, int y, int w, int h) {
   if (!widget)
     return;
-
+  
   const int sx = x * widget->app->hdpi;
   const int sy = y * widget->app->hdpi;
   const int sw = std::max (1, (int) (w * widget->app->hdpi));
   const int sh = std::max (1, (int) (h * widget->app->hdpi));
+
+  if (widget->scale.init_x == sx && widget->scale.init_y == sy &&
+      widget->scale.init_width == sw && widget->scale.init_height == sh) {
+    //expose ();
+    return;
+  }
 
   widget->x = sx;
   widget->y = sy;
@@ -739,8 +725,8 @@ void c_widget::move_resize (int x, int y, int w, int h) {
 
   os_move_window (widget->app->dpy, widget, sx, sy);
   os_resize_window (widget->app->dpy, widget, sw, sh);
-  widget->func.configure_callback (widget, NULL);
-  expose ();
+  //widget->func.configure_callback (widget, NULL);
+  //expose ();
 }
 
 void c_widget::move (int x, int y) {
@@ -750,13 +736,18 @@ void c_widget::move (int x, int y) {
   const int sx = x * widget->app->hdpi;
   const int sy = y * widget->app->hdpi;
 
+  if (widget->scale.init_x == sx && widget->scale.init_y == sy) {
+    //expose ();
+    return;
+  }
+
   widget->x = sx;
   widget->y = sy;
   widget->scale.init_x = sx;
   widget->scale.init_y = sy;
 
   os_move_window (widget->app->dpy, widget, sx, sy);
-  expose ();
+  //expose ();
 }
 
 void c_widget::resize (int w, int h) {
@@ -766,12 +757,17 @@ void c_widget::resize (int w, int h) {
   const int sw = std::max (1, (int) (w * widget->app->hdpi));
   const int sh = std::max (1, (int) (h * widget->app->hdpi));
 
+  if (widget->scale.init_width == sw && widget->scale.init_height == sh) {
+    //expose ();
+    return;
+  }
+
   widget->scale.init_width = sw;
   widget->scale.init_height = sh;
 
   os_resize_window (widget->app->dpy, widget, sw, sh);
-  widget->func.configure_callback (widget, NULL);
-  expose ();
+  //widget->func.configure_callback (widget, NULL);
+  //expose ();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1124,7 +1120,7 @@ void c_container::cb_draw (void *w_, void *userdata) {
 
 void c_frame::cb_draw (void *w_, void *user_data) {
   (void) user_data;
-
+  
   Widget_t *w = (Widget_t *) w_;
   if (!w || !w->parent_struct)
     return;

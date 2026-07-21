@@ -161,6 +161,11 @@ public:
   //c_meterwidget meter_in; // we only have one input
   c_meter meter_out;
   c_vudata vudata_out;
+  
+  int last_x = 0;
+  int last_y = 0;
+  int last_w = 0;
+  int last_h = 0;
 };
 
 class c_neuralblender_ui {
