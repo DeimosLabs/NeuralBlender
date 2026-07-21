@@ -843,7 +843,7 @@ void c_toplevelwindow::cb_close (void *w_, void *user_data) { CP
   window->on_close ();
 
   Widget_t *widget = (Widget_t *) w_;
-  if (widget && widget->app)
+  if (widget && widget->app && !(widget->flags & HIDE_ON_DELETE))
     widget->app->run = false;
 }
 
