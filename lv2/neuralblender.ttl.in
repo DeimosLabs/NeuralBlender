@@ -1286,7 +1286,7 @@ nb:CabD
 	        lv2:index 113 ;
 	        lv2:symbol "noisegate_attack" ;
 	        lv2:name "Noisegate Attack (ms)" ;
-	        lv2:default 2.0 ;
+	        lv2:default 5.0 ;
 	        lv2:minimum 0.0 ;
 	        lv2:maximum 500.0
 	    ] , [
@@ -1295,7 +1295,7 @@ nb:CabD
 	        lv2:index 114 ;
 	        lv2:symbol "noisegate_hold" ;
 	        lv2:name "Noisegate Hold (ms)" ;
-	        lv2:default 10.0 ;
+	        lv2:default 20.0 ;
 	        lv2:minimum 0.0 ;
 	        lv2:maximum 1000.0
 	    ] , [
@@ -1304,7 +1304,7 @@ nb:CabD
 	        lv2:index 115 ;
 	        lv2:symbol "noisegate_release" ;
 	        lv2:name "Noisegate Release (ms)" ;
-	        lv2:default 20.0 ;
+	        lv2:default 50.0 ;
 	        lv2:minimum 0.0 ;
 	        lv2:maximum 2000.0
 	    ] , [
