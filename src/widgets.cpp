@@ -702,31 +702,8 @@ int c_widget::h () {
 }
 
 void c_widget::move_resize (int x, int y, int w, int h) {
-  if (!widget)
-    return;
-  
-  const int sx = x * widget->app->hdpi;
-  const int sy = y * widget->app->hdpi;
-  const int sw = std::max (1, (int) (w * widget->app->hdpi));
-  const int sh = std::max (1, (int) (h * widget->app->hdpi));
-
-  if (widget->scale.init_x == sx && widget->scale.init_y == sy &&
-      widget->scale.init_width == sw && widget->scale.init_height == sh) {
-    //expose ();
-    return;
-  }
-
-  widget->x = sx;
-  widget->y = sy;
-  widget->scale.init_x = sx;
-  widget->scale.init_y = sy;
-  widget->scale.init_width = sw;
-  widget->scale.init_height = sh;
-
-  os_move_window (widget->app->dpy, widget, sx, sy);
-  os_resize_window (widget->app->dpy, widget, sw, sh);
-  //widget->func.configure_callback (widget, NULL);
-  //expose ();
+  move (x, y);
+  resize (w, h);
 }
 
 void c_widget::move (int x, int y) {
@@ -1140,8 +1117,11 @@ void c_frame::cb_draw (void *w_, void *user_data) {
   //debug ("c.bg: %f,%f,%f,%f to %f,%f,%f,%f", c.bg.r1, c.bg.g1, c.bg.b1, c.bg.a1, c.bg.r2, c.bg.g2, c.bg.b2, c.bg.a2);
   //debug ("c.fg: %f,%f,%f,%f to %f,%f,%f,%f", c.fg.r1, c.fg.g1, c.fg.b1, c.fg.a1, c.fg.r2, c.fg.g2, c.fg.b2, c.fg.a2);
 
-  fill_rounded_rect (w, UI_FRAME_RADIUS, bg);
-  draw_rounded_rect (w, UI_FRAME_RADIUS, fg, 2.0f);
+  const int width = std::max (1, w->scale.init_width);
+  const int height = std::max (1, w->scale.init_height);
+  fill_rounded_rect (w, 0, 0, width, height, 0.0f, g_colors->window_bg);
+  fill_rounded_rect (w, 0, 0, width, height, UI_FRAME_RADIUS, bg);
+  draw_rounded_rect (w, 0, 0, width, height, UI_FRAME_RADIUS, fg, 2.0f);
 }
 
 
