@@ -271,6 +271,7 @@ public:
   LV2_URID urid_stats = 0;
   LV2_URID urid_calib_target_db = 0;
   LV2_URID urid_calib_bass = 0;
+  LV2_URID urid_bank_bypass [BANK_COUNT] = {};
   LV2_URID urid_atom_Sequence = 0;
   
   inline bool init (LV2_URID_Map *m) {
@@ -344,6 +345,12 @@ public:
       map->map (map->handle, NB_URI "#CalibTargetDb");
     urid_calib_bass =
       map->map (map->handle, NB_URI "#CalibBass");
+    urid_bank_bypass [BANK_PEDAL] =
+      map->map (map->handle, NB_URI "#PedalBypass");
+    urid_bank_bypass [BANK_AMP] =
+      map->map (map->handle, NB_URI "#AmpBypass");
+    urid_bank_bypass [BANK_CAB] =
+      map->map (map->handle, NB_URI "#CabBypass");
 
     return true;
   }

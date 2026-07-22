@@ -888,6 +888,30 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
     return;
   }
 
+  if (value->type == urid_atom_Int) {
+    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+      if (prop != urid_bank_bypass [bank])
+        continue;
+
+      const bool bypassed = ((const LV2_Atom_Int *) value)->body != 0;
+      switch (bank) {
+        case BANK_PEDAL:
+          set_port_value (PORT_PEDAL_BYPASS, bypassed ? 1.0f : 0.0f);
+        break;
+
+        case BANK_CAB:
+          set_port_value (PORT_CAB_BYPASS, bypassed ? 1.0f : 0.0f);
+        break;
+
+        case BANK_AMP:
+        default:
+          set_port_value (PORT_AMP_BYPASS, bypassed ? 1.0f : 0.0f);
+        break;
+      }
+      return;
+    }
+  }
+
   if (value->type != urid_atom_Path &&
       value->type != urid_atom_String)
     return;

@@ -141,6 +141,7 @@ struct Plugin : public c_lv2_urids {
   
   // to get notified back when model is loaded from session restore
   bool notify_path [BANK_COUNT] [NB_NUM_MODELS] = {};
+  bool notify_bank_bypass [BANK_COUNT] = {};
   std::string current_path [BANK_COUNT] [NB_NUM_MODELS];
   bool restored_from_state = false;
   
@@ -530,6 +531,45 @@ static void set_calib_target_db (Plugin *self, float db) {
   }
 }
 
+static bool get_bank_bypass (Plugin *self, _lane_bank bank) {
+  if (!self)
+    return false;
+
+  switch (bank) {
+    case BANK_PEDAL:
+      return self->blender.pedal_bypass ();
+
+    case BANK_CAB:
+      return self->blender.cab_bypass ();
+
+    case BANK_AMP:
+    default:
+      return self->blender.amp_bypass ();
+  }
+}
+
+static void set_bank_bypass (Plugin *self, _lane_bank bank, bool bypass) {
+  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT)
+    return;
+
+  self->last_bank_bypass [bank] = bypass ? 1.0f : 0.0f;
+
+  switch (bank) {
+    case BANK_PEDAL:
+      self->blender.set_pedal_bypass (bypass);
+    break;
+
+    case BANK_CAB:
+      self->blender.set_cab_bypass (bypass);
+    break;
+
+    case BANK_AMP:
+    default:
+      self->blender.set_amp_bypass (bypass);
+    break;
+  }
+}
+
 static LV2_State_Status save (
   LV2_Handle instance,
   LV2_State_Store_Function store,
@@ -542,6 +582,15 @@ static LV2_State_Status save (
     get_state_path_features (features, &map_path, &free_path);
     
     for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+      const int32_t bypass =
+        get_bank_bypass (self, (_lane_bank) bank) ? 1 : 0;
+      store (handle,
+             self->urid_bank_bypass [bank],
+             &bypass,
+             sizeof (bypass),
+             self->urid_atom_Int,
+             LV2_STATE_IS_POD);
+
       for (int i = 0; i < NB_NUM_MODELS; i++) {
         const std::string filename =
           self->blender.banks [bank].lanes [i].model_filename ();
@@ -596,6 +645,23 @@ static LV2_State_Status restore (
   self->restored_from_state = true;
 
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    const void *bank_bypass_value =
+      retrieve (handle,
+                self->urid_bank_bypass [bank],
+                &size,
+                &type,
+                &valflags);
+
+    if (bank_bypass_value &&
+        type == self->urid_atom_Int &&
+        size >= sizeof (int32_t)) {
+      set_bank_bypass (
+        self,
+        (_lane_bank) bank,
+        (*(const int32_t *) bank_bypass_value) != 0);
+      self->notify_bank_bypass [bank] = true;
+    }
+
     for (int i = 0; i < NB_NUM_MODELS; i++) {
       const void *p =
         retrieve (handle,
@@ -1020,14 +1086,30 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         break;
     }
 
+    bool sent_bank_bypass_notify = false;
+    if (!sent_path_notify) {
+      for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+        if (self->notify_bank_bypass [bank]) {
+          forge_int_notify (
+            self,
+            self->urid_bank_bypass [bank],
+            get_bank_bypass (self, (_lane_bank) bank) ? 1 : 0);
+          self->notify_bank_bypass [bank] = false;
+          sent_bank_bypass_notify = true;
+          break;
+        }
+      }
+    }
+
 	    const bool sent_stats_notify =
+	      !sent_bank_bypass_notify &&
 	      self->stats_dirty.exchange (false, std::memory_order_acq_rel);
 	    if (sent_stats_notify)
 	      forge_stats_notify (self);
 
 	    const uint32_t meter_interval =
 	      (uint32_t) (self->samplerate > 0.0 ? self->samplerate / LV2_METER_FPS : 1600.0);
-	    if (!sent_path_notify && !sent_stats_notify &&
+	    if (!sent_path_notify && !sent_bank_bypass_notify && !sent_stats_notify &&
 	        self->meter_notify_samples >= meter_interval) {
       forge_meter_notify (self);
       self->meter_notify_samples = 0;
@@ -1045,6 +1127,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	        for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
 	          for (i = 0; i < NB_NUM_MODELS; i++)
 	            self->notify_path [bank] [i] = true;
+	        for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
+	          self->notify_bank_bypass [bank] = true;
 	        self->restored_from_state = false;
 	        self->stats_dirty.store (true, std::memory_order_release);
 	
@@ -1137,20 +1221,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     if (read_changed_bool (
           self->bank_bypass [bank], self->last_bank_bypass [bank], b)) { CP
-      switch (bank) {
-        case BANK_PEDAL:
-          self->blender.set_pedal_bypass (b);
-        break;
-
-        case BANK_CAB:
-          self->blender.set_cab_bypass (b);
-        break;
-
-        case BANK_AMP:
-        default:
-          self->blender.set_amp_bypass (b);
-        break;
-      }
+      set_bank_bypass (self, (_lane_bank) bank, b);
     }
   }
 
