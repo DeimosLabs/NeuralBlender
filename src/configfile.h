@@ -20,13 +20,6 @@
 #define CONFIG_KEY_NAME_VU_SCALE     "vu_scale_db"
 #define CONFIG_KEY_NAME_VU_HEADROOM  "vu_headroom_db"
 #define CONFIG_KEY_NAME_VU           "vu"
-#define CONFIG_KEY_NAME_TUNER        "tuner"
-#define CONFIG_KEY_NAME_TUNER_BASE   "tuner_base_freq"
-#define CONFIG_KEY_NAME_NOISEGATE    "noisegate"
-#define CONFIG_KEY_NAME_NOISETHRESH  "noisegate_thresh"
-#define CONFIG_KEY_NAME_NOISEATTACK  "noisegate_attack"
-#define CONFIG_KEY_NAME_NOISEHOLD    "noisegate_hold"
-#define CONFIG_KEY_NAME_NOISERELEASE "noisegate_release"
 #define CONFIG_DEFAULT_DIR           "/"
 
 class c_configfile {

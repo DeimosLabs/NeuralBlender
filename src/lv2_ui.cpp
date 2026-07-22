@@ -300,7 +300,6 @@ void c_lv2_ui::on_linked_calib (c_widget *w, bool b) {
 
     case BANK_AMP:
     default:
-      prefs.linked_calib = b;
       write_control (PORT_LINKED_CALIB_AMP, b ? 1.0f : 0.0f);
     break;
   }
@@ -316,7 +315,6 @@ void c_lv2_ui::on_noisegate (c_widget *w, bool b) {
   (void) w;
   CP
   state.noisegate_on = b;
-  prefs.noisegate_on = b;
   write_control (PORT_NOISEGATE_ENABLED, b ? 1.0f : 0.0f);
 }
 
@@ -324,7 +322,6 @@ void c_lv2_ui::on_noisethresh (c_widget *w, float f) {
   (void) w;
   CP
   state.noisethresh = f;
-  prefs.noisethresh = f;
   write_control (PORT_NOISEGATE_THRESHOLD, f);
 }
 
@@ -332,7 +329,6 @@ void c_lv2_ui::on_noiseattack (c_widget *w, float f) {
   (void) w;
   CP
   state.noiseattack = f;
-  prefs.noiseattack = f;
   write_control (PORT_NOISEGATE_ATTACK, f);
 }
 
@@ -340,7 +336,6 @@ void c_lv2_ui::on_noisehold (c_widget *w, float f) {
   (void) w;
   CP
   state.noisehold = f;
-  prefs.noisehold = f;
   write_control (PORT_NOISEGATE_HOLD, f);
 }
 
@@ -348,7 +343,6 @@ void c_lv2_ui::on_noiserelease (c_widget *w, float f) {
   (void) w;
   CP
   state.noiserelease = f;
-  prefs.noiserelease = f;
   write_control (PORT_NOISEGATE_RELEASE, f);
 }
 
@@ -367,7 +361,6 @@ void c_lv2_ui::on_tuner (c_widget *w, bool b) {
 void c_lv2_ui::on_tuner_base_freq (c_widget *w, float f) {
   (void) w;
   state.tuner_base_freq = f;
-  prefs.tuner_base_freq = f;
   write_control (PORT_TUNER_BASE_FREQ, f);
 }
 
@@ -396,15 +389,8 @@ void c_lv2_ui::on_bank_switch (c_widget *w, int n) {
 
 void c_lv2_ui::apply_prefs (t_prefs &p) {
   c_neuralblender_ui::apply_prefs (p);
-  write_control (PORT_LINKED_CALIB_PEDAL, p.linked_calib ? 1.0f : 0.0f);
-  write_control (PORT_LINKED_CALIB_AMP, p.linked_calib ? 1.0f : 0.0f);
-  write_control (PORT_LINKED_CALIB_CAB, p.linked_calib ? 1.0f : 0.0f);
   write_control (PORT_CALIB_SOURCE, (float) p.calib_source);
   write_control (PORT_CALIB_TARGET_DB, p.calib_target_db);
-  write_control (PORT_NOISEGATE_ATTACK, p.noiseattack);
-  write_control (PORT_NOISEGATE_HOLD, p.noisehold);
-  write_control (PORT_NOISEGATE_RELEASE, p.noiserelease);
-  write_control (PORT_TUNER_BASE_FREQ, p.tuner_base_freq);
 }
 
 bool c_lv2_ui::request_window_size (int w, int h) {
@@ -477,8 +463,6 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     const _lane_bank bank =
       port == PORT_LINKED_CALIB_PEDAL ? BANK_PEDAL :
       port == PORT_LINKED_CALIB_CAB   ? BANK_CAB   : BANK_AMP;
-    if (bank == BANK_AMP)
-      prefs.linked_calib = linked;
     set_linked_calib_for_bank (bank, linked);
     btn_other_link_pedal.set_value (linked_calib_for_bank (BANK_PEDAL));
     btn_other_link_amp.set_value (linked_calib_for_bank (BANK_AMP));
@@ -515,7 +499,6 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
   if (port == PORT_NOISEGATE_ENABLED) {
     state.noisegate_on = value >= 0.5f;
-    prefs.noisegate_on = state.noisegate_on;
     btn_noisegate.set_value (state.noisegate_on);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
@@ -524,7 +507,6 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
   if (port == PORT_NOISEGATE_THRESHOLD) {
     state.noisethresh = value;
-    prefs.noisethresh = value;
     knob_noisethresh.set_value (value);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
@@ -533,7 +515,6 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
   if (port == PORT_NOISEGATE_ATTACK) {
     state.noiseattack = value;
-    prefs.noiseattack = value;
     knob_noiseattack.set_value (value);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
@@ -542,7 +523,6 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
   if (port == PORT_NOISEGATE_HOLD) {
     state.noisehold = value;
-    prefs.noisehold = value;
     knob_noisehold.set_value (value);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
@@ -551,7 +531,6 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
   if (port == PORT_NOISEGATE_RELEASE) {
     state.noiserelease = value;
-    prefs.noiserelease = value;
     knob_noiserelease.set_value (value);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
@@ -575,9 +554,8 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
   if (port == PORT_TUNER_BASE_FREQ) {
     state.tuner_base_freq = value;
-    prefs.tuner_base_freq = value;
     char buf [64];
-    snprintf (buf, sizeof (buf), "%.3f", prefs.tuner_base_freq);
+    snprintf (buf, sizeof (buf), "%.3f", state.tuner_base_freq);
     text_other_tuner.set_text (buf);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;

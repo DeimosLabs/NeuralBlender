@@ -128,6 +128,7 @@ struct Plugin : public c_lv2_urids {
   
   std::atomic<bool> loader_running { true };
   std::atomic<bool> load_requested { false };
+  std::atomic<bool> restore_in_progress { false };
   
   // hehe what a mess
   bool pending_calibrate [BANK_COUNT] [NB_NUM_MODELS] = {};
@@ -259,6 +260,8 @@ static void loader_main (Plugin *self) { CP
       std::unique_lock<std::mutex> lock (self->loader_mutex);
 
       self->loader_cv.wait_for(lock, std::chrono::milliseconds (50), [&] {
+        if (self->restore_in_progress.load (std::memory_order_acquire))
+          return false;
         for (size_t b = BANK_PEDAL; b < BANK_COUNT; ++b) {
           if (self->pending_calibrate_all [b])
             return true;
@@ -273,6 +276,8 @@ static void loader_main (Plugin *self) { CP
 
       if (!self->loader_running)
         break;
+      if (self->restore_in_progress.load (std::memory_order_acquire))
+        continue;
 
       for (size_t b = BANK_PEDAL; b < BANK_COUNT && !do_load; ++b) {
         for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
@@ -626,6 +631,7 @@ static LV2_State_Status restore (
   const LV2_Feature *const *features) { 
   
   Plugin *self = (Plugin *) instance;
+  self->restore_in_progress.store (true, std::memory_order_release);
   LV2_State_Map_Path *map_path = NULL;
   LV2_State_Free_Path *free_path = NULL;
   get_state_path_features (features, &map_path, &free_path);
@@ -688,6 +694,9 @@ static LV2_State_Status restore (
       }
     }
   }
+
+  self->restore_in_progress.store (false, std::memory_order_release);
+  self->loader_cv.notify_one ();
 
   return LV2_STATE_SUCCESS;
 }

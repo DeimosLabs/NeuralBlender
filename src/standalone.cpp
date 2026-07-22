@@ -243,35 +243,31 @@ void c_standalone_ui::on_vu (c_widget *w, bool b) {
 
 void c_standalone_ui::on_noisegate (c_widget *w, bool b) {
   (void) w;
-  prefs.noisegate_on = b;
+  state.noisegate_on = b;
   g_blender->noisegate_on = b;
 }
 
 void c_standalone_ui::on_noisethresh (c_widget *w, float value) {
   (void) w;
   state.noisethresh = value;
-  prefs.noisethresh = value;
   g_blender->noisegate.set_threshold (value);
 }
 
 void c_standalone_ui::on_noiseattack (c_widget *w, float value) {
   (void) w;
   state.noiseattack = value;
-  prefs.noiseattack = value;
   g_blender->noisegate.set_attack (value);
 }
 
 void c_standalone_ui::on_noisehold (c_widget *w, float value) {
   (void) w;
   state.noisehold = value;
-  prefs.noisehold = value;
   g_blender->noisegate.set_hold (value);
 }
 
 void c_standalone_ui::on_noiserelease (c_widget *w, float value) {
   (void) w;
   state.noiserelease = value;
-  prefs.noiserelease = value;
   g_blender->noisegate.set_release (value);
 }
 
@@ -282,14 +278,13 @@ void c_standalone_ui::on_threshgain (c_widget *w, float f) {
 
 void c_standalone_ui::on_tuner (c_widget *w, bool b) {
   (void) w;
-  prefs.tuner_on = b;
+  state.tuner_on = b;
   g_blender->tuner_on = b;
 }
 
 void c_standalone_ui::on_tuner_base_freq (c_widget *w, float value) {
   (void) w;
   state.tuner_base_freq = value;
-  prefs.tuner_base_freq = value;
   g_blender->tuner_base_freq = value;
   g_blender->pitchtracker.set_base_freq ((int) lrintf (value));
 }
@@ -315,8 +310,6 @@ void c_standalone_ui::on_presence (c_widget *w, float value) {
 void c_standalone_ui::on_linked_calib (c_widget *w, bool b) {
   (void) w;
   set_linked_calib_for_bank (visible_bank, b);
-  if (visible_bank == BANK_AMP)
-    prefs.linked_calib = b;
   if (visible_bank >= BANK_PEDAL && visible_bank < BANK_COUNT)
     g_blender->banks [visible_bank].linked_calib = b;
   g_blender->linked_calib = g_blender->banks [BANK_AMP].linked_calib;
@@ -378,25 +371,6 @@ void c_standalone_ui::apply_prefs (t_prefs &p) {
   if (blender)
     blender->do_vu = p.vu_on;
   if (blender)
-    blender->tuner_on = p.tuner_on;
-  if (blender) {
-    blender->noisegate_on = p.noisegate_on;
-    blender->noisegate.set_threshold (p.noisethresh);
-    blender->noisegate.set_attack (p.noiseattack);
-    blender->noisegate.set_hold (p.noisehold);
-    blender->noisegate.set_release (p.noiserelease);
-  }
-  if (blender) {
-    blender->tuner_base_freq = p.tuner_base_freq;
-    blender->pitchtracker.set_base_freq ((int) lrintf (p.tuner_base_freq));
-  }
-  if (blender)
-    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
-      blender->banks [bank].linked_calib =
-        linked_calib_for_bank ((_lane_bank) bank);
-  if (blender)
-    blender->linked_calib = blender->banks [BANK_AMP].linked_calib;
-  if (blender)
     blender->calib_source = p.calib_source;
 }
 
@@ -405,19 +379,6 @@ void c_standalone_ui::write_prefs_to (t_prefs &p) {
 
   if (blender)
     p.calib_target_db = blender->banks [BANK_AMP].lanes [0].calib_target_db;
-  if (blender)
-    p.tuner_on = blender->tuner_on;
-  if (blender) {
-    p.noisegate_on = blender->noisegate_on;
-    p.noisethresh = blender->noisegate.threshold_db;
-    p.noiseattack = blender->noisegate.attack_ms;
-    p.noisehold = blender->noisegate.hold_ms;
-    p.noiserelease = blender->noisegate.release_ms;
-  }
-  if (blender)
-    p.tuner_base_freq = blender->tuner_base_freq;
-  if (blender)
-    p.linked_calib = linked_calib_for_bank (BANK_AMP);
   if (blender)
     p.calib_source = blender->calib_source;
 }
@@ -509,9 +470,6 @@ static void ui_main () {
     return;
   }
   g_blender->do_vu = g_ui->prefs.vu_on;
-  g_blender->tuner_on = g_ui->prefs.tuner_on;
-  g_blender->noisegate_on = g_ui->prefs.noisegate_on;
-  g_blender->noisegate.set_threshold (g_ui->prefs.noisethresh);
 
   c_neuralblender_state state;
   g_blender->get_state (state);

@@ -154,45 +154,6 @@ bool read_prefs_from_config (c_configfile &configfile, t_prefs &prefs) {
   str = configfile.get_item (CONFIG_KEY_NAME_VU);
   if (!str.empty ())
     prefs.vu_on = c_configfile::istrue (str);
-  
-  str = configfile.get_item (CONFIG_KEY_NAME_TUNER);
-  if (!str.empty ())
-    prefs.tuner_on = c_configfile::istrue (str);
-
-  float tuner_base_freq = prefs.tuner_base_freq;
-  if (parse_config_float (
-      configfile.get_item (CONFIG_KEY_NAME_TUNER_BASE),
-      tuner_base_freq))
-    prefs.tuner_base_freq = std::clamp (tuner_base_freq, 400.0f, 480.0f);
-
-  str = configfile.get_item (CONFIG_KEY_NAME_NOISEGATE);
-  if (!str.empty ())
-    prefs.noisegate_on = c_configfile::istrue (str);
-
-  float noisethresh = prefs.noisethresh;
-  if (parse_config_float (
-      configfile.get_item (CONFIG_KEY_NAME_NOISETHRESH),
-      noisethresh))
-    prefs.noisethresh =
-      std::clamp (noisethresh, NOISEGATE_THRESH_MIN, NOISEGATE_THRESH_MAX);
-
-  float noiseattack = prefs.noiseattack;
-  if (parse_config_float (
-      configfile.get_item (CONFIG_KEY_NAME_NOISEATTACK),
-      noiseattack))
-    prefs.noiseattack = std::max (0.0f, noiseattack);
-
-  float noisehold = prefs.noisehold;
-  if (parse_config_float (
-      configfile.get_item (CONFIG_KEY_NAME_NOISEHOLD),
-      noisehold))
-    prefs.noisehold = std::max (0.0f, noisehold);
-
-  float noiserelease = prefs.noiserelease;
-  if (parse_config_float (
-      configfile.get_item (CONFIG_KEY_NAME_NOISERELEASE),
-      noiserelease))
-    prefs.noiserelease = std::max (0.0f, noiserelease);
 
   return true;
 }
@@ -209,25 +170,6 @@ bool write_prefs_to_config (c_configfile &configfile, const t_prefs &prefs) {
   configfile.set_item (CONFIG_KEY_NAME_VU_HEADROOM, buf);
 
   configfile.set_item (CONFIG_KEY_NAME_VU, prefs.vu_on ? "1" : "0");
-  configfile.set_item (CONFIG_KEY_NAME_TUNER, prefs.tuner_on ? "1" : "0");
-  snprintf (buf, sizeof (buf), "%.6g", prefs.tuner_base_freq);
-  configfile.set_item (CONFIG_KEY_NAME_TUNER_BASE, buf);
-
-  configfile.set_item (
-    CONFIG_KEY_NAME_NOISEGATE,
-    prefs.noisegate_on ? "1" : "0");
-
-  snprintf (buf, sizeof (buf), "%.6g", prefs.noisethresh);
-  configfile.set_item (CONFIG_KEY_NAME_NOISETHRESH, buf);
-
-  snprintf (buf, sizeof (buf), "%.6g", prefs.noiseattack);
-  configfile.set_item (CONFIG_KEY_NAME_NOISEATTACK, buf);
-
-  snprintf (buf, sizeof (buf), "%.6g", prefs.noisehold);
-  configfile.set_item (CONFIG_KEY_NAME_NOISEHOLD, buf);
-
-  snprintf (buf, sizeof (buf), "%.6g", prefs.noiserelease);
-  configfile.set_item (CONFIG_KEY_NAME_NOISERELEASE, buf);
 
   return configfile.write_file ();
 }
@@ -763,13 +705,6 @@ bool c_neuralblender_ui::create (Window parent_) { CP
   configfile.read_file ();
   read_prefs_from_config (configfile, prefs);
   state.do_vu = prefs.vu_on;
-  state.tuner_on = prefs.tuner_on;
-  state.tuner_base_freq = prefs.tuner_base_freq;
-  state.noisegate_on = prefs.noisegate_on;
-  state.noisethresh = prefs.noisethresh;
-  state.noiseattack = prefs.noiseattack;
-  state.noisehold = prefs.noisehold;
-  state.noiserelease = prefs.noiserelease;
   
   if (configfile.istrue (CONFIG_KEY_NAME_ADV)) {
     CP
@@ -1516,13 +1451,11 @@ void c_neuralblender_ui::on_button (c_button *btn, bool value) {
 
     case ROLE_NOISEGATE: CP
       state.noisegate_on = value;
-      prefs.noisegate_on = value;
       on_noisegate (btn, value);
     break;
     
     case ROLE_TUNER: CP
       state.tuner_on = value;
-      prefs.tuner_on = value;
       on_tuner (btn, value);
       sync_tuner_visibility ();
         
@@ -1617,45 +1550,28 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
 
   vu_on (p.vu_on);
 
-  state.noisegate_on = p.noisegate_on;
-  state.noisethresh = p.noisethresh;
-  state.noiseattack = p.noiseattack;
-  state.noisehold = p.noisehold;
-  state.noiserelease = p.noiserelease;
-  state.tuner_base_freq = p.tuner_base_freq;
-  btn_noisegate.set_value (p.noisegate_on);
+  btn_noisegate.set_value (state.noisegate_on);
   knob_mastervolume.set_value (gain_to_db (state.master_gain));
   knob_presence.set_value (state.presence);
-  knob_noisethresh.set_value (p.noisethresh);
-  knob_noiseattack.set_value (p.noiseattack);
-  knob_noisehold.set_value (p.noisehold);
-  knob_noiserelease.set_value (p.noiserelease);
+  knob_noisethresh.set_value (state.noisethresh);
+  knob_noiseattack.set_value (state.noiseattack);
+  knob_noisehold.set_value (state.noisehold);
+  knob_noiserelease.set_value (state.noiserelease);
 
-  format_freq_text (buf, sizeof (buf), p.tuner_base_freq);
+  format_freq_text (buf, sizeof (buf), state.tuner_base_freq);
   text_other_tuner.set_text (buf);
   format_db_text (buf, sizeof (buf), p.calib_target_db);
   text_other_calib.set_text (buf);
 
-  /*if (p.noisegate_on)
-    knob_noisethresh.show ();
-  else
-    knob_noisethresh.hide ();*/
-
-  state.tuner_on = p.tuner_on;
   sync_tuner_visibility ();
 }
 
 void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
   apply_ui_prefs (p);
-  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
-    state.banks [bank].linked_calib = p.linked_calib;
 }
 
 void c_neuralblender_ui::write_prefs_to (t_prefs &p) { CP
   p.vu_on = state.do_vu;
-  p.tuner_on = state.tuner_on;
-  p.noisegate_on = state.noisegate_on;
-  p.noisethresh = state.noisethresh;
 }
 
 // called from lv2_ui - runs in UI thread

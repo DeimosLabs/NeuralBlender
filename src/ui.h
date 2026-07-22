@@ -51,14 +51,6 @@ typedef struct {
   float vu_scale_db     = -40.0f;
   float vu_headroom_db  = 6.0f;
   bool vu_on = true;
-  bool tuner_on = false;
-  float tuner_base_freq = 440.0f;
-  bool noisegate_on = false;
-  float noisethresh = -60.0f;
-  float noiseattack = 2.0f;
-  float noisehold = 10.0f;
-  float noiserelease = 20.0f;
-  bool linked_calib = false;
   int calib_source = 0; // 0=guitar, 1=bass
 } t_prefs;
 
