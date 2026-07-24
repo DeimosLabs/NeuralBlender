@@ -75,7 +75,7 @@ public:
 
   void set_pitchtracker (c_pitchtracker *p);
   void set_pitch (float freq, float note, float cents);
-  void on_ui_timer ();
+  bool on_ui_timer ();
   bool needs_redraw ();
   void set_base_freq (float f) { if (pitchtracker) pitchtracker->set_base_freq (f); }
 

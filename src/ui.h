@@ -208,6 +208,7 @@ public:
   c_meterwidget &input_meter_for_bank (_lane_bank bank);
   c_vudata &input_vudata_for_bank (_lane_bank bank);
   void redraw_visible_meters ();
+  void redraw_tuner_if_needed ();
   int exclusive_lane_for_bank (_lane_bank bank) const;
   void set_exclusive_lane_for_bank (_lane_bank bank, int lane);
   bool linked_calib_for_bank (_lane_bank bank) const;

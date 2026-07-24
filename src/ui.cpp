@@ -542,7 +542,7 @@ void c_lane_widgets::create (
   main_widget = native_owner;
   
   // regular controls
-  menu_list.create (&lane_frame, label, 0, 0, 320, 32);
+  menu_list.create (&lane_frame, "", 0, 0, 320, 32);
 
   int knobs_right = w - 180;
   knob_gain_in.create (&lane_frame, "Input", 0, 0, 64, 64);
@@ -1218,6 +1218,11 @@ void c_neuralblender_ui::redraw_visible_meters () {
     for (int i = 0; i < NB_NUM_MODELS; i++)
       redraw_meter (bank_lanes [i].meter_out);
   }
+}
+
+void c_neuralblender_ui::redraw_tuner_if_needed () {
+  if (state.tuner_on && tuner.on_ui_timer ())
+    mainwindow.redraw_child (tuner);
 }
 
 int c_neuralblender_ui::exclusive_lane_for_bank (_lane_bank bank) const {
@@ -1954,9 +1959,7 @@ int c_neuralblender_ui::idle () {
 
   redraw_visible_meters ();
   
-  if (state.tuner_on) {
-    tuner.on_ui_timer ();
-  }
+  redraw_tuner_if_needed ();
 
   if (tk_app.backend)
     tk_app.backend->flush_dirty (&app);

@@ -419,8 +419,7 @@ int c_lv2_ui::idle () {
 
   redraw_meters_now ();
 
-  if (state.tuner_on)
-    tuner.on_ui_timer ();
+  redraw_tuner_if_needed ();
 
   if (tk_app.backend) {
     tk_app.backend->flush_dirty (&app);

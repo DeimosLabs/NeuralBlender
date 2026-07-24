@@ -334,9 +334,9 @@ void c_tunerwidget::set_pitch (float freq, float note, float cents) {
   ui_needs_redraw.store (true, std::memory_order_release);
 }
 
-void c_tunerwidget::on_ui_timer () {
+bool c_tunerwidget::on_ui_timer () {
   if (!created || !visible)
-    return;
+    return false;
 
   bool dirty =
     ui_needs_redraw.exchange (false, std::memory_order_acq_rel);
@@ -352,10 +352,7 @@ void c_tunerwidget::on_ui_timer () {
     dirty = true;
   }
 
-  if (!dirty)
-    return;
-
-  invalidate_base ();
+  return dirty;
 }
 
 bool c_tunerwidget::needs_redraw () {
