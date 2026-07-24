@@ -1850,6 +1850,8 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
   state.noiseattack     = noisegate.attack_ms;
   state.noisehold       = noisegate.hold_ms;
   state.noiserelease    = noisegate.release_ms;
+  state.calib_target_db = banks [BANK_AMP].lanes [0].calib_target_db;
+  state.calib_source    = calib_source;
   
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     state.banks [bank].exclusive_lane = banks [bank].exclusive_lane;

@@ -164,6 +164,8 @@ struct c_neuralblender_state {
     noiseattack = other.noiseattack;
     noisehold = other.noisehold;
     noiserelease = other.noiserelease;
+    calib_target_db = other.calib_target_db;
+    calib_source = other.calib_source;
     
     pedal_bypass = other.pedal_bypass;
     amp_bypass   = other.amp_bypass;
@@ -193,6 +195,8 @@ struct c_neuralblender_state {
   float noiseattack       = 2.0f;
   float noisehold         = 10.0f;
   float noiserelease      = 20.0f;
+  float calib_target_db   = DB_CALIB_TARGET_DEFAULT;
+  int calib_source        = 0; // 0=guitar, 1=bass
   
   c_neuralblender_bank_state banks [BANK_COUNT];
   c_neuralblender_lane_state (&lanes) [NB_NUM_MODELS];

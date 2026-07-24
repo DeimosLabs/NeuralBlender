@@ -3,7 +3,7 @@
  * Original wxWidgets version was written for DIRT (Delt's Impulse
  * Response Tool) - see https://github.com/DeimosLabs/dirt
  *
- * Translated from wxWidgets to Cairo/xputty by Codex.
+ * Translated from wxWidgets to Cairo by Codex.
  */
 
 
@@ -15,11 +15,7 @@
 #include <cstring>
 
 #ifndef METER_DATA_ONLY
-#include <X11/Xlib.h>
-
-#include "meter.h"
-
-#include "xputty_compat.h"
+#include "widgets.h"
 #endif
 
 #define CMDLINE_DEBUG_COLOR ANSI_CYAN
@@ -325,55 +321,6 @@ void c_vudata::acknowledge () {
 
 #else
 
-#if 0
-
-// EXAMPLE USAGE, FROM CODEX:
-
-// Add members somewhere persistent, for example in c_neuralblender_ui or c_lane_widgets:
-
-c_vudata meter_data;
-c_meterwidget meter;
-
-// Create it after you have a valid xputty parent Widget_t *:
-
-meter.create(parent_widget, "Input", 20, 20, 180, 18);
-meter.set_vudata(&meter_data);
-meter.set_stereo(true);
-
-// Feed values from your UI/audio-side bridge:
-
-meter_data.set_l(0.45f, 0.70f, false);
-meter_data.set_r(0.35f, 0.62f, false);
-
-Then from your UI idle/timer path:
-
-meter.on_ui_timer();
-
-// For your current UI code, a quick test in c_neuralblender_ui::create() would look like:
-
-// ui.h member:
-c_vudata test_meter_data;
-c_meterwidget test_meter;
-
-// ui.cpp, after main_widget is created:
-test_meter.create(main_widget, "Test", 20, 600, 600, 20);
-test_meter.set_vudata(&test_meter_data);
-test_meter.set_stereo(true);
-
-test_meter_data.set_l(0.35f, 0.65f);
-test_meter_data.set_r(0.55f, 0.80f);
-
-// And in c_neuralblender_ui::idle():
-
-test_meter.on_ui_timer();
-
-// If you want vertical meters, just make the widget taller than it is wide:
-
-test_meter.create(main_widget, "Out", 600, 80, 20, 200);
-
-
-#endif
-
 #ifdef OLD_METER_CODE
 
 //#define DONT_USE_ANSI
@@ -571,378 +518,38 @@ static void vu_wait (c_vudata &vu, std::string str) {
 
 #endif
 
-static c_customwidget *custom_from_widget (void *w_) {
-  Widget_t *w = (Widget_t *) w_;
-  if (!w)
-    return nullptr;
-
-  return (c_customwidget *) w->parent_struct;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// c_customwidget
-
-void c_customwidget::create (Widget_t *parent_,
-                             const char *label_,
-                             int x, int y, int w, int h) {
-  parent = parent_;
-  label = label_ ? label_ : "";
-  width = w;
-  height = h;
-
-  if (!parent || !parent->app)
-    return;
-
-  widget = create_widget (parent->app, parent, x, y, w, h);
-  if (!widget)
-    return;
-  
-  widget->label = label;
-  widget->parent_struct = this;
-  widget->scale.gravity = CENTER;
-  widget->func.expose_callback = draw_cb;
-  widget->func.enter_callback = enter_cb;
-  widget->func.leave_callback = leave_cb;
-  widget->func.button_press_callback = button_press_cb;
-  widget->func.button_release_callback = button_release_cb;
-  widget->func.motion_callback = motion_cb;
-  widget->func.key_press_callback = key_press_cb;
-  widget->func.key_release_callback = key_release_cb;
-  widget->func.configure_notify_callback = configure_cb;
-
-  for (int i = 0; i < 8; ++i)
-    mousedown_x [i] = mousedown_y [i] = -16384;
-}
-
-void c_customwidget::set_opacity (int opacity_) {
-  opacity = std::clamp (opacity_, 0, 255);
-  invalidate_base ();
-}
-
-void c_customwidget::inspect () {
-  debug ("widget=%p size=%dx%d", widget, width, height);
-}
-
-void c_customwidget::move_resize (int x, int y, int w, int h) {
-  if (!widget || !widget->app)
-    return;
-
-  const int sx = x * widget->app->hdpi;
-  const int sy = y * widget->app->hdpi;
-  const int sw = std::max (1, (int) (w * widget->app->hdpi));
-  const int sh = std::max (1, (int) (h * widget->app->hdpi));
-
-  widget->x = sx;
-  widget->y = sy;
-  widget->scale.init_x = sx;
-  widget->scale.init_y = sy;
-  widget->scale.init_width = sw;
-  widget->scale.init_height = sh;
-
-  os_move_window (widget->app->dpy, widget, sx, sy);
-  os_resize_window (widget->app->dpy, widget, sw, sh);
-  configure_cb (widget, NULL);
-  invalidate_base ();
-  invalidate_overlay ();
-}
-
-void c_customwidget::move (int x, int y) {
-  if (!widget || !widget->app)
-    return;
-
-  const int sx = x * widget->app->hdpi;
-  const int sy = y * widget->app->hdpi;
-
-  widget->x = sx;
-  widget->y = sy;
-  widget->scale.init_x = sx;
-  widget->scale.init_y = sy;
-
-  os_move_window (widget->app->dpy, widget, sx, sy);
-  expose ();
-}
-
-void c_customwidget::resize (int w, int h) {
-  if (!widget || !widget->app)
-    return;
-
-  const int sw = std::max (1, (int) (w * widget->app->hdpi));
-  const int sh = std::max (1, (int) (h * widget->app->hdpi));
-
-  widget->scale.init_width = sw;
-  widget->scale.init_height = sh;
-
-  os_resize_window (widget->app->dpy, widget, sw, sh);
-  configure_cb (widget, NULL);
-  invalidate_base ();
-  invalidate_overlay ();
-}
-
-void c_customwidget::invalidate_base () {
-  base_image_valid = false;
-  expose ();
-}
-
-void c_customwidget::invalidate_overlay () {
-  expose ();
-}
-
-void c_customwidget::invalidate_overlay_rect (int x, int y, int w, int h) {
-  (void) x;
-  (void) y;
-  (void) w;
-  (void) h;
-  expose ();
-}
-
-void c_customwidget::expose () {
-  if (widget)
-    expose_widget (widget);
-}
-
-bool c_customwidget::button_left_down () const {
-  return mouse_buttons & 0x01;
-}
-
-bool c_customwidget::button_middle_down () const {
-  return mouse_buttons & 0x02;
-}
-
-bool c_customwidget::button_right_down () const {
-  return mouse_buttons & 0x04;
-}
-
-bool c_customwidget::check_click_distance (int which) const {
-  if (which < 0 || which >= 8)
-    return false;
-
-  return std::abs (mouse_x - mousedown_x [which]) <= click_distance &&
-         std::abs (mouse_y - mousedown_y [which]) <= click_distance;
-}
-
-void c_customwidget::sync_metrics () {
-  if (!widget)
-    return;
-
-  Metrics_t metrics;
-  os_get_window_metrics (widget, &metrics);
-  if (metrics.width != width || metrics.height != height) {
-    width = metrics.width;
-    height = metrics.height;
-    base_image_valid = false;
-    on_resize (width, height);
-  }
-  visible = metrics.visible;
-}
-
-void c_customwidget::render_base (cairo_t *cr) {
-  cairo_set_source_rgb (cr, 0.08, 0.08, 0.08);
-  cairo_paint (cr);
-
-  cairo_set_source_rgb (cr, 0.55, 0.55, 0.55);
-  cairo_move_to (cr, 0, 0);
-  cairo_line_to (cr, width, height);
-  cairo_move_to (cr, width, 0);
-  cairo_line_to (cr, 0, height);
-  cairo_stroke (cr);
-}
-
-void c_customwidget::render_overlay (cairo_t *cr) {
-  (void) cr;
-}
-
-void c_customwidget::draw_cb (void *w_, void *userdata) {
-  (void) userdata;
-  Widget_t *w = (Widget_t *) w_;
-  c_customwidget *cw = custom_from_widget (w_);
-  if (!w || !cw || !w->crb)
-    return;
-
-  cw->sync_metrics ();
-  if (cw->width <= 0 || cw->height <= 0)
-    return;
-
-  cairo_save (w->crb);
-  cairo_set_operator (w->crb, CAIRO_OPERATOR_SOURCE);
-  cairo_set_source_rgba (w->crb, 0.0, 0.0, 0.0, cw->opacity / 255.0);
-  cairo_paint (w->crb);
-  cairo_set_operator (w->crb, CAIRO_OPERATOR_OVER);
-  cw->render_base (w->crb);
-  cw->on_paint (w->crb);
-  cw->render_overlay (w->crb);
-  cairo_restore (w->crb);
-
-  cw->base_image_valid = true;
-}
-
-void c_customwidget::configure_cb (void *w_, void *userdata) {
-  (void) userdata;
-  Widget_t *w = (Widget_t *) w_;
-  c_customwidget *cw = custom_from_widget (w_);
-  if (!w || !cw)
-    return;
-
-  cw->sync_metrics ();
-
-  Metrics_t metrics;
-  os_get_window_metrics (w, &metrics);
-  if (w->width == metrics.width && w->height == metrics.height)
-    cw->expose ();
-}
-
-void c_customwidget::leave_cb (void *w_, void *userdata) {
-  (void) userdata;
-  c_customwidget *cw = custom_from_widget (w_);
-  if (!cw)
-    return;
-
-  cw->mouse_x = -1;
-  cw->mouse_y = -1;
-  cw->on_mouseleave ();
-  cw->expose ();
-}
-
-void c_customwidget::button_press_cb (void *w_, void *event_, void *userdata) {
-  (void) userdata;
-  c_customwidget *cw = custom_from_widget (w_);
-  XEvent *event = (XEvent *) event_;
-  if (!cw || !event)
-    return;
-
-  const int button = event->xbutton.button;
-  const int idx = button == Button1 ? 0 : button == Button2 ? 1 : button == Button3 ? 2 : -1;
-  cw->mouse_x = event->xbutton.x;
-  cw->mouse_y = event->xbutton.y;
-
-  if (idx >= 0) {
-    cw->mousedown_x [idx] = cw->mouse_x;
-    cw->mousedown_y [idx] = cw->mouse_y;
-    cw->mouse_buttons |= (1 << idx);
-    cw->on_mousedown (idx);
-  }
-
-  if (button == Button1)
-    cw->on_mousedown_left ();
-  else if (button == Button2)
-    cw->on_mousedown_middle ();
-  else if (button == Button3)
-    cw->on_mousedown_right ();
-  else if (button == Button4)
-    cw->on_mousewheel_v (1);
-  else if (button == Button5)
-    cw->on_mousewheel_v (-1);
-  else if (button == 6)
-    cw->on_mousewheel_h (1);
-  else if (button == 7)
-    cw->on_mousewheel_h (-1);
-
-  cw->expose ();
-}
-
-void c_customwidget::button_release_cb (void *w_, void *event_, void *userdata) {
-  (void) userdata;
-  c_customwidget *cw = custom_from_widget (w_);
-  XEvent *event = (XEvent *) event_;
-  if (!cw || !event)
-    return;
-
-  const int button = event->xbutton.button;
-  const int idx = button == Button1 ? 0 : button == Button2 ? 1 : button == Button3 ? 2 : -1;
-  cw->mouse_x = event->xbutton.x;
-  cw->mouse_y = event->xbutton.y;
-
-  if (idx >= 0) {
-    cw->mouse_buttons &= ~(1 << idx);
-    cw->on_mouseup (idx);
-  }
-
-  if (button == Button1)
-    cw->on_mouseup_left ();
-  else if (button == Button2)
-    cw->on_mouseup_middle ();
-  else if (button == Button3)
-    cw->on_mouseup_right ();
-
-  cw->expose ();
-}
-
-void c_customwidget::motion_cb (void *w_, void *event_, void *userdata) {
-  (void) userdata;
-  c_customwidget *cw = custom_from_widget (w_);
-  XEvent *event = (XEvent *) event_;
-  if (!cw || !event)
-    return;
-
-  cw->mouse_x = event->xmotion.x;
-  cw->mouse_y = event->xmotion.y;
-  cw->on_mousemove (cw->mouse_x, cw->mouse_y);
-}
-
-void c_customwidget::key_press_cb (void *w_, void *event_, void *userdata) {
-  (void) userdata;
-  c_customwidget *cw = custom_from_widget (w_);
-  XEvent *event = (XEvent *) event_;
-  if (!cw || !event)
-    return;
-
-  cw->on_keydown ((int) event->xkey.keycode, false);
-}
-
-void c_customwidget::key_release_cb (void *w_, void *event_, void *userdata) {
-  (void) userdata;
-  c_customwidget *cw = custom_from_widget (w_);
-  XEvent *event = (XEvent *) event_;
-  if (!cw || !event)
-    return;
-
-  cw->on_keyup ((int) event->xkey.keycode);
-}
-
-void c_customwidget::enter_cb (void *w_, void *userdata) {
-  (void) userdata;
-  c_customwidget *cw = custom_from_widget (w_);
-  if (!cw)
-    return;
-
-  cw->on_visible ();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// c_testwidget
-
-void c_testwidget::render_base (cairo_t *cr) {
-  cairo_set_source_rgb (cr, 0.1, 0.1, 0.1);
-  cairo_paint (cr);
-  cairo_set_source_rgb (cr, 0.7, 0.7, 0.7);
-  cairo_move_to (cr, 0, 0);
-  cairo_line_to (cr, width, height);
-  cairo_move_to (cr, width, 0);
-  cairo_line_to (cr, 0, height);
-  cairo_stroke (cr);
-}
-
-void c_testwidget::on_paint (cairo_t *cr) {
-  const char *msg = "c_customwidget";
-  cairo_text_extents_t extents;
-  cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (cr, 13.0);
-  cairo_text_extents (cr, msg, &extents);
-  cairo_set_source_rgb (cr, 0.85, 0.85, 0.85);
-  cairo_move_to (cr,
-                 (width - extents.width) * 0.5 - extents.x_bearing,
-                 (height - extents.height) * 0.5 - extents.y_bearing);
-  cairo_show_text (cr, msg);
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // c_meterwidget
 
-void c_meterwidget::create (Widget_t *parent,
+void c_meterwidget::create (nbtk::c_widget *parent,
                             const char *label,
                             int x, int y, int w, int h) {
-  c_customwidget::create (parent, label, x, y, w, h);
+  width = std::max (1, w);
+  height = std::max (1, h);
+  nbtk::c_canvas::create (parent, label, x, y, width, height);
+  created = true;
   set_db_scale (db_scale);
   update_geometry ();
+}
+
+void c_meterwidget::show () {
+  nbtk::c_canvas::show ();
+}
+
+void c_meterwidget::hide () {
+  nbtk::c_canvas::hide ();
+}
+
+void c_meterwidget::move_resize (int x, int y, int w, int h) {
+  nbtk::c_canvas::move_resize (x, y, w, h);
+}
+
+void c_meterwidget::move (int x, int y) {
+  nbtk::c_canvas::move (x, y);
+}
+
+void c_meterwidget::resize (int w, int h) {
+  nbtk::c_canvas::resize (w, h);
 }
 
 void c_meterwidget::set_db_scale (float f) {
@@ -972,12 +579,8 @@ bool c_meterwidget::needs_redraw () {
 }
 
 void c_meterwidget::on_ui_timer () {
-/*  if (needs_redraw ())
-    expose ();*/
-  
-  if (needs_redraw () && widget)
-    transparent_draw (widget, NULL);
-  
+  if (visible && needs_redraw ())
+    invalidate_base ();
 }
 
 void c_meterwidget::set_stereo (bool b) { CP
@@ -1097,6 +700,10 @@ void c_meterwidget::set_compression_gain (float f) {
   compressor_gain = std::clamp (f, 0.0f, 1.0f);
   invalidate_overlay ();
   expose ();
+}
+
+void c_meterwidget::set_compression_db (float db) {
+  set_compression_gain (powf (10.0f, db / 20.0f));
 }
 
 void c_meterwidget::draw_bar (cairo_t *cr, int at, int bar_th, float level, float hold) {

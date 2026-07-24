@@ -418,6 +418,7 @@ public:
   void on_master_gain (c_widget *w, float f) override;
   void on_presence (c_widget *w, float f) override;
   void on_bank_switch (c_widget *w, int n) override;
+  int idle () override;
   void apply_prefs (t_prefs &p) override;
   bool request_window_size (int w, int h) override;
 

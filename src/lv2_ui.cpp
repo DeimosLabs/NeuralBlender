@@ -227,12 +227,12 @@ void c_lv2_ui::on_muteall (c_widget *w, bool b) {
 }
 
 void c_lv2_ui::on_excl (c_widget *w, int n) {
-  (void) w;
+  const _lane_bank bank =
+    w && w->bank < BANK_COUNT ? (_lane_bank) w->bank : visible_bank;
+
   CP
-  set_exclusive_lane_for_bank (visible_bank, n);
-  if (n > 0 && n <= (int) NB_NUM_MODELS)
-    last_exclusive_lane [visible_bank] = (size_t) n;
-  switch (visible_bank) {
+  c_neuralblender_ui::on_excl (w, n);
+  switch (bank) {
     case BANK_PEDAL:
       write_control (PORT_EXCLUSIVE_LANE_PEDAL, (float) n);
     break;
@@ -308,6 +308,7 @@ void c_lv2_ui::on_linked_calib (c_widget *w, bool b) {
 void c_lv2_ui::on_calib_bass (c_widget *w, bool b) {
   (void) w;
   CP
+  state.calib_source = b ? 1 : 0;
   write_control (PORT_CALIB_SOURCE, b ? 1.0f : 0.0f);
 }
 
@@ -366,7 +367,7 @@ void c_lv2_ui::on_tuner_base_freq (c_widget *w, float f) {
 
 void c_lv2_ui::on_calib_target_db (c_widget *w, float f) {
   (void) w;
-  prefs.calib_target_db = f;
+  state.calib_target_db = f;
   write_control (PORT_CALIB_TARGET_DB, f);
 }
 
@@ -389,19 +390,38 @@ void c_lv2_ui::on_bank_switch (c_widget *w, int n) {
 
 void c_lv2_ui::apply_prefs (t_prefs &p) {
   c_neuralblender_ui::apply_prefs (p);
-  write_control (PORT_CALIB_SOURCE, (float) p.calib_source);
-  write_control (PORT_CALIB_TARGET_DB, p.calib_target_db);
 }
 
 bool c_lv2_ui::request_window_size (int w, int h) {
   if (resize && resize->ui_resize) {
     const bool ok = resize->ui_resize (resize->handle, w, h) == 0;
-    if (ok && mainwindow.widget && display)
-      os_resize_window (display, mainwindow.widget, w, h);
+    if (ok)
+      c_neuralblender_ui::request_window_size (w, h);
     return ok;
   }
 
   return c_neuralblender_ui::request_window_size (w, h);
+}
+
+int c_lv2_ui::idle () {
+  if (!ui_ready)
+    return 0;
+
+  if (ui_resize_pending && !ui_resize_lock) {
+    ui_resize_pending = false;
+    move_resize ();
+    pending_resize_w = 0;
+    pending_resize_h = 0;
+  }
+
+  run_embedded (&app);
+
+  redraw_meters_now ();
+
+  if (state.tuner_on)
+    tuner.on_ui_timer ();
+
+  return 0;
 }
 
 void c_lv2_ui::set_port_value (uint32_t port, float value) {
@@ -419,7 +439,6 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
   if (port == PORT_VU_ENABLE) {
     state.do_vu = value >= 0.5f;
-    prefs.vu_on = state.do_vu;
     btn_other_vu.set_value (state.do_vu);
     if (state.do_vu)
       vu_on ();
@@ -476,22 +495,18 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     int source = (int) lrintf (value);
     if (source < 0)
       source = 0;
-    prefs.calib_source = source;
-    btn_other_bass.set_value (prefs.calib_source == 1);
+    state.calib_source = source;
+    btn_other_bass.set_value (state.calib_source == 1);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;
   }
 
   if (port == PORT_CALIB_TARGET_DB) {
-    prefs.calib_target_db = value;
+    state.calib_target_db = value;
     char buf [64];
-    snprintf (buf, sizeof (buf), "%.1f", prefs.calib_target_db);
+    snprintf (buf, sizeof (buf), "%.1f", state.calib_target_db);
     text_other_calib.set_text (buf);
-    if (prefswindow.widget) {
-      snprintf (buf, sizeof (buf), "%.1f", prefs.calib_target_db);
-      prefswindow.text_calibdb.set_text (buf);
-    }
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;
@@ -722,25 +737,7 @@ void c_lv2_ui::set_model_property (LV2_URID property, const char *path) {
 }
 
 void c_lv2_ui::redraw_meters_now () {
-  if (visible_page == PAGE_OTHER) {
-    if (meter_in [PAGE_OTHER].needs_redraw () &&
-        meter_in [PAGE_OTHER].widget)
-      transparent_draw (meter_in [PAGE_OTHER].widget, NULL);
-    if (meter_masterout.needs_redraw () &&
-        meter_masterout.widget)
-      transparent_draw (meter_masterout.widget, NULL);
-    return;
-  }
-
-  if (meter_in [visible_bank].needs_redraw () && meter_in [visible_bank].widget)
-    transparent_draw (meter_in [visible_bank].widget, NULL);
-
-  c_lane_widgets *bank_lanes = lanes_for_bank (visible_bank);
-  for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
-    if (bank_lanes [lane].meter_out.needs_redraw () &&
-        bank_lanes [lane].meter_out.widget)
-      transparent_draw (bank_lanes [lane].meter_out.widget, NULL);
-  }
+  redraw_visible_meters ();
 }
 
 void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
@@ -798,8 +795,6 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
           n += 2;
         }
       }
-
-      redraw_meters_now ();
       break;
     }
 

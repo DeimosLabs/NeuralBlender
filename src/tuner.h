@@ -57,33 +57,46 @@ private:
   std::atomic<uint64_t> published_seq {  0 };
 };
 
-#ifndef METER_DATA_ONLY
+#if defined (HAVE_GUI)
 
-class c_tunerwidget : public c_customwidget {
+#include "widgets.h"
+
+class c_tunerwidget : public nbtk::c_canvas {
 public:
-  void create (Widget_t *parent,
+  void create (nbtk::c_widget *parent,
                const char *label,
-               int x, int y, int w, int h) override;
-               
+               int x, int y, int w, int h);
+
+  void show ();
+  void hide ();
+  void move_resize (int x, int y, int w, int h) override;
+  void move (int x, int y) override;
+  void resize (int w, int h) override;
+
   void set_pitchtracker (c_pitchtracker *p);
   void set_pitch (float freq, float note, float cents);
-  void on_ui_timer () override;
+  void on_ui_timer ();
   bool needs_redraw ();
-  void set_base_freq (float f) { pitchtracker->set_base_freq (f); }
-  
+  void set_base_freq (float f) { if (pitchtracker) pitchtracker->set_base_freq (f); }
+
+  bool created = false;
+  int width = 0;
+  int height = 0;
+
 protected:
   void render_base (cairo_t *cr) override;
   void on_paint (cairo_t *cr) override;
   void on_resize (int w, int h) override;
-  
+
   std::deque<int> hist_notes;
   std::deque<int> hist_cents;
-  
+
   c_pitchtracker *pitchtracker = NULL;
   float current_freq = 0.0f;
   float current_note = 0.0f;
   float current_cents = 0.0f;
   std::atomic<bool> ui_needs_redraw { false };
+
 };
 
-#endif
+#endif // HAVE_GUI

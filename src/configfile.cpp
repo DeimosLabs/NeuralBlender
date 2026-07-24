@@ -23,7 +23,8 @@ struct s_option {
   { CONFIG_KEY_NAME_CALIB_TARGET, "" },
   { CONFIG_KEY_NAME_VU_SCALE, "" },
   { CONFIG_KEY_NAME_VU_HEADROOM, "" },
-  { CONFIG_KEY_NAME_VU, "" },
+  { CONFIG_KEY_NAME_BYP_DCLICK, "" },
+  { CONFIG_KEY_NAME_BYP_RCLICK, "" },
   { "", "" }
 };
 

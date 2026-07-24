@@ -155,6 +155,8 @@ function(add_neuralblender_gui_library target_name)
     xputty
   )
 
+  target_compile_definitions(${target_name} PUBLIC HAVE_GUI=1)
+
   if (ARGN)
     target_compile_definitions(${target_name} PRIVATE ${ARGN})
   endif()

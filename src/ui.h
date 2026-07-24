@@ -21,17 +21,26 @@
 
 #pragma once
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "configfile.h"
 #include "xputty_compat.h"
 #include "widgets.h"
+#include "tuner.h"
 
 #define UI_BUTTON_RADIUS     12.0
 #define UI_CHECKBOX_RADIUS   8.0
+#define UI_COMBOBOX_RADIUS   8.0
+#define UI_TEXTBOX_RADIUS    8.0
+#define UI_MENU_RADIUS       6.0
 #define UI_FRAME_RADIUS      12.0
+#define UI_LIST_RADIUS       6.0
+#define UI_SCROLLBAR_WIDTH   16
+#define UI_SCROLLBAR_RADIUS  8.0
 #define UI_STATS_PER_LANE    NB_STATS_PER_LANE
+#define UI_DOUBLECLICK_MS    300
 
 enum _ui_page {
   PAGE_PEDAL = 0,
@@ -44,63 +53,69 @@ enum _ui_page {
 class c_neuralblender;
 struct c_neuralblender_state;
 class c_neuralblender_ui;
-class c_filepicker;
+//class c_filepicker;
 
 typedef struct {
-  float calib_target_db = -12.0f;
-  float vu_scale_db     = -40.0f;
-  float vu_headroom_db  = 6.0f;
-  bool vu_on = true;
-  int calib_source = 0; // 0=guitar, 1=bass
+  float vu_scale_db        = -40.0f;
+  float vu_headroom_db     = 6.0f;
+  bool  bypass_doubleclick = false;
+  bool  bypass_rightclick  = true;
 } t_prefs;
 
 bool read_prefs_from_config  (c_configfile &configfile, t_prefs &prefs);
 bool write_prefs_to_config   (c_configfile &configfile, const t_prefs &prefs);
 
-class c_prefswindow : public c_toplevelwindow {
+class c_prefswindow : public c_tktoplevelwindow {
 public:
   void create (c_neuralblender_ui *ui);
   void show ();
   void hide ();
   
-  void on_resize ();
+  void on_resize () override;
+  void on_tk_action (nbtk::t_action_event &event) override;
   void get_prefs_from (t_prefs &prefs);
   void set_prefs_to   (t_prefs &prefs);
   void load_defaults ();
+
+  nbtk::c_frame frame1;
+  nbtk::c_button btn_cancel;
+  nbtk::c_button btn_ok;
+  nbtk::c_button btn_defaults;
   
-  c_frame frame1;
-  c_button btn_cancel;
-  c_button btn_ok;
-  c_button btn_defaults;
+  nbtk::c_label label_vuscale;
+  nbtk::c_label label_vuheadroom;
+  nbtk::c_label label_spacer1;
   
-  c_label label_calibdb;
-  c_label label_vuscale;
-  c_label label_vuheadroom;
-  c_label label_spacer1;
-  
-  c_textbox text_calibdb;
-  c_textbox text_vuscale;
-  c_textbox text_vuheadroom;
+  nbtk::c_textbox text_vuscale;
+  nbtk::c_textbox text_vuheadroom;
+  nbtk::c_checkbox btn_bypass_doubleclick;
+  nbtk::c_checkbox btn_bypass_rightclick;
 };
 
-class c_aboutwindow : public c_toplevelwindow {
+class c_tkaboutwindow;
+
+class c_tkaboutwindow : public c_tktoplevelwindow {
 public:
   void create (c_neuralblender_ui *ui);
 
   void show ();
   void hide ();
-  
-  void on_resize ();  
 
-  //Widget_t *w = NULL;
-  c_frame frame;
-  c_button btn_ok;
-  c_label labels [16];
-  c_linklabel linklabel;
-  c_image img_toplogo;
-  c_image img_logo;
-  c_neuralblender_ui *ui = NULL;
+  void on_tk_action (nbtk::t_action_event &event);
+
+  nbtk::c_frame tk_frame;
+  nbtk::c_staticimage tk_toplogo;
+  nbtk::c_staticimage tk_logo;
+  nbtk::c_label tk_labels [8];
+  nbtk::c_label tk_link;
+  nbtk::c_label tk_build;
+  nbtk::c_button tk_ok;
+  nbtk::c_knob test_knob;
+  nbtk::c_listbox test_listbox;
+  nbtk::c_scrollbar test_scrollbar;
 };
+
+class c_lane_widgets;
 
 class c_lane_widgets {
 public:
@@ -109,50 +124,57 @@ public:
 
   void create (
       c_neuralblender_ui *ui,
-      Widget_t *parent,
+      nbtk::c_widget *parent,
+      nbtk::t_native_handle native_owner,
       size_t bank_id,
       size_t lane_id,
       int x, int y, int w, int h);
-      
+	      
   void move_resize (int x, int y, int w, int h);
+  void set_state (_widget_state state);
   
   //bool user_mute = false;
   size_t lane_id = -1;
   size_t bank_id = -1;
   c_neuralblender_ui *ui = NULL;
+  nbtk::t_native_handle native_owner = nullptr;
   size_t which_lane = 0;
-  Widget_t *main_widget = NULL;
-  //Widget_t *wreg = NULL;
-  //Widget_t *wadv = NULL;
-  c_frame lane_widget;
-  c_container cont_regcontrols;
+  nbtk::t_native_handle main_widget = nullptr;
+  nbtk::c_widget lane_root;
+  nbtk::c_frame lane_frame;
+  _widget_state lane_state = WSTATE_NORMAL;
+  bool created = false;
+  //c_container cont_regcontrols;
   //c_container cont_advcontrols;
   
-  c_knob knob_gain_in;
-  c_knob knob_ir_pitch;
-  c_knob knob_gain_out;
-  c_knob knob_dry_out;
-  c_knob knob_delay;
-  c_knob knob_dryout;
+  nbtk::c_knob knob_gain_in;
+  nbtk::c_knob knob_ir_pitch;
+  nbtk::c_knob knob_gain_out;
+  nbtk::c_knob knob_dry_out;
+  nbtk::c_knob knob_delay;
+  nbtk::c_knob knob_dryout;
   
-  c_button btn_mute;
-  c_button btn_excl;
-  c_button btn_browse;
-  c_button btn_clear;
-  c_button btn_flip;
-  c_button btn_calib;
-  c_combobox menu_list;
+  nbtk::c_button btn_mute;
+  nbtk::c_button btn_excl;
+  nbtk::c_button btn_browse;
+  nbtk::c_button btn_clear;
+  nbtk::c_button btn_flip;
+  nbtk::c_button btn_calib;
+  nbtk::c_combobox menu_list;
   //c_label label_flip;
   //c_label label_calib;
-  c_label label_frames;
-  c_label label_trim;
-  c_label label_engine;
+  nbtk::c_label label_frames;
+  nbtk::c_label label_trim;
+  nbtk::c_label label_engine;
   
-  c_filepicker filepicker;
+  nbtk::c_filepicker filepicker;
   
   //c_meterwidget meter_in; // we only have one input
-  c_meter meter_out;
+  c_meterwidget meter_out;
   c_vudata vudata_out;
+  c_widget proxy;
+
+  void on_tk_action (nbtk::t_action_event &event);
   
   int last_x = 0;
   int last_y = 0;
@@ -183,8 +205,9 @@ public:
   size_t choose_exclusive_lane () const;
   c_lane_widgets *lanes_for_bank (_lane_bank bank);
   const c_lane_widgets *lanes_for_bank (_lane_bank bank) const;
-  c_meter &input_meter_for_bank (_lane_bank bank);
+  c_meterwidget &input_meter_for_bank (_lane_bank bank);
   c_vudata &input_vudata_for_bank (_lane_bank bank);
+  void redraw_visible_meters ();
   int exclusive_lane_for_bank (_lane_bank bank) const;
   void set_exclusive_lane_for_bank (_lane_bank bank, int lane);
   bool linked_calib_for_bank (_lane_bank bank) const;
@@ -228,7 +251,7 @@ public:
   virtual void on_threshgain (c_widget *w, float f)            = 0;
   virtual void on_excl (c_widget *w, int n)                       ; // UI only
           void on_excl_use (c_widget *w, bool b)                  ;
-          void on_button (c_button *btn, bool value)              ;
+          void on_tk_action (nbtk::t_action_event &event)         ;
   virtual void on_bank_switch (c_widget *w, int n)                ;
           void sync_page_visibility ()                            ;
           void ensure_tuner_created ()                            ;
@@ -247,72 +270,70 @@ public:
   Window window;
   c_neuralblender *blender = NULL;
   Xputty app;
+  c_tkappbridge tk_app;
   c_mainwindow mainwindow;
-  c_aboutwindow aboutwindow;
+  c_tkaboutwindow tkaboutwindow;
   c_prefswindow prefswindow;
   Window parent;
   int tuner_height = 56;
   bool do_set_min_size = false; // ugly hack for ardour's window size shenanigans
   
-  c_container    cont_toparea;
-  c_container    cont_pedals;
-  c_container    cont_models;
-  c_container    cont_cabs;
-  c_container    cont_other;
-  c_image        img_logo;
-  c_button       btn_tab_pedals;
-  c_button       btn_tab_models;
-  c_button       btn_tab_cabs;
-  c_button       btn_tab_other;
-  c_button       btn_enable;
-  c_button       btn_muteall;
-  c_button       btn_noisegate;
-  c_button       btn_tuner;
+  nbtk::c_container cont_toparea;
+  nbtk::c_container cont_pedals;
+  nbtk::c_container cont_models;
+  nbtk::c_container cont_cabs;
+  nbtk::c_container cont_other;
+  nbtk::c_staticimage img_logo;
+  nbtk::c_button btn_tab_pedals;
+  nbtk::c_button btn_tab_models;
+  nbtk::c_button btn_tab_cabs;
+  nbtk::c_button btn_tab_other;
+  nbtk::c_button btn_enable;
+  nbtk::c_button btn_muteall;
+  nbtk::c_button btn_noisegate;
+  nbtk::c_button btn_tuner;
   
-  c_frame        frame_other_volumepresence;
-  c_knob         knob_mastervolume;
-  c_knob         knob_presence;
-  c_frame        frame_other_noisegate;
-  c_label        label_other_noisegate;
-  c_knob         knob_noisethresh;
-  c_knob         knob_noiseattack;
-  c_knob         knob_noisehold;
-  c_knob         knob_noiserelease;
-  c_frame        frame_other_linkexcl;
-  c_label        label_other_byp;
-  c_label        label_other_link;
-  c_label        label_other_excl;
-  c_button       btn_other_link_pedal;
-  c_button       btn_other_link_amp;
-  c_button       btn_other_link_cab;
-  c_button       btn_other_byp_pedal;
-  c_button       btn_other_byp_amp;
-  c_button       btn_other_byp_cab;
-  c_button       btn_other_excl_pedal;
-  c_button       btn_other_excl_amp;
-  c_button       btn_other_excl_cab;
-  c_frame        frame_other_misc;
-  c_label        label_other_tuner;
-  c_label        label_other_calib;
-  c_textbox      text_other_tuner;
-  c_textbox      text_other_calib;
-  c_button       btn_other_tuner_down;
-  c_button       btn_other_tuner_up;
-  c_button       btn_other_tuner_default;
-  c_button       btn_other_vu;
-  c_button       btn_other_bass;
-  c_button       btn_other_prefs;
-  c_button       btn_other_about;
+  nbtk::c_frame  frame_other_volumepresence;
+  nbtk::c_knob   knob_mastervolume;
+  nbtk::c_knob   knob_presence;
+  nbtk::c_frame  frame_other_noisegate;
+  nbtk::c_label  label_other_noisegate;
+  nbtk::c_knob   knob_noisethresh;
+  nbtk::c_knob   knob_noiseattack;
+  nbtk::c_knob   knob_noisehold;
+  nbtk::c_knob   knob_noiserelease;
+  nbtk::c_frame  frame_other_linkexcl;
+  nbtk::c_label  label_other_byp;
+  nbtk::c_label  label_other_link;
+  nbtk::c_label  label_other_excl;
+  nbtk::c_checkbox btn_other_link_pedal;
+  nbtk::c_checkbox btn_other_link_amp;
+  nbtk::c_checkbox btn_other_link_cab;
+  nbtk::c_checkbox btn_other_byp_pedal;
+  nbtk::c_checkbox btn_other_byp_amp;
+  nbtk::c_checkbox btn_other_byp_cab;
+  nbtk::c_checkbox btn_other_excl_pedal;
+  nbtk::c_checkbox btn_other_excl_amp;
+  nbtk::c_checkbox btn_other_excl_cab;
+  nbtk::c_frame  frame_other_misc;
+  nbtk::c_label  label_other_tuner;
+  nbtk::c_label  label_other_calib;
+  nbtk::c_textbox text_other_tuner;
+  nbtk::c_textbox text_other_calib;
+  nbtk::c_button btn_other_tuner_down;
+  nbtk::c_button btn_other_tuner_up;
+  nbtk::c_button btn_other_tuner_default;
+  nbtk::c_checkbox btn_other_vu;
+  nbtk::c_checkbox btn_other_bass;
+  nbtk::c_button btn_other_prefs;
+  nbtk::c_button btn_other_about;
   
   c_lane_widgets lanes_pedals [NB_NUM_MODELS];
   c_lane_widgets lanes_models [NB_NUM_MODELS];
   c_lane_widgets lanes_cabs [NB_NUM_MODELS];
-  //c_filepicker   filepicker_pedals [NB_NUM_MODELS];
-  //c_filepicker   filepicker_models [NB_NUM_MODELS];
-  //c_filepicker   filepicker_cabs [NB_NUM_MODELS];
-  c_meter        meter_in [PAGE_COUNT];
-  c_meter        meter_masterout;
-  c_tuner        tuner;
+  c_meterwidget  meter_in [PAGE_COUNT];
+  c_meterwidget  meter_masterout;
+  c_tunerwidget  tuner;
   
   t_prefs        prefs;
   

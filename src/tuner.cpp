@@ -14,7 +14,7 @@
 #include "cmdline_debug.h"
 
 #ifndef METER_DATA_ONLY
-#include "xputty_compat.h"
+#include "widgets.h"
 #endif
 
 #ifdef METER_DATA_ONLY
@@ -287,10 +287,37 @@ void c_pitchtracker::dump () {
 
 #else
 
-void c_tunerwidget::create (Widget_t *parent,
+void c_tunerwidget::create (nbtk::c_widget *parent,
                             const char *label,
                             int x, int y, int w, int h) {
-  c_customwidget::create (parent, label, x, y, w, h);
+  width = std::max (1, w);
+  height = std::max (1, h);
+  nbtk::c_canvas::create (parent, label, x, y, width, height);
+  created = true;
+}
+
+void c_tunerwidget::show () {
+  nbtk::c_canvas::show ();
+}
+
+void c_tunerwidget::hide () {
+  nbtk::c_canvas::hide ();
+}
+
+void c_tunerwidget::move_resize (int x, int y, int w, int h) {
+  width = std::max (1, w);
+  height = std::max (1, h);
+  nbtk::c_canvas::move_resize (x, y, w, h);
+}
+
+void c_tunerwidget::move (int x, int y) {
+  nbtk::c_canvas::move (x, y);
+}
+
+void c_tunerwidget::resize (int w, int h) {
+  width = std::max (1, w);
+  height = std::max (1, h);
+  nbtk::c_canvas::resize (w, h);
 }
 
 void c_tunerwidget::set_pitchtracker (c_pitchtracker *p) {
@@ -308,7 +335,7 @@ void c_tunerwidget::set_pitch (float freq, float note, float cents) {
 }
 
 void c_tunerwidget::on_ui_timer () {
-  if (!widget)
+  if (!created || !visible)
     return;
 
   bool dirty =
@@ -325,8 +352,10 @@ void c_tunerwidget::on_ui_timer () {
     dirty = true;
   }
 
-  if (dirty)
-    transparent_draw (widget, NULL);
+  if (!dirty)
+    return;
+
+  invalidate_base ();
 }
 
 bool c_tunerwidget::needs_redraw () {
@@ -394,6 +423,9 @@ void c_tunerwidget::on_paint (cairo_t *cr) {
   float a = 1.0 - ((float) abscents / 100.0);
   
   int i;
+  cairo_set_source_rgba (cr, 0, 0, 0, 1);
+  cairo_rectangle (cr, 0, 0, width, height);
+  cairo_fill (cr);
   for (i = 0; hist_notes.size () == INTUNE_DELAY && i < INTUNE_DELAY; i++)
     if (((int) hist_notes [i] % 12) != ((int) current_note % 12) || abs (hist_cents [i]) >= INTUNE_THRESHOLD)
       stable_tuning = false;

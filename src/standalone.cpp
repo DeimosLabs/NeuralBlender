@@ -237,7 +237,7 @@ void c_standalone_ui::on_muteall (c_widget *w, bool b) {
 void c_standalone_ui::on_vu (c_widget *w, bool b) {
   (void) w;
   debug ("b=%d", (int) b);
-  prefs.vu_on = b;
+  state.do_vu = b;
   g_blender->do_vu = b;
 }
 
@@ -291,7 +291,7 @@ void c_standalone_ui::on_tuner_base_freq (c_widget *w, float value) {
 
 void c_standalone_ui::on_calib_target_db (c_widget *w, float value) {
   (void) w;
-  prefs.calib_target_db = value;
+  state.calib_target_db = value;
   g_blender->set_calib_target_db (value);
 }
 
@@ -317,9 +317,9 @@ void c_standalone_ui::on_linked_calib (c_widget *w, bool b) {
 
 void c_standalone_ui::on_calib_bass (c_widget *w, bool b) {
   (void) w;
-  prefs.calib_source = b ? 1 : 0;
+  state.calib_source = b ? 1 : 0;
   if (blender)
-    blender->calib_source = prefs.calib_source;
+    blender->calib_source = state.calib_source;
 }
 
 /* these are UI only
@@ -363,24 +363,12 @@ void c_standalone_ui::on_about (c_widget *w) {
 }
 
 void c_standalone_ui::apply_prefs (t_prefs &p) {
-  if (blender)
-    blender->set_calib_target_db (p.calib_target_db);
-
   c_neuralblender_ui::apply_prefs (p);
 
-  if (blender)
-    blender->do_vu = p.vu_on;
-  if (blender)
-    blender->calib_source = p.calib_source;
 }
 
 void c_standalone_ui::write_prefs_to (t_prefs &p) {
   c_neuralblender_ui::write_prefs_to (p);
-
-  if (blender)
-    p.calib_target_db = blender->banks [BANK_AMP].lanes [0].calib_target_db;
-  if (blender)
-    p.calib_source = blender->calib_source;
 }
 
 void c_standalone_ui::apply_effective_controls () {
@@ -469,8 +457,6 @@ static void ui_main () {
     g_running = false;
     return;
   }
-  g_blender->do_vu = g_ui->prefs.vu_on;
-
   c_neuralblender_state state;
   g_blender->get_state (state);
   if (g_ui->calib_default) {
