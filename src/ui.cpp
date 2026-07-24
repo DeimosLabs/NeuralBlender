@@ -180,11 +180,15 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   
   int default_w = 550;
   int default_h = 550;
+  nbtk::t_native_window root =
+      ui->tk_app.backend
+        ? ui->tk_app.backend->root_window (ui->mainwindow.native_handle (), false)
+        : 0;
   
   if (!create_tk (
       ui,
       &ui->tk_app,
-      os_get_root_window (&ui->app, IS_WINDOW),
+      root,
       "NeuralBlender settings",
       0, 0, default_w, default_h,
       ui->mainwindow.native_handle ()))
@@ -314,10 +318,15 @@ void c_tkaboutwindow::create (c_neuralblender_ui *ui_) { CP
   if (!ui || !ui->ui_ready || widget)
     return;
 
+  nbtk::t_native_window native_root =
+      ui->tk_app.backend
+        ? ui->tk_app.backend->root_window (ui->mainwindow.native_handle (), false)
+        : 0;
+
   if (!create_tk (
       ui,
       &ui->tk_app,
-      os_get_root_window (&ui->app, IS_WINDOW),
+      native_root,
       "About NeuralBlender (tk)",
       470, 0, 450, 480,
       ui->mainwindow.native_handle ()))
@@ -356,7 +365,7 @@ void c_tkaboutwindow::create (c_neuralblender_ui *ui_) { CP
   tk_ok.create (root, "OK", 310, 424, 128, 40);
   tk_ok.set_image_default (data_xputty_approved_png);
   
-  test_knob.create (root, "test knob", 16, 400, 64, 64);
+  /*test_knob.create (root, "test knob", 16, 400, 64, 64);
   test_listbox.create (root, "test listbox", 100, 400, 200, 80);
   test_scrollbar.create (root, "", 300, 400, UI_SCROLLBAR_WIDTH, 80);
   test_listbox.set_scrollbar (&test_scrollbar);
@@ -364,7 +373,7 @@ void c_tkaboutwindow::create (c_neuralblender_ui *ui_) { CP
     char buf [32];
     snprintf (buf, 31, "Item %d", i + 1);
     test_listbox.add (buf);
-  }
+  }*/
 }
 
 void c_tkaboutwindow::show () { CP
@@ -654,7 +663,10 @@ void c_lane_widgets::create (
   btn_flip.set_image_default (data_icon_phase_big_png);
   
   if (ui && lane_id < NB_NUM_MODELS) {
-    Window root = os_get_root_window (&ui->app, IS_WINDOW);
+    nbtk::t_native_window root =
+        ui->tk_app.backend
+          ? ui->tk_app.backend->root_window (ui->mainwindow.native_handle (), false)
+          : 0;
     filepicker.create (
       ui, &ui->tk_app, root, native_owner, lane_id, bank_id, "Select file");
     filepicker.lane = lane_id;

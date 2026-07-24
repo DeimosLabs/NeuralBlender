@@ -69,6 +69,7 @@ enum _scrollbar_orientation {
 namespace nbtk {
 
 using t_native_handle = nbtk_native_handle_t;
+using t_native_window = nbtk_native_window_t;
 
 struct t_point {
   int x = 0;
@@ -600,6 +601,7 @@ public:
   virtual bool request_size (t_native_handle widget, int w, int h) = 0;
   virtual void move_resize (t_native_handle widget, int x, int y, int w, int h) = 0;
   virtual void set_mouse_cursor (t_native_handle widget, _mouse_cursor cursor) = 0;
+  virtual t_native_window root_window (t_native_handle widget, bool is_widget) const = 0;
   virtual t_point root_to_screen (t_native_handle widget, t_point p) const = 0;
   virtual t_point screen_to_root (t_native_handle widget, t_point p) const = 0;
 };
@@ -948,7 +950,7 @@ class c_toplevelwindow : public c_widget {
 public:
   bool create (
       c_neuralblender_ui *ui,
-      Window parent,
+      nbtk::t_native_window parent,
       const char *title,
       int x, int y, int w, int h,
       nbtk::t_native_handle owner = nullptr);
@@ -1012,7 +1014,7 @@ public:
   bool create_tk (
       c_neuralblender_ui *ui,
       c_tkappbridge *tk_app,
-      Window parent,
+      nbtk::t_native_window parent,
       const char *title,
       int x, int y, int w, int h,
       nbtk::t_native_handle owner = nullptr);
@@ -1062,7 +1064,7 @@ public:
   void create (
       c_neuralblender_ui *ui,
       c_tkappbridge *tk_app,
-      Window parent,
+      t_native_window parent,
       t_native_handle owner,
       size_t lane,
       uint64_t bank,

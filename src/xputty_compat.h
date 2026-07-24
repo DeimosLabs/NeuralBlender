@@ -7,6 +7,7 @@
 #include "dialogs/xfile-dialog.h"
 
 typedef Widget_t *nbtk_native_handle_t;
+typedef Window nbtk_native_window_t;
 
 #ifdef min
 #undef min

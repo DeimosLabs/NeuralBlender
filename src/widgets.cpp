@@ -260,6 +260,14 @@ public:
     }
   }
 
+  t_native_window root_window (t_native_handle handle, bool is_widget) const override {
+    Widget_t *widget = as_xputty_widget (handle);
+    if (!widget || !widget->app)
+      return 0;
+
+    return os_get_root_window (widget->app, is_widget ? IS_WIDGET : IS_WINDOW);
+  }
+
   t_point root_to_screen (t_native_handle handle, t_point p) const override {
     Widget_t *widget = as_xputty_widget (handle);
     if (!widget || !widget->app)
@@ -271,7 +279,7 @@ public:
     os_translate_coords (
         widget,
         widget->widget,
-        os_get_root_window (widget->app, IS_WIDGET),
+        root_window (handle, true),
         (int) (p.x * hdpi),
         (int) (p.y * hdpi),
         &sx,
@@ -293,7 +301,7 @@ public:
     const float hdpi = widget->app->hdpi;
     os_translate_coords (
         widget,
-        os_get_root_window (widget->app, IS_WIDGET),
+        root_window (handle, true),
         widget->widget,
         (int) (p.x * hdpi),
         (int) (p.y * hdpi),
@@ -3924,7 +3932,7 @@ void c_widget::resize (int w, int h) {
 
 bool c_toplevelwindow::create (
     c_neuralblender_ui *ui_,
-    Window parent_,
+    nbtk::t_native_window parent_,
     const char *title_,
     int x, int y, int w, int h,
     nbtk::t_native_handle owner_) {
@@ -4349,7 +4357,7 @@ bool c_tktoplevelwindow::ensure_tk_buffer (int w, int h) {
 bool c_tktoplevelwindow::create_tk (
     c_neuralblender_ui *ui_,
     c_tkappbridge *tk_app_,
-    Window parent_,
+    nbtk::t_native_window parent_,
     const char *title_,
     int x, int y, int w_, int h_,
     nbtk::t_native_handle owner) {
@@ -4803,7 +4811,7 @@ void nbtk::c_filepicker::sync_owner_metadata () {
 void nbtk::c_filepicker::create (
     c_neuralblender_ui *ui_,
     c_tkappbridge *tk_app_,
-    Window parent_,
+    t_native_window parent_,
     t_native_handle owner,
     size_t lane_,
     uint64_t bank_,
