@@ -13,8 +13,6 @@
 #include <sys/stat.h>
 #include <chrono>
 
-#include <X11/cursorfont.h>
-
 #include "neuralblender.h"
 #include "ui.h"
 
@@ -43,37 +41,6 @@ static void sync_bank_tab_icon (
     nbtk::c_button &button,
     const c_neuralblender_state &state,
     _lane_bank bank);
-
-static bool get_parent_window_size (
-    Display *display, Window parent,
-    double hdpi,
-    int *w, int *h) {
-
-  if (!display || !parent || !w || !h)
-    return false;
-
-  XWindowAttributes attr;
-  if (!XGetWindowAttributes (display, parent, &attr))
-    return false;
-
-  if (attr.width <= 0 || attr.height <= 0)
-    return false;
-
-  const double scale = hdpi > 0.0 ? hdpi : 1.0;
-  const int logical_w = (int) (attr.width / scale);
-  const int logical_h = (int) (attr.height / scale);
-
-  if (logical_w < MIN_WINDOW_WIDTH || logical_h < MIN_WINDOW_HEIGHT)
-    return false;
-
-  // Avoid using the root window size as a startup hint in standalone mode.
-  if (logical_w > 3000 || logical_h > 2200)
-    return false;
-
-  *w = logical_w;
-  *h = logical_h;
-  return true;
-}
 
 std::string path_dirname (const std::string &path) {
   const size_t pos = path.find_last_of ('/');
@@ -262,8 +229,10 @@ void c_prefswindow::hide () { CP
 }
 
 void c_prefswindow::load_defaults () {
-  text_vuscale.set_text ("-48");
-  text_vuheadroom.set_text ("6");
+  text_vuscale.set_text ("-48.0");
+  text_vuheadroom.set_text ("6.0");
+  btn_bypass_doubleclick.set_value (false);
+  btn_bypass_rightclick.set_value (true);
 }
 
 void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
@@ -804,15 +773,20 @@ void c_neuralblender_ui::update_ir_cwd (std::string path) {
   configfile.set_item (CONFIG_KEY_NAME_IR_CWD, path_dirname (path));
 }
 
-bool c_neuralblender_ui::create (Window parent_) { CP
+bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   size_t i;
   destroy ();
-  
-  main_init (&app);
-  app.small_font = 12 * app.hdpi;
+
+  if (!tk_app.backend)
+    tk_app.backend = nbtk::create_native_backend ();
+  if (!tk_app.backend)
+    return false;
+
+  tk_app.backend->init_app (&app);
+  /*app.small_font = 12 * app.hdpi;
   app.normal_font = 14 * app.hdpi;
-  app.big_font = 20 * app.hdpi;
-  display = app.dpy;
+  app.big_font = 20 * app.hdpi;*/
+  display = tk_app.backend->display (&app);
   
   configfile.read_file ();
   read_prefs_from_config (configfile, prefs);
@@ -831,14 +805,23 @@ bool c_neuralblender_ui::create (Window parent_) { CP
 
   parent = parent_;
   if (!parent)
-    parent = DefaultRootWindow (display);
+    parent = tk_app.backend->default_root_window (display);
 
   int initial_w = DEFAULT_WINDOW_WIDTH;
   int initial_h = DEFAULT_WINDOW_HEIGHT;
-  if (parent_ &&
-      get_parent_window_size (
-        display, parent, app.hdpi, &initial_w, &initial_h)) {
-    debug ("initial parent window size %d,%d", initial_w, initial_h);
+  if (parent_) {
+    int parent_w = 0;
+    int parent_h = 0;
+    if (tk_app.backend->window_size (
+          display, parent, app.hdpi, &parent_w, &parent_h) &&
+        parent_w >= MIN_WINDOW_WIDTH &&
+        parent_h >= MIN_WINDOW_HEIGHT &&
+        parent_w <= 3000 &&
+        parent_h <= 2200) {
+      initial_w = parent_w;
+      initial_h = parent_h;
+      debug ("initial parent window size %d,%d", initial_w, initial_h);
+    }
   }
     
   if (!mainwindow.create (this, parent, "NeuralBlender", 0, 0, 
@@ -1165,7 +1148,8 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
 
 void c_neuralblender_ui::destroy () { CP
   if (ui_ready)
-    main_quit (&app);
+    if (tk_app.backend)
+      tk_app.backend->shutdown_app (&app);
 
   memset (&app, 0, sizeof (app));
   display = NULL;
@@ -1965,7 +1949,8 @@ int c_neuralblender_ui::idle () {
     pending_resize_h = 0;
   }
 
-  run_embedded (&app);
+  if (tk_app.backend)
+    tk_app.backend->run_events (&app);
 
   redraw_visible_meters ();
   
@@ -1973,8 +1958,9 @@ int c_neuralblender_ui::idle () {
     tuner.on_ui_timer ();
   }
 
-  int pending = XPending(app.dpy);
-  
+  if (tk_app.backend)
+    tk_app.backend->flush_dirty (&app);
+
   //static c_printfps fps ("UI idle: ");
   //fps.tick ();
 

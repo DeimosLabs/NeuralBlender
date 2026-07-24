@@ -414,12 +414,18 @@ int c_lv2_ui::idle () {
     pending_resize_h = 0;
   }
 
-  run_embedded (&app);
+  if (tk_app.backend)
+    tk_app.backend->run_events (&app);
 
   redraw_meters_now ();
 
   if (state.tuner_on)
     tuner.on_ui_timer ();
+
+  if (tk_app.backend) {
+    tk_app.backend->flush_dirty (&app);
+    tk_app.backend->flush (mainwindow.native_handle ());
+  }
 
   return 0;
 }

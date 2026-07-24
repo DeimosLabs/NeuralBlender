@@ -470,8 +470,9 @@ static void ui_main () {
   fprintf (stderr, "UI running...\n");
   
   CP
-  //main_run (&g_ui->app);   // blocking xputty loop
-  while (g_running && g_ui->app.run) {
+  while (g_running &&
+      g_ui->tk_app.backend &&
+      g_ui->tk_app.backend->is_running (&g_ui->app)) {
     g_ui->idle ();
     usleep (16777);
   }

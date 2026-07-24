@@ -1,8 +1,7 @@
 
 /* NeuralBlender - RTNeural / NAM based amp modeler
  *
- * This is an "addendum" / wrapper classes around xputty to make it more
- * fit to my style of coding, and work around some of its internals/callbacks
+ * nbtk widget and native-window implementation.
  */
 
 #include <string.h>
@@ -16,11 +15,6 @@
 #include "neuralblender.h"
 #include "ui.h"
 #include "widgets.h"
-
-#include "xdrawing_area.h"
-#include "xtooltip.h"
-#include "xpngloader.h"
-#include <X11/keysym.h>
 
 #include "data/data.h"
 
@@ -101,6 +95,61 @@ static Widget_t *as_xputty_widget (t_native_handle handle) {
 
 class c_x11_native_backend : public c_native_backend {
 public:
+  void init_app (t_native_app *app) override {
+    if (app)
+      main_init (app);
+  }
+
+  void shutdown_app (t_native_app *app) override {
+    if (app)
+      main_quit (app);
+  }
+
+  void run_events (t_native_app *app) override {
+    if (app)
+      run_embedded (app);
+  }
+
+  void flush_dirty (t_native_app *app) override {
+    if (app)
+      draw_dirty_widgets (app);
+  }
+
+  bool is_running (const t_native_app *app) const override {
+    return app && app->run;
+  }
+
+  t_native_display display (const t_native_app *app) const override {
+    return app ? app->dpy : nullptr;
+  }
+
+  t_native_window default_root_window (t_native_display display) const override {
+    return display ? DefaultRootWindow (display) : 0;
+  }
+
+  bool window_size (
+      t_native_display display,
+      t_native_window window,
+      double hdpi,
+      int *w,
+      int *h) const override {
+
+    if (!display || !window || !w || !h)
+      return false;
+
+    XWindowAttributes attr;
+    if (!XGetWindowAttributes (display, window, &attr))
+      return false;
+
+    if (attr.width <= 0 || attr.height <= 0)
+      return false;
+
+    const double scale = hdpi > 0.0 ? hdpi : 1.0;
+    *w = (int) (attr.width / scale);
+    *h = (int) (attr.height / scale);
+    return *w > 0 && *h > 0;
+  }
+
   void invalidate (t_native_handle handle) override {
     Widget_t *widget = as_xputty_widget (handle);
     if (widget)
@@ -3946,7 +3995,9 @@ bool c_toplevelwindow::create (
     return false;
 
   if (!parent)
-    parent = DefaultRootWindow (ui->display);
+    parent = ui->tk_app.backend
+      ? ui->tk_app.backend->default_root_window (ui->display)
+      : 0;
 
   widget = create_window (&ui->app, parent, x, y, w, h);
   if (!widget)
@@ -4540,8 +4591,6 @@ void c_tktoplevelwindow::redraw_child (nbtk::c_widget &child, int pad) {
   cairo_restore (widget->cr);
 
   cairo_surface_flush (widget->surface);
-  if (tk_app && tk_app->backend)
-    tk_app->backend->flush (widget);
 }
 
 void c_tktoplevelwindow::on_close () {

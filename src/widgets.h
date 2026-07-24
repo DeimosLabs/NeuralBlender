@@ -1,8 +1,7 @@
 
 /* NeuralBlender - RTNeural / NAM based amp modeler
  *
- * This is an "addendum" / wrapper classes around xputty to make it more
- * fit to my style of coding, and work around some of its internals/callbacks
+ * nbtk widget and native-window declarations.
  */
 
 #pragma once
@@ -13,7 +12,7 @@
 #include <string>
 #include <vector>
 #include <cairo/cairo.h>
-#include "xputty_compat.h"
+#include "native_compat.h"
 
 struct t_gradient;
 struct t_gradientcolors;
@@ -70,6 +69,8 @@ namespace nbtk {
 
 using t_native_handle = nbtk_native_handle_t;
 using t_native_window = nbtk_native_window_t;
+using t_native_display = nbtk_native_display_t;
+using t_native_app = nbtk_native_app_t;
 
 struct t_point {
   int x = 0;
@@ -588,6 +589,19 @@ class c_native_backend {
 public:
   virtual ~c_native_backend () = default;
 
+  virtual void init_app (t_native_app *app) = 0;
+  virtual void shutdown_app (t_native_app *app) = 0;
+  virtual void run_events (t_native_app *app) = 0;
+  virtual void flush_dirty (t_native_app *app) = 0;
+  virtual bool is_running (const t_native_app *app) const = 0;
+  virtual t_native_display display (const t_native_app *app) const = 0;
+  virtual t_native_window default_root_window (t_native_display display) const = 0;
+  virtual bool window_size (
+      t_native_display display,
+      t_native_window window,
+      double hdpi,
+      int *w,
+      int *h) const = 0;
   virtual void invalidate (t_native_handle widget) = 0;
   virtual void flush (t_native_handle widget) = 0;
   virtual bool grab_pointer (t_native_handle widget) = 0;

@@ -26,7 +26,7 @@
 #include <vector>
 
 #include "configfile.h"
-#include "xputty_compat.h"
+#include "native_compat.h"
 #include "widgets.h"
 #include "tuner.h"
 
@@ -186,7 +186,7 @@ class c_neuralblender_ui {
 public:
   c_neuralblender_ui ();
   virtual ~c_neuralblender_ui ();
-  bool create (Window parent = 0);
+  bool create (nbtk::t_native_window parent = 0);
   void destroy ();
   virtual int idle ();
   void draw ();
@@ -266,15 +266,15 @@ public:
   virtual void write_prefs_to (t_prefs &p)                        ;
           void apply_ui_prefs (t_prefs &p)                        ;
 	  
-  Display *display = NULL;
-  Window window;
+  nbtk::t_native_display display = NULL;
+  nbtk::t_native_window window;
   c_neuralblender *blender = NULL;
-  Xputty app;
+  nbtk::t_native_app app;
   c_tkappbridge tk_app;
   c_mainwindow mainwindow;
   c_tkaboutwindow tkaboutwindow;
   c_prefswindow prefswindow;
-  Window parent;
+  nbtk::t_native_window parent;
   int tuner_height = 56;
   bool do_set_min_size = false; // ugly hack for ardour's window size shenanigans
   
