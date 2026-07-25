@@ -52,7 +52,7 @@ On debian/ubuntu/mint, just run:
 ```bash
 sudo apt install git cmake libeigen3-dev lv2-dev libjack-dev libcairo2-dev libsndfile1-dev libsamplerate0-dev xxd
 ```
-See CMakeLists.txt for more details.
+On other distributions, the package names (and package system) are probably different, but still available.
 
 To grab the code, build and install, run something like:
 ```
