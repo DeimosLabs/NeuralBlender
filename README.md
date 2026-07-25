@@ -48,7 +48,7 @@ Required libs / utilities:
   - libsoundfile, libsamplerate (for IR support)
   - xxd utility, for inline data
   
-On ubuntu/mint, just run:
+On debian/ubuntu/mint, just run:
 ```bash
 sudo apt install git cmake libeigen3-dev lv2-dev libjack-dev libcairo2-dev libsndfile1-dev libsamplerate0-dev xxd
 ```
