@@ -31,7 +31,7 @@ Features considered for future versions: VST plugin, series mode(s), optionally 
 
 Demo: All the guitars and bass in this song are straight DI's processed through NeuralBlender with a bit of EQ and reverb.
 
-https://soundcloud.com/delt01/snakeskin
+!["Snakeskin" on soundcloud](https://soundcloud.com/delt01/snakeskin)
 
 ![NeuralBlender in Ardour](data/screenshot-session.png)
 
