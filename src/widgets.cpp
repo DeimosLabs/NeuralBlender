@@ -5166,8 +5166,8 @@ void nbtk::c_filepicker::on_resize () {
   listbox.move_resize (12, list_y, list_w, list_h);
   vscrollbar.move_resize (12 + list_w + 4, list_y, scroll_w, list_h);
   listbox.sync_scrollbar ();
-  combo_filter.move_resize (pad, button_y, 150, button_h);
-  btn_show_hidden.move_resize (pad + 158, button_y, 152, button_h);
+  combo_filter.move_resize (pad, button_y, 120, button_h);
+  btn_show_hidden.move_resize (pad + 138, button_y, 152, button_h);
   btn_ok.move_resize (ww - pad - button_w, button_y, button_w, button_h);
   btn_cancel.move_resize (
       ww - pad * 2 - button_w * 2,
