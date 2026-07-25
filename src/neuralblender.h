@@ -29,6 +29,8 @@
 #include <mutex>
 #include <cmath>
 #include <atomic>
+#include <chrono>
+#include <iostream>
 
 #define RTNEURAL_DEFAULT_ALIGNMENT 16
 #include "RTNeural/RTNeural.h"
@@ -71,6 +73,44 @@
 #define NB_XFADE_MS              10.0f
 #define NB_LANE_XFADE_MS         NB_XFADE_MS
 #define TUNER_THRESH_DB          -40.0f
+
+#ifndef NB_DEBUG_RATE_HELPERS
+#define NB_DEBUG_RATE_HELPERS
+inline uint64_t now_ms () {
+  using clock = std::chrono::steady_clock;
+  return std::chrono::duration_cast<std::chrono::milliseconds> (
+    clock::now ().time_since_epoch ()
+  ).count ();
+}
+
+struct c_printfps {
+  std::string m_str;
+  uint64_t count = 0;
+  uint64_t last = now_ms ();
+
+  c_printfps (std::string str) : m_str (std::move (str)) { }
+
+  inline void tick () {
+    count++;
+
+    uint64_t now = now_ms ();
+    if (now - last >= 1000) {
+      std::cout << m_str << count << "\n";
+      count = 0;
+      last = now;
+    }
+  }
+};
+#endif
+
+// TODO: fix this shit
+#ifndef DEBUG_SHOW_RATE
+//#ifdef DEBUG
+#define DEBUG_SHOW_RATE(x) {static c_printfps fps(x);fps.tick();}
+//#else
+//#define DEBUG_SHOW_RATE(x)
+//#endif
+#endif
 
 enum _lane_bank {
   BANK_PEDAL = 0,

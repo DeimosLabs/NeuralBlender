@@ -381,7 +381,7 @@ void c_tunerwidget::render_base (cairo_t *cr) {
   cairo_stroke (cr);
 }
 
-static const char *note_names [] = {
+static const char *note_names [12] = {
   "C-",
   "C#",
   "D-",
@@ -396,7 +396,7 @@ static const char *note_names [] = {
   "B-",
 };
 
-void c_tunerwidget::on_paint (cairo_t *cr) {
+void c_tunerwidget::on_paint (cairo_t *cr) { //DEBUG_SHOW_RATE ("tuner redraw: ")
   char buf [32];
   cairo_text_extents_t ext;
   

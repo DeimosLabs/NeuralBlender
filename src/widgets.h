@@ -70,7 +70,6 @@ namespace nbtk {
 using t_native_handle = nbtk_native_handle_t;
 using t_native_window = nbtk_native_window_t;
 using t_native_display = nbtk_native_display_t;
-using t_native_app = nbtk_native_app_t;
 
 struct t_point {
   int x = 0;
@@ -527,8 +526,8 @@ public:
   virtual void dispatch_mouse_down (int x, int y, int button);
   virtual void dispatch_mouse_up (int x, int y, int button);
   virtual void dispatch_mouse_move (int x, int y);
-  virtual void dispatch_key_down (int key);
-  virtual void dispatch_key_up (int key);
+  virtual bool dispatch_key_down (int key);
+  virtual bool dispatch_key_up (int key);
   virtual void dispatch_text_input (const char *text);
   virtual void invalidate_rect (int x, int y, int w, int h);
   virtual void set_mouse_cursor (_mouse_cursor cursor);
@@ -693,6 +692,8 @@ public:
   static void cb_button_press (void *w, void *event, void *user_data);
   static void cb_button_release (void *w, void *event, void *user_data);
   static void cb_motion (void *w, void *event, void *user_data);
+  static void cb_key_press (void *w, void *event, void *user_data);
+  static void cb_key_release (void *w, void *event, void *user_data);
 
   c_widget *owner = nullptr;
   t_native_handle widget = nullptr;
@@ -852,6 +853,8 @@ typedef struct {
   t_statecolors frame_disabled;
 } t_colortheme;
 
+#ifndef NB_DEBUG_RATE_HELPERS
+#define NB_DEBUG_RATE_HELPERS
 inline uint64_t now_ms () {
   using clock = std::chrono::steady_clock;
   return std::chrono::duration_cast<std::chrono::milliseconds> (
@@ -877,6 +880,15 @@ struct c_printfps {
     }
   }
 };
+#endif
+
+#ifndef DEBUG_SHOW_RATE
+#ifdef DEBUG
+#define DEBUG_SHOW_RATE(x) {static c_printfps fps(x);fps.tick();}
+#else
+#define DEBUG_SHOW_RATE(x)
+#endif
+#endif
 
 const t_colortheme *get_colortheme ();
 void tk_path_rounded_rect (cairo_t *cr,
@@ -1037,6 +1049,7 @@ public:
   void on_configure_notify () override;
   void on_expose () override;
   void on_close () override;
+  virtual bool on_tk_key_down (int key);
   void set_min_size (int w, int h) override;
   void redraw_child (nbtk::c_widget &child, int pad = 1);
   void activate_tk ();
@@ -1088,6 +1101,7 @@ public:
   void hide ();
   void on_resize () override;
   void on_tk_action (t_action_event &event) override;
+  bool on_tk_key_down (int key) override;
 
   void sync_owner_metadata ();
   void scan_current_dir ();

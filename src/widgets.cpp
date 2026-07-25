@@ -32,6 +32,7 @@ uint64_t get_unique_id () {
   return current++;
 }
 
+static int tk_key_from_xkey (XKeyEvent *key);
 static const t_statecolors &colors_for (_widget_style style, _widget_state state);
 static cairo_surface_t *get_knob_image_surface ();
 static bool draw_nbtk_knob_image (
@@ -40,9 +41,9 @@ static bool draw_nbtk_knob_image (
     double y,
     double size);
 static void set_x11_window_background (
-    Widget_t *w,
+    nbtk::t_native_widget *w,
     const t_gradientcolors &colors);
-static void disable_x11_window_background (Widget_t *w);
+static void disable_x11_window_background (nbtk::t_native_widget *w);
 
 static cairo_surface_t *g_knob_image_surface = NULL;
 
@@ -89,8 +90,8 @@ static bool draw_nbtk_knob_image (
 
 namespace nbtk {
 
-static Widget_t *as_xputty_widget (t_native_handle handle) {
-  return (Widget_t *) handle;
+static nbtk::t_native_widget *as_native_widget (t_native_handle handle) {
+  return (nbtk::t_native_widget *) handle;
 }
 
 class c_x11_native_backend : public c_native_backend {
@@ -151,19 +152,19 @@ public:
   }
 
   void invalidate (t_native_handle handle) override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     if (widget)
       expose_widget (widget);
   }
 
   void flush (t_native_handle handle) override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     if (widget && widget->app && widget->app->dpy)
       XFlush (widget->app->dpy);
   }
 
   bool grab_pointer (t_native_handle handle) override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     if (!widget || !widget->app || !widget->app->dpy)
       return false;
 
@@ -181,13 +182,13 @@ public:
   }
 
   void ungrab_pointer (t_native_handle handle) override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     if (widget && widget->app && widget->app->dpy)
       XUngrabPointer (widget->app->dpy, CurrentTime);
   }
 
   bool query_pointer (t_native_handle handle, t_point *local) const override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     if (!widget || !widget->app || !widget->app->dpy || !local)
       return false;
 
@@ -219,17 +220,17 @@ public:
   void set_window_background (
       t_native_handle handle,
       const t_gradientcolors &colors) override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     set_x11_window_background (widget, colors);
   }
 
   void disable_window_background (t_native_handle handle) override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     disable_x11_window_background (widget);
   }
 
   void set_min_size (t_native_handle handle, int w, int h) override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     if (!widget || !widget->app || !widget->app->dpy)
       return;
 
@@ -264,7 +265,7 @@ public:
   }
 
   bool request_size (t_native_handle handle, int w, int h) override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     if (!widget || !widget->app || !widget->app->dpy)
       return false;
 
@@ -278,7 +279,7 @@ public:
   }
 
   void move_resize (t_native_handle handle, int x, int y, int w, int h) override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     if (!widget || !widget->app)
       return;
 
@@ -296,7 +297,7 @@ public:
   }
 
   void set_mouse_cursor (t_native_handle handle, _mouse_cursor cursor) override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     if (!widget || !widget->app || !widget->app->dpy)
       return;
 
@@ -310,7 +311,7 @@ public:
   }
 
   t_native_window root_window (t_native_handle handle, bool is_widget) const override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     if (!widget || !widget->app)
       return 0;
 
@@ -318,7 +319,7 @@ public:
   }
 
   t_point root_to_screen (t_native_handle handle, t_point p) const override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     if (!widget || !widget->app)
       return p;
 
@@ -341,7 +342,7 @@ public:
   }
 
   t_point screen_to_root (t_native_handle handle, t_point p) const override {
-    Widget_t *widget = as_xputty_widget (handle);
+    nbtk::t_native_widget *widget = as_native_widget (handle);
     if (!widget || !widget->app)
       return p;
 
@@ -1547,9 +1548,9 @@ bool c_listbox::on_mouse_down (int x_, int y_, int button) { CP
   last_mouse_button = button;
 
   if (button == Button4)
-    return scroll_to (first_visible - 1) || true;
+    return scroll_to (first_visible - UI_MOUSEWHEEL_ROWS) || true;
   if (button == Button5)
-    return scroll_to (first_visible + 1) || true;
+    return scroll_to (first_visible + UI_MOUSEWHEEL_ROWS) || true;
 
   c_widget::on_mouse_down (x_, y_, button);
   if (button != Button1)
@@ -1581,9 +1582,9 @@ bool c_listbox::on_mouse_up (int x_, int y_, int button) { CP
   last_mouse_button = button;
 
   if (button == Button4)
-    return scroll_to (first_visible - 1) || true;
+    return scroll_to (first_visible - UI_MOUSEWHEEL_ROWS) || true;
   if (button == Button5)
-    return scroll_to (first_visible + 1) || true;
+    return scroll_to (first_visible + UI_MOUSEWHEEL_ROWS) || true;
 
   c_widget::on_mouse_up (x_, y_, button);
   if (button != Button1)
@@ -1608,11 +1609,15 @@ bool c_listbox::on_mouse_up (int x_, int y_, int button) { CP
 bool c_listbox::on_key_down (int key) {
   switch (key) {
     case KEY_UP:
-      set_selected (selected < 0 ? 0 : selected - 1, true);
+      if (!rows.empty ())
+        set_selected (selected < 0 ? 0 : std::max (0, selected - 1), true);
       return true;
 
     case KEY_DOWN:
-      set_selected (selected < 0 ? 0 : selected + 1, true);
+      if (!rows.empty ())
+        set_selected (
+            selected < 0 ? 0 : std::min ((int) rows.size () - 1, selected + 1),
+            true);
       return true;
 
     case KEY_RETURN:
@@ -1711,6 +1716,28 @@ bool c_combobox::on_mouse_up (int x_, int y_, int button) {
 }
 
 bool c_combobox::on_key_down (int key) {
+  if (list_visible) {
+    switch (key) {
+      case KEY_ESCAPE:
+        hide_list ();
+        return true;
+
+      case KEY_RETURN:
+        if (listbox.selected >= 0)
+          set_selected (listbox.selected, true);
+        hide_list ();
+        return true;
+
+      case KEY_UP:
+      case KEY_DOWN:
+        listbox.on_key_down (key);
+        return true;
+
+      default:
+        break;
+    }
+  }
+
   switch (key) {
     case KEY_RETURN:
       toggle_list ();
@@ -1721,7 +1748,8 @@ bool c_combobox::on_key_down (int key) {
       return true;
 
     case KEY_UP:
-      set_selected (selected < 0 ? 0 : selected - 1, true);
+      if (!items.empty ())
+        set_selected (selected < 0 ? 0 : std::max (0, selected - 1), true);
       return true;
 
     case KEY_DOWN:
@@ -1729,7 +1757,10 @@ bool c_combobox::on_key_down (int key) {
         show_list ();
         return true;
       }
-      set_selected (selected < 0 ? 0 : selected + 1, true);
+      if (!items.empty ())
+        set_selected (
+            selected < 0 ? 0 : std::min ((int) items.size () - 1, selected + 1),
+            true);
       return true;
 
     default:
@@ -1740,14 +1771,15 @@ bool c_combobox::on_key_down (int key) {
 void c_combobox::on_action (t_action_event &event) {
   if (event.source_id == listbox.id) {
     event.handled = true;
+    if (!event.value)
+      return;
+
     bool changed = false;
     if (event.source_index >= 0)
-      changed = set_selected (event.source_index, event.value);
-    if (event.value) {
-      if (!changed && selected >= 0)
-        on_change (selected);
-      hide_list ();
-    }
+      changed = set_selected (event.source_index, true);
+    if (!changed && selected >= 0)
+      on_change (selected);
+    hide_list ();
     return;
   }
 
@@ -1831,6 +1863,8 @@ void c_combobox::show_list () {
   listbox.visible = true;
   if (selected >= 0)
     listbox.set_selected (selected);
+  if (app)
+    app->set_focus (&listbox);
 
   t_point p = local_to_screen ({ 0, h });
   popup->show_at_screen_pos (p.x, p.y);
@@ -1840,6 +1874,8 @@ void c_combobox::show_list () {
 void c_combobox::hide_list () {
   list_visible = false;
   listbox.visible = false;
+  if (app)
+    app->set_focus (this);
   if (popup)
     popup->close ();
   invalidate ();
@@ -2003,12 +2039,13 @@ void c_knob::draw (cairo_t *cr) {
     cairo_set_source_rgba (cr, 0.80, 0.96, 0.94, 0.95);
   else
     cairo_set_source_rgba (cr, 1.0, 1.0, 1.0, 0.95);
+
   cairo_set_line_width (cr, std::max (2.0, indicator_radius * 0.08));
   cairo_set_line_cap (cr, CAIRO_LINE_CAP_ROUND);
   cairo_arc (cr, cx, cy, indicator_radius, a0, a1);
   cairo_stroke (cr);
 
-  const double dot_dist = indicator_radius * 0.68;
+  const double dot_dist = indicator_radius * 0.55;
   const double dot_r = std::max (2.0, indicator_radius * 0.10);
   cairo_arc (
     cr,
@@ -2804,14 +2841,18 @@ void c_app::dispatch_mouse_move (int x, int y) {
     root->mouse_move_tree (x, y);
 }
 
-void c_app::dispatch_key_down (int key) {
-  if (focused_widget)
-    focused_widget->on_key_down (key);
+bool c_app::dispatch_key_down (int key) {
+  if (focused_widget && focused_widget->on_key_down (key))
+    return true;
+
+  return root && root->on_key_down (key);
 }
 
-void c_app::dispatch_key_up (int key) {
-  if (focused_widget)
-    focused_widget->on_key_up (key);
+bool c_app::dispatch_key_up (int key) {
+  if (focused_widget && focused_widget->on_key_up (key))
+    return true;
+
+  return root && root->on_key_up (key);
 }
 
 void c_app::dispatch_text_input (const char *text) {
@@ -3000,7 +3041,7 @@ void c_popupwindow::create_native_for_owner (
     int h_) {
 
   create_for_owner (app_, owner_, w_, h_);
-  Widget_t *native_owner = as_xputty_widget (native_owner_);
+  nbtk::t_native_widget *native_owner = as_native_widget (native_owner_);
   if (!native_owner || !native_owner->app)
     return;
 
@@ -3014,7 +3055,7 @@ void c_popupwindow::create_native_for_owner (
   if (!widget)
     return;
 
-  Widget_t *w = as_xputty_widget (widget);
+  nbtk::t_native_widget *w = as_native_widget (widget);
   w->parent_struct = this;
   w->scale.gravity = NONE;
   os_set_window_attrb (w);
@@ -3026,6 +3067,8 @@ void c_popupwindow::create_native_for_owner (
   w->func.button_release_callback = c_popupwindow::cb_button_release;
   w->func.double_click_callback = c_popupwindow::cb_button_release;
   w->func.motion_callback = c_popupwindow::cb_motion;
+  w->func.key_press_callback = c_popupwindow::cb_key_press;
+  w->func.key_release_callback = c_popupwindow::cb_key_release;
   os_set_input_mask (w);
   childlist_add_child (native_owner->childlist, w);
 }
@@ -3073,10 +3116,12 @@ void c_popupwindow::move_resize (int x_, int y_, int w_, int h_) {
 void c_popupwindow::show () {
   c_nativewindow::show ();
   if (widget) {
-    Widget_t *w = as_xputty_widget (widget);
+    nbtk::t_native_widget *w = as_native_widget (widget);
     widget_show_all (w);
     if (app && app->backend)
       pointer_grabbed = app->backend->grab_pointer (widget);
+    if (takes_focus () && w->app && w->app->dpy)
+      XSetInputFocus (w->app->dpy, w->widget, RevertToParent, CurrentTime);
     close_on_release = false;
     if (app && app->backend)
       app->backend->invalidate (widget);
@@ -3086,7 +3131,7 @@ void c_popupwindow::show () {
 void c_popupwindow::hide () {
   c_nativewindow::hide ();
   if (widget) {
-    Widget_t *w = as_xputty_widget (widget);
+    nbtk::t_native_widget *w = as_native_widget (widget);
     if (pointer_grabbed && app && app->backend) {
       app->backend->ungrab_pointer (widget);
       pointer_grabbed = false;
@@ -3098,7 +3143,7 @@ void c_popupwindow::hide () {
 
 void c_popupwindow::cb_expose (void *w_, void *user_data) {
   (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   if (!w || !w->parent_struct)
     return;
 
@@ -3117,7 +3162,7 @@ void c_popupwindow::cb_button_press (
     void *user_data) {
 
   (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   XButtonEvent *button = (XButtonEvent *) event;
   if (!w || !w->parent_struct || !button)
     return;
@@ -3153,7 +3198,7 @@ void c_popupwindow::cb_button_release (
     void *user_data) {
 
   (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   XButtonEvent *button = (XButtonEvent *) event;
   if (!w || !w->parent_struct || !button)
     return;
@@ -3192,7 +3237,7 @@ void c_popupwindow::cb_motion (
     void *user_data) {
 
   (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   XMotionEvent *motion = (XMotionEvent *) event;
   if (!w || !w->parent_struct || !motion)
     return;
@@ -3212,6 +3257,49 @@ void c_popupwindow::cb_motion (
         x,
         y);
   }
+  expose_widget (w);
+}
+
+void c_popupwindow::cb_key_press (
+    void *w_,
+    void *event,
+    void *user_data) {
+
+  (void) user_data;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
+  XKeyEvent *key = (XKeyEvent *) event;
+  if (!w || !w->parent_struct || !key)
+    return;
+
+  c_popupwindow *self = (c_popupwindow *) w->parent_struct;
+  const int tk_key = tk_key_from_xkey (key);
+  bool handled = false;
+  if (tk_key != KEY_UNKNOWN && self->app)
+    handled = self->app->dispatch_key_down (tk_key);
+  if (!handled && tk_key != KEY_UNKNOWN)
+    handled = self->on_key_down (tk_key);
+  if (!handled && tk_key != KEY_UNKNOWN && self->owner)
+    self->owner->on_key_down (tk_key);
+
+  expose_widget (w);
+}
+
+void c_popupwindow::cb_key_release (
+    void *w_,
+    void *event,
+    void *user_data) {
+
+  (void) user_data;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
+  XKeyEvent *key = (XKeyEvent *) event;
+  if (!w || !w->parent_struct || !key)
+    return;
+
+  c_popupwindow *self = (c_popupwindow *) w->parent_struct;
+  const int tk_key = tk_key_from_xkey (key);
+  if (tk_key != KEY_UNKNOWN && self->app)
+    self->app->dispatch_key_up (tk_key);
+
   expose_widget (w);
 }
 
@@ -3416,7 +3504,7 @@ static const t_statecolors &colors_for (
 
 // we need to keep this for now
 static void set_widget_color_all_states (
-    Widget_t *w,
+    nbtk::t_native_widget *w,
     Color_mod mod,
     const float r,
     const float g,
@@ -3433,7 +3521,7 @@ static void set_widget_color_all_states (
   set_widget_color (w, INSENSITIVE_, mod, r, g, b, a);
 }
 
-static bool get_widget_size  (Widget_t *w, int *rx, int *ry, int *rw, int *rh) {
+static bool get_widget_size  (nbtk::t_native_widget *w, int *rx, int *ry, int *rw, int *rh) {
   if (!w)
     return false;
 
@@ -3464,16 +3552,16 @@ static cairo_pattern_t *create_vertical_gradient (
 }
 
 static c_toplevelwindow *toplevel_from_widget (void *w_) {
-  Widget_t *w = (Widget_t *) w_;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   if (!w || !w->parent_struct)
     return NULL;
 
   return (c_toplevelwindow *) w->parent_struct;
 }
 
-static c_toplevelwindow *toplevel_from_child_widget (Widget_t *w) {
+static c_toplevelwindow *toplevel_from_child_widget (nbtk::t_native_widget *w) {
   while (w && w->parent) {
-    Widget_t *parent_widget = (Widget_t *) w->parent;
+    nbtk::t_native_widget *parent_widget = (nbtk::t_native_widget *) w->parent;
     if ((parent_widget->flags & IS_WINDOW) && parent_widget->parent_struct)
       return (c_toplevelwindow *) parent_widget->parent_struct;
 
@@ -3537,7 +3625,7 @@ void tk_set_gradient (
 }
 
 static void fill_rounded_rect (
-    Widget_t *w,
+    nbtk::t_native_widget *w,
     int x,
     int y,
     int width,
@@ -3556,7 +3644,7 @@ static void fill_rounded_rect (
 }
 
 static void fill_rounded_rect (
-    Widget_t *w,
+    nbtk::t_native_widget *w,
     float radius,
     const t_gradientcolors &colors) {
   int x = 0, y = 0, width = 0, height = 0;
@@ -3567,7 +3655,7 @@ static void fill_rounded_rect (
 }
 
 static void draw_rounded_rect (
-    Widget_t *w,
+    nbtk::t_native_widget *w,
     int x,
     int y,
     int width,
@@ -3597,7 +3685,7 @@ static void draw_rounded_rect (
 }
 
 static void draw_rounded_rect (
-    Widget_t *w,
+    nbtk::t_native_widget *w,
     float radius,
     const t_gradientcolors &colors,
     float line_width) {
@@ -3609,7 +3697,7 @@ static void draw_rounded_rect (
 }
 
 static void draw_check_mark (
-    Widget_t *w,
+    nbtk::t_native_widget *w,
     int x,
     int y,
     int width,
@@ -3642,7 +3730,7 @@ static void draw_check_mark (
 }
 
 static void draw_checkbox (
-    Widget_t *w,
+    nbtk::t_native_widget *w,
     const t_statecolors &colors,
     bool checked) {
 
@@ -3699,7 +3787,7 @@ unsigned long x11_color_pixel (
 }
 
 void set_x11_window_background (
-    Widget_t *w,
+    nbtk::t_native_widget *w,
     const t_gradientcolors &colors) {
 
   if (!w || !w->app || !w->app->dpy || !w->widget)
@@ -3710,7 +3798,7 @@ void set_x11_window_background (
   XClearWindow (display, w->widget);
 }
 
-void disable_x11_window_background (Widget_t *w) {
+void disable_x11_window_background (nbtk::t_native_widget *w) {
   if (!w || !w->app || !w->app->dpy || !w->widget)
     return;
 
@@ -3722,10 +3810,10 @@ void cb_dummy (void *w_, void* user_data) {}
 ////////////////////////////////////////////////////////////////////////////////
 // c_widget
 
-// this one must be called AFTER add_* (Widget_t *, ...) in child create functions
+// this one must be called AFTER add_* (nbtk::t_native_widget *, ...) in child create functions
 void c_widget::create (
     c_neuralblender_ui *ui_,
-    Widget_t *parent,
+    nbtk::t_native_widget *parent,
     const char *label_,
     int x, int y, int w, int h) {
 
@@ -4016,7 +4104,7 @@ bool c_toplevelwindow::create (
 
   os_register_wm_delete_window (widget);
   auto_close (true);
-  Widget_t *owner = nbtk::as_xputty_widget (owner_);
+  nbtk::t_native_widget *owner = nbtk::as_native_widget (owner_);
   if (owner)
     os_set_transient_for_hint (owner, widget);
   set_title (title_);
@@ -4077,7 +4165,7 @@ void c_toplevelwindow::cb_close (void *w_, void *user_data) { CP
 
   window->on_close ();
 
-  Widget_t *widget = (Widget_t *) w_;
+  nbtk::t_native_widget *widget = (nbtk::t_native_widget *) w_;
   if (widget && widget->app && !(widget->flags & HIDE_ON_DELETE))
     widget->app->run = false;
 }
@@ -4608,6 +4696,11 @@ void c_tktoplevelwindow::on_close () {
   handling_close = false;
 }
 
+bool c_tktoplevelwindow::on_tk_key_down (int key) {
+  (void) key;
+  return false;
+}
+
 void c_tktoplevelwindow::auto_hide_on_close (bool b) {
   hide_on_close = b;
   if (b)
@@ -4626,7 +4719,7 @@ void c_tktoplevelwindow::cb_button_press (
     void *user_data) {
 
   (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   XButtonEvent *button = (XButtonEvent *) event;
   if (!w || !w->parent_struct || !button)
     return;
@@ -4661,7 +4754,7 @@ void c_tktoplevelwindow::cb_button_release (
     void *user_data) {
 
   (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   XButtonEvent *button = (XButtonEvent *) event;
   if (!w || !w->parent_struct || !button)
     return;
@@ -4691,7 +4784,7 @@ void c_tktoplevelwindow::cb_motion (
     void *user_data) {
 
   (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   XMotionEvent *motion = (XMotionEvent *) event;
   if (!w || !w->parent_struct || !motion)
     return;
@@ -4714,7 +4807,7 @@ void c_tktoplevelwindow::cb_motion (
 
 void c_tktoplevelwindow::cb_enter (void *w_, void *user_data) {
   (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   if (!w || !w->parent_struct || !w->app)
     return;
 
@@ -4733,7 +4826,7 @@ void c_tktoplevelwindow::cb_enter (void *w_, void *user_data) {
 
 void c_tktoplevelwindow::cb_leave (void *w_, void *user_data) {
   (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   if (!w || !w->parent_struct)
     return;
 
@@ -4773,7 +4866,7 @@ void c_tktoplevelwindow::cb_key_press (
     void *user_data) {
 
   (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   XKeyEvent *key = (XKeyEvent *) event;
   if (!w || !w->parent_struct || !key)
     return;
@@ -4785,8 +4878,11 @@ void c_tktoplevelwindow::cb_key_press (
   self->activate_tk ();
 
   const int tk_key = tk_key_from_xkey (key);
+  bool handled = false;
   if (tk_key != nbtk::KEY_UNKNOWN)
-    self->tk_app->dispatch_key_down (tk_key);
+    handled = self->tk_app->dispatch_key_down (tk_key);
+  if (!handled && tk_key != nbtk::KEY_UNKNOWN)
+    handled = self->on_tk_key_down (tk_key);
 
   char text [32] = {};
   KeySym ignored = 0;
@@ -4803,7 +4899,7 @@ void c_tktoplevelwindow::cb_key_release (
     void *user_data) {
 
   (void) user_data;
-  Widget_t *w = (Widget_t *) w_;
+  nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   XKeyEvent *key = (XKeyEvent *) event;
   if (!w || !w->parent_struct || !key)
     return;
@@ -4846,7 +4942,7 @@ static std::string path_parent_dir (const std::string &path) {
 }
 
 void nbtk::c_filepicker::sync_owner_metadata () {
-  Widget_t *owner_widget_ = as_xputty_widget (owner_widget);
+  nbtk::t_native_widget *owner_widget_ = as_native_widget (owner_widget);
   if (!owner_widget_ || !owner_widget_->parent_struct)
     return;
 
@@ -4877,7 +4973,7 @@ void nbtk::c_filepicker::create (
       0,
       520,
       420,
-      as_xputty_widget (owner)))
+      as_native_widget (owner)))
     return;
 
   lane = lane_;
@@ -4981,6 +5077,15 @@ void nbtk::c_filepicker::on_tk_action (t_action_event &event) {
   }
 
   c_tktoplevelwindow::on_tk_action (event);
+}
+
+bool nbtk::c_filepicker::on_tk_key_down (int key) {
+  if (key == KEY_ESCAPE) {
+    hide ();
+    return true;
+  }
+
+  return c_tktoplevelwindow::on_tk_key_down (key);
 }
 
 void nbtk::c_filepicker::scan_current_dir () {
