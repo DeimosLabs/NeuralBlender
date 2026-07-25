@@ -1468,9 +1468,9 @@ void c_listbox::draw (cairo_t *cr) {
     return;
 
   static cairo_surface_t *dir_icon =
-    cairo_image_surface_create_from_stream (data_xputty_directory_png);
+    cairo_image_surface_create_from_stream (data_icon_picker_directory_png);
   static cairo_surface_t *file_icon =
-    cairo_image_surface_create_from_stream (data_xputty_file_png);
+    cairo_image_surface_create_from_stream (data_icon_picker_file_png);
 
   const t_statecolors &frame = colors_for (WSTYLE_FRAME, WSTATE_NORMAL);
   const t_statecolors &sel = colors_for (WSTYLE_BUTTON, WSTATE_ON);
@@ -4998,10 +4998,10 @@ void nbtk::c_filepicker::create (
   vscrollbar.set_orientation (SCROLLBAR_VERTICAL);
 
   btn_ok.create (&tk_root, "OK", 342, 380, 80, 30);
-  btn_ok.set_image_default (data_xputty_approved_png);
+  btn_ok.set_image_default (data_icon_xputty_approved_png);
 
   btn_cancel.create (&tk_root, "Cancel", 432, 380, 80, 30);
-  btn_cancel.set_image_default (data_xputty_cancel_png);
+  btn_cancel.set_image_default (data_icon_xputty_cancel_png);
 
   on_resize ();
 }

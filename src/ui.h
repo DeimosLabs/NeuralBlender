@@ -93,9 +93,9 @@ public:
   nbtk::c_checkbox btn_bypass_rightclick;
 };
 
-class c_tkaboutwindow;
+class c_aboutwindow;
 
-class c_tkaboutwindow : public c_tktoplevelwindow {
+class c_aboutwindow : public c_tktoplevelwindow {
 public:
   void create (c_neuralblender_ui *ui);
 
@@ -274,7 +274,7 @@ public:
   nbtk::t_native_app app;
   c_tkappbridge tk_app;
   c_mainwindow mainwindow;
-  c_tkaboutwindow tkaboutwindow;
+  c_aboutwindow aboutwindow;
   c_prefswindow prefswindow;
   nbtk::t_native_window parent;
   int tuner_height = 56;

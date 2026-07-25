@@ -164,9 +164,9 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
 
   frame1.create (&tk_root, "", 12, 12, w () - 24, h () - 80);
   btn_ok.create (&tk_root, "OK", 0, 0, 128, 40);
-  btn_ok.set_image_default (data_xputty_approved_png);
+  btn_ok.set_image_default (data_icon_xputty_approved_png);
   btn_cancel.create (&tk_root, "Cancel", 0, 0, 128, 40);
-  btn_cancel.set_image_default (data_xputty_cancel_png);
+  btn_cancel.set_image_default (data_icon_xputty_cancel_png);
 
   label_vuscale.create (&frame1, "VU meter scale dB:", 16, 32, 180, 32);
   label_vuscale.align = TEXT_LEFT;
@@ -267,7 +267,7 @@ void c_prefswindow::set_prefs_to (t_prefs &prefs) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// c_tkaboutwindow
+// c_aboutwindow
 
 static const char *g_about_text [] = {
 #ifdef LV2
@@ -282,7 +282,7 @@ static const char *g_about_text [] = {
   NULL
 };
 
-void c_tkaboutwindow::create (c_neuralblender_ui *ui_) { CP
+void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   ui = ui_;
   if (!ui || !ui->ui_ready || widget)
     return;
@@ -332,7 +332,7 @@ void c_tkaboutwindow::create (c_neuralblender_ui *ui_) { CP
   tk_build.size = 10.0f;
 
   tk_ok.create (root, "OK", 310, 424, 128, 40);
-  tk_ok.set_image_default (data_xputty_approved_png);
+  tk_ok.set_image_default (data_icon_xputty_approved_png);
   
   /*test_knob.create (root, "test knob", 16, 400, 64, 64);
   test_listbox.create (root, "test listbox", 100, 400, 200, 80);
@@ -345,7 +345,7 @@ void c_tkaboutwindow::create (c_neuralblender_ui *ui_) { CP
   }*/
 }
 
-void c_tkaboutwindow::show () { CP
+void c_aboutwindow::show () { CP
   if (!widget)
     create (ui);
   if (!widget)
@@ -355,14 +355,14 @@ void c_tkaboutwindow::show () { CP
   expose_widget (widget);
 }
 
-void c_tkaboutwindow::hide () { CP
+void c_aboutwindow::hide () { CP
   if (!widget)
     return;
 
   widget_hide (widget);
 }
 
-void c_tkaboutwindow::on_tk_action (nbtk::t_action_event &event) {
+void c_aboutwindow::on_tk_action (nbtk::t_action_event &event) {
   if (event.source_id == tk_ok.id && event.mouse_button == Button1) {
     hide ();
     event.handled = true;
@@ -880,7 +880,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_tuner.padding =     12;
   btn_noisegate.padding = 12;
   
-  tkaboutwindow.create (this);
+  aboutwindow.create (this);
   prefswindow.create (this);
   mainwindow.activate_tk ();
   
@@ -984,9 +984,9 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   text_other_tuner.create (&frame_other_misc, "", 250, 14, 150, 40);
   text_other_calib.create (&frame_other_misc, "", 250, 60, 150, 40);
   btn_other_prefs.create (&frame_other_misc, "Settings", 0, 130, 120, 40);
-  btn_other_prefs.set_image_default (data_xputty_gear_png);
+  btn_other_prefs.set_image_default (data_icon_xputty_gear_png);
   btn_other_about.create (&frame_other_misc, "About...", 0, 130, 120, 40);
-  btn_other_about.set_image_default (data_xputty_info_png);
+  btn_other_about.set_image_default (data_icon_xputty_info_png);
   
   btn_other_tuner_down.create (&frame_other_misc, "", 420, 14, 40, 40);
   btn_other_tuner_down.set_image_default (data_icon_flat_png);
@@ -1544,7 +1544,7 @@ void c_neuralblender_ui::on_tk_action (nbtk::t_action_event &event) {
       break;
 
       case ROLE_ABOUT:
-        tkaboutwindow.show ();
+        aboutwindow.show ();
         on_about ();
       break;
 
