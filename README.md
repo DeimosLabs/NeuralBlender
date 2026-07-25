@@ -29,6 +29,10 @@ On my Intel Core7 ultra, it loads 5 or 6 models in the middle of a busy live ses
 
 Features considered for future versions: VST plugin, series mode(s), optionally more than 4 lanes per model bank, lane groups, DSP load-splitting/balancing etc...
 
+Demo: All the guitars and bass in this song are straight DI's processed through NeuralBlender with a bit of EQ and reverb.
+
+https://soundcloud.com/delt01/snakeskin
+
 ![NeuralBlender in Ardour](data/screenshot-session.png)
 
 ![NeuralBlender custom UI](data/screenshot-ui.png)
