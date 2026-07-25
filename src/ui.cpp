@@ -580,6 +580,7 @@ void c_lane_widgets::create (
   
   // regular controls
   menu_list.create (&lane_frame, "", 0, 0, 320, 32);
+  menu_list.wheel_selects_item = true;
 
   int knobs_right = w - 180;
   knob_gain_in.create (&lane_frame, "Input", 0, 0, 64, 64);

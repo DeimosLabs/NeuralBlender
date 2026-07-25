@@ -445,6 +445,7 @@ public:
   std::unique_ptr<c_popupwindow> popup;
   bool list_visible = false;
   bool toggle_on_mouse_up = false;
+  bool wheel_selects_item = false;
 };
 
 class c_knob : public c_widget {

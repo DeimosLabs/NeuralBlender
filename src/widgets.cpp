@@ -1701,6 +1701,19 @@ void c_combobox::draw (cairo_t *cr) {
 }
 
 bool c_combobox::on_mouse_down (int x_, int y_, int button) {
+  if (wheel_selects_item && (button == Button4 || button == Button5)) {
+    if (!items.empty ()) {
+      const int dir = button == Button4 ? -1 : 1;
+      const int current = selected < 0 ? 0 : selected;
+      const int next = std::clamp (
+          current + dir,
+          0,
+          (int) items.size () - 1);
+      set_selected (next, true);
+    }
+    return true;
+  }
+
   c_widget::on_mouse_down (x_, y_, button);
   toggle_on_mouse_up = button == Button1;
 
