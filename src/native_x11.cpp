@@ -82,6 +82,16 @@ static void ensure_cairo (nbtk::t_native_widget *w) {
   if (!w || !w->app || !w->app->dpy || !w->widget)
     return;
 
+  XWindowAttributes attr;
+  if (XGetWindowAttributes (w->app->dpy, w->widget, &attr) &&
+      attr.width > 0 && attr.height > 0) {
+    w->width = attr.width;
+    w->height = attr.height;
+    w->x = attr.x;
+    w->y = attr.y;
+    w->visible = attr.map_state == IsViewable;
+  }
+
   const int width = std::max (1, w->width);
   const int height = std::max (1, w->height);
   if (w->surface &&
@@ -370,16 +380,19 @@ void os_get_window_metrics (nbtk::t_native_widget *w, Metrics_t *metrics) {
   metrics->y = w->y;
   metrics->visible = w->visible;
 
-  if (w->app && w->app->dpy && w->widget) {
-    XWindowAttributes attr;
-    if (XGetWindowAttributes (w->app->dpy, w->widget, &attr)) {
-      metrics->width = attr.width;
-      metrics->height = attr.height;
-      metrics->x = attr.x;
-      metrics->y = attr.y;
-      metrics->visible = attr.map_state == IsViewable;
-    }
-  }
+  if (!w->app || !w->app->dpy || !w->widget)
+    return;
+
+  XWindowAttributes attr;
+  if (!XGetWindowAttributes (w->app->dpy, w->widget, &attr))
+    return;
+
+  metrics->width = attr.width;
+  metrics->height = attr.height;
+  metrics->x = attr.x;
+  metrics->y = attr.y;
+  metrics->visible = attr.map_state == IsViewable;
+
 }
 
 void os_set_window_min_size (

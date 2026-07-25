@@ -234,8 +234,11 @@ public:
     if (!widget || !widget->app || !widget->app->dpy)
       return;
 
+    const float hdpi = widget->app->hdpi > 0.0f ? widget->app->hdpi : 1.0f;
+    const int native_w = std::max (1, (int) (w * hdpi));
+    const int native_h = std::max (1, (int) (h * hdpi));
     Display *display = widget->app->dpy;
-    set_window_hints (display, widget->widget, w, h);
+    set_window_hints (display, widget->widget, native_w, native_h);
 
     Window root = 0;
     Window parent = 0;
@@ -259,7 +262,7 @@ public:
       if (!parent || parent == root)
         break;
 
-      set_window_hints (display, parent, w, h);
+      set_window_hints (display, parent, native_w, native_h);
       current = parent;
     }
   }
@@ -373,12 +376,11 @@ private:
     if (!hints)
       return;
 
-    hints->flags = PMinSize | PBaseSize | PWinGravity;
+    hints->flags = PMinSize | PBaseSize;
     hints->min_width = w;
     hints->min_height = h;
     hints->base_width = w;
     hints->base_height = h;
-    hints->win_gravity = CenterGravity;
     XSetWMNormalHints (display, window, hints);
     XFree (hints);
   }

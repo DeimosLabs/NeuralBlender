@@ -722,7 +722,7 @@ void c_lane_widgets::move_resize (
   
   int adv_btn_x = 84;
   int adv_btn_y = h * 2 / 11;
-  label_frames.move_resize (knob_delay.x, h - 20, knob_delay.w, 16);
+  label_frames.move_resize (knob_delay.x - 10, h - 20, knob_delay.w + 20, 16);
   label_engine.move_resize (knob_gain_in.x, h - 20, knob_gain_in.w, 16);
   label_trim.move_resize (knob_dry_out.x, h - 20, knob_dry_out.w +
                           knob_dry_out.w, 16);
@@ -1045,6 +1045,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     
     int window_width = std::max (MIN_WINDOW_WIDTH, mainwindow.w ());
     int window_height = std::max (MIN_WINDOW_HEIGHT, mainwindow.h ());
+
     debug ("move_resize: snap=%d visible=%d main=%d,%d metrics=%d,%d pending=%d,%d",
            (int) snap_to_default, (int) metrics_visible,
            mainwindow.w (), mainwindow.h (),
