@@ -15,6 +15,7 @@ option(GUI            "Enable GUI" ON)
 option(DEBUG          "Debug build" OFF)
 option(TRACE          "Debug (mostly) UI code" OFF)
 option(NOASAN         "Disable asan on debug build" ON)
+option(GZIP_SUPPORT   "Enable gzip-compressed model/IR loading" ON)
 
 find_package(PkgConfig REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -24,6 +25,14 @@ find_program(XXD_EXECUTABLE xxd REQUIRED)
 pkg_check_modules(FFTW3F REQUIRED IMPORTED_TARGET fftw3f)
 pkg_check_modules(SNDFILE REQUIRED IMPORTED_TARGET sndfile)
 pkg_check_modules(SAMPLERATE REQUIRED IMPORTED_TARGET samplerate)
+
+if (GZIP_SUPPORT)
+  find_package(ZLIB)
+  if (NOT ZLIB_FOUND)
+    message(WARNING "zlib not found, disabling gzip support")
+    set(GZIP_SUPPORT OFF)
+  endif()
+endif()
 
 function(add_neuralblender_gui_library target_name)
   add_library(${target_name} STATIC
@@ -167,9 +176,8 @@ target_include_directories(neuralblender_data PUBLIC
   ${CMAKE_CURRENT_BINARY_DIR}/data
 )
 
-add_library(neuralblender_core OBJECT
+set(NEURALBLENDER_CORE_SOURCES
   src/neuralblender.cpp
-  src/gzip.cpp
   
   external/NAM/get_dsp.cpp
   external/NAM/dsp.cpp
@@ -184,6 +192,14 @@ add_library(neuralblender_core OBJECT
   external/NAM/wavenet/model.cpp
   external/NAM/wavenet/a2_fast.cpp
   external/NAM/wavenet/slimmable.cpp
+)
+
+if (GZIP_SUPPORT)
+  list(APPEND NEURALBLENDER_CORE_SOURCES src/gzip.cpp)
+endif()
+
+add_library(neuralblender_core OBJECT
+  ${NEURALBLENDER_CORE_SOURCES}
 )
 
 add_library(neuralblender_meter_data OBJECT
@@ -232,7 +248,19 @@ target_compile_definitions(neuralblender_meter_data PRIVATE
   METER_DATA_ONLY
 )
 
-target_link_libraries(neuralblender_core PUBLIC Eigen3::Eigen z PkgConfig::FFTW3F PkgConfig::SNDFILE PkgConfig::SAMPLERATE neuralblender_cmdline_debug neuralblender_config)
+target_link_libraries(neuralblender_core PUBLIC
+  Eigen3::Eigen
+  PkgConfig::FFTW3F
+  PkgConfig::SNDFILE
+  PkgConfig::SAMPLERATE
+  neuralblender_cmdline_debug
+  neuralblender_config
+)
+
+if (GZIP_SUPPORT)
+  target_compile_definitions(neuralblender_core PUBLIC HAVE_GZIP)
+  target_link_libraries(neuralblender_core PUBLIC ZLIB::ZLIB)
+endif()
 
 if (DEBUG)
   message(STATUS "Debug enabled")
