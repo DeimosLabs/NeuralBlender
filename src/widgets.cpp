@@ -610,7 +610,7 @@ bool c_widget::update_hover_tree (int px, int py) {
     mouse_inside = true;
     on_mouse_enter ();
   }
-  if (app && wants_hover)
+  if (app && (wants_hover || !tooltip.empty ()))
     app->hovered_widget = this;
 
   for (c_widget *child : children) {
@@ -634,10 +634,16 @@ void c_widget::clear_hover_tree () {
     mouse_inside = false;
     if (app && app->hovered_widget == this)
       app->hovered_widget = nullptr;
+    if (app && app->tooltip_widget == this)
+      app->hide_tooltip ();
     on_mouse_leave ();
   }
 
   clear_hover ();
+}
+
+c_frame::c_frame () {
+  corner_radius = UI_FRAME_RADIUS;
 }
 
 void c_frame::draw (cairo_t *cr) {
@@ -645,7 +651,7 @@ void c_frame::draw (cairo_t *cr) {
     return;
 
   const t_statecolors &colors = colors_for (WSTYLE_FRAME, state);
-  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, UI_FRAME_RADIUS);
+  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   tk_set_gradient (cr, h, colors.bg);
   cairo_fill_preserve (cr);
 
@@ -792,6 +798,7 @@ static void tk_draw_surface_scaled (
 c_button::c_button () {
   wants_mouse = true;
   wants_hover = true;
+  corner_radius = UI_BUTTON_RADIUS;
 }
 
 c_button::~c_button () {
@@ -842,7 +849,7 @@ void c_button::draw (cairo_t *cr) {
     return;
 
   const t_statecolors &colors = colors_for (WSTYLE_BUTTON, tk_button_state (*this));
-  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, UI_BUTTON_RADIUS);
+  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   tk_set_gradient (cr, h, colors.bg);
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, h, colors.fg);
@@ -971,6 +978,7 @@ bool c_button::set_value (bool value_) {
 c_checkbox::c_checkbox () {
   is_toggle = true;
   align = TEXT_LEFT;
+  corner_radius = UI_CHECKBOX_RADIUS;
 }
 
 void c_checkbox::draw (cairo_t *cr) {
@@ -984,7 +992,7 @@ void c_checkbox::draw (cairo_t *cr) {
   const int bx = 2;
   const int by = (h - box) / 2;
 
-  tk_path_rounded_rect (cr, bx, by, box, box, UI_CHECKBOX_RADIUS);
+  tk_path_rounded_rect (cr, bx, by, box, box, corner_radius);
   tk_set_gradient (cr, box, colors.bg);
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, box, colors.fg);
@@ -1027,6 +1035,7 @@ void c_checkbox::draw (cairo_t *cr) {
 c_scrollbar::c_scrollbar () {
   wants_mouse = true;
   wants_hover = true;
+  corner_radius = UI_SCROLLBAR_RADIUS;
 }
 
 bool c_scrollbar::set_value (float value_, bool notify) {
@@ -1104,7 +1113,7 @@ void c_scrollbar::draw (cairo_t *cr) {
     pressed ? WSTATE_DOWN : hovered ? WSTATE_HOVER : WSTATE_NORMAL);
   const t_gradientcolors &bg = get_colortheme ()->window_bg;
 
-  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, UI_SCROLLBAR_RADIUS);
+  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   cairo_set_source_rgba (cr, bg.r1, bg.g1, bg.b1, bg.a1);
   cairo_fill_preserve (cr);
   cairo_set_source_rgba (
@@ -1113,7 +1122,13 @@ void c_scrollbar::draw (cairo_t *cr) {
   cairo_stroke (cr);
 
   const t_rect r = thumb_rect ();
-  tk_path_rounded_rect (cr, r.x, r.y, r.w, r.h, std::max (0, (int) UI_SCROLLBAR_RADIUS - (r.x - 2)));
+  tk_path_rounded_rect (
+      cr,
+      r.x,
+      r.y,
+      r.w,
+      r.h,
+      std::max (0.0f, corner_radius - (float) (r.x - 2)));
   tk_set_gradient (cr, r.h, thumb.bg);
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, r.h, thumb.fg);
@@ -1306,6 +1321,7 @@ void c_container::on_action (t_action_event &event) {
 c_listbox::c_listbox () {
   wants_mouse = true;
   wants_hover = true;
+  corner_radius = UI_LIST_RADIUS;
 }
 
 void c_listbox::clear () {
@@ -1481,7 +1497,7 @@ void c_listbox::draw (cairo_t *cr) {
     frame.fg.r1, frame.fg.g1, frame.fg.b1, frame.fg.a1
   };
 
-  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, UI_LIST_RADIUS);
+  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   cairo_set_source_rgba (cr, bg.r1, bg.g1, bg.b1, bg.a1);
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, h, outline);
@@ -1504,7 +1520,9 @@ void c_listbox::draw (cairo_t *cr) {
 
     const int y0 = row * row_height;
     if (index == selected) {
-      tk_path_rounded_rect (cr, 4, y0 + 2, w - 8, row_height - 4, 4.0);
+      const float row_radius =
+        std::min (corner_radius, std::max (0.0f, (float) row_height * 0.25f));
+      tk_path_rounded_rect (cr, 4, y0 + 2, w - 8, row_height - 4, row_radius);
       tk_set_gradient (cr, row_height, sel.bg);
       cairo_fill (cr);
     } else if (hovered) {
@@ -1635,6 +1653,7 @@ bool c_listbox::on_key_down (int key) {
 c_combobox::c_combobox () {
   wants_mouse = true;
   wants_hover = true;
+  corner_radius = UI_COMBOBOX_RADIUS;
 }
 
 c_combobox::~c_combobox () = default;
@@ -1661,7 +1680,7 @@ void c_combobox::draw (cairo_t *cr) {
       WSTYLE_BUTTON,
       pressed ? WSTATE_DOWN : hovered ? WSTATE_HOVER : WSTATE_NORMAL);
 
-  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, UI_COMBOBOX_RADIUS);
+  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   tk_set_gradient (cr, h, colors.bg);
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, h, colors.fg);
@@ -2201,6 +2220,7 @@ c_textbox::c_textbox () {
   wants_mouse = true;
   wants_hover = true;
   align = TEXT_LEFT;
+  corner_radius = UI_TEXTBOX_RADIUS;
 }
 
 void c_textbox::draw (cairo_t *cr) {
@@ -2212,7 +2232,7 @@ void c_textbox::draw (cairo_t *cr) {
   const t_statecolors &textbox_colors = colors_for (WSTYLE_FRAME, WSTATE_NORMAL);
   const t_statecolors &focus_colors = colors_for (WSTYLE_FRAME, WSTATE_SELECTED);
 
-  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, UI_TEXTBOX_RADIUS);
+  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   tk_set_gradient (cr, h, textbox_colors.bg);
   cairo_fill_preserve (cr);
 
@@ -2815,6 +2835,17 @@ void c_widget::invalidate_rect (int x_, int y_, int w_, int h_) {
   app->invalidate_rect (p.x, p.y, w_, h_);
 }
 
+c_app::~c_app () = default;
+
+void c_widget::set_tooltip (const char *text) {
+  tooltip = text ? text : "";
+  if (app &&
+      (app->tooltip_widget == this ||
+       app->tooltip_pending_widget == this) &&
+      tooltip.empty ())
+    app->hide_tooltip ();
+}
+
 void c_app::create (int w, int h) {
   create_root<c_widget> (w, h);
 }
@@ -2829,6 +2860,8 @@ void c_app::draw () {
 }
 
 void c_app::dispatch_mouse_down (int x, int y, int button) {
+  hide_tooltip ();
+
   for (auto it = popups.rbegin (); it != popups.rend (); ++it) {
     c_popupwindow *popup = it->get ();
     if (!popup || !popup->visible)
@@ -2852,8 +2885,12 @@ void c_app::dispatch_mouse_up (int x, int y, int button) {
 }
 
 void c_app::dispatch_mouse_move (int x, int y) {
-  if (root)
-    root->mouse_move_tree (x, y);
+  if (!root)
+    return;
+
+  hovered_widget = nullptr;
+  root->update_hover_tree (x, y);
+  update_tooltip (hovered_widget, x, y);
 }
 
 bool c_app::dispatch_key_down (int key) {
@@ -2907,6 +2944,78 @@ void c_app::clear_focus (c_widget *widget) {
     old->invalidate ();
 }
 
+void c_app::tick () {
+  if (!show_tooltips) {
+    hide_tooltip ();
+    return;
+  }
+
+  if (!tooltip_pending_widget ||
+      tooltip_widget == tooltip_pending_widget ||
+      tooltip_pending_widget->tooltip.empty ())
+    return;
+
+  const uint64_t now = now_ms ();
+  if (tooltip_delay > 0 &&
+      now - tooltip_pending_since < tooltip_delay)
+    return;
+
+  update_tooltip (tooltip_pending_widget, tooltip_root_x, tooltip_root_y);
+}
+
+void c_app::update_tooltip (c_widget *widget, int root_x, int root_y) {
+  if (!show_tooltips) {
+    hide_tooltip ();
+    return;
+  }
+
+  if (!widget || widget->tooltip.empty ()) {
+    hide_tooltip ();
+    return;
+  }
+
+  tooltip_root_x = root_x;
+  tooltip_root_y = root_y;
+
+  const uint64_t now = now_ms ();
+  if (tooltip_pending_widget != widget) {
+    tooltip_pending_widget = widget;
+    tooltip_pending_since = now;
+    if (tooltip_popup)
+      tooltip_popup->close ();
+    tooltip_widget = nullptr;
+  }
+
+  if (tooltip_widget != widget &&
+      tooltip_delay > 0 &&
+      now - tooltip_pending_since < tooltip_delay)
+    return;
+
+  if (!tooltip_popup)
+    tooltip_popup = create_tooltip (widget);
+  if (!tooltip_popup)
+    return;
+
+  if (tooltip_widget != widget) {
+    tooltip_widget = widget;
+    tooltip_popup->owner = widget;
+    tooltip_popup->set_text (widget->tooltip.c_str ());
+  }
+
+  t_point p = root_to_screen ({ root_x + 14, root_y + 20 });
+  tooltip_popup->show_at_screen_pos (p.x, p.y);
+}
+
+void c_app::hide_tooltip () {
+  tooltip_widget = nullptr;
+  tooltip_pending_widget = nullptr;
+  tooltip_pending_since = 0;
+  tooltip_root_x = 0;
+  tooltip_root_y = 0;
+  if (tooltip_popup)
+    tooltip_popup->close ();
+}
+
 void c_app::on_event (t_event &event) {
   (void) event;
 }
@@ -2921,6 +3030,12 @@ void c_app::on_command (t_command_event &event) {
 
 std::unique_ptr<c_popupwindow> c_app::create_popup (c_widget *owner) {
   std::unique_ptr<c_popupwindow> popup = std::make_unique<c_popupwindow> ();
+  popup->create_for_owner (this, owner, 1, 1);
+  return popup;
+}
+
+std::unique_ptr<c_tooltip> c_app::create_tooltip (c_widget *owner) {
+  std::unique_ptr<c_tooltip> popup = std::make_unique<c_tooltip> ();
   popup->create_for_owner (this, owner, 1, 1);
   return popup;
 }
@@ -3353,9 +3468,69 @@ bool c_tooltip::takes_focus () const {
   return false;
 }
 
+void c_tooltip::show () {
+  c_nativewindow::show ();
+  if (widget) {
+    nbtk::t_native_widget *w = as_native_widget (widget);
+    widget_show_all (w);
+    if (app && app->backend)
+      app->backend->invalidate (widget);
+  }
+}
+
 void c_tooltip::set_text (const char *text) {
-  root.label = text ? text : "";
+  const char *str = text ? text : "";
+  if (!frame.id) {
+    frame.create (&root, "", 0, 0, 1, 1);
+    frame.corner_radius = UI_TOOLTIP_RADIUS;
+    label.create (&frame, "", 6, 3, 1, 1);
+    label.align = TEXT_LEFT;
+    label.size = 11.0f;
+  }
+
+  label.label = str;
+
+  /*const int text_w =
+      std::max (24, (int) label.label.size () * 7 + 14);
+  const int tooltip_w = std::min (420, text_w);
+  const int tooltip_h = 24;
+  
+  move_resize (x, y, tooltip_w, tooltip_h);
+  root.move_resize (0, 0, tooltip_w, tooltip_h);
+  frame.move_resize (0, 0, tooltip_w, tooltip_h);
+  label.move_resize (7, 2, std::max (1, tooltip_w - 14), tooltip_h - 4);
   root.invalidate ();
+  */
+  
+  const int pad_x = 2;
+  const int pad_y = 2;
+  cairo_surface_t *measure_surface =
+      cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 1, 1);
+  cairo_t *measure_cr = cairo_create (measure_surface);
+  cairo_select_font_face (
+      measure_cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  cairo_set_font_size (measure_cr, label.size * label.font_multiplier ());
+  cairo_text_extents_t ext {};
+  cairo_text_extents (measure_cr, str, &ext);
+  cairo_destroy (measure_cr);
+  cairo_surface_destroy (measure_surface);
+
+  const int text_w =
+      std::max (24, (int) std::ceil (ext.x_advance + 16) + pad_x * 2 + 2);
+  const int tooltip_w = std::min (420, text_w);
+  const int tooltip_h = 24;
+  
+  move_resize (x, y, tooltip_w, tooltip_h);
+  root.move_resize (0, 0, tooltip_w, tooltip_h);
+  frame.move_resize (0, 0, tooltip_w, tooltip_h);
+  label.move_resize (
+      pad_x,
+      pad_y,
+      std::max (1, tooltip_w - pad_x * 2),
+      tooltip_h - pad_y * 2);
+  root.invalidate ();
+  label.align = TEXT_CENTER;
+  
 }
 
 } // namespace nbtk
@@ -3756,10 +3931,14 @@ static void draw_checkbox (
   const int size = std::max (4, height - 6);
   const int cx = x + 3;
   const int cy = y + (height - size) / 2;
+  const c_widget *widget = w->parent_struct ?
+    (const c_widget *) w->parent_struct : nullptr;
+  const float radius = widget ?
+    (float) widget->corner_radius : (float) UI_CHECKBOX_RADIUS;
 
   //fill_rounded_rect (w, x, y, width, height, 0.0f, g_colors->window_bg);
-  fill_rounded_rect (w, cx, cy, size, size, UI_CHECKBOX_RADIUS, colors.bg);
-  draw_rounded_rect (w, cx, cy, size, size, UI_CHECKBOX_RADIUS, colors.fg, 2.0f);
+  fill_rounded_rect (w, cx, cy, size, size, radius, colors.bg);
+  draw_rounded_rect (w, cx, cy, size, size, radius, colors.fg, 2.0f);
 
   if (checked)
     draw_check_mark (w, cx, cy, size, size, colors.fg);
@@ -4440,6 +4619,20 @@ std::unique_ptr<nbtk::c_popupwindow> c_tkappbridge::create_popup (
   return popup;
 }
 
+std::unique_ptr<nbtk::c_tooltip> c_tkappbridge::create_tooltip (
+    nbtk::c_widget *owner) {
+
+  std::unique_ptr<nbtk::c_tooltip> popup =
+    std::make_unique<nbtk::c_tooltip> ();
+  popup->create_native_for_owner (
+      this,
+      owner,
+      native_window ? native_window->widget : NULL,
+      1,
+      1);
+  return popup;
+}
+
 nbtk::t_point c_tkappbridge::root_to_screen (nbtk::t_point p) const {
   if (!backend || !native_window || !native_window->widget)
     return nbtk::c_app::root_to_screen (p);
@@ -4742,6 +4935,7 @@ void c_tktoplevelwindow::cb_button_press (
   c_tktoplevelwindow *self = (c_tktoplevelwindow *) w->parent_struct;
   if (self->tk_app) {
     self->activate_tk ();
+    self->tk_app->hide_tooltip ();
     const int rx = button->x / w->app->hdpi;
     const int ry = button->y / w->app->hdpi;
     const bool handled = self->tk_root.mouse_down_tree (
@@ -4815,6 +5009,7 @@ void c_tktoplevelwindow::cb_motion (
       self->tk_app->focused_widget->on_mouse_move (local.x, local.y);
     } else {
       self->tk_root.update_hover_tree (rx, ry);
+      self->tk_app->update_tooltip (self->tk_app->hovered_widget, rx, ry);
     }
     self->save_tk_state ();
   }
@@ -4835,6 +5030,8 @@ void c_tktoplevelwindow::cb_enter (void *w_, void *user_data) {
 
     self->activate_tk ();
     self->tk_root.update_hover_tree (local.x, local.y);
+    self->tk_app->update_tooltip (
+        self->tk_app->hovered_widget, local.x, local.y);
     self->save_tk_state ();
   }
 }
@@ -4848,6 +5045,7 @@ void c_tktoplevelwindow::cb_leave (void *w_, void *user_data) {
   c_tktoplevelwindow *self = (c_tktoplevelwindow *) w->parent_struct;
   if (self->tk_app) {
     self->activate_tk ();
+    self->tk_app->hide_tooltip ();
     self->tk_root.clear_hover_tree ();
     self->save_tk_state ();
   }

@@ -417,6 +417,8 @@ int c_lv2_ui::idle () {
   if (tk_app.backend)
     tk_app.backend->run_events (&app);
 
+  tk_app.tick ();
+
   redraw_meters_now ();
 
   redraw_tuner_if_needed ();

@@ -36,6 +36,7 @@
 #define UI_TEXTBOX_RADIUS    8.0
 #define UI_MENU_RADIUS       6.0
 #define UI_FRAME_RADIUS      12.0
+#define UI_TOOLTIP_RADIUS    4.0
 #define UI_LIST_RADIUS       6.0
 #define UI_SCROLLBAR_WIDTH   16
 #define UI_SCROLLBAR_RADIUS  8.0
@@ -61,6 +62,7 @@ typedef struct {
   float vu_headroom_db     = 6.0f;
   bool  bypass_doubleclick = false;
   bool  bypass_rightclick  = true;
+  bool  show_tooltips      = true;
 } t_prefs;
 
 bool read_prefs_from_config  (c_configfile &configfile, t_prefs &prefs);
@@ -91,6 +93,7 @@ public:
   nbtk::c_textbox text_vuheadroom;
   nbtk::c_checkbox btn_bypass_doubleclick;
   nbtk::c_checkbox btn_bypass_rightclick;
+  nbtk::c_checkbox btn_show_tooltips;
 };
 
 class c_aboutwindow;

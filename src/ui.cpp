@@ -155,6 +155,10 @@ bool read_prefs_from_config (c_configfile &configfile, t_prefs &prefs) {
   if (!str.empty ())
     prefs.bypass_rightclick = c_configfile::istrue (str);
 
+  str = configfile.get_item (CONFIG_KEY_NAME_TOOLTIPS);
+  if (!str.empty ())
+    prefs.show_tooltips = c_configfile::istrue (str);
+
   return true;
 }
 
@@ -170,6 +174,8 @@ bool write_prefs_to_config (c_configfile &configfile, const t_prefs &prefs) {
     CONFIG_KEY_NAME_BYP_DCLICK, prefs.bypass_doubleclick ? "1" : "0");
   configfile.set_item (
     CONFIG_KEY_NAME_BYP_RCLICK, prefs.bypass_rightclick ? "1" : "0");
+  configfile.set_item (
+    CONFIG_KEY_NAME_TOOLTIPS, prefs.show_tooltips ? "1" : "0");
 
   return configfile.write_file ();
 }
@@ -212,16 +218,24 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   label_spacer1.create (&frame1, "", 16, 112, 12, 12);
 
   btn_bypass_doubleclick.create (
-    &frame1, "Toggle bypass on click again", 16, 152, 320, 32);
+    &frame1, "Toggle bypass on doubleclick", 16, 152, 320, 32);
   btn_bypass_doubleclick.align = TEXT_LEFT;
   btn_bypass_rightclick.create (
     &frame1, "Toggle bypass on right click", 16, 192, 320, 32);
   btn_bypass_rightclick.align = TEXT_LEFT;
+  btn_show_tooltips.create (
+    &frame1, "Show tooltips", 16, 232, 320, 32);
+  btn_show_tooltips.align = TEXT_LEFT;
   btn_defaults.create (&frame1, "Reset to defaults", 12, 0, 400, 40);
 
   text_vuscale.create (&frame1, "", 220, 28, 120, 36);
   text_vuheadroom.create (&frame1, "", 220, 68, 120, 36);
   
+  text_vuscale.set_tooltip ("Minimum dB value visible on VU meters");
+  text_vuheadroom.set_tooltip ("Extra headroom given to VU meters above 0dB");
+  btn_bypass_doubleclick.set_tooltip ("Toggle bypassing banks when clicking the top button again");
+  btn_bypass_rightclick.set_tooltip ("Toggle bypassing banks when right-clicking the top button");
+  btn_show_tooltips.set_tooltip ("No idea what this does");
   on_resize ();
 }
 
@@ -270,6 +284,7 @@ void c_prefswindow::load_defaults () {
   text_vuheadroom.set_text ("6.0");
   btn_bypass_doubleclick.set_value (false);
   btn_bypass_rightclick.set_value (true);
+  btn_show_tooltips.set_value (true);
 }
 
 void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
@@ -285,6 +300,7 @@ void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
   
   btn_bypass_doubleclick.set_value (prefs.bypass_doubleclick);
   btn_bypass_rightclick.set_value (prefs.bypass_rightclick);
+  btn_show_tooltips.set_value (prefs.show_tooltips);
 }
 
 void c_prefswindow::set_prefs_to (t_prefs &prefs) {
@@ -301,6 +317,7 @@ void c_prefswindow::set_prefs_to (t_prefs &prefs) {
   
   prefs.bypass_doubleclick = btn_bypass_doubleclick.value;
   prefs.bypass_rightclick = btn_bypass_rightclick.value;
+  prefs.show_tooltips = btn_show_tooltips.value;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -644,7 +661,6 @@ void c_lane_widgets::create (
   knob_delay.set_default (0);
   knob_delay.set_value (0);
   knob_delay.set_step (0.01);
-  //delay.set_tooltip ("Micro delay applied to this amp's output");
 
   btn_flip.create   (&lane_frame, "", 0, 0, 32, 32);
   btn_calib.create  (&lane_frame, "", 0, 0, 32, 32);
@@ -689,6 +705,25 @@ void c_lane_widgets::create (
     filepicker.add_allowed_filter ("*", "All files");
   }
   
+  knob_gain_in.set_tooltip ("Input going into this model (NAM)");
+  knob_ir_pitch.set_tooltip ("Shift the pitch of this IR by hundredths of a semitone");
+  knob_gain_out.set_tooltip ("Scale output from this model");
+  knob_dry_out.set_tooltip ("Pass dry signal alongside model output");
+  btn_browse.set_tooltip ("Load a model or IR (wav) file");
+  btn_clear.set_tooltip ("Clear this model/IR");
+  btn_mute.set_tooltip ("Mute this lane/channel");
+  btn_excl.set_tooltip ("Use this lane/channel");
+  knob_delay.set_tooltip ("Micro delay applied to this lane's output");
+  btn_flip.set_tooltip ("DC flip (phase invert) this lane");
+  btn_calib.set_tooltip ("Calibrate (normalize) this lane's output");
+  
+  /*if (bank_id == BANK_CAB) {
+    knob_gain_in.hide ();
+    knob_ir_pitch.show ();
+  } else {
+    knob_gain_in.show ();
+    knob_ir_pitch.hide ();
+  }*/
 }
 
 void c_lane_widgets::move_resize (
@@ -1067,6 +1102,14 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   //} else {
   //  hide_advanced_settings ();
   //}
+  btn_tab_pedals.set_tooltip ("Pedals bank");
+  btn_tab_models.set_tooltip ("Amp model bank");
+  btn_tab_cabs.set_tooltip ("Cab/IR bank");
+  btn_tab_other.set_tooltip ("More settings");
+  btn_enable.set_tooltip ("Master BYPASS");
+  btn_muteall.set_tooltip ("Master MUTE");
+  btn_tuner.set_tooltip ("Enable tuner");
+  btn_noisegate.set_tooltip ("Enable noisegate");
   
   ui_ready = true;
   move_resize ();
@@ -1737,6 +1780,10 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
   const float scale_db = p.vu_scale_db <= 0.0f ? p.vu_scale_db : DEFAULT_VU_DB;
   const float headroom_db = std::clamp (p.vu_headroom_db, 0.0f, 12.0f);
 
+  tk_app.show_tooltips = p.show_tooltips;
+  if (!tk_app.show_tooltips)
+    tk_app.hide_tooltip ();
+
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     meter_in [bank].set_db_scale (scale_db);
     meter_in [bank].set_headroom (headroom_db);
@@ -1816,7 +1863,12 @@ void c_neuralblender_ui::update_stats () {
       
       bank_lanes [i].label_engine.label = engine_names [eng];
       bank_lanes [i].label_engine.invalidate ();
-      if (eng == ENGINE_IR) {
+      const bool lane_loaded =
+        state.banks [bank].lanes [i].loaded;
+      const bool show_ir_pitch =
+        eng == ENGINE_IR || (bank == BANK_CAB && !lane_loaded);
+
+      if (show_ir_pitch) {
         bank_lanes [i].knob_gain_in.hide ();
         bank_lanes [i].knob_ir_pitch.show ();
       } else {
@@ -2004,6 +2056,8 @@ int c_neuralblender_ui::idle () {
 
   if (tk_app.backend)
     tk_app.backend->run_events (&app);
+
+  tk_app.tick ();
 
   redraw_visible_meters ();
   

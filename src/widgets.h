@@ -191,6 +191,7 @@ public:
   virtual void move_resize (int x, int y, int w, int h);
   void invalidate ();
   void invalidate_rect (int x, int y, int w, int h);
+  void set_tooltip (const char *text);
   
   c_app *app = nullptr;
   c_widget *parent = nullptr;
@@ -199,11 +200,13 @@ public:
   uint64_t id = 0;
   
   std::string label;
+  std::string tooltip;
   int x = 0;
   int y = 0;
   int w = 0;
   int h = 0;
   float text_size = 1.0f;
+  float corner_radius = 0.0f;
   _textalign align = TEXT_CENTER;
   bool visible = true;
   bool enabled = true;
@@ -218,6 +221,8 @@ public:
 
 class c_frame : public c_widget {
 public:
+  c_frame ();
+
   void draw (cairo_t *cr) override;
 
   _widget_state state = WSTATE_NORMAL;
@@ -520,7 +525,7 @@ private:
 
 class c_app {
 public:
-  virtual ~c_app () = default;
+  virtual ~c_app ();
 
   virtual void create (int w, int h);
   virtual void draw ();
@@ -534,8 +539,12 @@ public:
   virtual void set_mouse_cursor (_mouse_cursor cursor);
   virtual void set_focus (c_widget *widget);
   virtual void clear_focus (c_widget *widget = nullptr);
+  virtual void tick ();
+  virtual void update_tooltip (c_widget *widget, int root_x, int root_y);
+  virtual void hide_tooltip ();
 
   virtual std::unique_ptr<c_popupwindow> create_popup (c_widget *owner);
+  virtual std::unique_ptr<c_tooltip> create_tooltip (c_widget *owner);
   virtual t_point root_to_screen (t_point p) const;
   virtual t_point screen_to_root (t_point p) const;
   virtual void on_event (t_event &event);
@@ -579,8 +588,16 @@ public:
   c_widget *root = nullptr;
   std::vector<std::unique_ptr<c_widget>> widgets;
   std::vector<std::unique_ptr<c_popupwindow>> popups;
+  std::unique_ptr<c_tooltip> tooltip_popup;
+  bool show_tooltips = true;
   c_widget *focused_widget = nullptr;
   c_widget *hovered_widget = nullptr;
+  c_widget *tooltip_widget = nullptr;
+  c_widget *tooltip_pending_widget = nullptr;
+  uint64_t tooltip_pending_since = 0;
+  int tooltip_root_x = 0;
+  int tooltip_root_y = 0;
+  uint64_t tooltip_delay = 400;
   bool mouse_captured = false;
   float font_scale = 1.0f;
 };
@@ -714,7 +731,11 @@ class c_tooltip : public c_popupwindow {
 public:
   bool close_on_outside_click () const override;
   bool takes_focus () const override;
+  void show () override;
   void set_text (const char *text);
+
+  c_frame frame;
+  c_label label;
 };
 
 class c_canvas : public c_widget {
@@ -1025,6 +1046,8 @@ public:
   void set_focus (nbtk::c_widget *widget) override;
   void clear_focus (nbtk::c_widget *widget = nullptr) override;
   std::unique_ptr<nbtk::c_popupwindow> create_popup (
+      nbtk::c_widget *owner) override;
+  std::unique_ptr<nbtk::c_tooltip> create_tooltip (
       nbtk::c_widget *owner) override;
   nbtk::t_point root_to_screen (nbtk::t_point p) const override;
   nbtk::t_point screen_to_root (nbtk::t_point p) const override;

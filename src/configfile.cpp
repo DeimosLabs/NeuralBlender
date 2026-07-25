@@ -25,6 +25,7 @@ struct s_option {
   { CONFIG_KEY_NAME_VU_HEADROOM, "" },
   { CONFIG_KEY_NAME_BYP_DCLICK, "" },
   { CONFIG_KEY_NAME_BYP_RCLICK, "" },
+  { CONFIG_KEY_NAME_TOOLTIPS, "" },
   { "", "" }
 };
 

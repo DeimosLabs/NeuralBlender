@@ -21,6 +21,7 @@
 #define CONFIG_KEY_NAME_VU_HEADROOM  "vu_headroom_db"
 #define CONFIG_KEY_NAME_BYP_DCLICK   "bypass_doubleclick"
 #define CONFIG_KEY_NAME_BYP_RCLICK   "bypass_rightclick"
+#define CONFIG_KEY_NAME_TOOLTIPS     "show_tooltips"
 #define CONFIG_DEFAULT_DIR           "/"
 
 class c_configfile {
