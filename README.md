@@ -75,7 +75,7 @@ For the standalone version, see --help text for more info/options
 
 ## Supported systems
 
-Should compile and work fine on any POSIX-compliant OS including Linux, MacOS (to be fixed), FreeBSD, etc.
+Should compile and work fine on any POSIX-compliant OS including Linux, MacOS (to be fixed), FreeBSD, etc. For now UI uses X11, but recent rewrite should make it easy to port to other graphic systems.
 
 Tested on:
   - Void Linux
