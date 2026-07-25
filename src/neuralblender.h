@@ -147,6 +147,8 @@ struct c_mix_state {
   uint32_t lane_mask;
 };
 
+bool read_file_to_mem (const char *fn, std::vector<unsigned char> &out);
+
 extern const char *g_build_timestamp;
 
 static inline float db_to_gain (float db) {

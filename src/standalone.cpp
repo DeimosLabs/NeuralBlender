@@ -33,7 +33,6 @@
 #include "ui.h"
 #endif
 
-#include "gzip.h"
 #include "data.h"
 
 #define CMDLINE_IMPLEMENTATION

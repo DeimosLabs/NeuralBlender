@@ -1106,6 +1106,9 @@ public:
   void sync_owner_metadata ();
   void scan_current_dir ();
   void add_files_from_dir (c_combobox *cb);
+  void clear_allowed_filters ();
+  void add_allowed_filter (std::string filter, std::string filter_label);
+  void set_active_filter (int index);
   std::string get_current_dir () const;
   void set_current_dir (std::string str);
   bool is_visible () const;
@@ -1117,15 +1120,21 @@ public:
   c_label label_path;
   c_listbox listbox;
   c_scrollbar vscrollbar;
+  c_combobox combo_filter;
+  c_checkbox btn_show_hidden;
   c_button btn_ok;
   c_button btn_cancel;
 
   std::string title;
   std::string current_dir;
   std::string combo_dir;
+  std::vector<std::string> filter_labels;
+  std::vector<std::vector<std::string>> filter_suffixes;
+  std::vector<std::string> accepted_suffixes;
   std::vector<std::string> filelist;
   std::vector<t_listrow> rows;
   t_native_handle owner_widget = nullptr;
+  bool show_hidden = false;
 };
 
 } // namespace nbtk

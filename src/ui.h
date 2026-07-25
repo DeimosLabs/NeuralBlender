@@ -41,7 +41,7 @@
 #define UI_SCROLLBAR_RADIUS  8.0
 #define UI_STATS_PER_LANE    NB_STATS_PER_LANE
 #define UI_DOUBLECLICK_MS    300
-#define UI_MOUSEWHEEL_ROWS   3
+#define UI_MOUSEWHEEL_ROWS   2
 
 enum _ui_page {
   PAGE_PEDAL = 0,

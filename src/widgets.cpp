@@ -4943,6 +4943,74 @@ static std::string path_parent_dir (const std::string &path) {
   return path_dirname (trimmed);
 }
 
+static bool filepicker_suffix_match (
+    const std::string &name,
+    const std::string &suffix_spec) {
+  if (suffix_spec.empty ())
+    return false;
+
+  size_t pos = 0;
+  while (pos <= suffix_spec.size ()) {
+    size_t end = suffix_spec.find ('|', pos);
+    if (end == std::string::npos)
+      end = suffix_spec.size ();
+
+    std::string suffix = suffix_spec.substr (pos, end - pos);
+    if (suffix == "*")
+      return true;
+    while (!suffix.empty () && suffix.front () == '*')
+      suffix.erase (suffix.begin ());
+
+    if (!suffix.empty () &&
+        name.size () >= suffix.size () &&
+        !strcasecmp (
+          name.c_str () + name.size () - suffix.size (),
+          suffix.c_str ()))
+      return true;
+
+    if (end == suffix_spec.size ())
+      break;
+    pos = end + 1;
+  }
+
+  return false;
+}
+
+static bool filepicker_accepts_file (
+    const std::vector<std::string> &accepted_suffixes,
+    const std::string &name) {
+  if (accepted_suffixes.empty ())
+    return is_supported_model_filename (name);
+
+  for (const std::string &suffix : accepted_suffixes)
+    if (filepicker_suffix_match (name, suffix))
+      return true;
+
+  return false;
+}
+
+static std::vector<std::string> split_filepicker_filter (
+    const std::string &filter) {
+  std::vector<std::string> ret;
+
+  size_t pos = 0;
+  while (pos <= filter.size ()) {
+    size_t end = filter.find ('|', pos);
+    if (end == std::string::npos)
+      end = filter.size ();
+
+    std::string item = filter.substr (pos, end - pos);
+    if (!item.empty ())
+      ret.push_back (std::move (item));
+
+    if (end == filter.size ())
+      break;
+    pos = end + 1;
+  }
+
+  return ret;
+}
+
 void nbtk::c_filepicker::sync_owner_metadata () {
   nbtk::t_native_widget *owner_widget_ = as_native_widget (owner_widget);
   if (!owner_widget_ || !owner_widget_->parent_struct)
@@ -4973,10 +5041,12 @@ void nbtk::c_filepicker::create (
       title.c_str (),
       0,
       0,
+      640,
       520,
-      420,
       as_native_widget (owner)))
     return;
+
+  set_min_size (550, 300);
 
   lane = lane_;
   bank = bank_;
@@ -4996,6 +5066,15 @@ void nbtk::c_filepicker::create (
   vscrollbar.create (&frame, "", 472, 42, 18, 300);
   vscrollbar.set_container (&listbox);
   vscrollbar.set_orientation (SCROLLBAR_VERTICAL);
+
+  combo_filter.create (&tk_root, "Files", 8, 380, 100, 30);
+  combo_filter.visible_rows_max = 6;
+  combo_filter.set_items (filter_labels);
+  combo_filter.set_selected (0);
+
+  btn_show_hidden.create (&tk_root, "Show hidden", 166, 380, 86, 30);
+  btn_show_hidden.is_toggle = true;
+  btn_show_hidden.set_value (show_hidden);
 
   btn_ok.create (&tk_root, "OK", 342, 380, 80, 30);
   btn_ok.set_image_default (data_icon_xputty_approved_png);
@@ -5020,6 +5099,45 @@ void nbtk::c_filepicker::show () {
   scan_current_dir ();
   widget_show_all (widget);
   expose ();
+}
+
+void nbtk::c_filepicker::clear_allowed_filters () {
+  filter_labels.clear ();
+  filter_suffixes.clear ();
+  accepted_suffixes.clear ();
+
+  if (combo_filter.id) {
+    combo_filter.clear ();
+    combo_filter.set_selected (-1);
+  }
+}
+
+void nbtk::c_filepicker::add_allowed_filter (
+    std::string filter,
+    std::string filter_label) {
+  filter_labels.push_back (
+      filter_label.empty () ? filter : std::move (filter_label));
+  filter_suffixes.push_back (split_filepicker_filter (filter));
+
+  const int selected = combo_filter.id ? combo_filter.get_selection () : 0;
+  if (combo_filter.id) {
+    combo_filter.set_items (filter_labels);
+    combo_filter.set_selected (
+        selected >= 0 && selected < (int) filter_labels.size () ? selected : 0);
+  }
+
+  set_active_filter (
+      selected >= 0 && selected < (int) filter_suffixes.size () ? selected : 0);
+}
+
+void nbtk::c_filepicker::set_active_filter (int index) {
+  if (index < 0 || index >= (int) filter_suffixes.size ())
+    index = 0;
+
+  accepted_suffixes =
+      index >= 0 && index < (int) filter_suffixes.size ()
+        ? filter_suffixes [(size_t) index]
+        : std::vector<std::string> {};
 }
 
 void nbtk::c_filepicker::hide () {
@@ -5048,6 +5166,8 @@ void nbtk::c_filepicker::on_resize () {
   listbox.move_resize (12, list_y, list_w, list_h);
   vscrollbar.move_resize (12 + list_w + 4, list_y, scroll_w, list_h);
   listbox.sync_scrollbar ();
+  combo_filter.move_resize (pad, button_y, 150, button_h);
+  btn_show_hidden.move_resize (pad + 158, button_y, 152, button_h);
   btn_ok.move_resize (ww - pad - button_w, button_y, button_w, button_h);
   btn_cancel.move_resize (
       ww - pad * 2 - button_w * 2,
@@ -5060,6 +5180,20 @@ void nbtk::c_filepicker::on_tk_action (t_action_event &event) {
   if (event.source_id == btn_cancel.id) {
     event.handled = true;
     hide ();
+    return;
+  }
+
+  if (event.source_id == combo_filter.id) {
+    event.handled = true;
+    set_active_filter (combo_filter.get_selection ());
+    scan_current_dir ();
+    return;
+  }
+
+  if (event.source_id == btn_show_hidden.id) {
+    event.handled = true;
+    show_hidden = btn_show_hidden.value;
+    scan_current_dir ();
     return;
   }
 
@@ -5117,6 +5251,8 @@ void nbtk::c_filepicker::scan_current_dir () {
     const char *name = entry->d_name;
     if (!name || !strcmp (name, ".") || !strcmp (name, ".."))
       continue;
+    if (!show_hidden && name [0] == '.')
+      continue;
 
     std::string full = path_join (current_dir, name);
 
@@ -5130,7 +5266,8 @@ void nbtk::c_filepicker::scan_current_dir () {
 
     if (S_ISDIR (st.st_mode)) {
       dir_rows.push_back ({ std::string (name) + "/", full, true, is_symlink });
-    } else if (S_ISREG (st.st_mode) && is_supported_model_filename (name)) {
+    } else if (S_ISREG (st.st_mode) &&
+               filepicker_accepts_file (accepted_suffixes, name)) {
       file_rows.push_back ({ name, full, false, is_symlink });
       filelist.push_back (name);
     }
@@ -5188,12 +5325,14 @@ void nbtk::c_filepicker::add_files_from_dir (c_combobox *cb) {
       const char *name = entry->d_name;
       if (!name || !strcmp (name, ".") || !strcmp (name, ".."))
         continue;
+      if (!show_hidden && name [0] == '.')
+        continue;
 
       std::string full = path_join (combo_dir, name);
       struct stat st;
       if (!stat (full.c_str (), &st) &&
           S_ISREG (st.st_mode) &&
-          is_supported_model_filename (name))
+          filepicker_accepts_file (accepted_suffixes, name))
         combo_files.push_back (name);
     }
     closedir (dir);

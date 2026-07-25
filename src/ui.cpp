@@ -31,6 +31,12 @@
 
 extern const char *g_build_timestamp;
 
+#ifdef HAVE_GZIP
+#define UI_GZIP_SUFFIX(suffix) suffix "|" suffix ".gz"
+#else
+#define UI_GZIP_SUFFIX(suffix) suffix
+#endif
+
 static bool page_has_bank (_ui_page page);
 static _lane_bank bank_for_page (_ui_page page);
 static const char *cwd_config_key_for_bank_ui (_lane_bank bank);
@@ -61,15 +67,46 @@ std::string path_basename (const std::string &path) {
   return path.substr (pos + 1);
 }
 
+static bool filename_ends_with (const std::string &path, const char *suffix) {
+  const size_t suffix_len = strlen (suffix);
+  return path.size () >= suffix_len &&
+         path.rfind (suffix) == path.size () - suffix_len;
+}
+
+static bool is_supported_model_filename_lower (const std::string &lower) {
+  return filename_ends_with (lower, ".nam") ||
+#ifdef HAVE_GZIP
+         filename_ends_with (lower, ".nam.gz") ||
+#endif
+         filename_ends_with (lower, ".json") ||
+#ifdef HAVE_GZIP
+         filename_ends_with (lower, ".json.gz") ||
+#endif
+         filename_ends_with (lower, ".aidax") ||
+         filename_ends_with (lower, ".wav")
+#ifdef HAVE_GZIP
+         || filename_ends_with (lower, ".wav.gz")
+#endif
+         ;
+}
+
 bool is_supported_model_filename (const std::string &path) {
   std::string lower = path;
   std::transform (lower.begin (), lower.end (), lower.begin (),
                   [] (unsigned char c) { return (char) std::tolower (c); });
 
-  return (lower.size () >= 4 && lower.rfind (".nam") == lower.size () - 4) ||
-         (lower.size () >= 5 && lower.rfind (".json") == lower.size () - 5) ||
-         (lower.size () >= 6 && lower.rfind (".aidax") == lower.size () - 6) ||
-         (lower.size () >= 4 && lower.rfind (".wav") == lower.size () - 4);
+  return is_supported_model_filename_lower (lower);
+}
+
+static const char *ui_model_filter () {
+  return
+    UI_GZIP_SUFFIX ("*.nam") "|"
+    UI_GZIP_SUFFIX ("*.json") "|"
+    "*.aidax";
+}
+
+static const char *ui_wav_filter () {
+  return UI_GZIP_SUFFIX ("*.wav");
 }
 
 static bool parse_config_float (const std::string &s, float &value) {
@@ -640,6 +677,15 @@ void c_lane_widgets::create (
       ui, &ui->tk_app, root, native_owner, lane_id, bank_id, "Select file");
     filepicker.lane = lane_id;
     filepicker.bank = bank_id;
+    filepicker.clear_allowed_filters ();
+    if (bank_id == BANK_CAB) {
+      filepicker.add_allowed_filter (ui_wav_filter (), "WAV / IR");
+      filepicker.add_allowed_filter (ui_model_filter (), "NAM / JSON");
+    } else {
+      filepicker.add_allowed_filter (ui_model_filter (), "NAM / JSON");
+      filepicker.add_allowed_filter (ui_wav_filter (), "WAV / IR");
+    }
+    filepicker.add_allowed_filter ("*", "All files");
   }
   
 }

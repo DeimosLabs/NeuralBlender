@@ -22,12 +22,20 @@
 #include <filesystem>
 #include <cerrno>
 #include <cstdlib>
+#include <cstring>
 #include <chrono>
 #include <thread>
 #include <iostream>
+#ifdef HAVE_GZIP
+#include <unistd.h>
+#endif
 #include "neuralblender.h"
 #include "data.h"
 #include "configfile.h"
+
+#ifdef HAVE_GZIP
+#include "gzip.h"
+#endif
 
 #ifdef HAVE_SNDFILE
 #include <sndfile.h>
@@ -145,9 +153,19 @@ static bool ends_with (const std::string &a, const std::string &b, bool casesens
 
 static bool is_supported_model_path (const std::string &path) {
   return ends_with (path, ".nam") ||
+#ifdef HAVE_GZIP
+         ends_with (path, ".nam.gz") ||
+#endif
          ends_with (path, ".json") ||
+#ifdef HAVE_GZIP
+         ends_with (path, ".json.gz") ||
+#endif
          ends_with (path, ".aidax") ||
-         ends_with (path, ".wav");
+         ends_with (path, ".wav")
+#ifdef HAVE_GZIP
+         || ends_with (path, ".wav.gz")
+#endif
+         ;
 }
 
 static bool parse_float (const std::string &s, float &value) {
@@ -184,6 +202,184 @@ static float clamp_calib_target_db (float db) {
 
   return std::clamp (db, CALIB_TARGET_DB_MIN, CALIB_TARGET_DB_MAX);
 }
+
+bool read_file_to_mem (const char *filename,
+                       std::vector<unsigned char> &out) {
+  out.clear ();
+
+  std::ifstream f (filename, std::ios::binary | std::ios::ate);
+  if (!f)
+    return false;
+
+  std::streamsize size = f.tellg ();
+  if (size < 0)
+    return false;
+
+  f.seekg (0, std::ios::beg);
+  out.resize ((size_t) size);
+
+  if (size > 0 && !f.read ((char *) out.data (), size)) {
+    out.clear ();
+    return false;
+  }
+
+  return true;
+}
+
+#ifdef HAVE_GZIP
+static bool read_gzipped_json_file (
+    const std::string &filename, nlohmann::json &json) {
+  std::vector<unsigned char> filedata;
+  if (!read_file_to_mem (filename.c_str (), filedata))
+    return false;
+
+  if (!c_gzip::memory_block_is_gzipped (filedata.data (), filedata.size ()))
+    return false;
+
+  size_t json_size = 0;
+  unsigned char *json_data = c_gzip::gunzip_memory_block (
+      filedata.data (), filedata.size (), &json_size);
+  if (!json_data)
+    return false;
+
+  try {
+    json = nlohmann::json::parse (json_data, json_data + json_size);
+    free (json_data);
+    return true;
+  } catch (...) {
+    free (json_data);
+    throw;
+  }
+}
+
+static bool gunzip_file_to_temp (
+    const std::string &filename,
+    const char *suffix,
+    std::string &temp_filename) {
+  temp_filename.clear ();
+
+  std::vector<unsigned char> filedata;
+  if (!read_file_to_mem (filename.c_str (), filedata))
+    return false;
+
+  if (!c_gzip::memory_block_is_gzipped (filedata.data (), filedata.size ()))
+    return false;
+
+  size_t data_size = 0;
+  unsigned char *data = c_gzip::gunzip_memory_block (
+      filedata.data (), filedata.size (), &data_size);
+  if (!data)
+    return false;
+
+  std::string tmpl = "/tmp/neuralblender_XXXXXX";
+  if (suffix)
+    tmpl += suffix;
+
+  std::vector<char> path (tmpl.begin (), tmpl.end ());
+  path.push_back ('\0');
+
+  const int suffix_len = suffix ? (int) strlen (suffix) : 0;
+  int fd = mkstemps (path.data (), suffix_len);
+  if (fd < 0) {
+    free (data);
+    return false;
+  }
+
+  bool ok = true;
+  size_t written = 0;
+  while (written < data_size) {
+    ssize_t n = write (fd, data + written, data_size - written);
+    if (n <= 0) {
+      ok = false;
+      break;
+    }
+    written += (size_t) n;
+  }
+
+  close (fd);
+  free (data);
+
+  if (!ok) {
+    unlink (path.data ());
+    return false;
+  }
+
+  temp_filename = path.data ();
+  return true;
+}
+#endif
+
+#ifdef HAVE_SNDFILE
+struct t_sndfile_mem {
+  const unsigned char *data = NULL;
+  sf_count_t size = 0;
+  sf_count_t pos = 0;
+};
+
+static sf_count_t sndfile_mem_get_filelen (void *user_data) {
+  t_sndfile_mem *m = (t_sndfile_mem *) user_data;
+  return m ? m->size : 0;
+}
+
+static sf_count_t sndfile_mem_seek (
+    sf_count_t offset, int whence, void *user_data) {
+  t_sndfile_mem *m = (t_sndfile_mem *) user_data;
+  if (!m)
+    return -1;
+
+  sf_count_t newpos = 0;
+  switch (whence) {
+    case SEEK_SET:
+      newpos = offset;
+      break;
+    case SEEK_CUR:
+      newpos = m->pos + offset;
+      break;
+    case SEEK_END:
+      newpos = m->size + offset;
+      break;
+    default:
+      return -1;
+  }
+
+  if (newpos < 0)
+    return -1;
+  if (newpos > m->size)
+    newpos = m->size;
+
+  m->pos = newpos;
+  return m->pos;
+}
+
+static sf_count_t sndfile_mem_read (
+    void *ptr, sf_count_t count, void *user_data) {
+  t_sndfile_mem *m = (t_sndfile_mem *) user_data;
+  if (!m || !ptr || count <= 0)
+    return 0;
+
+  const sf_count_t remaining = m->size - m->pos;
+  const sf_count_t nread = std::min (count, remaining);
+  if (nread <= 0)
+    return 0;
+
+  memcpy (ptr, m->data + m->pos, (size_t) nread);
+  m->pos += nread;
+  return nread;
+}
+
+static sf_count_t sndfile_mem_tell (void *user_data) {
+  t_sndfile_mem *m = (t_sndfile_mem *) user_data;
+  return m ? m->pos : 0;
+}
+
+static SF_VIRTUAL_IO g_sndfile_mem_vio {
+  sndfile_mem_get_filelen,
+  sndfile_mem_seek,
+  sndfile_mem_read,
+  NULL,
+  sndfile_mem_tell
+};
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // c_noisegate
@@ -279,7 +475,6 @@ void c_noisegate::process_block (float *in, float *out, uint32_t nframes) {
   display_gain.store (gain, std::memory_order_relaxed);
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // c_delayline
 
@@ -336,10 +531,41 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   debug ("start");
   
   v.clear ();
-  
-  SF_INFO info {};
-  
-  SNDFILE *f = sf_open (filename, SFM_READ, &info);
+
+  SF_INFO info { };
+  SNDFILE *f = NULL;
+#ifdef HAVE_GZIP
+  std::vector<unsigned char> filedata;
+  unsigned char *gzip_data = NULL;
+  const unsigned char *actualdata = NULL;
+  size_t actualsize = 0;
+  t_sndfile_mem memfile {};
+
+  if (read_file_to_mem (filename, filedata) &&
+      c_gzip::memory_block_is_gzipped (filedata.data (), filedata.size ())) {
+    gzip_data = c_gzip::gunzip_memory_block (
+        filedata.data (), filedata.size (), &actualsize);
+    if (!gzip_data) {
+      std::cerr << "Error: failed to decompress WAV file: " << filename << "\n";
+      return false;
+    }
+
+    actualdata = gzip_data;
+    memfile.data = actualdata;
+    memfile.size = (sf_count_t) actualsize;
+    memfile.pos = 0;
+    f = sf_open_virtual (&g_sndfile_mem_vio, SFM_READ, &info, &memfile);
+    if (!f) {
+      std::cerr << "Error: failed to open gzipped WAV file: " << filename << "\n";
+      free (gzip_data);
+      return false;
+    }
+  }
+
+  if (!f)
+#endif
+    f = sf_open (filename, SFM_READ, &info);
+
   if (!f) {
     std::cerr << "Error: failed to open WAV file: " << filename << "\n";
     return false;
@@ -352,12 +578,20 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   if (frames <= 0 || chans <= 0) {
     std::cerr << "Error: invalid WAV format in " << filename << "\n";
     sf_close (f);
+#ifdef HAVE_GZIP
+    if (gzip_data)
+      free (gzip_data);
+#endif
     return false;
   }
   
   std::vector<float> buf (frames * chans);
   sf_count_t readframes = sf_readf_float (f, buf.data (), frames);
   sf_close (f);
+#ifdef HAVE_GZIP
+  if (gzip_data)
+    free (gzip_data);
+#endif
 
   if (readframes <= 0) {
     std::cerr << "Error: no samples read from " << filename << "\n";
@@ -843,6 +1077,25 @@ void c_convolver::process_block (
 
 
 static int nam_version_major_minor (const std::string &filename) {
+#ifdef HAVE_GZIP
+  if (ends_with (filename, ".nam.gz")) {
+    try {
+      nlohmann::json j;
+      if (!read_gzipped_json_file (filename, j))
+        return -1;
+
+      std::string version = j.value ("version", "");
+      int major = 0, minor = 0;
+      if (sscanf (version.c_str (), "%d.%d", &major, &minor) != 2)
+        return -1;
+
+      return major * 1000 + minor;
+    } catch (...) {
+      return -1;
+    }
+  }
+#endif
+
   std::ifstream f (filename, std::ios::binary);
   if (!f)
     return -1;
@@ -948,8 +1201,25 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
   
   try
   {
-    auto new_model =
-      nam::get_dsp (std::filesystem::path (fn));
+    std::unique_ptr<nam::DSP> new_model;
+#ifdef HAVE_GZIP
+    if (ends_with (fn, ".nam.gz")) {
+      std::string temp_fn;
+      if (!gunzip_file_to_temp (fn, ".nam", temp_fn)) {
+        fprintf (stderr, "Failed to decompress NAM model: %s\n", fn.c_str ());
+        return false;
+      }
+
+      try {
+        new_model = nam::get_dsp (std::filesystem::path (temp_fn));
+        std::filesystem::remove (temp_fn);
+      } catch (...) {
+        std::filesystem::remove (temp_fn);
+        throw;
+      }
+    } else
+#endif
+      new_model = nam::get_dsp (std::filesystem::path (fn));
 
     if (!new_model)
     {
@@ -985,13 +1255,28 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
 
 bool c_neuralamp::load_json (const std::string &fn) { CP
   try {
-    std::ifstream file (fn);
-    if (!file.is_open ()) {
-      fprintf (stderr, "Could not open model file: %s\n", fn.c_str ());
-      return false;
+    std::unique_ptr<RTNeural::Model<float>> new_model;
+#ifdef HAVE_GZIP
+    if (ends_with (fn, ".json.gz")) {
+      nlohmann::json model_json;
+      if (!read_gzipped_json_file (fn, model_json)) {
+        fprintf (stderr, "Failed to decompress model file: %s\n", fn.c_str ());
+        return false;
+      }
+
+      new_model = RTNeural::json_parser::parseJson<float>(model_json);
+    } else
+#endif
+    {
+      std::ifstream file (fn);
+      if (!file.is_open ()) {
+        fprintf (stderr, "Could not open model file: %s\n", fn.c_str ());
+        return false;
+      }
+
+      new_model = RTNeural::json_parser::parseJson<float>(file);
     }
 
-    auto new_model = RTNeural::json_parser::parseJson<float>(file);
     if (!new_model) {
       fprintf (stderr, "RTNeural parser returned null: %s\n", fn.c_str ());
       return false;
@@ -1069,9 +1354,17 @@ bool c_neuralamp::load_model_now (const std::string &load_fn) { CP
   m_loaded.store (false, std::memory_order_release);
 
   bool ret = false;
-  if (ends_with (load_fn, ".nam"))
+  if (ends_with (load_fn, ".nam")
+#ifdef HAVE_GZIP
+      || ends_with (load_fn, ".nam.gz")
+#endif
+     )
     ret = load_nam (load_fn);
-  else if (ends_with (load_fn, ".wav")) {
+  else if (ends_with (load_fn, ".wav")
+#ifdef HAVE_GZIP
+           || ends_with (load_fn, ".wav.gz")
+#endif
+          ) {
     m_nam_model.reset ();
     m_rtneural_model.reset ();
     m_convolver.clear ();

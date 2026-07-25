@@ -1,306 +1,192 @@
-
 /* NeuralBlender - RTNeural / NAM based amp modeler
  *
  * data compression / gzip utility functions
- * Old C code (kind of poorly) written by me years ago, roughly
- * translated to C++ just now
-*/
+ */
 
-#include <arpa/inet.h>
 #include "gzip.h"
+
+#include <algorithm>
+#include <limits>
 
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_GREEN
 #include "cmdline_debug.h"
 
-#define net_to_int16(x) ntohs(x)
-#define int16_to_net(x) htons(x)
-#define net_to_int32(x) ntohl(x)
-#define int32_to_net(x) htonl(x)
+#define ZLIB_BUFFER_SIZE 65536
+#define GZIP_WINDOW_BITS 31
 
-bool c_gzip::memory_block_is_gzipped (unsigned char *data, size_t length) {
-  if (length < 10) {
-    debug ("abusrdly small size for gzip file: %ld bytes\n",
+static unsigned char *copy_vector_to_malloc (
+    const std::vector<unsigned char> &data,
+    size_t *r_length) {
+  unsigned char *retval =
+      (unsigned char *) malloc (data.size () + 16);
+  if (!retval)
+    return NULL;
+
+  if (!data.empty ())
+    memcpy (retval, data.data (), data.size ());
+  memset (retval + data.size (), 0, 16);
+
+  if (r_length)
+    *r_length = data.size ();
+
+  return retval;
+}
+
+bool c_gzip::memory_block_is_gzipped (
+    const unsigned char *data, size_t length) {
+  if (!data || length < 10) {
+    debug ("absurdly small size for gzip file: %ld bytes\n",
            (long int) length);
     return false;
   }
-  
-  if (data [0] == 0x1f && data [1] == 0x8b) {
-    debug ("format tags match, returning TRUE\n");
-    return true;
-  }
-  
-  debug ("format mismatch, this is not a gzip file\n");
-  return false;
+
+  return data [0] == 0x1f && data [1] == 0x8b;
 }
 
-#define ZLIB_BUFFER_SIZE 65536
+unsigned char *c_gzip::gunzip_memory_block (
+    const unsigned char *gzip_data,
+    size_t gzip_length,
+    size_t *r_unzip_length) {
 
-class c_buffer {
-public:
-  c_buffer (unsigned char *data_, size_t size_) {
-    data = data_;
-    size = size_;
-  }
-  unsigned char *data;
-  size_t size;
-};
-
-/* this has to be freed afterwards.
- * DONE: use buffers
- * DONE: detect incomplete streams */
-unsigned char *c_gzip::gunzip_memory_block (unsigned char *gzip_data, size_t gzip_length,
-                                           size_t *r_unzip_length) {
-  int i;
-  char tags [4], flags;
-  uint32_t *int32ptr, unzip_length, gzip_crc;
-  uint16_t *int16ptr;
-  unsigned char *retval = NULL;
-  unsigned char out_buffer [ZLIB_BUFFER_SIZE];
-  unsigned char *outptr = NULL;
-  z_stream strm;
-  int z_status, n;
-  //t_linklist *buffer_list;
-  //t_linkitem *linkitem;
-  std::vector<c_buffer> buffer_list;
-  size_t have = 0, total_size = 0;
-  
   debug ("start, gzip_data=0x%lX, gzip_length=%ld\n",
-          (long int) gzip_data, (long int) gzip_length);
-  
+         (long int) gzip_data, (long int) gzip_length);
+
+  if (r_unzip_length)
+    *r_unzip_length = 0;
+
   if (!memory_block_is_gzipped (gzip_data, gzip_length))
     return NULL;
-  
-  int32ptr = (uint32_t *) tags;
-  int16ptr = (uint16_t *) tags;
-  
-  tags [0] = gzip_data [gzip_length - 5];
-  tags [1] = gzip_data [gzip_length - 6];
-  tags [2] = gzip_data [gzip_length - 7];
-  tags [3] = gzip_data [gzip_length - 8];
-  
-  gzip_crc = net_to_int32 (*int32ptr);
-  
-  tags [0] = gzip_data [gzip_length - 1];
-  tags [1] = gzip_data [gzip_length - 2];
-  tags [2] = gzip_data [gzip_length - 3];
-  tags [3] = gzip_data [gzip_length - 4];
-  
-  unzip_length = net_to_int32 (*int32ptr);
-  
-  debug ("gzip_data [0]: 0x%X, [1]: 0x%X\n",
-          gzip_data [0], gzip_data [1]);
-  
-  flags = gzip_data [3];
-  
-  debug ("flags=%d, os=%d\n", (int) flags, (int) gzip_data [9]);
-  
-  debug ("\ntags=%d,%d,%d,%d, *int32ptr=0x%X, gzip_crc=0x%X, unzip_length=%d\n\n",
-         tags [0], tags [1], tags [2], tags [3], (int) *int32ptr, (int) gzip_crc, (int) unzip_length);
-  
-  strm.zalloc = Z_NULL;
-  strm.zfree = Z_NULL;
-  strm.opaque = Z_NULL;
-  strm.avail_in = gzip_length;
-  strm.next_in = gzip_data;
-  z_status = inflateInit2 (&strm, 31); /* window size = 15, add 16 to parse gzip header */
+
+  z_stream strm {};
+  strm.avail_in = (uInt) std::min (
+      gzip_length, (size_t) std::numeric_limits<uInt>::max ());
+  strm.next_in = const_cast<Bytef *> ((const Bytef *) gzip_data);
+
+  int z_status = inflateInit2 (&strm, GZIP_WINDOW_BITS);
   if (z_status != Z_OK) {
-    //free (retval);
-    printf ("inflateInit returned error %d\n", z_status);
+    debug ("inflateInit2 returned error %d\n", z_status);
     return NULL;
-  } else {
-    debug ("inflateInit seems to have succeeded\n");
   }
-  
-  /* example from http://www.zlib.net/zlib_how.html
-   * we're only using the inner loop because we have only
-   * one input buffer */
-  
-  /* run inflate () on input until output buffer not full */
+
+  std::vector<unsigned char> out;
+  unsigned char out_buffer [ZLIB_BUFFER_SIZE];
+
   do {
+    if (strm.avail_in == 0 &&
+        strm.total_in < gzip_length) {
+      const size_t remaining = gzip_length - strm.total_in;
+      strm.avail_in = (uInt) std::min (
+          remaining, (size_t) std::numeric_limits<uInt>::max ());
+      strm.next_in =
+          const_cast<Bytef *> ((const Bytef *) gzip_data + strm.total_in);
+    }
+
     strm.avail_out = ZLIB_BUFFER_SIZE;
     strm.next_out = out_buffer;
+
     z_status = inflate (&strm, Z_NO_FLUSH);
-    //assert(ret != Z_STREAM_ERROR);  /* state not clobbered */
-    switch (z_status) {
-    case Z_NEED_DICT:
-      z_status = Z_DATA_ERROR;     /* and fall through */
-    case Z_DATA_ERROR:
-    case Z_MEM_ERROR:
-    case Z_STREAM_ERROR:
-      printf ("inflate returned error %d\n", z_status);
+    if (z_status == Z_NEED_DICT ||
+        z_status == Z_DATA_ERROR ||
+        z_status == Z_MEM_ERROR ||
+        z_status == Z_STREAM_ERROR ||
+        z_status == Z_BUF_ERROR) {
+      debug ("inflate returned error %d\n", z_status);
       inflateEnd (&strm);
       return NULL;
     }
-    have = ZLIB_BUFFER_SIZE - strm.avail_out;
-    /*
-    if (fwrite(out, 1, have, dest) != have || ferror(dest)) {
-        inflateEnd(&strm);
-        return Z_ERRNO;
-    }*/
-    debug ("adding buffer to linklist, size %ld\n", (long int) have);
-    //linklist_add_item_copy (buffer_list, out_buffer, have);
-    c_buffer b (out_buffer, have);
-    buffer_list.push_back (b);
-    total_size += have;
-  } while (strm.avail_out == 0);
-  
-  debug ("last inflate call returned %d\n", z_status);
-  
+
+    const size_t have = ZLIB_BUFFER_SIZE - strm.avail_out;
+    out.insert (out.end (), out_buffer, out_buffer + have);
+  } while (z_status != Z_STREAM_END);
+
   inflateEnd (&strm);
-  
-  /* now we flatten the list of buffer entries into a single linear buffer */
-  retval = (unsigned char *) malloc (total_size + 16);
-  for (i = 0; i < 16; i++)
-    retval [total_size + i] = 0;
-  outptr = retval;
-  //linkitem = buffer_list->first;
-  
-  debug ("\n\ngot total_size %ld, retval at 0x%lX\n",
-         (long int) total_size, (long int) retval);
-  
-  /*while (linkitem) {
-    memcpy (outptr, linkitem->data, linkitem->size);
-    debug ("adding output buffer size %ld at 0x%lX\n",
-           (long int) linkitem->size, (long int) outptr);
-    outptr += linkitem->size;
-    linkitem = linkitem->next;
-  }*/
-  for (int i = 0; i < buffer_list.size (); i++) {
-    size_t sz = buffer_list [i].size;
-    void *data = buffer_list [i].data;
-    memcpy (outptr, data, sz);
-    debug ("adding output buffer size %ld at 0x%lX\n",
-           sz, (long int) outptr);
-    outptr += sz;
+
+  unsigned char *retval = copy_vector_to_malloc (out, r_unzip_length);
+  if (!retval) {
+    debug ("malloc failed for uncompressed block, size=%ld\n",
+           (long int) out.size ());
+    return NULL;
   }
-  
-  if (r_unzip_length) {
-    *r_unzip_length = total_size;
-    debug ("*r_unzip_length=%ld\n", (long int) *r_unzip_length);
-  } else {
-    debug ("got null pointer for r_unzip_length");
-  }
-  
-  //linklist_dealloc (buffer_list);
-  
-  debug ("end\n");
+
+  debug ("end, uncompressed size=%ld\n", (long int) out.size ());
   return retval;
 }
 
+unsigned char *c_gzip::gzip_memory_block (
+    const unsigned char *data,
+    size_t data_length,
+    size_t *r_zip_length) {
 
-/* Again, this has to be freed afterwards.
- * NOTE: An extra 16 bytes is actually allocated at the end of the gzipped block, but
- * is not accounted by r_zip_length. This is so that the blowfish encryption
- * algorithm can work on it afterwards without corrupting data.
- */
-unsigned char *c_gzip::gzip_memory_block (unsigned char *data, size_t data_length,
-                                           size_t *r_zip_length) {
-  int i;
-  char tags [4], flags;
-  unsigned char *retval = NULL;
-  unsigned char out_buffer [ZLIB_BUFFER_SIZE];
-  unsigned char *outptr = NULL;
-  z_stream strm;
-  int z_status, n, flush_mode;
-  //t_linklist *buffer_list;
-  //t_linkitem *linkitem;
-  std::vector<c_buffer> buffer_list;
-  size_t have = 0, total_size = 0;
-  
   debug ("start, data=0x%lX, data_length=%ld\n",
-          (long int) data, (long int) data_length);
-  
-  strm.zalloc = Z_NULL;
-  strm.zfree = Z_NULL;
-  strm.opaque = Z_NULL;
-  strm.avail_in = data_length;
-  strm.next_in = data;
-  z_status = deflateInit2 (&strm,
-                           Z_BEST_COMPRESSION,
-                           Z_DEFLATED,
-                           31, /* window size = 15, add 16 to generate gzip header */
-                           9,  /* mem level */
-                           Z_DEFAULT_STRATEGY);
-                           
-  if (z_status != Z_OK) {
-    //free (retval);
-    debug ("deflateInit returned error %d\n", z_status);
+         (long int) data, (long int) data_length);
+
+  if (r_zip_length)
+    *r_zip_length = 0;
+
+  if (!data && data_length > 0)
     return NULL;
-  } else {
-    debug ("deflateInit seems to have succeeded\n");
+
+  z_stream strm {};
+  strm.avail_in = (uInt) std::min (
+      data_length, (size_t) std::numeric_limits<uInt>::max ());
+  strm.next_in = const_cast<Bytef *> ((const Bytef *) data);
+
+  int z_status = deflateInit2 (
+      &strm,
+      Z_BEST_COMPRESSION,
+      Z_DEFLATED,
+      GZIP_WINDOW_BITS,
+      9,
+      Z_DEFAULT_STRATEGY);
+
+  if (z_status != Z_OK) {
+    debug ("deflateInit2 returned error %d\n", z_status);
+    return NULL;
   }
-  
-  //buffer_list = linklist_init (TRUE);
-  
-  /* run deflate() on input until output buffer not full, finish
-   * compression if all of source has been read in */
+
+  std::vector<unsigned char> out;
+  unsigned char out_buffer [ZLIB_BUFFER_SIZE];
+
   do {
-    /* TODO: flush_mode can't rely on strm.avail_in, fix this */
-    flush_mode = (strm.avail_in <= ZLIB_BUFFER_SIZE) ? Z_FINISH : Z_SYNC_FLUSH;
-    debug ("avail_in=%ld, flush_mode=%d\n", (long int) strm.avail_in, flush_mode);
+    if (strm.avail_in == 0 &&
+        strm.total_in < data_length) {
+      const size_t remaining = data_length - strm.total_in;
+      strm.avail_in = (uInt) std::min (
+          remaining, (size_t) std::numeric_limits<uInt>::max ());
+      strm.next_in = const_cast<Bytef *> (
+          (const Bytef *) data + strm.total_in);
+    }
+
+    const int flush =
+        (strm.total_in + strm.avail_in) >= data_length
+          ? Z_FINISH
+          : Z_NO_FLUSH;
+
     strm.avail_out = ZLIB_BUFFER_SIZE;
     strm.next_out = out_buffer;
-    z_status = deflate (&strm, flush_mode);
-    //assert(ret != Z_STREAM_ERROR);  /* state not clobbered */
-    switch (z_status) {
-    case Z_MEM_ERROR:
-    case Z_STREAM_ERROR:
+
+    z_status = deflate (&strm, flush);
+    if (z_status == Z_MEM_ERROR ||
+        z_status == Z_STREAM_ERROR ||
+        z_status == Z_BUF_ERROR) {
       debug ("deflate returned error %d\n", z_status);
       deflateEnd (&strm);
-      //linklist_dealloc (buffer_list);
       return NULL;
     }
-    have = ZLIB_BUFFER_SIZE - strm.avail_out;
 
-    debug ("adding buffer to linklist, size %ld\n", (long int) have);
-    //linklist_add_item_copy (buffer_list, out_buffer, have);
-    c_buffer b (out_buffer, have);
-    buffer_list.push_back (b);
-    total_size += have;
-  } while (strm.avail_out == 0);
-  
-  debug ("total_size=%ld\n", (long int) total_size);
-  debug ("last deflate call returned %d\n", z_status);
-  
+    const size_t have = ZLIB_BUFFER_SIZE - strm.avail_out;
+    out.insert (out.end (), out_buffer, out_buffer + have);
+  } while (z_status != Z_STREAM_END);
+
   deflateEnd (&strm);
-  
-  /* the rest is almost exact duplicate from gunzip_memory_block () */
-  
-  /* now we flatten the list of buffer entries into a single linear buffer */
-  retval = (unsigned char *) malloc (total_size + 16);
-  for (i = 0; i < 16; i++)
-    retval [total_size + i] = 0;
-  outptr = retval;
-  //linkitem = buffer_list->first;
-  
-  
-  debug ("\n\ngot total_size %ld, retval at 0x%lX\n",
-         (long int) total_size, (long int) retval);
-  
-  /*while (linkitem) {
-    memcpy (outptr, linkitem->data, linkitem->size);
-    debug ("adding output buffer size %ld at 0x%lX\n",
-           (long int) linkitem->size, (long int) outptr);
-    outptr += linkitem->size;
-    linkitem = linkitem->next;
-  }*/
-  for (int i = 0; i < buffer_list.size (); i++) {
-    size_t sz = buffer_list [i].size;
-    void *data = buffer_list [i].data;
-    memcpy (outptr, data, sz);
-    outptr += sz;
+
+  unsigned char *retval = copy_vector_to_malloc (out, r_zip_length);
+  if (!retval) {
+    debug ("malloc failed for compressed block, size=%ld\n",
+           (long int) out.size ());
+    return NULL;
   }
-  
-  if (r_zip_length) {
-    *r_zip_length = total_size;
-    printf ("*r_zip_length=%ld\n", (long int) *r_zip_length);
-  } else {
-    printf ("got null pointer for r_zip_length\n");
-  }
-  
-  //linklist_dealloc (buffer_list);
-  
-  debug ("end\n");
+
+  debug ("end, compressed size=%ld\n", (long int) out.size ());
   return retval;
 }
-
