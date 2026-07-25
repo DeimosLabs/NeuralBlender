@@ -10,11 +10,11 @@ Features:
   - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
   - Standalone app and LV2 plugin
   - Proper multithreading with UI and loader threads separate from DSP
-  - VU meters can be disabled to save a tiny bit of DSP load
+  - VU meters can be disabled to save a tiny bit of CPU
   - Calibration target dB is now a user defined setting
   - "Linked" calibration mode follows loudest model which has calib. enabled
   - Calibration can be tuned for guitar or bass
-  - Tuner, can be enabled/disabled
+  - Tuner, can be enabled/disabled to save a bit of CPU
   - Volume ramping/crossfade when loading, switching etc. to avoid clicks
   - Each model slot / lane has:
     - input gain
