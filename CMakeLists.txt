@@ -16,6 +16,7 @@ option(DEBUG          "Debug build" OFF)
 option(TRACE          "Debug (mostly) UI code" OFF)
 option(NOASAN         "Disable asan on debug build" ON)
 option(GZIP_SUPPORT   "Enable gzip-compressed model/IR loading" ON)
+option(USE_NATIVE_ARCH "Enable CPU-specific optimizations (-march=native)" OFF)
 
 find_package(PkgConfig REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -256,6 +257,15 @@ target_link_libraries(neuralblender_core PUBLIC
   neuralblender_cmdline_debug
   neuralblender_config
 )
+
+if (USE_NATIVE_ARCH)
+  if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    message(STATUS "Native CPU optimizations enabled (-march=native)")
+    target_compile_options(neuralblender_core PUBLIC -march=native)
+  else()
+    message(WARNING "USE_NATIVE_ARCH is enabled, but no native architecture flags are defined for ${CMAKE_CXX_COMPILER_ID}")
+  endif()
+endif()
 
 if (GZIP_SUPPORT)
   target_compile_definitions(neuralblender_core PUBLIC HAVE_GZIP)
