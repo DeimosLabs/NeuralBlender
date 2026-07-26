@@ -3102,7 +3102,18 @@ void c_app::tick () {
       now - tooltip_pending_since < tooltip_delay)
     return;
 
-  update_tooltip (tooltip_pending_widget, tooltip_root_x, tooltip_root_y);
+  if (!tooltip_popup)
+    tooltip_popup = create_tooltip (tooltip_pending_widget);
+  if (!tooltip_popup)
+    return;
+
+  if (tooltip_widget != tooltip_pending_widget) {
+    tooltip_widget = tooltip_pending_widget;
+    tooltip_popup->owner = tooltip_pending_widget;
+    tooltip_popup->set_text (tooltip_pending_widget->tooltip.c_str ());
+  }
+
+  tooltip_popup->show_at_screen_pos (tooltip_root_x, tooltip_root_y);
 }
 
 void c_app::update_tooltip (c_widget *widget, int root_x, int root_y) {
@@ -3116,8 +3127,9 @@ void c_app::update_tooltip (c_widget *widget, int root_x, int root_y) {
     return;
   }
 
-  tooltip_root_x = root_x;
-  tooltip_root_y = root_y;
+  const t_point screen = root_to_screen ({ root_x + 14, root_y + 20 });
+  tooltip_root_x = screen.x;
+  tooltip_root_y = screen.y;
 
   const uint64_t now = now_ms ();
   if (tooltip_pending_widget != widget) {
@@ -3144,8 +3156,7 @@ void c_app::update_tooltip (c_widget *widget, int root_x, int root_y) {
     tooltip_popup->set_text (widget->tooltip.c_str ());
   }
 
-  t_point p = root_to_screen ({ root_x + 14, root_y + 20 });
-  tooltip_popup->show_at_screen_pos (p.x, p.y);
+  tooltip_popup->show_at_screen_pos (tooltip_root_x, tooltip_root_y);
 }
 
 void c_app::hide_tooltip () {
