@@ -51,6 +51,10 @@
 
 //#define STANDALONE // done for us by build system (currently cmake)
 
+static constexpr double MAX_IR_SECONDS = 10.0;
+static constexpr size_t WAV_READ_CHUNK_FRAMES = 8192;
+static constexpr uint32_t MAX_IR_PARTITIONS = 512;
+
 // a few helper functions
 
 // not using this one, let's keep it for now
@@ -225,6 +229,18 @@ bool read_file_to_mem (const char *filename,
 }
 
 #ifdef HAVE_GZIP
+static bool file_is_gzipped (const char *filename) {
+  if (!filename || !filename [0])
+    return false;
+
+  unsigned char magic [2] = {};
+  std::ifstream f (filename, std::ios::binary);
+  if (!f.read ((char *) magic, sizeof (magic)))
+    return false;
+
+  return magic [0] == 0x1f && magic [1] == 0x8b;
+}
+
 static bool read_gzipped_json_file (
     const std::string &filename, nlohmann::json &json) {
   std::vector<unsigned char> filedata;
@@ -539,8 +555,12 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   size_t actualsize = 0;
   t_sndfile_mem memfile {};
 
-  if (read_file_to_mem (filename, filedata) &&
-      c_gzip::memory_block_is_gzipped (filedata.data (), filedata.size ())) {
+  if (file_is_gzipped (filename)) {
+    if (!read_file_to_mem (filename, filedata)) {
+      std::cerr << "Error: failed to read gzipped WAV file: " << filename << "\n";
+      return false;
+    }
+
     gzip_data = c_gzip::gunzip_memory_block (
         filedata.data (), filedata.size (), &actualsize);
     if (!gzip_data) {
@@ -582,9 +602,81 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
 #endif
     return false;
   }
+
+  if (channel < 0 || channel >= chans) {
+    std::cerr << "Error: " << filename << " does not have channel " << channel << "\n";
+    sf_close (f);
+#ifdef HAVE_GZIP
+    if (gzip_data)
+      free (gzip_data);
+#endif
+    return false;
+  }
+
+  const double seconds =
+      info.samplerate > 0 ? (double) frames / (double) info.samplerate : 0.0;
+  if (seconds > MAX_IR_SECONDS) {
+    std::cerr << "Error: refusing to load oversized IR/WAV file: "
+              << filename << " (" << seconds << " seconds, max "
+              << MAX_IR_SECONDS << ")\n";
+    sf_close (f);
+#ifdef HAVE_GZIP
+    if (gzip_data)
+      free (gzip_data);
+#endif
+    return false;
+  }
   
-  std::vector<float> buf (frames * chans);
-  sf_count_t readframes = sf_readf_float (f, buf.data (), frames);
+  try {
+    v.reserve ((size_t) frames);
+  } catch (const std::bad_alloc &) {
+    std::cerr << "Error: out of memory loading WAV file: " << filename << "\n";
+    sf_close (f);
+#ifdef HAVE_GZIP
+    if (gzip_data)
+      free (gzip_data);
+#endif
+    return false;
+  }
+
+  std::vector<float> buf;
+  try {
+    buf.resize ((size_t) WAV_READ_CHUNK_FRAMES * (size_t) chans);
+  } catch (const std::bad_alloc &) {
+    std::cerr << "Error: out of memory loading WAV file: " << filename << "\n";
+    sf_close (f);
+#ifdef HAVE_GZIP
+    if (gzip_data)
+      free (gzip_data);
+#endif
+    return false;
+  }
+
+  sf_count_t readframes = 0;
+  while (readframes < frames) {
+    const sf_count_t want =
+      std::min ((sf_count_t) WAV_READ_CHUNK_FRAMES, frames - readframes);
+    const sf_count_t got = sf_readf_float (f, buf.data (), want);
+    if (got <= 0)
+      break;
+
+    try {
+      for (sf_count_t i = 0; i < got; ++i)
+        v.push_back (buf [(size_t) chans * (size_t) i + (size_t) channel]);
+    } catch (const std::bad_alloc &) {
+      std::cerr << "Error: out of memory loading WAV file: " << filename << "\n";
+      sf_close (f);
+#ifdef HAVE_GZIP
+      if (gzip_data)
+        free (gzip_data);
+#endif
+      v.clear ();
+      return false;
+    }
+
+    readframes += got;
+  }
+
   sf_close (f);
 #ifdef HAVE_GZIP
   if (gzip_data)
@@ -594,18 +686,6 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   if (readframes <= 0) {
     std::cerr << "Error: no samples read from " << filename << "\n";
     return false;
-  }
-  
-  if (channel < 0 || channel >= chans) {
-    std::cerr << "Error: " << filename << " does not have channel " << channel << "\n";
-    return false;
-  }
-  
-  v.resize ((size_t) readframes);
-
-  // read every 'channel' sample out of 'chans' into v
-  for (sf_count_t i = 0; i < readframes; i++) {
-    v [i] = buf [chans * i + channel];
   }
   
   return true;
@@ -923,6 +1003,15 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
     ceil_div_u32 (m_ir.size (), m_partition_size);
   if (m_num_partitions == 0)
     return false;
+
+  if (m_num_partitions > MAX_IR_PARTITIONS) {
+    std::cerr << "Error: refusing to enable oversized IR realtime convolution: "
+              << m_ir.size () << " samples at blocksize " << blocksize
+              << " requires " << m_num_partitions << " partitions, max "
+              << MAX_IR_PARTITIONS << "\n";
+    clear_fft_state ();
+    return false;
+  }
 
   m_overlap.resize (m_partition_size);
   std::fill (m_overlap.begin (), m_overlap.end (), 0.0f);
