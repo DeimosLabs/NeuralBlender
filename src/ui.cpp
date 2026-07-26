@@ -705,6 +705,7 @@ void c_lane_widgets::create (
     filepicker.add_allowed_filter ("*", "All files");
   }
   
+  menu_list.set_tooltip ("Currently loaded model/IR, lists others in same directory");
   knob_gain_in.set_tooltip ("Input going into this model (NAM)");
   knob_ir_pitch.set_tooltip ("Shift the pitch of this IR by hundredths of a semitone");
   knob_gain_out.set_tooltip ("Scale output from this model");
