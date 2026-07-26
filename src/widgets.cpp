@@ -141,8 +141,8 @@ static t_colortheme g_default_colors = {
   { // normal, hover, on, on_hover, down, disabled
     sc (grad  (1.0f,  1.0f,  1.0f,  0.15f,   0.0f,  0.0f,  0.0f,  0.0f), grad (0.48f, 0.49f, 0.50f, 1.0f, 0.00f, 0.00f, 0.00f, 1.0f)),
     sc (grad  (0.16f, 0.16f, 0.17f, 0.45f, 0.23f, 0.23f, 0.24f, 0.45f), grad (0.68f, 0.69f, 0.70f, 1.0f, 0.00f, 0.00f, 0.00f, 1.0f)),
-    sc (grad  (0.04f, 0.32f, 0.32f, 0.90f, 0.08f, 0.58f, 0.57f, 0.90f), grad (0.00f, 0.00f, 0.00f, 1.0f, 0.28f, 0.79f, 0.80f, 1.0f)),
-    sc (grad  (0.04f, 0.32f, 0.32f, 0.90f, 0.09f, 0.68f, 0.67f, 0.90f), grad (0.00f, 0.00f, 0.00f, 1.0f, 0.48f, 0.89f, 1.0f, 1.0f)),
+    sc (grad  (0.08f, 0.58f, 0.57f, 0.90f, 0.04f, 0.32f, 0.32f, 0.90f), grad (0.28f, 0.79f, 0.80f, 1.0f, 0.00f, 0.00f, 0.00f, 1.0f)),
+    sc (grad  (0.04f, 0.32f, 0.32f, 0.90f, 0.09f, 0.68f, 0.67f, 0.90f), grad (0.28f, 0.79f, 0.80f, 1.0f, 0.00f, 0.00f, 0.00f, 1.0f)),
     sc (grad  (0.07f, 0.07f, 0.08f, 0.85f, 0.12f, 0.12f, 0.13f, 0.85f), solid (0.42f, 0.43f, 0.44f, 1.0f)),
     sc (solid (0.10f, 0.10f, 0.10f, 0.45f), solid (0.30f, 0.30f, 0.31f, 0.75f))
   },
@@ -1978,12 +1978,15 @@ void c_combobox::clear () {
   items.clear ();
   selected = -1;
   listbox.clear ();
+  measured_dropdown_width = 0;
+  dropdown_width_dirty = false;
   invalidate ();
 }
 
 void c_combobox::add (const std::string &text) {
   items.push_back (text);
   listbox.set_items (items);
+  dropdown_width_dirty = true;
   sync_list_geometry ();
   invalidate ();
 }
@@ -1994,6 +1997,7 @@ void c_combobox::set_items (const std::vector<std::string> &items_) {
     selected = -1;
   listbox.set_items (items);
   listbox.set_selected (selected);
+  dropdown_width_dirty = true;
   sync_list_geometry ();
   invalidate ();
 }
@@ -2021,6 +2025,50 @@ int c_combobox::get_selection () const {
 
 std::string c_combobox::selected_text () const {
   return selected >= 0 && selected < (int) items.size () ? items [selected] : "";
+}
+
+int c_combobox::measure_dropdown_width () {
+  if (!dropdown_width_dirty)
+    return measured_dropdown_width;
+
+  dropdown_width_dirty = false;
+  measured_dropdown_width = w;
+  if (items.empty ())
+    return measured_dropdown_width;
+
+  cairo_surface_t *surface =
+    cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 1, 1);
+  if (!surface || cairo_surface_status (surface) != CAIRO_STATUS_SUCCESS) {
+    if (surface)
+      cairo_surface_destroy (surface);
+    return measured_dropdown_width;
+  }
+
+  cairo_t *cr = cairo_create (surface);
+  if (!cr || cairo_status (cr) != CAIRO_STATUS_SUCCESS) {
+    if (cr)
+      cairo_destroy (cr);
+    cairo_surface_destroy (surface);
+    return measured_dropdown_width;
+  }
+
+  cairo_select_font_face (
+      cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  const float font_scale = app ? app->font_scale : 1.0f;
+  cairo_set_font_size (cr, listbox.size * text_size * font_scale);
+
+  double widest = 0.0;
+  for (const std::string &item : items) {
+    cairo_text_extents_t ext {};
+    cairo_text_extents (cr, item.c_str (), &ext);
+    widest = std::max (widest, ext.x_advance);
+  }
+
+  cairo_destroy (cr);
+  cairo_surface_destroy (surface);
+
+  measured_dropdown_width = std::max (w, (int) std::ceil (widest) + 16);
+  return measured_dropdown_width;
 }
 
 void c_combobox::show_list () {
@@ -2055,6 +2103,12 @@ void c_combobox::show_list () {
     app->set_focus (&listbox);
 
   t_point p = local_to_screen ({ 0, h });
+  if (app && app->root && popup) {
+    const t_point root_screen = app->root_to_screen ({ 0, 0 });
+    const int right = root_screen.x + app->root->w;
+    if (p.x + popup->w > right)
+      p.x = std::max (root_screen.x, right - popup->w);
+  }
   popup->show_at_screen_pos (p.x, p.y);
   invalidate ();
 }
@@ -2095,12 +2149,20 @@ void c_combobox::sync_list_geometry () {
   const int popup_h = rows * dropdown_row_height;
   const bool needs_scroll = (int) items.size () > rows;
   const int scroll_w = needs_scroll ? NBTK_SCROLLBAR_WIDTH : 0;
-  listbox.move_resize (0, 0, std::max (1, w - scroll_w), popup_h);
+  int max_popup_w = NBTK_COMBOBOX_POPUP_MAX_WIDTH;
+  if (app && app->root)
+    max_popup_w = std::min (max_popup_w, std::max (w, app->root->w));
+  max_popup_w = std::max (w, max_popup_w);
+  const int popup_w = std::clamp (
+      std::max (w, measure_dropdown_width () + scroll_w),
+      w,
+      max_popup_w);
+  listbox.move_resize (0, 0, std::max (1, popup_w - scroll_w), popup_h);
   vscrollbar.move_resize (
-      std::max (1, w - scroll_w), 0, std::max (1, scroll_w), popup_h);
+      std::max (1, popup_w - scroll_w), 0, std::max (1, scroll_w), popup_h);
   vscrollbar.visible = needs_scroll;
   if (popup)
-    popup->move_resize (popup->x, popup->y, w, popup_h);
+    popup->move_resize (popup->x, popup->y, popup_w, popup_h);
   listbox.sync_scrollbar ();
 }
 
@@ -2335,10 +2397,17 @@ void c_knob::draw (cairo_t *cr) {
 
   const double a0 = 3.0 * M_PI / 4.0;
   const double a1 = angle_from_value ();
-  if (hovered || dragging)
-    cairo_set_source_rgba (cr, 0.80, 0.96, 0.94, 0.95);
-  else
-    cairo_set_source_rgba (cr, 1.0, 1.0, 1.0, 0.95);
+  if (hovered || dragging) {
+    const t_statecolors &on_colors = colors_for (WSTYLE_BUTTON, nbtk::WSTATE_ON);
+    cairo_set_source_rgba (
+        cr,
+        on_colors.fg.r1,
+        on_colors.fg.g1,
+        on_colors.fg.b1,
+        on_colors.fg.a1);
+  } else {
+    tk_set_solid_source (cr, nbtk::get_colortheme ()->text_fg);
+  }
 
   cairo_set_line_width (cr, std::max (2.0, indicator_radius * 0.08));
   cairo_set_line_cap (cr, CAIRO_LINE_CAP_ROUND);
@@ -5389,7 +5458,6 @@ void nbtk::c_filepicker::add_files_from_dir (
   if (!cb)
     return;
 
-  cb->items.clear ();
   combo_dir = current_dir;
 
   int sel = -1;
@@ -5434,8 +5502,8 @@ void nbtk::c_filepicker::add_files_from_dir (
       sel = (int) i;
   }
 
-  cb->selected = sel;
-  cb->update_widget ();
+  cb->set_items (combo_files);
+  cb->set_selected (sel);
 }
 
 std::string nbtk::c_filepicker::get_current_dir () const {

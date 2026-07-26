@@ -872,12 +872,14 @@ void c_lane_widgets::create (
     filepicker.lane = lane_id;
     filepicker.bank = bank_id;
     filepicker.clear_allowed_filters ();
+    std::string wav_label = "IR / WAV";
+    std::string nam_label = "NAM / JSON";
     if (bank_id == BANK_CAB) {
-      filepicker.add_allowed_filter (ui_wav_filter (), "WAV / IR");
-      filepicker.add_allowed_filter (ui_model_filter (), "NAM / JSON");
+      filepicker.add_allowed_filter (ui_wav_filter (), wav_label);
+      filepicker.add_allowed_filter (ui_model_filter (), nam_label);
     } else {
-      filepicker.add_allowed_filter (ui_model_filter (), "NAM / JSON");
-      filepicker.add_allowed_filter (ui_wav_filter (), "WAV / IR");
+      filepicker.add_allowed_filter (ui_model_filter (), nam_label);
+      filepicker.add_allowed_filter (ui_wav_filter (), wav_label);
     }
     filepicker.add_allowed_filter ("*", "All files");
   }

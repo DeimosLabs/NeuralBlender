@@ -29,6 +29,7 @@
 #define NBTK_LIST_RADIUS       6.0
 #define NBTK_SCROLLBAR_WIDTH   16
 #define NBTK_SCROLLBAR_RADIUS  8.0
+#define NBTK_COMBOBOX_POPUP_MAX_WIDTH 640
 #define NBTK_DOUBLECLICK_MS    300
 #define NBTK_MOUSEWHEEL_ROWS   2
 #define NBTK_AUTOSCROLL_MS     20
@@ -467,6 +468,7 @@ public:
   void hide_list ();
   void toggle_list ();
   void sync_list_geometry ();
+  int measure_dropdown_width ();
   void emit_action ();
   bool on_popup_mouse_down (c_popupwindow *popup, int x, int y, int button);
   bool on_popup_mouse_move (c_popupwindow *popup, int x, int y);
@@ -489,6 +491,8 @@ public:
   int drag_scroll_dir = 0;
   uint64_t drag_last_scroll_ms = 0;
   bool wheel_selects_item = false;
+  int measured_dropdown_width = 0;
+  bool dropdown_width_dirty = true;
 };
 
 class c_knob : public c_widget {
