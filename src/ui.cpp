@@ -715,15 +715,7 @@ void c_lane_widgets::create (
   btn_excl.set_tooltip ("Use this lane/channel");
   knob_delay.set_tooltip ("Micro delay applied to this lane's output");
   btn_flip.set_tooltip ("DC flip (phase invert) this lane");
-  btn_calib.set_tooltip ("Calibrate (normalize) this lane's output");
-  
-  /*if (bank_id == BANK_CAB) {
-    knob_gain_in.hide ();
-    knob_ir_pitch.show ();
-  } else {
-    knob_gain_in.show ();
-    knob_ir_pitch.hide ();
-  }*/
+  btn_calib.set_tooltip ("Calibrate (normalize) this lane's output");  
 }
 
 void c_lane_widgets::move_resize (
@@ -1110,6 +1102,21 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_muteall.set_tooltip ("Master MUTE");
   btn_tuner.set_tooltip ("Enable tuner");
   btn_noisegate.set_tooltip ("Enable noisegate");
+  knob_mastervolume.set_tooltip ("Master output volume from plugin");
+  knob_presence.set_tooltip ("Presence: applies a builtin high-frequency IR to output");
+  knob_noisethresh.set_tooltip ("Noisegate threshold");
+  knob_noiseattack.set_tooltip ("Noisegate attack");
+  knob_noisehold.set_tooltip ("Noisegate hold");
+  knob_noiserelease.set_tooltip ("Noisegate release");
+  text_other_tuner.set_tooltip ("Base frequency used by tuner for middle A");
+  text_other_calib.set_tooltip ("Aim calibration to reach this target on typical input");
+  btn_other_vu.set_tooltip ("Enable/disable display of VU meters");
+  btn_other_prefs.set_tooltip ("Non-host preferences");
+  btn_other_about.set_tooltip ("About NeuralBlender");
+  btn_other_tuner_down.set_tooltip ("Transpose tuner down a semitone");
+  btn_other_tuner_up.set_tooltip ("Transpose tuner up a semitone");
+  btn_other_tuner_default.set_tooltip ("Reset tuner to A=440");
+  btn_other_bass.set_tooltip ("Calibrate models/IR output levels for bass guitar");
   
   ui_ready = true;
   move_resize ();
