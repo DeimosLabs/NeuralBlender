@@ -37,10 +37,11 @@ Demo: https://soundcloud.com/delt01/snakeskin All the guitars and bass in this t
 
 ![NeuralBlender in Ardour](data/screenshot-ardour.png)
 
+No pre-built binaries yet, if anyone would like them, please let me know.
 
 Compiles and installs with cmake.
 
-Required libs / utilities:
+Required libs / utilities to build:
   - eigen3 (for core, required)
   - lv2 (for LV2 plugin)
   - jack (for standalone app)
