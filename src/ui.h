@@ -26,7 +26,6 @@
 #include <vector>
 
 #include "configfile.h"
-#include "native_compat.h"
 #include "widgets.h"
 #include "tuner.h"
 
@@ -93,6 +92,7 @@ class c_neuralblender_ui;
 typedef struct {
   float vu_scale_db        = -40.0f;
   float vu_headroom_db     = 6.0f;
+  bool  calib_default      = false;
   bool  bypass_doubleclick = false;
   bool  bypass_rightclick  = true;
   bool  show_tooltips      = true;
@@ -100,6 +100,7 @@ typedef struct {
 
 bool read_prefs_from_config  (c_configfile &configfile, t_prefs &prefs);
 bool write_prefs_to_config   (c_configfile &configfile, const t_prefs &prefs);
+bool is_supported_model_filename (const std::string &path);
 
 class c_prefswindow : public nbtk::c_toplevelwindow {
 public:
@@ -113,6 +114,7 @@ public:
   void set_prefs_to   (t_prefs &prefs);
   void load_defaults ();
 
+  c_neuralblender_ui *ui = NULL;
   nbtk::c_frame frame1;
   nbtk::c_button btn_cancel;
   nbtk::c_button btn_ok;
@@ -126,35 +128,36 @@ public:
   nbtk::c_textbox text_vuheadroom;
   nbtk::c_checkbox btn_bypass_doubleclick;
   nbtk::c_checkbox btn_bypass_rightclick;
+  nbtk::c_checkbox btn_calib_default;
   nbtk::c_checkbox btn_show_tooltips;
 };
 
 class c_aboutwindow : public nbtk::c_toplevelwindow {
 public:
   void create (c_neuralblender_ui *ui);
-
+  
   void show ();
   void hide ();
-
+  
+  void on_resize () override;
   void on_tk_action (nbtk::t_action_event &event);
 
-  nbtk::c_frame tk_frame;
-  nbtk::c_staticimage tk_toplogo;
-  nbtk::c_staticimage tk_logo;
-  nbtk::c_label tk_labels [8];
-  nbtk::c_label tk_link;
-  nbtk::c_label tk_build;
-  nbtk::c_button tk_ok;
-  nbtk::c_knob test_knob;
-  nbtk::c_listbox test_listbox;
-  nbtk::c_scrollbar test_scrollbar;
+  c_neuralblender_ui *ui = NULL;
+  nbtk::c_frame frame_main;
+  nbtk::c_staticimage image_toplogo;
+  nbtk::c_staticimage image_logo;
+  nbtk::c_label label_text [8];
+  //nbtk::c_label label_link1;
+  //nbtk::c_label label_link2;
+  nbtk::c_label label_build;
+  nbtk::c_button btn_ok;
 };
 
 class c_neuralblendermainwindow : public nbtk::c_toplevelwindow {
 public:
   bool create (
       c_neuralblender_ui *ui,
-      Window parent,
+      nbtk::t_native_window parent,
       const char *title,
       int x, int y, int w, int h,
       nbtk::t_native_handle owner = nullptr);
@@ -167,6 +170,7 @@ public:
   void on_tk_action (nbtk::t_action_event &event) override;
 
 private:
+  c_neuralblender_ui *ui = NULL;
   bool children_mapped = false;
 };
 
@@ -174,7 +178,7 @@ class c_neuralblender_filepicker : public nbtk::c_filepicker {
 public:
   void create (
       c_neuralblender_ui *ui,
-      nbtk::c_tkappbridge *tk_app,
+      nbtk::c_app *nbtk_app,
       nbtk::t_native_window parent,
       nbtk::t_native_handle owner,
       size_t lane,
@@ -190,6 +194,7 @@ public:
 
   size_t lane = (size_t) -1;
   uint64_t bank = (uint64_t) -1;
+  c_neuralblender_ui *ui = NULL;
 };
 
 class c_lane_widgets {
@@ -345,7 +350,7 @@ public:
   nbtk::t_native_window window;
   c_neuralblender *blender = NULL;
   nbtk::t_native_app app;
-  nbtk::c_tkappbridge tk_app;
+  nbtk::c_app nbtk_app;
   c_neuralblendermainwindow mainwindow;
   c_aboutwindow aboutwindow;
   c_prefswindow prefswindow;

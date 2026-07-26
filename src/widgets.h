@@ -1,7 +1,12 @@
 
-/* NeuralBlender - RTNeural / NAM based amp modeler
+/* NBTK - NeuralBlender Tool Kit
+ * Formerly (and very briefly) known as Simple Halfassed Interface Toolkit
  *
- * nbtk widget and native-window declarations.
+ * This started out as a set of wrapper classes around xputty to make it
+ * more fit to my style of coding, but then it quickly grew into its own
+ * mini-toolkit. I'm keeping it separate from the DSP and UI code, since it
+ * may be reused in other projects. Huge thanks to Codex for lots of
+ * help with this!!
  */
 
 #pragma once
@@ -14,8 +19,8 @@
 #include <cairo/cairo.h>
 #include "native_compat.h"
 
-#define NBTK_BUTTON_RADIUS     12.0
-#define NBTK_CHECKBOX_RADIUS   8.0
+#define NBTK_BUTTON_RADIUS     8.0
+#define NBTK_CHECKBOX_RADIUS   6.0
 #define NBTK_COMBOBOX_RADIUS   8.0
 #define NBTK_TEXTBOX_RADIUS    8.0
 #define NBTK_MENU_RADIUS       6.0
@@ -27,9 +32,6 @@
 #define NBTK_DOUBLECLICK_MS    300
 #define NBTK_MOUSEWHEEL_ROWS   2
 #define NBTK_AUTOSCROLL_MS     20
-
-class c_neuralblender_ui;
-class c_neuralblender;
 
 namespace nbtk {
 
@@ -108,9 +110,9 @@ class c_button;
 class c_listbox;
 class c_scrollbar;
 class c_nativewindow;
+class c_toplevelwindow;
 class c_popupwindow;
 class c_native_backend;
-class c_menu;
 class c_tooltip;
 class c_filepicker;
 
@@ -157,6 +159,7 @@ enum e_key {
   KEY_RIGHT,
   KEY_HOME,
   KEY_END,
+  KEY_SPACE,
   KEY_RETURN,
   KEY_ESCAPE
 };
@@ -183,6 +186,7 @@ public:
   virtual bool on_key_up (int key);
   virtual bool on_text_input (const char *text);
   virtual void clear_hover ();
+  virtual _mouse_cursor mouse_cursor () const;
   virtual void on_event (t_event &event);
   virtual void on_action (t_action_event &event);
   virtual void on_command (t_command_event &event);
@@ -211,6 +215,7 @@ public:
   void set_tooltip (const char *text);
   
   c_app *app = nullptr;
+  c_toplevelwindow *toplevel = nullptr;
   c_widget *parent = nullptr;
   c_widget *action_parent = nullptr;
   std::vector<c_widget *> children;
@@ -259,6 +264,7 @@ public:
   void on_mouse_enter () override;
   void on_mouse_leave () override;
   void clear_hover () override;
+  _mouse_cursor mouse_cursor () const override;
 
   float size = 13.0f;
   bool link = false;
@@ -273,6 +279,7 @@ public:
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
   bool on_mouse_move (int x, int y) override;
+  bool on_key_down (int key) override;
   void on_mouse_enter () override;
   void on_mouse_leave () override;
   void clear_hover () override;
@@ -492,6 +499,7 @@ public:
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
   bool on_mouse_move (int x, int y) override;
+  bool on_key_down (int key) override;
   void on_mouse_leave () override;
 
   bool set_value (float value, bool notify = false);
@@ -615,7 +623,11 @@ public:
 
   cairo_t *cr = nullptr;
   std::unique_ptr<c_native_backend> backend;
-  c_nativewindow *main_window = nullptr;
+  t_native_app *native_app = nullptr;
+  t_native_display display = nullptr;
+  c_nativewindow *embedded_window = nullptr;
+  c_toplevelwindow *active_toplevel = nullptr;
+  c_toplevelwindow *action_toplevel = nullptr;
   c_widget *root = nullptr;
   std::vector<std::unique_ptr<c_widget>> widgets;
   std::vector<std::unique_ptr<c_popupwindow>> popups;
@@ -707,18 +719,6 @@ public:
   bool visible = false;
 };
 
-class c_basetoplevelwindow : public c_nativewindow {
-public:
-  void on_close () override;
-};
-
-class c_embeddedwindow : public c_nativewindow {
-public:
-  void create_for_parent (c_app *app, void *native_parent, int w, int h);
-
-  void *native_parent = nullptr;
-};
-
 class c_popupwindow : public c_nativewindow {
 public:
   void create_for_owner (c_app *app, c_widget *owner, int w, int h);
@@ -750,14 +750,6 @@ public:
   t_native_handle widget = nullptr;
   bool pointer_grabbed = false;
   bool close_on_release = false;
-};
-
-class c_menu : public c_popupwindow {
-public:
-  bool close_on_outside_click () const override;
-  bool takes_focus () const override;
-  bool on_key_down (int key) override;
-  bool on_mouse_down (int x, int y, int button) override;
 };
 
 class c_tooltip : public c_popupwindow {
@@ -848,9 +840,11 @@ typedef struct {
 
 typedef struct {
   t_gradientcolors window_bg;
+  t_gradientcolors text_fg;
+  t_gradientcolors text_disabled;
+  t_gradientcolors link_fg;
 
   t_controlcolors button;
-  t_controlcolors checkbox;
   t_controlcolors radio;
 
   t_statecolors frame_normal;
@@ -896,25 +890,19 @@ struct c_printfps {
 #endif
 
 const t_colortheme *get_colortheme ();
+std::string path_dirname (const std::string &path);
+std::string path_basename (const std::string &path);
 void tk_path_rounded_rect (cairo_t *cr,
     double x, double y, double w, double h,
     double r);
 void tk_set_gradient (cairo_t *cr, double h, const t_gradientcolors &colors);
-
-} // namespace nbtk
-
-std::string path_dirname (const std::string &path);
-std::string path_basename (const std::string &path);
-bool is_supported_model_filename (const std::string &path);
-
-namespace nbtk {
 
 class c_native_toplevelwindow {
 public:
   virtual ~c_native_toplevelwindow () = default;
 
   bool create (
-      c_neuralblender_ui *ui,
+      c_app *app,
       nbtk::t_native_window parent,
       const char *title,
       int x, int y, int w, int h,
@@ -953,39 +941,19 @@ public:
   
   uint64_t id = 0;
   std::string label;
-  c_neuralblender_ui *ui = NULL;
+  c_app *app_context = NULL;
+  c_native_backend *backend = NULL;
   nbtk::t_native_handle widget = nullptr;
   Window window = 0;
   Window parent = 0;
-};
-
-class c_toplevelwindow;
-
-class c_tkappbridge : public nbtk::c_app {
-public:
-  void invalidate_rect (int x, int y, int w, int h) override;
-  void set_mouse_cursor (nbtk::_mouse_cursor cursor) override;
-  void set_focus (nbtk::c_widget *widget) override;
-  void clear_focus (nbtk::c_widget *widget = nullptr) override;
-  std::unique_ptr<nbtk::c_popupwindow> create_popup (
-      nbtk::c_widget *owner) override;
-  std::unique_ptr<nbtk::c_tooltip> create_tooltip (
-      nbtk::c_widget *owner) override;
-  nbtk::t_point root_to_screen (nbtk::t_point p) const override;
-  nbtk::t_point screen_to_root (nbtk::t_point p) const override;
-  void on_action (nbtk::t_action_event &event) override;
-
-  c_toplevelwindow *native_window = NULL;
-  c_toplevelwindow *action_owner = NULL;
 };
 
 class c_toplevelwindow : public c_native_toplevelwindow {
 public:
   ~c_toplevelwindow ();
 
-  bool create_tk (
-      c_neuralblender_ui *ui,
-      c_tkappbridge *tk_app,
+  bool create (
+      c_app *widget_app,
       nbtk::t_native_window parent,
       const char *title,
       int x, int y, int w, int h,
@@ -1011,7 +979,7 @@ public:
   static void cb_key_press (void *w, void *event, void *user_data);
   static void cb_key_release (void *w, void *event, void *user_data);
 
-  c_tkappbridge *tk_app = NULL;
+  c_app *widget_app = NULL;
   nbtk::c_widget tk_root;
   nbtk::c_widget *focused_widget = NULL;
   nbtk::c_widget *hovered_widget = NULL;
@@ -1033,8 +1001,7 @@ private:
 class c_filepicker : public c_toplevelwindow {
 public:
   void create (
-      ::c_neuralblender_ui *ui,
-      c_tkappbridge *tk_app,
+      c_app *widget_app,
       t_native_window parent,
       t_native_handle owner,
       const char *title);

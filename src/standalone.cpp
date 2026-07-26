@@ -132,6 +132,8 @@ bool c_standalone_ui::load_model (
     state.banks [bank].lanes [which].loaded = loaded;
     state.banks [bank].lanes [which].filename =
       loaded && filename ? filename : "";
+    if (loaded && calib_default)
+      state.banks [bank].lanes [which].do_calib = true;
   }
   apply_effective_controls ();
   if (which < NB_NUM_MODELS) {
@@ -470,8 +472,8 @@ static void ui_main () {
   
   CP
   while (g_running &&
-      g_ui->tk_app.backend &&
-      g_ui->tk_app.backend->is_running (&g_ui->app)) {
+      g_ui->nbtk_app.backend &&
+      g_ui->nbtk_app.backend->is_running (&g_ui->app)) {
     g_ui->idle ();
     usleep (16777);
   }

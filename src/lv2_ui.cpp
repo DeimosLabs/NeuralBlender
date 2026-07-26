@@ -31,9 +31,6 @@
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_MAGENTA
 #include "cmdline_debug.h"
 
-std::string path_dirname (const std::string &path);
-
-
 void c_lv2_ui::write_control (uint32_t port, float value) {
   if (updating_from_host || !write)
     return;
@@ -414,18 +411,18 @@ int c_lv2_ui::idle () {
     pending_resize_h = 0;
   }
 
-  if (tk_app.backend)
-    tk_app.backend->run_events (&app);
+  if (nbtk_app.backend)
+    nbtk_app.backend->run_events (&app);
 
-  tk_app.tick ();
+  nbtk_app.tick ();
 
   redraw_meters_now ();
 
   redraw_tuner_if_needed ();
 
-  if (tk_app.backend) {
-    tk_app.backend->flush_dirty (&app);
-    tk_app.backend->flush (mainwindow.native_handle ());
+  if (nbtk_app.backend) {
+    nbtk_app.backend->flush_dirty (&app);
+    nbtk_app.backend->flush (mainwindow.native_handle ());
   }
 
   return 0;

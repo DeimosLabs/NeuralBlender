@@ -48,25 +48,6 @@ static void sync_bank_tab_icon (
     const c_neuralblender_state &state,
     _lane_bank bank);
 
-std::string path_dirname (const std::string &path) {
-  const size_t pos = path.find_last_of ('/');
-  if (pos == std::string::npos)
-    return "";
-
-  if (pos == 0)
-    return "/";
-
-  return path.substr (0, pos);
-}
-
-std::string path_basename (const std::string &path) {
-  const size_t pos = path.find_last_of ('/');
-  if (pos == std::string::npos)
-    return path;
-
-  return path.substr (pos + 1);
-}
-
 static bool filename_ends_with (const std::string &path, const char *suffix) {
   const size_t suffix_len = strlen (suffix);
   return path.size () >= suffix_len &&
@@ -83,21 +64,22 @@ static bool is_supported_model_filename_lower (const std::string &lower) {
          filename_ends_with (lower, ".json.gz") ||
 #endif
          filename_ends_with (lower, ".aidax") ||
-         filename_ends_with (lower, ".wav")
+         filename_ends_with (lower, ".wav");
 #ifdef HAVE_GZIP
-         || filename_ends_with (lower, ".wav.gz")
+         filename_ends_with (lower, ".aidax") ||
+         filename_ends_with (lower, ".wav.gz");
 #endif
-         ;
 }
 
 bool c_neuralblendermainwindow::create (
     c_neuralblender_ui *ui_,
-    Window parent_,
+    nbtk::t_native_window parent_,
     const char *title_,
     int x, int y, int w, int h,
     nbtk::t_native_handle owner) {
 
-  if (!create_tk (ui_, &ui_->tk_app, parent_, title_, x, y, w, h, owner))
+  ui = ui_;
+  if (!c_toplevelwindow::create (&ui_->nbtk_app, parent_, title_, x, y, w, h, owner))
     return false;
 
   auto_close (false);
@@ -228,6 +210,10 @@ bool read_prefs_from_config (c_configfile &configfile, t_prefs &prefs) {
   if (!str.empty ())
     prefs.bypass_rightclick = c_configfile::istrue (str);
 
+  str = configfile.get_item (CONFIG_KEY_NAME_CALIB);
+  if (!str.empty ())
+    prefs.calib_default = c_configfile::istrue (str);
+
   str = configfile.get_item (CONFIG_KEY_NAME_TOOLTIPS);
   if (!str.empty ())
     prefs.show_tooltips = c_configfile::istrue (str);
@@ -248,6 +234,8 @@ bool write_prefs_to_config (c_configfile &configfile, const t_prefs &prefs) {
   configfile.set_item (
     CONFIG_KEY_NAME_BYP_RCLICK, prefs.bypass_rightclick ? "1" : "0");
   configfile.set_item (
+    CONFIG_KEY_NAME_CALIB, prefs.calib_default ? "1" : "0");
+  configfile.set_item (
     CONFIG_KEY_NAME_TOOLTIPS, prefs.show_tooltips ? "1" : "0");
 
   return configfile.write_file ();
@@ -264,13 +252,12 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   int default_w = 550;
   int default_h = 550;
   nbtk::t_native_window root =
-      ui->tk_app.backend
-        ? ui->tk_app.backend->root_window (ui->mainwindow.native_handle (), false)
+      ui->nbtk_app.backend
+        ? ui->nbtk_app.backend->root_window (ui->mainwindow.native_handle (), false)
         : 0;
   
-  if (!create_tk (
-      ui,
-      &ui->tk_app,
+  if (!c_toplevelwindow::create (
+      &ui->nbtk_app,
       root,
       "NeuralBlender settings",
       0, 0, default_w, default_h,
@@ -290,14 +277,17 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   label_vuheadroom.align = nbtk::TEXT_LEFT;
   label_spacer1.create (&frame1, "", 16, 112, 12, 12);
 
+  btn_calib_default.create (
+    &frame1, "Calibrate default on", 16, 152, 320, 32);
+  btn_calib_default.align = nbtk::TEXT_LEFT;
   btn_bypass_doubleclick.create (
-    &frame1, "Toggle bypass on doubleclick", 16, 152, 320, 32);
+    &frame1, "Toggle bypass on doubleclick", 16, 192, 320, 32);
   btn_bypass_doubleclick.align = nbtk::TEXT_LEFT;
   btn_bypass_rightclick.create (
-    &frame1, "Toggle bypass on right click", 16, 192, 320, 32);
+    &frame1, "Toggle bypass on right click", 16, 232, 320, 32);
   btn_bypass_rightclick.align = nbtk::TEXT_LEFT;
   btn_show_tooltips.create (
-    &frame1, "Show tooltips", 16, 232, 320, 32);
+    &frame1, "Show tooltips", 16, 272, 320, 32);
   btn_show_tooltips.align = nbtk::TEXT_LEFT;
   btn_defaults.create (&frame1, "Reset to defaults", 12, 0, 400, 40);
 
@@ -306,13 +296,14 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   
   text_vuscale.set_tooltip ("Minimum dB value visible on VU meters");
   text_vuheadroom.set_tooltip ("Extra headroom given to VU meters above 0dB");
+  btn_calib_default.set_tooltip ("Enable calibration by default for newly loaded lanes");
   btn_bypass_doubleclick.set_tooltip ("Toggle bypassing banks when clicking the top button again");
   btn_bypass_rightclick.set_tooltip ("Toggle bypassing banks when right-clicking the top button");
   btn_show_tooltips.set_tooltip ("No idea what this does");
   on_resize ();
 }
 
-void c_prefswindow::on_resize () {
+void c_prefswindow::on_resize () { CP
   nbtk::c_toplevelwindow::on_resize ();
   frame1.move_resize (12, 12, w () - 24, h () - 80);
   
@@ -355,6 +346,7 @@ void c_prefswindow::hide () { CP
 void c_prefswindow::load_defaults () {
   text_vuscale.set_text ("-48.0");
   text_vuheadroom.set_text ("6.0");
+  btn_calib_default.set_value (false);
   btn_bypass_doubleclick.set_value (false);
   btn_bypass_rightclick.set_value (true);
   btn_show_tooltips.set_value (true);
@@ -373,6 +365,7 @@ void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
   
   btn_bypass_doubleclick.set_value (prefs.bypass_doubleclick);
   btn_bypass_rightclick.set_value (prefs.bypass_rightclick);
+  btn_calib_default.set_value (prefs.calib_default);
   btn_show_tooltips.set_value (prefs.show_tooltips);
 }
 
@@ -390,6 +383,7 @@ void c_prefswindow::set_prefs_to (t_prefs &prefs) {
   
   prefs.bypass_doubleclick = btn_bypass_doubleclick.value;
   prefs.bypass_rightclick = btn_bypass_rightclick.value;
+  prefs.calib_default = btn_calib_default.value;
   prefs.show_tooltips = btn_show_tooltips.value;
 }
 
@@ -405,7 +399,8 @@ static const char *g_about_text [] = {
   "RTNeural and NeuralAmpModeler",
   "",
   "by Deimos Laboratories",
-  "", // web link, see below
+  "http://deimos.ca/neuralblender", // web link, see below
+  "https://github.com/DeimosLabs/NeuralBlender",
   NULL
 };
 
@@ -415,16 +410,15 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
     return;
 
   nbtk::t_native_window native_root =
-      ui->tk_app.backend
-        ? ui->tk_app.backend->root_window (ui->mainwindow.native_handle (), false)
+      ui->nbtk_app.backend
+        ? ui->nbtk_app.backend->root_window (ui->mainwindow.native_handle (), false)
         : 0;
 
-  if (!create_tk (
-      ui,
-      &ui->tk_app,
+  if (!c_toplevelwindow::create (
+      &ui->nbtk_app,
       native_root,
       "About NeuralBlender (tk)",
-      470, 0, 450, 480,
+      470, 0, 450, 500,
       ui->mainwindow.native_handle ()))
     return;
 
@@ -432,44 +426,36 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   nbtk::c_widget *root = &tk_root;
   const int panel_x = 12;
   const int panel_y = 12;
-  const int panel_w = 426;
+  const int panel_w = 424;
 
-  tk_frame.create (root, "", panel_x, panel_y, panel_w, 388);
+  frame_main.create (root, "", panel_x, panel_y, panel_w, 420);
 
-  tk_toplogo.create (&tk_frame, "", 85, 12, 256, 32);
-  tk_toplogo.set_png (data_textlogo_1024x128_png);
+  image_toplogo.create (&frame_main, "", 85, 12, 256, 32);
+  image_toplogo.set_png (data_textlogo_1024x128_png);
 
-  tk_logo.create (&tk_frame, "", 133, 64, 160, 160);
-  tk_logo.set_png (data_neuralblender_logo_160_png);
+  image_logo.create (&frame_main, "", 133, 64, 160, 160);
+  image_logo.set_png (data_neuralblender_logo_160_png);
 
   for (int i = 0; g_about_text [i]; i++) {
-    tk_labels [i].create (
-      &tk_frame, g_about_text [i], 0, 240 + i * 24, panel_w, 24);
-    tk_labels [i].size = 13.0f;
+    label_text [i].create (
+      &frame_main, g_about_text [i], 0, 240 + i * 24, panel_w, 24);
+    label_text [i].size = 13.0f;
   }
 
-  tk_link.create (
-    &tk_frame, "http://deimos.ca/neuralblender", 0, 336, panel_w, 24);
-  tk_link.size = 13.0f;
-  tk_link.link = true;
-
+  /*label_link.create (
+    &frame_main, "http://deimos.ca/neuralblender", 0, 336, panel_w, 24);
+  label_link.size = 13.0f;
+  label_link.link = true;*/
+  label_text [4].link = true;
+  label_text [5].link = true;
+  
   char buf [64];
   snprintf (buf, sizeof (buf), "Build timestamp: %s", g_build_timestamp);
-  tk_build.create (&tk_frame, buf, 0, 360, panel_w, 20);
-  tk_build.size = 10.0f;
+  label_build.create (&frame_main, buf, 0, 390, panel_w, 20);
+  label_build.size = 10.0f;
 
-  tk_ok.create (root, "OK", 310, 424, 128, 40);
-  tk_ok.set_image_default (data_icon_xputty_approved_png);
-  
-  /*test_knob.create (root, "test knob", 16, 400, 64, 64);
-  test_listbox.create (root, "test listbox", 100, 400, 200, 80);
-  test_scrollbar.create (root, "", 300, 400, NBTK_SCROLLBAR_WIDTH, 80);
-  test_listbox.set_scrollbar (&test_scrollbar);
-  for (int i = 0; i < 10; i++) {
-    char buf [32];
-    snprintf (buf, 31, "Item %d", i + 1);
-    test_listbox.add (buf);
-  }*/
+  btn_ok.create (root, "OK", 310, 424, 128, 40);
+  btn_ok.set_image_default (data_icon_xputty_approved_png);
 }
 
 void c_aboutwindow::show () { CP
@@ -489,8 +475,14 @@ void c_aboutwindow::hide () { CP
   widget_hide (widget);
 }
 
+void c_aboutwindow::on_resize () { CP
+  frame_main.move ((w () - frame_main.w) / 2, (h () - frame_main.h) / 2 - 24);
+  btn_ok.move (w () - 140, h () - 50);
+  c_toplevelwindow::on_resize ();
+}
+
 void c_aboutwindow::on_tk_action (nbtk::t_action_event &event) {
-  if (event.source_id == tk_ok.id && event.mouse_button == Button1) {
+  if (event.source_id == btn_ok.id && event.mouse_button == Button1) {
     hide ();
     event.handled = true;
   }
@@ -501,14 +493,15 @@ void c_aboutwindow::on_tk_action (nbtk::t_action_event &event) {
 
 void c_neuralblender_filepicker::create (
     c_neuralblender_ui *ui_,
-    nbtk::c_tkappbridge *tk_app,
+    nbtk::c_app *nbtk_app,
     nbtk::t_native_window parent,
     nbtk::t_native_handle owner,
     size_t lane_,
     uint64_t bank_,
     const char *title_) {
 
-  nbtk::c_filepicker::create (ui_, tk_app, parent, owner, title_);
+  ui = ui_;
+  nbtk::c_filepicker::create (nbtk_app, parent, owner, title_);
   lane = lane_;
   bank = bank_;
 }
@@ -556,7 +549,7 @@ void c_neuralblender_filepicker::on_file_select (
   if (lane >= NB_NUM_MODELS)
     return;
 
-  current_dir = path_dirname (filename);
+  current_dir = nbtk::path_dirname (filename);
   if (!current_dir.empty ())
     ui->configfile.set_item (cwd_config_key_for_bank_ui (bank_), current_dir);
 
@@ -870,11 +863,11 @@ void c_lane_widgets::create (
   
   if (ui && lane_id < NB_NUM_MODELS) {
     nbtk::t_native_window root =
-        ui->tk_app.backend
-          ? ui->tk_app.backend->root_window (ui->mainwindow.native_handle (), false)
+        ui->nbtk_app.backend
+          ? ui->nbtk_app.backend->root_window (ui->mainwindow.native_handle (), false)
           : 0;
     filepicker.create (
-      ui, &ui->tk_app, root, native_owner, lane_id, bank_id,
+      ui, &ui->nbtk_app, root, native_owner, lane_id, bank_id,
       bank_id == BANK_CAB ? "Select IR file" : "Select model file");
     filepicker.lane = lane_id;
     filepicker.bank = bank_id;
@@ -893,7 +886,10 @@ void c_lane_widgets::create (
   knob_gain_in.set_tooltip ("Input going into this model (NAM)");
   knob_ir_pitch.set_tooltip ("Shift the pitch of this IR by 100ths of a semitone");
   knob_gain_out.set_tooltip ("Scale output from this model");
-  knob_dry_out.set_tooltip ("Pass dry signal alongside model output");
+  if (bank_id == BANK_CAB)
+    knob_dry_out.set_tooltip ("Pass dry signal alongside IR output");
+  else
+    knob_dry_out.set_tooltip ("Pass dry signal alongside model output");
   btn_browse.set_tooltip ("Load a model or IR (wav) file");
   btn_clear.set_tooltip ("Clear this model/IR");
   btn_mute.set_tooltip ("Mute this lane/channel");
@@ -1023,29 +1019,31 @@ c_neuralblender_ui::~c_neuralblender_ui () { CP
 void c_neuralblender_ui::update_model_cwd (std::string path) {
   CP
   debug ("path='%s'", path.c_str ());
-  configfile.set_item (CONFIG_KEY_NAME_MODEL_CWD, path_dirname (path));
+  configfile.set_item (CONFIG_KEY_NAME_MODEL_CWD, nbtk::path_dirname (path));
 }
 
 void c_neuralblender_ui::update_ir_cwd (std::string path) {
   CP
   debug ("path='%s'", path.c_str ());
-  configfile.set_item (CONFIG_KEY_NAME_IR_CWD, path_dirname (path));
+  configfile.set_item (CONFIG_KEY_NAME_IR_CWD, nbtk::path_dirname (path));
 }
 
 bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   size_t i;
   destroy ();
 
-  if (!tk_app.backend)
-    tk_app.backend = nbtk::create_native_backend ();
-  if (!tk_app.backend)
+  if (!nbtk_app.backend)
+    nbtk_app.backend = nbtk::create_native_backend ();
+  if (!nbtk_app.backend)
     return false;
 
-  tk_app.backend->init_app (&app);
+  nbtk_app.backend->init_app (&app);
+  nbtk_app.native_app = &app;
   /*app.small_font = 12 * app.hdpi;
   app.normal_font = 14 * app.hdpi;
   app.big_font = 20 * app.hdpi;*/
-  display = tk_app.backend->display (&app);
+  display = nbtk_app.backend->display (&app);
+  nbtk_app.display = display;
   
   configfile.read_file ();
   read_prefs_from_config (configfile, prefs);
@@ -1055,7 +1053,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
     state.showadvanced = true;
   }
 
-  if (configfile.istrue (CONFIG_KEY_NAME_CALIB)) {
+  if (prefs.calib_default) {
     calib_default = true;
     for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
       for (i = 0; i < NB_NUM_MODELS; ++i)
@@ -1064,14 +1062,14 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
 
   parent = parent_;
   if (!parent)
-    parent = tk_app.backend->default_root_window (display);
+    parent = nbtk_app.backend->default_root_window (display);
 
   int initial_w = DEFAULT_WINDOW_WIDTH;
   int initial_h = DEFAULT_WINDOW_HEIGHT;
   if (parent_) {
     int parent_w = 0;
     int parent_h = 0;
-    if (tk_app.backend->window_size (
+    if (nbtk_app.backend->window_size (
           display, parent, app.hdpi, &parent_w, &parent_h) &&
         parent_w >= MIN_WINDOW_WIDTH &&
         parent_h >= MIN_WINDOW_HEIGHT &&
@@ -1245,31 +1243,31 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   label_other_byp.align = nbtk::TEXT_LEFT;
   label_other_link.align = nbtk::TEXT_LEFT;
   label_other_excl.align = nbtk::TEXT_LEFT;
-  btn_other_byp_pedal.create (&frame_other_linkexcl, "Pedal",  x1, y0, 150, 32);
+  btn_other_byp_pedal.create (&frame_other_linkexcl, "Pedal",  x1, y0, 100, 32);
   btn_other_byp_pedal.role = ROLE_BANK_BYPASS;
   btn_other_byp_pedal.bank = BANK_PEDAL;
-  btn_other_byp_amp.create (&frame_other_linkexcl, "Amp",      x2, y0, 150, 32);
+  btn_other_byp_amp.create (&frame_other_linkexcl, "Amp",      x2, y0, 100, 32);
   btn_other_byp_amp.role = ROLE_BANK_BYPASS;
   btn_other_byp_amp.bank = BANK_AMP;
-  btn_other_byp_cab.create (&frame_other_linkexcl, "Cab/IR",   x3, y0, 150, 32);
+  btn_other_byp_cab.create (&frame_other_linkexcl, "Cab",   x3, y0, 100, 32);
   btn_other_byp_cab.role = ROLE_BANK_BYPASS;
   btn_other_byp_cab.bank = BANK_CAB;
-  btn_other_link_pedal.create (&frame_other_linkexcl, "Pedal", x1, y1, 150, 32);
+  btn_other_link_pedal.create (&frame_other_linkexcl, "Pedal", x1, y1, 100, 32);
   btn_other_link_pedal.role = ROLE_LINKED_CALIB;
   btn_other_link_pedal.bank = BANK_PEDAL;
-  btn_other_link_amp.create (&frame_other_linkexcl, "Amp",     x2, y1, 150, 32);
+  btn_other_link_amp.create (&frame_other_linkexcl, "Amp",     x2, y1, 100, 32);
   btn_other_link_amp.role = ROLE_LINKED_CALIB;
   btn_other_link_amp.bank = BANK_AMP;
-  btn_other_link_cab.create (&frame_other_linkexcl, "Cab/IR",  x3, y1, 150, 32);
+  btn_other_link_cab.create (&frame_other_linkexcl, "Cab",  x3, y1, 100, 32);
   btn_other_link_cab.role = ROLE_LINKED_CALIB;
   btn_other_link_cab.bank = BANK_CAB;
-  btn_other_excl_pedal.create (&frame_other_linkexcl, "Pedal", x1, y2, 150, 32);
+  btn_other_excl_pedal.create (&frame_other_linkexcl, "Pedal", x1, y2, 100, 32);
   btn_other_excl_pedal.role = ROLE_EXCL_TOGGLE;
   btn_other_excl_pedal.bank = BANK_PEDAL;
-  btn_other_excl_amp.create (&frame_other_linkexcl, "Amp",     x2, y2, 150, 32);
+  btn_other_excl_amp.create (&frame_other_linkexcl, "Amp",     x2, y2, 100, 32);
   btn_other_excl_amp.role = ROLE_EXCL_TOGGLE;
   btn_other_excl_amp.bank = BANK_AMP;
-  btn_other_excl_cab.create (&frame_other_linkexcl, "Cab/IR",  x3, y2, 150, 32);
+  btn_other_excl_cab.create (&frame_other_linkexcl, "Cab",  x3, y2, 100, 32);
   btn_other_excl_cab.role = ROLE_EXCL_TOGGLE;
   btn_other_excl_cab.bank = BANK_CAB;
   
@@ -1343,7 +1341,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   knob_noisehold.set_tooltip ("Noisegate hold");
   knob_noiserelease.set_tooltip ("Noisegate release");
   text_other_tuner.set_tooltip ("Base frequency used by tuner for middle A");
-  text_other_calib.set_tooltip ("Aim calibration to reach this target on typical input");
+  text_other_calib.set_tooltip ("Aim calibration to reach this target output on typical input");
   btn_other_vu.set_tooltip ("Enable/disable display of VU meters");
   btn_other_prefs.set_tooltip ("Non-host preferences");
   btn_other_about.set_tooltip ("About NeuralBlender");
@@ -1480,11 +1478,13 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
 
 void c_neuralblender_ui::destroy () { CP
   if (ui_ready)
-    if (tk_app.backend)
-      tk_app.backend->shutdown_app (&app);
+    if (nbtk_app.backend)
+      nbtk_app.backend->shutdown_app (&app);
 
   memset (&app, 0, sizeof (app));
   display = NULL;
+  nbtk_app.native_app = NULL;
+  nbtk_app.display = NULL;
   window = 0;
   mainwindow.widget = NULL;
   mainwindow.window = 0;
@@ -2008,9 +2008,9 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
   const float scale_db = p.vu_scale_db <= 0.0f ? p.vu_scale_db : DEFAULT_VU_DB;
   const float headroom_db = std::clamp (p.vu_headroom_db, 0.0f, 12.0f);
 
-  tk_app.show_tooltips = p.show_tooltips;
-  if (!tk_app.show_tooltips)
-    tk_app.hide_tooltip ();
+  nbtk_app.show_tooltips = p.show_tooltips;
+  if (!nbtk_app.show_tooltips)
+    nbtk_app.hide_tooltip ();
 
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     meter_in [bank].set_db_scale (scale_db);
@@ -2058,10 +2058,12 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
 }
 
 void c_neuralblender_ui::apply_prefs (t_prefs &p) { CP
+  calib_default = p.calib_default;
   apply_ui_prefs (p);
 }
 
 void c_neuralblender_ui::write_prefs_to (t_prefs &p) { CP
+  p.calib_default = calib_default;
 }
 
 // called from lv2_ui - runs in UI thread
@@ -2280,17 +2282,17 @@ int c_neuralblender_ui::idle () {
     pending_resize_h = 0;
   }
 
-  if (tk_app.backend)
-    tk_app.backend->run_events (&app);
+  if (nbtk_app.backend)
+    nbtk_app.backend->run_events (&app);
 
-  tk_app.tick ();
+  nbtk_app.tick ();
 
   redraw_visible_meters ();
   
   redraw_tuner_if_needed ();
 
-  if (tk_app.backend)
-    tk_app.backend->flush_dirty (&app);
+  if (nbtk_app.backend)
+    nbtk_app.backend->flush_dirty (&app);
 
   //static c_printfps fps ("UI idle: ");
   //fps.tick ();
