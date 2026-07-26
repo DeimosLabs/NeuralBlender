@@ -32,18 +32,21 @@ uint64_t get_unique_id () {
   return current++;
 }
 
-static int tk_key_from_xkey (XKeyEvent *key);
-static const t_statecolors &colors_for (_widget_style style, _widget_state state);
 static cairo_surface_t *get_knob_image_surface ();
 static bool draw_nbtk_knob_image (
     cairo_t *cr,
     double x,
     double y,
     double size);
+
+namespace nbtk {
+static int tk_key_from_xkey (XKeyEvent *key);
+static const t_statecolors &colors_for (_widget_style style, nbtk::_widget_state state);
 static void set_x11_window_background (
-    nbtk::t_native_widget *w,
-    const t_gradientcolors &colors);
-static void disable_x11_window_background (nbtk::t_native_widget *w);
+    t_native_widget *w,
+    const nbtk::t_gradientcolors &colors);
+static void disable_x11_window_background (t_native_widget *w);
+}
 
 static cairo_surface_t *g_knob_image_surface = NULL;
 
@@ -219,9 +222,9 @@ public:
 
   void set_window_background (
       t_native_handle handle,
-      const t_gradientcolors &colors) override {
+      const nbtk::t_gradientcolors &colors) override {
     nbtk::t_native_widget *widget = as_native_widget (handle);
-    set_x11_window_background (widget, colors);
+    nbtk::set_x11_window_background (widget, colors);
   }
 
   void disable_window_background (t_native_handle handle) override {
@@ -299,7 +302,7 @@ public:
         std::max (1, (int) (h * hdpi)));
   }
 
-  void set_mouse_cursor (t_native_handle handle, _mouse_cursor cursor) override {
+  void set_mouse_cursor (t_native_handle handle, nbtk::_mouse_cursor cursor) override {
     nbtk::t_native_widget *widget = as_native_widget (handle);
     if (!widget || !widget->app || !widget->app->dpy)
       return;
@@ -643,7 +646,7 @@ void c_widget::clear_hover_tree () {
 }
 
 c_frame::c_frame () {
-  corner_radius = UI_FRAME_RADIUS;
+  corner_radius = NBTK_FRAME_RADIUS;
 }
 
 void c_frame::draw (cairo_t *cr) {
@@ -798,7 +801,7 @@ static void tk_draw_surface_scaled (
 c_button::c_button () {
   wants_mouse = true;
   wants_hover = true;
-  corner_radius = UI_BUTTON_RADIUS;
+  corner_radius = NBTK_BUTTON_RADIUS;
 }
 
 c_button::~c_button () {
@@ -815,14 +818,14 @@ cairo_surface_t *c_button::image_for_state () const {
   return img_off;
 }
 
-static _widget_state tk_button_state (const c_button &button) {
+static nbtk::_widget_state tk_button_state (const c_button &button) {
   if (button.pressed && button.hovered) return WSTATE_DOWN_HOVER;
   if (button.pressed)                   return WSTATE_DOWN;
   if (!button.value && button.hovered)  return WSTATE_OFF_HOVER;
   if (button.value && button.hovered)   return WSTATE_ON_HOVER;
-  if (button.hovered)                   return WSTATE_HOVER;
-  if (button.value)                     return WSTATE_ON;
-  return WSTATE_OFF;
+  if (button.hovered)                   return nbtk::WSTATE_HOVER;
+  if (button.value)                     return nbtk::WSTATE_ON;
+  return nbtk::WSTATE_OFF;
 }
 
 void c_button::destroy_images () {
@@ -978,7 +981,7 @@ bool c_button::set_value (bool value_) {
 c_checkbox::c_checkbox () {
   is_toggle = true;
   align = TEXT_LEFT;
-  corner_radius = UI_CHECKBOX_RADIUS;
+  corner_radius = NBTK_CHECKBOX_RADIUS;
 }
 
 void c_checkbox::draw (cairo_t *cr) {
@@ -987,7 +990,7 @@ void c_checkbox::draw (cairo_t *cr) {
 
   const t_statecolors &colors = colors_for (
       WSTYLE_CHECKBOX,
-      enabled ? (value ? WSTATE_ON : WSTATE_OFF) : WSTATE_DISABLED);
+      enabled ? (value ? nbtk::WSTATE_ON : nbtk::WSTATE_OFF) : nbtk::WSTATE_DISABLED);
   const int box = std::max (24, std::min (h - 4, 24));
   const int bx = 2;
   const int by = (h - box) / 2;
@@ -1035,7 +1038,7 @@ void c_checkbox::draw (cairo_t *cr) {
 c_scrollbar::c_scrollbar () {
   wants_mouse = true;
   wants_hover = true;
-  corner_radius = UI_SCROLLBAR_RADIUS;
+  corner_radius = NBTK_SCROLLBAR_RADIUS;
 }
 
 bool c_scrollbar::set_value (float value_, bool notify) {
@@ -1107,11 +1110,11 @@ void c_scrollbar::draw (cairo_t *cr) {
   if (!cr)
     return;
 
-  const t_statecolors &frame = colors_for (WSTYLE_FRAME, WSTATE_NORMAL);
+  const t_statecolors &frame = colors_for (WSTYLE_FRAME, nbtk::WSTATE_NORMAL);
   const t_statecolors &thumb = colors_for (
     WSTYLE_BUTTON,
-    pressed ? WSTATE_DOWN : hovered ? WSTATE_HOVER : WSTATE_NORMAL);
-  const t_gradientcolors &bg = get_colortheme ()->window_bg;
+    pressed ? WSTATE_DOWN : hovered ? nbtk::WSTATE_HOVER : nbtk::WSTATE_NORMAL);
+  const nbtk::t_gradientcolors &bg = nbtk::get_colortheme ()->window_bg;
 
   tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   cairo_set_source_rgba (cr, bg.r1, bg.g1, bg.b1, bg.a1);
@@ -1214,7 +1217,7 @@ void c_container::draw (cairo_t *cr) {
   if (!cr)
     return;
 
-  const t_gradientcolors &bg = get_colortheme ()->window_bg;
+  const nbtk::t_gradientcolors &bg = nbtk::get_colortheme ()->window_bg;
   cairo_set_source_rgba (cr, bg.r1, bg.g1, bg.b1, bg.a1);
   cairo_rectangle (cr, 0, 0, w, h);
   cairo_fill (cr);
@@ -1324,7 +1327,7 @@ void c_container::on_action (t_action_event &event) {
 c_listbox::c_listbox () {
   wants_mouse = true;
   wants_hover = true;
-  corner_radius = UI_LIST_RADIUS;
+  corner_radius = NBTK_LIST_RADIUS;
 }
 
 void c_listbox::clear () {
@@ -1493,11 +1496,11 @@ void c_listbox::draw (cairo_t *cr) {
   static cairo_surface_t *file_icon =
     cairo_image_surface_create_from_stream (data_icon_picker_file_png);
 
-  const t_statecolors &frame = colors_for (WSTYLE_FRAME, WSTATE_NORMAL);
-  const t_statecolors &sel = colors_for (WSTYLE_BUTTON, WSTATE_ON);
-  const t_statecolors &hover = colors_for (WSTYLE_BUTTON, WSTATE_HOVER);
-  const t_gradientcolors &bg = get_colortheme ()->window_bg;
-  const t_gradientcolors outline = {
+  const t_statecolors &frame = colors_for (WSTYLE_FRAME, nbtk::WSTATE_NORMAL);
+  const t_statecolors &sel = colors_for (WSTYLE_BUTTON, nbtk::WSTATE_ON);
+  const t_statecolors &hover = colors_for (WSTYLE_BUTTON, nbtk::WSTATE_HOVER);
+  const nbtk::t_gradientcolors &bg = nbtk::get_colortheme ()->window_bg;
+  const nbtk::t_gradientcolors outline = {
     frame.fg.r2, frame.fg.g2, frame.fg.b2, frame.fg.a2,
     frame.fg.r1, frame.fg.g1, frame.fg.b1, frame.fg.a1
   };
@@ -1576,9 +1579,9 @@ bool c_listbox::on_mouse_down (int x_, int y_, int button) { CP
   last_mouse_button = button;
 
   if (button == Button4)
-    return scroll_to (first_visible - UI_MOUSEWHEEL_ROWS) || true;
+    return scroll_to (first_visible - NBTK_MOUSEWHEEL_ROWS) || true;
   if (button == Button5)
-    return scroll_to (first_visible + UI_MOUSEWHEEL_ROWS) || true;
+    return scroll_to (first_visible + NBTK_MOUSEWHEEL_ROWS) || true;
 
   c_widget::on_mouse_down (x_, y_, button);
   if (button != Button1)
@@ -1596,7 +1599,7 @@ bool c_listbox::on_mouse_down (int x_, int y_, int button) { CP
     mouse_activate_pending = true;
   } else if (was_selected) {
     const bool double_click = activate_on_doubleclick &&
-      now - last_click_ms < UI_DOUBLECLICK_MS;
+      now - last_click_ms < NBTK_DOUBLECLICK_MS;
     mouse_activate_pending = activate_on_click_again || double_click;
   }
   set_selected (index, true);
@@ -1610,9 +1613,9 @@ bool c_listbox::on_mouse_up (int x_, int y_, int button) { CP
   last_mouse_button = button;
 
   if (button == Button4)
-    return scroll_to (first_visible - UI_MOUSEWHEEL_ROWS) || true;
+    return scroll_to (first_visible - NBTK_MOUSEWHEEL_ROWS) || true;
   if (button == Button5)
-    return scroll_to (first_visible + UI_MOUSEWHEEL_ROWS) || true;
+    return scroll_to (first_visible + NBTK_MOUSEWHEEL_ROWS) || true;
 
   c_widget::on_mouse_up (x_, y_, button);
   if (button != Button1)
@@ -1661,7 +1664,7 @@ bool c_listbox::on_key_down (int key) {
 c_combobox::c_combobox () {
   wants_mouse = true;
   wants_hover = true;
-  corner_radius = UI_COMBOBOX_RADIUS;
+  corner_radius = NBTK_COMBOBOX_RADIUS;
 }
 
 c_combobox::~c_combobox () = default;
@@ -1686,7 +1689,7 @@ void c_combobox::draw (cairo_t *cr) {
 
   const t_statecolors &colors = colors_for (
       WSTYLE_BUTTON,
-      pressed ? WSTATE_DOWN : hovered ? WSTATE_HOVER : WSTATE_NORMAL);
+      pressed ? WSTATE_DOWN : hovered ? nbtk::WSTATE_HOVER : nbtk::WSTATE_NORMAL);
 
   tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   tk_set_gradient (cr, h, colors.bg);
@@ -1911,7 +1914,7 @@ void c_combobox::show_list () {
       listbox.set_vscrollbar (&vscrollbar);
 
       vscrollbar.create (
-          &popup->root, "", w, 0, UI_SCROLLBAR_WIDTH, dropdown_row_height);
+          &popup->root, "", w, 0, NBTK_SCROLLBAR_WIDTH, dropdown_row_height);
       vscrollbar.set_container (&listbox);
       vscrollbar.set_orientation (SCROLLBAR_VERTICAL);
     }
@@ -1967,7 +1970,7 @@ void c_combobox::sync_list_geometry () {
   listbox.row_height = dropdown_row_height;
   const int popup_h = rows * dropdown_row_height;
   const bool needs_scroll = (int) items.size () > rows;
-  const int scroll_w = needs_scroll ? UI_SCROLLBAR_WIDTH : 0;
+  const int scroll_w = needs_scroll ? NBTK_SCROLLBAR_WIDTH : 0;
   listbox.move_resize (0, 0, std::max (1, w - scroll_w), popup_h);
   vscrollbar.move_resize (
       std::max (1, w - scroll_w), 0, std::max (1, scroll_w), popup_h);
@@ -2182,7 +2185,7 @@ void c_knob::draw (cairo_t *cr) {
 
   const t_statecolors &colors = colors_for (
     WSTYLE_BUTTON,
-    pressed ? WSTATE_DOWN : hovered ? WSTATE_HOVER : WSTATE_NORMAL);
+    pressed ? WSTATE_DOWN : hovered ? nbtk::WSTATE_HOVER : nbtk::WSTATE_NORMAL);
 
   const int label_h = label.empty () ? 0 :
     std::max (14, (int) (size * font_multiplier () + 4));
@@ -2359,7 +2362,7 @@ c_textbox::c_textbox () {
   wants_mouse = true;
   wants_hover = true;
   align = TEXT_LEFT;
-  corner_radius = UI_TEXTBOX_RADIUS;
+  corner_radius = NBTK_TEXTBOX_RADIUS;
 }
 
 void c_textbox::draw (cairo_t *cr) {
@@ -2367,9 +2370,9 @@ void c_textbox::draw (cairo_t *cr) {
     return;
 
   const bool focused = app && app->focused_widget == this;
-  const t_statecolors &normal_colors = colors_for (WSTYLE_BUTTON, WSTATE_NORMAL);
-  const t_statecolors &textbox_colors = colors_for (WSTYLE_FRAME, WSTATE_NORMAL);
-  const t_statecolors &focus_colors = colors_for (WSTYLE_FRAME, WSTATE_SELECTED);
+  const t_statecolors &normal_colors = colors_for (WSTYLE_BUTTON, nbtk::WSTATE_NORMAL);
+  const t_statecolors &textbox_colors = colors_for (WSTYLE_FRAME, nbtk::WSTATE_NORMAL);
+  const t_statecolors &focus_colors = colors_for (WSTYLE_FRAME, nbtk::WSTATE_SELECTED);
 
   tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   tk_set_gradient (cr, h, textbox_colors.bg);
@@ -2538,13 +2541,13 @@ void c_textbox::emit_action () {
   on_action (event);
 }
 
-void c_button::set_image (const unsigned char *pngdata, _widget_state which) {
+void c_button::set_image (const unsigned char *pngdata, nbtk::_widget_state which) {
   cairo_surface_t **csp = nullptr;
 
   switch (which) {
-    case WSTATE_OFF:        csp = &img_off; break;
-    case WSTATE_ON:         csp = &img_on; break;
-    case WSTATE_HOVER:      csp = &img_hover; break;
+    case nbtk::WSTATE_OFF:        csp = &img_off; break;
+    case nbtk::WSTATE_ON:         csp = &img_on; break;
+    case nbtk::WSTATE_HOVER:      csp = &img_hover; break;
     case WSTATE_DOWN:       csp = &img_down; break;
     case WSTATE_DOWN_HOVER: csp = &img_down_hover; break;
     case WSTATE_OFF_HOVER:  csp = &img_off_hover; break;
@@ -2554,9 +2557,9 @@ void c_button::set_image (const unsigned char *pngdata, _widget_state which) {
       csp = &img_default;
     break;
     case WSTATE_ALL:
-      set_image (pngdata, WSTATE_OFF);
-      set_image (pngdata, WSTATE_ON);
-      set_image (pngdata, WSTATE_HOVER);
+      set_image (pngdata, nbtk::WSTATE_OFF);
+      set_image (pngdata, nbtk::WSTATE_ON);
+      set_image (pngdata, nbtk::WSTATE_HOVER);
       set_image (pngdata, WSTATE_DOWN);
       set_image (pngdata, WSTATE_DOWN_HOVER);
       set_image (pngdata, WSTATE_OFF_HOVER);
@@ -3056,7 +3059,7 @@ void c_app::invalidate_rect (int x, int y, int w, int h) {
     main_window->invalidate_rect (x, y, w, h);
 }
 
-void c_app::set_mouse_cursor (_mouse_cursor cursor) {
+void c_app::set_mouse_cursor (nbtk::_mouse_cursor cursor) {
   (void) cursor;
 }
 
@@ -3292,7 +3295,7 @@ t_point c_nativewindow::screen_to_local (t_point p) const {
   return p;
 }
 
-void c_toplevelwindow::on_close () {
+void c_basetoplevelwindow::on_close () {
   hide ();
 }
 
@@ -3344,7 +3347,7 @@ void c_popupwindow::create_native_for_owner (
   os_set_window_attrb (w);
   os_set_transient_for_hint (native_owner, w);
   if (app && app->backend)
-    app->backend->set_window_background (widget, get_colortheme ()->window_bg);
+    app->backend->set_window_background (widget, nbtk::get_colortheme ()->window_bg);
   w->func.expose_callback = c_popupwindow::cb_expose;
   w->func.button_press_callback = c_popupwindow::cb_button_press;
   w->func.button_release_callback = c_popupwindow::cb_button_release;
@@ -3688,7 +3691,7 @@ void c_tooltip::set_text (const char *text) {
   const char *str = text ? text : "";
   if (!frame.id) {
     frame.create (&root, "", 0, 0, 1, 1);
-    frame.corner_radius = UI_TOOLTIP_RADIUS;
+    frame.corner_radius = NBTK_TOOLTIP_RADIUS;
     label.create (&frame, "", 6, 3, 1, 1);
     label.align = TEXT_LEFT;
     label.size = 11.0f;
@@ -3741,24 +3744,22 @@ void c_tooltip::set_text (const char *text) {
 
 } // namespace nbtk
 
-static const char *cwd_config_key_for_bank (uint64_t bank) {
-  return bank == BANK_CAB ? CONFIG_KEY_NAME_IR_CWD : CONFIG_KEY_NAME_MODEL_CWD;
-}
+namespace nbtk {
 
-static constexpr t_gradientcolors grad (
+static constexpr nbtk::t_gradientcolors grad (
     float r1, float g1, float b1, float a1,
     float r2, float g2, float b2, float a2) {
   return { r1, g1, b1, a1, r2, g2, b2, a2 };
 }
 
-static constexpr t_gradientcolors solid (
+static constexpr nbtk::t_gradientcolors solid (
     float r, float g, float b, float a = 1.0f) {
   return grad (r, g, b, a, r, g, b, a);
 }
 
 static constexpr t_statecolors sc (
-    t_gradientcolors bg,
-    t_gradientcolors fg) {
+    nbtk::t_gradientcolors bg,
+    nbtk::t_gradientcolors fg) {
   return { bg, fg };
 }
 
@@ -3824,15 +3825,15 @@ const t_colortheme *get_colortheme () {
 
 static const t_statecolors &control_colors_for_state (
     const t_controlcolors &colors,
-    _widget_state state) {
+    nbtk::_widget_state state) {
 
   switch (state) {
-    case WSTATE_HOVER:
+    case nbtk::WSTATE_HOVER:
     case WSTATE_OFF_HOVER:
       return colors.hover;
 
-    case WSTATE_ON:
-    case WSTATE_SELECTED:
+    case nbtk::WSTATE_ON:
+    case nbtk::WSTATE_SELECTED:
       return colors.on;
 
     case WSTATE_ON_HOVER:
@@ -3842,28 +3843,28 @@ static const t_statecolors &control_colors_for_state (
     case WSTATE_DOWN_HOVER:
       return colors.down;
 
-    case WSTATE_DISABLED:
+    case nbtk::WSTATE_DISABLED:
       return colors.disabled;
 
-    case WSTATE_OFF:
-    case WSTATE_NORMAL:
+    case nbtk::WSTATE_OFF:
+    case nbtk::WSTATE_NORMAL:
     default:
       return colors.normal;
   }
 }
 
-static const t_statecolors &frame_colors_for_state (_widget_state state) {
+static const t_statecolors &frame_colors_for_state (nbtk::_widget_state state) {
   switch (state) {
-    case WSTATE_SELECTED:
-    case WSTATE_HOVER:
+    case nbtk::WSTATE_SELECTED:
+    case nbtk::WSTATE_HOVER:
       return g_colors->frame_selected;
 
-    case WSTATE_DISABLED:
-    case WSTATE_OFF:
+    case nbtk::WSTATE_DISABLED:
+    case nbtk::WSTATE_OFF:
       return g_colors->frame_disabled;
 
-    case WSTATE_NORMAL:
-    case WSTATE_ON:
+    case nbtk::WSTATE_NORMAL:
+    case nbtk::WSTATE_ON:
     default:
       return g_colors->frame_normal;
   }
@@ -3871,7 +3872,7 @@ static const t_statecolors &frame_colors_for_state (_widget_state state) {
 
 static const t_statecolors &colors_for (
     _widget_style style,
-    _widget_state state) {
+    nbtk::_widget_state state) {
 
   switch (style) {
     case WSTYLE_FRAME:
@@ -3937,7 +3938,7 @@ static cairo_pattern_t *create_vertical_gradient (
     int x,
     int y,
     int h,
-    const t_gradientcolors &colors) {
+    const nbtk::t_gradientcolors &colors) {
 
   cairo_pattern_t *pat = cairo_pattern_create_linear (x, y, x, y + h);
   cairo_pattern_add_color_stop_rgba (
@@ -3947,19 +3948,19 @@ static cairo_pattern_t *create_vertical_gradient (
   return pat;
 }
 
-static c_toplevelwindow *toplevel_from_widget (void *w_) {
+static c_native_toplevelwindow *toplevel_from_widget (void *w_) {
   nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   if (!w || !w->parent_struct)
     return NULL;
 
-  return (c_toplevelwindow *) w->parent_struct;
+  return (c_native_toplevelwindow *) w->parent_struct;
 }
 
-static c_toplevelwindow *toplevel_from_child_widget (nbtk::t_native_widget *w) {
+static c_native_toplevelwindow *toplevel_from_child_widget (nbtk::t_native_widget *w) {
   while (w && w->parent) {
     nbtk::t_native_widget *parent_widget = (nbtk::t_native_widget *) w->parent;
     if ((parent_widget->flags & IS_WINDOW) && parent_widget->parent_struct)
-      return (c_toplevelwindow *) parent_widget->parent_struct;
+      return (c_native_toplevelwindow *) parent_widget->parent_struct;
 
     w = parent_widget;
   }
@@ -3996,7 +3997,7 @@ void tk_path_rounded_rect (
 void tk_set_gradient (
     cairo_t *cr,
     double h,
-    const t_gradientcolors &colors) {
+    const nbtk::t_gradientcolors &colors) {
 
   if (!cr)
     return;
@@ -4027,7 +4028,7 @@ static void fill_rounded_rect (
     int width,
     int height,
     float radius,
-    const t_gradientcolors &colors) {
+    const nbtk::t_gradientcolors &colors) {
 
   if (!w || !w->crb || width <= 0 || height <= 0)
     return;
@@ -4042,12 +4043,12 @@ static void fill_rounded_rect (
 static void fill_rounded_rect (
     nbtk::t_native_widget *w,
     float radius,
-    const t_gradientcolors &colors) {
+    const nbtk::t_gradientcolors &colors) {
   int x = 0, y = 0, width = 0, height = 0;
   if (!get_widget_size (w, &x, &y, &width, &height))
     return;
 
-  fill_rounded_rect (w, x, y, width, height, radius, colors);
+  nbtk::fill_rounded_rect (w, x, y, width, height, radius, colors);
 }
 
 static void draw_rounded_rect (
@@ -4057,7 +4058,7 @@ static void draw_rounded_rect (
     int width,
     int height,
     float radius,
-    const t_gradientcolors &colors,
+    const nbtk::t_gradientcolors &colors,
     float line_width) {
 
   if (!w || !w->crb || width <= 0 || height <= 0)
@@ -4083,7 +4084,7 @@ static void draw_rounded_rect (
 static void draw_rounded_rect (
     nbtk::t_native_widget *w,
     float radius,
-    const t_gradientcolors &colors,
+    const nbtk::t_gradientcolors &colors,
     float line_width) {
   int x = 0, y = 0, width = 0, height = 0;
   if (!get_widget_size (w, &x, &y, &width, &height))
@@ -4092,80 +4093,9 @@ static void draw_rounded_rect (
   draw_rounded_rect (w, x, y, width, height, radius, colors, line_width);
 }
 
-static void draw_check_mark (
-    nbtk::t_native_widget *w,
-    int x,
-    int y,
-    int width,
-    int height,
-    const t_gradientcolors &colors) {
-
-  if (!w || !w->crb || width <= 0 || height <= 0)
-    return;
-
-  cairo_save (w->crb);
-  cairo_set_source_rgba (w->crb, colors.r1, colors.g1, colors.b1, colors.a1);
-  cairo_set_line_width (w->crb, std::max (2.0, width * 0.16));
-  cairo_set_line_cap (w->crb, CAIRO_LINE_CAP_ROUND);
-  cairo_set_line_join (w->crb, CAIRO_LINE_JOIN_ROUND);
-
-  cairo_move_to (
-      w->crb,
-      x + width * 0.23,
-      y + height * 0.52);
-  cairo_line_to (
-      w->crb,
-      x + width * 0.43,
-      y + height * 0.72);
-  cairo_line_to (
-      w->crb,
-      x + width * 0.78,
-      y + height * 0.28);
-  cairo_stroke (w->crb);
-  cairo_restore (w->crb);
-}
-
-static void draw_checkbox (
-    nbtk::t_native_widget *w,
-    const t_statecolors &colors,
-    bool checked) {
-
-  int x = 0, y = 0, width = 0, height = 0;
-  if (!get_widget_size (w, &x, &y, &width, &height))
-    return;
-
-  const int size = std::max (4, height - 6);
-  const int cx = x + 3;
-  const int cy = y + (height - size) / 2;
-  const c_widget *widget = w->parent_struct ?
-    (const c_widget *) w->parent_struct : nullptr;
-  const float radius = widget ?
-    (float) widget->corner_radius : (float) UI_CHECKBOX_RADIUS;
-
-  //fill_rounded_rect (w, x, y, width, height, 0.0f, g_colors->window_bg);
-  fill_rounded_rect (w, cx, cy, size, size, radius, colors.bg);
-  draw_rounded_rect (w, cx, cy, size, size, radius, colors.fg, 2.0f);
-
-  if (checked)
-    draw_check_mark (w, cx, cy, size, size, colors.fg);
-
-	  const char *label = w->label ? w->label : "";
-	  if (label [0] && width > size + 8) {
-	    cairo_text_extents_t ext;
-	    use_text_color_scheme (w, NORMAL_);
-	    cairo_set_font_size (w->crb, w->app->normal_font / w->scale.ascale);
-	    cairo_text_extents (w->crb, label, &ext);
-    cairo_move_to (
-        w->crb,
-        cx + size + 8 - ext.x_bearing,
-        y + (height - ext.height) * 0.5 - ext.y_bearing);
-    cairo_show_text (w->crb, label);
-  }
-}
-
 unsigned long x11_color_pixel (
     Display *display,
-    const t_gradientcolors &colors) {
+    const nbtk::t_gradientcolors &colors) {
 
   if (!display)
     return 0;
@@ -4188,7 +4118,7 @@ unsigned long x11_color_pixel (
 
 void set_x11_window_background (
     nbtk::t_native_widget *w,
-    const t_gradientcolors &colors) {
+    const nbtk::t_gradientcolors &colors) {
 
   if (!w || !w->app || !w->app->dpy || !w->widget)
     return;
@@ -4205,269 +4135,16 @@ void disable_x11_window_background (nbtk::t_native_widget *w) {
   XSetWindowBackgroundPixmap (w->app->dpy, w->widget, None);
 }
 
+} // namespace nbtk
+
 void cb_dummy (void *w_, void* user_data) {}
 
-////////////////////////////////////////////////////////////////////////////////
-// c_widget
-
-// this one must be called AFTER add_* (nbtk::t_native_widget *, ...) in child create functions
-void c_widget::create (
-    c_neuralblender_ui *ui_,
-    nbtk::t_native_widget *parent,
-    const char *label_,
-    int x, int y, int w, int h) {
-
-  debug ("label_='%s'", label_);
-  id = get_unique_id ();
-  label = label_ ? label_ : "";
-  ui = ui_;
-  if (!ui) { debug ("!ui"); }
-  if (!widget) {
-    debug ("!widget");
-    return;
-  }
-  add_tooltip (widget, ""); // creates initial tooltip
-  set_tooltip ("");         // our function below hides it
-  set_x11_window_background (widget, bg_colors ? *bg_colors : g_colors->window_bg);
-  widget->flags |= USE_TRANSPARENCY /*| DONT_PROPAGATE*/;
-
-  // no callback func because it would overwrite the ones from
-  // child widget classes if they call this func. after their own
-
-  widget->scale.gravity = NONE;
-  widget->parent_struct = this;
-  widget->label = label.c_str ();
-  
-  created = true;
-}
-
-bool c_widget::set_label (const char *label_) {
-  label = label_ ? label_ : "";
-  if (!widget)
-    return false;
-
-  widget->label = label.c_str ();
-  expose ();
-  return true;
-}
-
-bool c_widget::set_tooltip (const char *tt) {
-  tooltip = tt ? tt : "";
-  
-  if (!widget)
-    return false;
-  
-  if (tooltip.empty ()) {
-    widget->flags &= ~HAS_TOOLTIP;
-    return false;
-  } else {
-    tooltip_set_text (widget, tooltip.c_str ());
-    widget->flags |= HAS_TOOLTIP;
-    return true;
-  }
-}
-
-bool c_widget::on_keydown (XKeyEvent *key) { CP
-  (void) key;
-  return false;
-}
-
-bool c_widget::on_keyup (XKeyEvent *key) { CP
-  (void) key;
-  return false;
-}
-
-void c_widget::show () {
-  if (widget) widget_show (widget);
-}
-
-void c_widget::hide () {
-  if (widget) widget_hide (widget);
-}
-
-void c_widget::focus () {
-  c_toplevelwindow *top = toplevel_from_child_widget (widget);
-  if (top)
-    top->set_focused_widget (this);
-}
-
-void c_widget::clear_focus () {
-  c_toplevelwindow *top = toplevel_from_child_widget (widget);
-  if (top)
-    top->clear_focus ();
-}
-
-void c_widget::on_focus_lost () {
-}
-
-void c_widget::set_state (_widget_state state_) {
-  wstate = state_;
-  expose ();
-}
-
-void c_widget::expose () {
-  if (widget)
-    expose_widget (widget);
-}
-
-const t_gradientcolors *c_widget::bg_override_for_state (
-    _widget_state state) const {
-
-  switch (state) {
-    case WSTATE_SELECTED:
-    case WSTATE_HOVER:
-      return highlight_bg_colors;
-
-    case WSTATE_DISABLED:
-    case WSTATE_OFF:
-      return disabled_bg_colors;
-
-    case WSTATE_NORMAL:
-    case WSTATE_ON:
-    default:
-      return active_bg_colors;
-  }
-}
-
-const t_gradientcolors *c_widget::fg_override_for_state (
-    _widget_state state) const {
-
-  switch (state) {
-    case WSTATE_SELECTED:
-    case WSTATE_HOVER:
-      return highlight_fg_colors;
-
-    case WSTATE_DISABLED:
-    case WSTATE_OFF:
-      return disabled_fg_colors;
-
-    case WSTATE_NORMAL:
-    case WSTATE_ON:
-    default:
-      return active_fg_colors;
-  }
-}
-
-bool c_widget::get_label_size (int *rw, int *rh, const char *text) {
-  if (rw) *rw = 0;
-  if (rh) *rh = 0;
-
-  if (!widget || !widget->crb || !widget->app)
-    return false;
-
-  const char *s = text ? text : label.c_str ();
-  if (!s)
-    s = "";
-
-  float fontsize = widget->app->normal_font / widget->scale.ascale;
-  fontsize *= text_size;
-
-  cairo_save (widget->crb);
-  cairo_set_font_size (widget->crb, fontsize);
-
-  cairo_text_extents_t ext;
-  cairo_text_extents (widget->crb, s, &ext);
-  cairo_restore (widget->crb);
-
-  if (rw)
-    *rw = (int) std::ceil (ext.width);
-  if (rh)
-    *rh = (int) std::ceil (ext.height);
-
-  return true;
-}
-
-// -1 for padding x/y means stay at that size
-void c_widget::shrinkwrap (int padding_x, int padding_y) {
-  int lw, lh;
-  if (get_label_size (&lw, &lh)) {
-    if (padding_x < 0)
-      lw = w ();
-    if (padding_y < 0)
-      lh = h ();
-    
-    resize (lw + padding_x + 1, lh + padding_y + 1);
-  }
-}
-
-int c_widget::x () {
-  if (!widget || !widget->app)
-    return 0;
-
-  return (int) (widget->scale.init_x / widget->app->hdpi);
-}
-
-int c_widget::y () {
-  if (!widget || !widget->app)
-    return 0;
-
-  return (int) (widget->scale.init_y / widget->app->hdpi);
-}
-
-int c_widget::w () {
-  if (!widget || !widget->app)
-    return 0;
-
-  return (int) (widget->scale.init_width / widget->app->hdpi);
-}
-
-int c_widget::h () {
-  if (!widget || !widget->app)
-    return 0;
-
-  return (int) (widget->scale.init_height / widget->app->hdpi);
-}
-
-void c_widget::move_resize (int x, int y, int w, int h) {
-  move (x, y);
-  resize (w, h);
-}
-
-void c_widget::move (int x, int y) {
-  if (!widget)
-    return;
-
-  const int sx = x * widget->app->hdpi;
-  const int sy = y * widget->app->hdpi;
-
-  if (widget->scale.init_x == sx && widget->scale.init_y == sy) {
-    //expose ();
-    return;
-  }
-
-  widget->x = sx;
-  widget->y = sy;
-  widget->scale.init_x = sx;
-  widget->scale.init_y = sy;
-
-  os_move_window (widget->app->dpy, widget, sx, sy);
-  //expose ();
-}
-
-void c_widget::resize (int w, int h) {
-  if (!widget)
-    return;
-
-  const int sw = std::max (1, (int) (w * widget->app->hdpi));
-  const int sh = std::max (1, (int) (h * widget->app->hdpi));
-
-  if (widget->scale.init_width == sw && widget->scale.init_height == sh) {
-    //expose ();
-    return;
-  }
-
-  widget->scale.init_width = sw;
-  widget->scale.init_height = sh;
-
-  os_resize_window (widget->app->dpy, widget, sw, sh);
-  //widget->func.configure_callback (widget, NULL);
-  //expose ();
-}
+namespace nbtk {
 
 ////////////////////////////////////////////////////////////////////////////////
-// c_toplevelwindow / c_mainwindow
+// c_native_toplevelwindow / c_toplevelwindow
 
-bool c_toplevelwindow::create (
+bool c_native_toplevelwindow::create (
     c_neuralblender_ui *ui_,
     nbtk::t_native_window parent_,
     const char *title_,
@@ -4495,12 +4172,12 @@ bool c_toplevelwindow::create (
   widget->parent_struct = this;
   widget->label = label.c_str ();
   widget->scale.gravity = NONE;
-  widget->func.resize_notify_callback = c_toplevelwindow::cb_resize;
+  widget->func.resize_notify_callback = c_native_toplevelwindow::cb_resize;
   widget->func.configure_notify_callback =
-      c_toplevelwindow::cb_configure_notify;
-  widget->func.expose_callback = c_toplevelwindow::cb_expose;
-  widget->func.key_press_callback = c_toplevelwindow::cb_key_press;
-  widget->func.unmap_notify_callback = c_toplevelwindow::cb_close;
+      c_native_toplevelwindow::cb_configure_notify;
+  widget->func.expose_callback = c_native_toplevelwindow::cb_expose;
+  widget->func.key_press_callback = c_native_toplevelwindow::cb_key_press;
+  widget->func.unmap_notify_callback = c_native_toplevelwindow::cb_close;
 
   os_register_wm_delete_window (widget);
   auto_close (true);
@@ -4509,57 +4186,56 @@ bool c_toplevelwindow::create (
     os_set_transient_for_hint (owner, widget);
   set_title (title_);
   if (ui && ui->tk_app.backend)
-    ui->tk_app.backend->set_window_background (widget, get_colortheme ()->window_bg);
+    ui->tk_app.backend->set_window_background (widget, nbtk::get_colortheme ()->window_bg);
   else
-    set_x11_window_background (widget, get_colortheme ()->window_bg);
+    nbtk::set_x11_window_background (widget, nbtk::get_colortheme ()->window_bg);
 
   return true;
 }
 
-void c_toplevelwindow::cb_expose (void *w_, void *user_data) {
+void c_native_toplevelwindow::cb_expose (void *w_, void *user_data) {
   (void) user_data;
 
-  c_toplevelwindow *window = toplevel_from_widget (w_);
+  c_native_toplevelwindow *window = nbtk::toplevel_from_widget (w_);
   if (!window)
     return;
 
   window->on_expose ();
 }
 
-void c_toplevelwindow::cb_resize (void *w_, void *user_data) {
+void c_native_toplevelwindow::cb_resize (void *w_, void *user_data) {
   (void) user_data;
 
-  c_toplevelwindow *window = toplevel_from_widget (w_);
+  c_native_toplevelwindow *window = nbtk::toplevel_from_widget (w_);
   if (!window)
     return;
 
   window->on_resize ();
 }
 
-void c_toplevelwindow::cb_configure_notify (void *w_, void *user_data) {
+void c_native_toplevelwindow::cb_configure_notify (void *w_, void *user_data) {
   (void) user_data;
 
-  c_toplevelwindow *window = toplevel_from_widget (w_);
+  c_native_toplevelwindow *window = nbtk::toplevel_from_widget (w_);
   if (!window)
     return;
 
   window->on_configure_notify ();
 }
 
-void c_toplevelwindow::cb_key_press (void *w_, void *event, void *user_data) {
+void c_native_toplevelwindow::cb_key_press (void *w_, void *event, void *user_data) {
   (void) user_data;
+  (void) event;
 
-  c_toplevelwindow *window = toplevel_from_widget (w_);
+  c_native_toplevelwindow *window = nbtk::toplevel_from_widget (w_);
   if (!window)
     return;
-
-  window->on_keydown ((XKeyEvent *) event);
 }
 
-void c_toplevelwindow::cb_close (void *w_, void *user_data) { CP
+void c_native_toplevelwindow::cb_close (void *w_, void *user_data) { CP
   (void) user_data;
 
-  c_toplevelwindow *window = toplevel_from_widget (w_);
+  c_native_toplevelwindow *window = nbtk::toplevel_from_widget (w_);
   if (!window)
     return;
 
@@ -4570,24 +4246,7 @@ void c_toplevelwindow::cb_close (void *w_, void *user_data) { CP
     widget->app->run = false;
 }
 
-bool c_mainwindow::create (
-    c_neuralblender_ui *ui_,
-    Window parent_,
-    const char *title_,
-    int x, int y, int w, int h,
-    nbtk::t_native_handle owner) {
-
-  if (!create_tk (ui_, &ui_->tk_app, parent_, title_, x, y, w, h, owner))
-    return false;
-
-  auto_close (false);
-  auto_hide_on_close (false);
-  auto_quit_on_close (true);
-  ui_->window = window;
-  return true;
-}
-
-void c_toplevelwindow::set_min_size_to_current () {
+void c_native_toplevelwindow::set_min_size_to_current () {
   if (!widget)
     return;
 
@@ -4599,14 +4258,14 @@ void c_toplevelwindow::set_min_size_to_current () {
       widget->scale.init_height);
 }
 
-void c_toplevelwindow::set_min_size (int w, int h) {
+void c_native_toplevelwindow::set_min_size (int w, int h) {
   if (!widget)
     return;
 
   os_set_window_min_size (widget, w, h, w, h);
 }
 
-void c_toplevelwindow::show () {
+void c_native_toplevelwindow::show () {
   if (!widget)
     return;
 
@@ -4616,7 +4275,7 @@ void c_toplevelwindow::show () {
     XFlush (widget->app->dpy);*/
 }
 
-void c_toplevelwindow::hide () {
+void c_native_toplevelwindow::hide () {
   if (!widget)
     return;
 
@@ -4624,7 +4283,7 @@ void c_toplevelwindow::hide () {
   widget_hide (widget);
 }
 
-void c_toplevelwindow::auto_close (bool b) {
+void c_native_toplevelwindow::auto_close (bool b) {
   if (!widget)
     return;
 
@@ -4634,7 +4293,7 @@ void c_toplevelwindow::auto_close (bool b) {
     widget->flags &= ~HIDE_ON_DELETE;
 }
 
-void c_toplevelwindow::set_title (const char *title_) {
+void c_native_toplevelwindow::set_title (const char *title_) {
   label = title_ ? title_ : "";
   if (!widget)
     return;
@@ -4643,14 +4302,14 @@ void c_toplevelwindow::set_title (const char *title_) {
   widget_set_title (widget, label.c_str ());
 }
 
-void c_toplevelwindow::set_icon_from_png (const unsigned char *png) {
+void c_native_toplevelwindow::set_icon_from_png (const unsigned char *png) {
   if (!widget || !png)
     return;
 
   widget_set_icon_from_png (widget, png);
 }
 
-void c_toplevelwindow::set_mouse_cursor (_mouse_cursor cursor) {
+void c_native_toplevelwindow::set_mouse_cursor (nbtk::_mouse_cursor cursor) {
   if (!widget)
     return;
 
@@ -4663,7 +4322,7 @@ void c_toplevelwindow::set_mouse_cursor (_mouse_cursor cursor) {
   fallback.set_mouse_cursor (widget, cursor);
 }
 
-bool c_toplevelwindow::request_size (int w, int h) {
+bool c_native_toplevelwindow::request_size (int w, int h) {
   if (!widget)
     return false;
 
@@ -4674,15 +4333,15 @@ bool c_toplevelwindow::request_size (int w, int h) {
   return fallback.request_size (widget, w, h);
 }
 
-bool c_toplevelwindow::is_created () const {
+bool c_native_toplevelwindow::is_created () const {
   return widget != NULL;
 }
 
-nbtk::t_native_handle c_toplevelwindow::native_handle () const {
+nbtk::t_native_handle c_native_toplevelwindow::native_handle () const {
   return widget;
 }
 
-bool c_toplevelwindow::get_metrics (int *w, int *h, bool *visible) const {
+bool c_native_toplevelwindow::get_metrics (int *w, int *h, bool *visible) const {
   if (!widget || !widget->app)
     return false;
 
@@ -4697,38 +4356,45 @@ bool c_toplevelwindow::get_metrics (int *w, int *h, bool *visible) const {
   return true;
 }
 
-void c_toplevelwindow::force_draw () {
+void c_native_toplevelwindow::force_draw () {
   if (widget)
     widget_draw (widget, NULL);
 }
 
-void c_toplevelwindow::set_focused_widget (c_widget *w) {
-  if (focused_widget == w)
-    return;
-
-  c_widget *old = focused_widget;
-  focused_widget = w;
-
-  if (widget && widget->app) {
-    if (focused_widget)
-      widget->app->key_snooper = widget;
-    else if (widget->app->key_snooper == widget)
-      widget->app->key_snooper = NULL;
-  }
-
-  if (old)
-    old->on_focus_lost ();
-  if (old)
-    old->set_state (WSTATE_NORMAL);
-  if (focused_widget)
-    focused_widget->set_state (WSTATE_SELECTED);
+void c_native_toplevelwindow::clear_focus () {
+  if (widget && widget->app && widget->app->key_snooper == widget)
+    widget->app->key_snooper = NULL;
 }
 
-void c_toplevelwindow::clear_focus () {
-  set_focused_widget (NULL);
+int c_native_toplevelwindow::x () {
+  if (!widget || !widget->app)
+    return 0;
+
+  return (int) (widget->scale.init_x / widget->app->hdpi);
 }
 
-void c_toplevelwindow::on_expose () {
+int c_native_toplevelwindow::y () {
+  if (!widget || !widget->app)
+    return 0;
+
+  return (int) (widget->scale.init_y / widget->app->hdpi);
+}
+
+int c_native_toplevelwindow::w () {
+  if (!widget || !widget->app)
+    return 0;
+
+  return (int) (widget->scale.init_width / widget->app->hdpi);
+}
+
+int c_native_toplevelwindow::h () {
+  if (!widget || !widget->app)
+    return 0;
+
+  return (int) (widget->scale.init_height / widget->app->hdpi);
+}
+
+void c_native_toplevelwindow::on_expose () {
   if (!widget)
     return;
 
@@ -4740,20 +4406,20 @@ void c_toplevelwindow::on_expose () {
   debug ("toplevel expose: metrics=%d,%d init=%d,%d",
          (int) metrics.width, (int) metrics.height,
          widget->scale.init_width, widget->scale.init_height);
-  fill_rounded_rect (widget, 0, 0, metrics.width, metrics.height,
-                     0.0f, g_colors->window_bg);
+  nbtk::fill_rounded_rect (widget, 0, 0, metrics.width, metrics.height,
+                     0.0f, nbtk::get_colortheme ()->window_bg);
   
-  //static c_printfps fps("c_toplevelwindow::on_expose ");
+  //static c_printfps fps("c_native_toplevelwindow::on_expose ");
   //fps.tick ();
 }
 
-void c_toplevelwindow::on_resize () { CP
+void c_native_toplevelwindow::on_resize () { CP
 }
 
-void c_toplevelwindow::on_configure_notify () {
+void c_native_toplevelwindow::on_configure_notify () {
 }
 
-void c_toplevelwindow::on_tk_action (nbtk::t_action_event &event) {
+void c_native_toplevelwindow::on_tk_action (nbtk::t_action_event &event) {
   (void) event;
 }
 
@@ -4767,7 +4433,7 @@ void c_tkappbridge::invalidate_rect (int x, int y, int w, int h) {
     backend->invalidate (native_window->widget);
 }
 
-void c_tkappbridge::set_mouse_cursor (_mouse_cursor cursor) {
+void c_tkappbridge::set_mouse_cursor (nbtk::_mouse_cursor cursor) {
   if (!native_window)
     return;
 
@@ -4861,11 +4527,11 @@ void c_tkappbridge::on_action (nbtk::t_action_event &event) {
     nbtk::c_app::on_action (event);
 }
 
-c_tktoplevelwindow::~c_tktoplevelwindow () {
+c_toplevelwindow::~c_toplevelwindow () {
   clear_tk_buffer ();
 }
 
-void c_tktoplevelwindow::clear_tk_buffer () {
+void c_toplevelwindow::clear_tk_buffer () {
   if (tk_cr) {
     cairo_destroy (tk_cr);
     tk_cr = NULL;
@@ -4880,7 +4546,7 @@ void c_tktoplevelwindow::clear_tk_buffer () {
   tk_surface_h = 0;
 }
 
-bool c_tktoplevelwindow::ensure_tk_buffer (int w, int h) {
+bool c_toplevelwindow::ensure_tk_buffer (int w, int h) {
   w = std::max (1, w);
   h = std::max (1, h);
 
@@ -4907,7 +4573,7 @@ bool c_tktoplevelwindow::ensure_tk_buffer (int w, int h) {
   return true;
 }
 
-bool c_tktoplevelwindow::create_tk (
+bool c_toplevelwindow::create_tk (
     c_neuralblender_ui *ui_,
     c_tkappbridge *tk_app_,
     nbtk::t_native_window parent_,
@@ -4919,7 +4585,7 @@ bool c_tktoplevelwindow::create_tk (
   if (!tk_app)
     return false;
 
-  if (!c_toplevelwindow::create (ui_, parent_, title_, x, y, w_, h_, owner))
+  if (!c_native_toplevelwindow::create (ui_, parent_, title_, x, y, w_, h_, owner))
     return false;
 
   if (!tk_app->backend)
@@ -4927,14 +4593,14 @@ bool c_tktoplevelwindow::create_tk (
   if (tk_app->backend)
     tk_app->backend->disable_window_background (widget);
 
-  widget->func.button_press_callback = c_tktoplevelwindow::cb_button_press;
-  widget->func.button_release_callback = c_tktoplevelwindow::cb_button_release;
-  widget->func.double_click_callback = c_tktoplevelwindow::cb_button_release;
-  widget->func.motion_callback = c_tktoplevelwindow::cb_motion;
-  widget->func.enter_callback = c_tktoplevelwindow::cb_enter;
-  widget->func.leave_callback = c_tktoplevelwindow::cb_leave;
-  widget->func.key_press_callback = c_tktoplevelwindow::cb_key_press;
-  widget->func.key_release_callback = c_tktoplevelwindow::cb_key_release;
+  widget->func.button_press_callback = c_toplevelwindow::cb_button_press;
+  widget->func.button_release_callback = c_toplevelwindow::cb_button_release;
+  widget->func.double_click_callback = c_toplevelwindow::cb_button_release;
+  widget->func.motion_callback = c_toplevelwindow::cb_motion;
+  widget->func.enter_callback = c_toplevelwindow::cb_enter;
+  widget->func.leave_callback = c_toplevelwindow::cb_leave;
+  widget->func.key_press_callback = c_toplevelwindow::cb_key_press;
+  widget->func.key_release_callback = c_toplevelwindow::cb_key_release;
   os_set_input_mask (widget);
 
   tk_app->focused_widget = nullptr;
@@ -4955,7 +4621,7 @@ bool c_tktoplevelwindow::create_tk (
   return true;
 }
 
-void c_tktoplevelwindow::activate_tk () {
+void c_toplevelwindow::activate_tk () {
   if (!tk_app)
     return;
 
@@ -4967,7 +4633,7 @@ void c_tktoplevelwindow::activate_tk () {
   tk_app->mouse_captured = mouse_captured;
 }
 
-void c_tktoplevelwindow::save_tk_state () {
+void c_toplevelwindow::save_tk_state () {
   if (!tk_app)
     return;
 
@@ -4976,7 +4642,7 @@ void c_tktoplevelwindow::save_tk_state () {
   mouse_captured = tk_app->mouse_captured;
 }
 
-void c_tktoplevelwindow::on_resize () {
+void c_toplevelwindow::on_resize () {
   if (!widget || !widget->app)
     return;
 
@@ -5001,11 +4667,11 @@ void c_tktoplevelwindow::on_resize () {
       std::max (1, (int) (metrics.height / widget->app->hdpi)));
 }
 
-void c_tktoplevelwindow::on_configure_notify () {
+void c_toplevelwindow::on_configure_notify () {
   on_resize ();
 }
 
-void c_tktoplevelwindow::on_expose () {
+void c_toplevelwindow::on_expose () {
   if (!widget || !widget->crb)
     return;
 
@@ -5026,7 +4692,7 @@ void c_tktoplevelwindow::on_expose () {
 
   tk_app->cr = draw_cr;
 
-  const t_gradientcolors &bg = get_colortheme ()->window_bg;
+  const nbtk::t_gradientcolors &bg = nbtk::get_colortheme ()->window_bg;
   cairo_save (draw_cr);
   cairo_set_operator (draw_cr, CAIRO_OPERATOR_SOURCE);
   cairo_set_source_rgba (draw_cr, bg.r1, bg.g1, bg.b1, bg.a1);
@@ -5048,14 +4714,14 @@ void c_tktoplevelwindow::on_expose () {
   }
 }
 
-void c_tktoplevelwindow::set_min_size (int w, int h) {
+void c_toplevelwindow::set_min_size (int w, int h) {
   if (tk_app && tk_app->backend)
     tk_app->backend->set_min_size (widget, w, h);
   else
-    c_toplevelwindow::set_min_size (w, h);
+    c_native_toplevelwindow::set_min_size (w, h);
 }
 
-void c_tktoplevelwindow::redraw_child (nbtk::c_widget &child, int pad) {
+void c_toplevelwindow::redraw_child (nbtk::c_widget &child, int pad) {
   if (!widget || !widget->crb || !widget->cr || !child.visible)
     return;
 
@@ -5095,7 +4761,7 @@ void c_tktoplevelwindow::redraw_child (nbtk::c_widget &child, int pad) {
   cairo_surface_flush (widget->surface);
 }
 
-void c_tktoplevelwindow::on_close () {
+void c_toplevelwindow::on_close () {
   if (handling_close)
     return;
 
@@ -5110,24 +4776,24 @@ void c_tktoplevelwindow::on_close () {
   handling_close = false;
 }
 
-bool c_tktoplevelwindow::on_tk_key_down (int key) {
+bool c_toplevelwindow::on_tk_key_down (int key) {
   (void) key;
   return false;
 }
 
-void c_tktoplevelwindow::auto_hide_on_close (bool b) {
+void c_toplevelwindow::auto_hide_on_close (bool b) {
   hide_on_close = b;
   if (b)
     auto_close (true);
 }
 
-void c_tktoplevelwindow::auto_quit_on_close (bool b) {
+void c_toplevelwindow::auto_quit_on_close (bool b) {
   quit_on_close = b;
   if (b)
     auto_close (false);
 }
 
-void c_tktoplevelwindow::cb_button_press (
+void c_toplevelwindow::cb_button_press (
     void *w_,
     void *event,
     void *user_data) {
@@ -5138,7 +4804,7 @@ void c_tktoplevelwindow::cb_button_press (
   if (!w || !w->parent_struct || !button)
     return;
 
-  c_tktoplevelwindow *self = (c_tktoplevelwindow *) w->parent_struct;
+  c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->tk_app) {
     self->activate_tk ();
     self->tk_app->hide_tooltip ();
@@ -5163,7 +4829,7 @@ void c_tktoplevelwindow::cb_button_press (
   expose_widget (w);
 }
 
-void c_tktoplevelwindow::cb_button_release (
+void c_toplevelwindow::cb_button_release (
     void *w_,
     void *event,
     void *user_data) {
@@ -5174,7 +4840,7 @@ void c_tktoplevelwindow::cb_button_release (
   if (!w || !w->parent_struct || !button)
     return;
 
-  c_tktoplevelwindow *self = (c_tktoplevelwindow *) w->parent_struct;
+  c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->tk_app) {
     self->activate_tk ();
     const int rx = button->x / w->app->hdpi;
@@ -5193,7 +4859,7 @@ void c_tktoplevelwindow::cb_button_release (
   expose_widget (w);
 }
 
-void c_tktoplevelwindow::cb_motion (
+void c_toplevelwindow::cb_motion (
     void *w_,
     void *event,
     void *user_data) {
@@ -5204,7 +4870,7 @@ void c_tktoplevelwindow::cb_motion (
   if (!w || !w->parent_struct || !motion)
     return;
 
-  c_tktoplevelwindow *self = (c_tktoplevelwindow *) w->parent_struct;
+  c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->tk_app) {
     self->activate_tk ();
     const int rx = motion->x / w->app->hdpi;
@@ -5221,13 +4887,13 @@ void c_tktoplevelwindow::cb_motion (
   }
 }
 
-void c_tktoplevelwindow::cb_enter (void *w_, void *user_data) {
+void c_toplevelwindow::cb_enter (void *w_, void *user_data) {
   (void) user_data;
   nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   if (!w || !w->parent_struct || !w->app)
     return;
 
-  c_tktoplevelwindow *self = (c_tktoplevelwindow *) w->parent_struct;
+  c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->tk_app) {
     nbtk::t_point local;
     if (!self->tk_app->backend ||
@@ -5242,13 +4908,13 @@ void c_tktoplevelwindow::cb_enter (void *w_, void *user_data) {
   }
 }
 
-void c_tktoplevelwindow::cb_leave (void *w_, void *user_data) {
+void c_toplevelwindow::cb_leave (void *w_, void *user_data) {
   (void) user_data;
   nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
   if (!w || !w->parent_struct)
     return;
 
-  c_tktoplevelwindow *self = (c_tktoplevelwindow *) w->parent_struct;
+  c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->tk_app) {
     self->activate_tk ();
     self->tk_app->hide_tooltip ();
@@ -5279,7 +4945,7 @@ static int tk_key_from_xkey (XKeyEvent *key) {
   }
 }
 
-void c_tktoplevelwindow::cb_key_press (
+void c_toplevelwindow::cb_key_press (
     void *w_,
     void *event,
     void *user_data) {
@@ -5290,7 +4956,7 @@ void c_tktoplevelwindow::cb_key_press (
   if (!w || !w->parent_struct || !key)
     return;
 
-  c_tktoplevelwindow *self = (c_tktoplevelwindow *) w->parent_struct;
+  c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (!self->tk_app)
     return;
 
@@ -5312,7 +4978,7 @@ void c_tktoplevelwindow::cb_key_press (
   self->save_tk_state ();
 }
 
-void c_tktoplevelwindow::cb_key_release (
+void c_toplevelwindow::cb_key_release (
     void *w_,
     void *event,
     void *user_data) {
@@ -5323,7 +4989,7 @@ void c_tktoplevelwindow::cb_key_release (
   if (!w || !w->parent_struct || !key)
     return;
 
-  c_tktoplevelwindow *self = (c_tktoplevelwindow *) w->parent_struct;
+  c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (!self->tk_app)
     return;
 
@@ -5335,6 +5001,8 @@ void c_tktoplevelwindow::cb_key_release (
 
   self->save_tk_state ();
 }
+
+} // namespace nbtk
 
 ////////////////////////////////////////////////////////////////////////////////
 // nbtk::c_filepicker
@@ -5358,6 +5026,17 @@ static std::string path_parent_dir (const std::string &path) {
     trimmed.pop_back ();
 
   return path_dirname (trimmed);
+}
+
+static std::string filepicker_dirname (const std::string &path) {
+  const size_t pos = path.find_last_of ('/');
+  if (pos == std::string::npos)
+    return "";
+
+  if (pos == 0)
+    return "/";
+
+  return path.substr (0, pos);
 }
 
 static bool filepicker_suffix_match (
@@ -5397,7 +5076,7 @@ static bool filepicker_accepts_file (
     const std::vector<std::string> &accepted_suffixes,
     const std::string &name) {
   if (accepted_suffixes.empty ())
-    return is_supported_model_filename (name);
+    return true;
 
   for (const std::string &suffix : accepted_suffixes)
     if (filepicker_suffix_match (name, suffix))
@@ -5428,25 +5107,11 @@ static std::vector<std::string> split_filepicker_filter (
   return ret;
 }
 
-void nbtk::c_filepicker::sync_owner_metadata () {
-  nbtk::t_native_widget *owner_widget_ = as_native_widget (owner_widget);
-  if (!owner_widget_ || !owner_widget_->parent_struct)
-    return;
-
-  c_widget *owner = (c_widget *) owner_widget_->parent_struct;
-  if (owner->bank < BANK_COUNT)
-    bank = owner->bank;
-  if (owner->lane < NB_NUM_MODELS)
-    lane = owner->lane;
-}
-
 void nbtk::c_filepicker::create (
     c_neuralblender_ui *ui_,
-    c_tkappbridge *tk_app_,
+    nbtk::c_tkappbridge *tk_app_,
     t_native_window parent_,
     t_native_handle owner,
-    size_t lane_,
-    uint64_t bank_,
     const char *title_) {
 
   title = title_ ? title_ : "";
@@ -5465,8 +5130,6 @@ void nbtk::c_filepicker::create (
 
   set_min_size (550, 300);
 
-  lane = lane_;
-  bank = bank_;
   auto_hide_on_close (true);
   auto_quit_on_close (false);
 
@@ -5506,16 +5169,12 @@ void nbtk::c_filepicker::show () {
   if (!widget)
     return;
 
-  sync_owner_metadata ();
-
-  if (current_dir.empty () && ui)
-    current_dir = ui->configfile.get_item (cwd_config_key_for_bank (bank));
   if (current_dir.empty ())
-    current_dir = CONFIG_DEFAULT_DIR;
+    current_dir = ".";
 
   scan_current_dir ();
   widget_show_all (widget);
-  expose ();
+  force_draw ();
 }
 
 void nbtk::c_filepicker::clear_allowed_filters () {
@@ -5563,7 +5222,7 @@ void nbtk::c_filepicker::hide () {
 }
 
 void nbtk::c_filepicker::on_resize () {
-  c_tktoplevelwindow::on_resize ();
+  nbtk::c_toplevelwindow::on_resize ();
 
   const int ww = tk_root.w;
   const int wh = tk_root.h;
@@ -5574,7 +5233,7 @@ void nbtk::c_filepicker::on_resize () {
   const int list_y = 42;
   const int frame_h = std::max (80, button_y - pad * 2);
   const int frame_w = std::max (120, ww - pad * 2);
-  const int scroll_w = UI_SCROLLBAR_WIDTH;
+  const int scroll_w = NBTK_SCROLLBAR_WIDTH;
   const int list_h = std::max (24, frame_h - list_y - 12);
   const int list_w = std::max (24, frame_w - 36 - scroll_w);
 
@@ -5629,7 +5288,7 @@ void nbtk::c_filepicker::on_tk_action (t_action_event &event) {
     return;
   }
 
-  c_tktoplevelwindow::on_tk_action (event);
+  nbtk::c_toplevelwindow::on_tk_action (event);
 }
 
 bool nbtk::c_filepicker::on_tk_key_down (int key) {
@@ -5638,7 +5297,7 @@ bool nbtk::c_filepicker::on_tk_key_down (int key) {
     return true;
   }
 
-  return c_tktoplevelwindow::on_tk_key_down (key);
+  return nbtk::c_toplevelwindow::on_tk_key_down (key);
 }
 
 void nbtk::c_filepicker::scan_current_dir () {
@@ -5715,7 +5374,9 @@ void nbtk::c_filepicker::scan_current_dir () {
       filelist.size ());
 }
 
-void nbtk::c_filepicker::add_files_from_dir (c_combobox *cb) {
+void nbtk::c_filepicker::add_files_from_dir (
+    c_combobox *cb,
+    const std::string &selected_file) {
   if (!cb)
     return;
 
@@ -5723,13 +5384,9 @@ void nbtk::c_filepicker::add_files_from_dir (c_combobox *cb) {
   combo_dir = current_dir;
 
   int sel = -1;
-  _lane_bank bank_ = (bank < BANK_COUNT) ? (_lane_bank) bank : BANK_AMP;
-  std::string selected_file;
-  if (ui && lane < NB_NUM_MODELS)
-    selected_file = ui->state.banks [bank_].lanes [lane].filename;
 
   if (!selected_file.empty ()) {
-    std::string loaded_dir = path_dirname (selected_file);
+    std::string loaded_dir = filepicker_dirname (selected_file);
     if (!loaded_dir.empty ())
       combo_dir = loaded_dir;
   }
@@ -5778,8 +5435,6 @@ std::string nbtk::c_filepicker::get_current_dir () const {
 
 void nbtk::c_filepicker::set_current_dir (std::string str) {
   current_dir = std::move (str);
-  if (ui && !current_dir.empty ())
-    ui->configfile.set_item (cwd_config_key_for_bank (bank), current_dir);
   scan_current_dir ();
 }
 
@@ -5801,93 +5456,6 @@ std::string nbtk::c_filepicker::selected_path () const {
 }
 
 void nbtk::c_filepicker::on_file_select (const std::string &filename) {
-  if (!ui || filename.empty ())
-    return;
-
-  _lane_bank bank_ = (bank < BANK_COUNT) ? (_lane_bank) bank : BANK_AMP;
-  if (lane >= NB_NUM_MODELS)
-    return;
-
-  current_dir = path_dirname (filename);
-  if (!current_dir.empty ())
-    ui->configfile.set_item (cwd_config_key_for_bank (bank), current_dir);
-
-  ui->state.banks [bank_].lanes [lane].filename = filename;
-  ui->state.current_dir = current_dir;
-  scan_current_dir ();
-  ui->load_model (bank_, lane, filename.c_str ());
-
-  nbtk::c_combobox *cb = &ui->lanes_for_bank (bank_) [lane].menu_list;
-  cb->clear ();
-  add_files_from_dir (cb);
-  ui->on_fileselected (this, filename.c_str ());
+  (void) filename;
   hide ();
-}
-
-bool c_toplevelwindow::on_keydown (XKeyEvent *key) { CP
-  if (!widget || !key)
-    return false;
-
-  if (!focused_widget)
-    return false;
-
-  return focused_widget->on_keydown (key);
-}
-
-void c_mainwindow::show () {
-  if (!widget)
-    return;
-
-  children_mapped = false;
-  widget_show (widget);
-  /*if (widget->app && widget->app->dpy)
-    XFlush (widget->app->dpy);*/
-}
-
-void c_mainwindow::show_children () {
-  if (!widget || children_mapped)
-    return;
-
-  children_mapped = true;
-  if (ui)
-    ui->sync_page_visibility ();
-}
-
-void c_mainwindow::on_expose () {
-  if (!widget)
-    return;
-
-  c_tktoplevelwindow::on_expose ();
-  show_children ();
-}
-
-void c_mainwindow::on_resize () { CP
-  if (!widget || !ui)
-    return;
-
-  Metrics_t metrics;
-  os_get_window_metrics (widget, &metrics);
-  if (!metrics.visible)
-    return;
-
-  debug ("mainwindow resize: metrics=%d,%d init=%d,%d",
-         (int) metrics.width, (int) metrics.height,
-         widget->scale.init_width, widget->scale.init_height);
-  c_tktoplevelwindow::on_resize ();
-  ui->on_window_resize (
-      metrics.width / widget->app->hdpi,
-      metrics.height / widget->app->hdpi);
-}
-
-void c_mainwindow::on_configure_notify () {
-  if (!ui)
-    return;
-
-  c_tktoplevelwindow::on_configure_notify ();
-  ui->on_window_configured ();
-}
-
-void c_mainwindow::on_tk_action (nbtk::t_action_event &event) {
-  if (ui)
-    ui->on_tk_action (event);
 }

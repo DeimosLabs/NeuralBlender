@@ -82,36 +82,36 @@ public:
     blender = b;
   }
   bool load_model (_lane_bank bank, size_t which, const char *filename) override;
-  void on_gain_in (c_widget *w, float f);
-  void on_ir_pitch (c_widget *w, float f);
-  void on_gain_out (c_widget *w, float f);
-  void on_dry_out (c_widget *w, float f);
-  void on_delay (c_widget *w, float f);
-  void on_filebrowse (c_widget *w);
-  void on_fileselected (c_widget *w, const char *path);
-  void on_fileclear (c_widget *w);
-  void on_mute (c_widget *w, bool b);
-  void on_dcflip (c_widget *w, bool b);
-  void on_calibrate (c_widget *w, bool b);
-  void on_muteall (c_widget *w, bool b);
-  void on_vu (c_widget *w, bool);
-  void on_linked_calib (c_widget *w, bool b);
-  void on_calib_bass (c_widget *w, bool b);
-  void on_noisegate (c_widget *w, bool b);
-  void on_noisethresh (c_widget *w, float f);
-  void on_noiseattack (c_widget *w, float f);
-  void on_noisehold (c_widget *w, float f);
-  void on_noiserelease (c_widget *w, float f);
-  void on_threshgain (c_widget *w, float f);
-  void on_tuner (c_widget *w, bool b);
-  void on_tuner_base_freq (c_widget *w, float f);
-  void on_calib_target_db (c_widget *w, float f);
-  void on_master_gain (c_widget *w, float f);
-  void on_presence (c_widget *w, float f);
-  //void on_excl (c_widget *w, int which);
-  void on_bypass (c_widget *w, bool b);
-  void on_bank_bypass (c_widget *w, _lane_bank bank, bool b);
-  void on_about (c_widget *w);
+  void on_gain_in (nbtk::c_widget *w, float f);
+  void on_ir_pitch (nbtk::c_widget *w, float f);
+  void on_gain_out (nbtk::c_widget *w, float f);
+  void on_dry_out (nbtk::c_widget *w, float f);
+  void on_delay (nbtk::c_widget *w, float f);
+  void on_filebrowse (nbtk::c_widget *w);
+  void on_fileselected (nbtk::c_widget *w, const char *path);
+  void on_fileclear (nbtk::c_widget *w);
+  void on_mute (nbtk::c_widget *w, bool b);
+  void on_dcflip (nbtk::c_widget *w, bool b);
+  void on_calibrate (nbtk::c_widget *w, bool b);
+  void on_muteall (nbtk::c_widget *w, bool b);
+  void on_vu (nbtk::c_widget *w, bool);
+  void on_linked_calib (nbtk::c_widget *w, bool b);
+  void on_calib_bass (nbtk::c_widget *w, bool b);
+  void on_noisegate (nbtk::c_widget *w, bool b);
+  void on_noisethresh (nbtk::c_widget *w, float f);
+  void on_noiseattack (nbtk::c_widget *w, float f);
+  void on_noisehold (nbtk::c_widget *w, float f);
+  void on_noiserelease (nbtk::c_widget *w, float f);
+  void on_threshgain (nbtk::c_widget *w, float f);
+  void on_tuner (nbtk::c_widget *w, bool b);
+  void on_tuner_base_freq (nbtk::c_widget *w, float f);
+  void on_calib_target_db (nbtk::c_widget *w, float f);
+  void on_master_gain (nbtk::c_widget *w, float f);
+  void on_presence (nbtk::c_widget *w, float f);
+  //void on_excl (nbtk::c_widget *w, int which);
+  void on_bypass (nbtk::c_widget *w, bool b);
+  void on_bank_bypass (nbtk::c_widget *w, _lane_bank bank, bool b);
+  void on_about (nbtk::c_widget *w);
   void apply_prefs (t_prefs &p) override;
   void write_prefs_to (t_prefs &p) override;
   void apply_effective_controls () override;
@@ -145,27 +145,27 @@ bool c_standalone_ui::load_model (
   return loaded;
 }
 
-void c_standalone_ui::on_gain_in (c_widget *w, float f) {
+void c_standalone_ui::on_gain_in (nbtk::c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
   g_blender->set_gain_in ((_lane_bank) w->bank, w->lane, f);
 }
 
-void c_standalone_ui::on_ir_pitch (c_widget *w, float f) {
+void c_standalone_ui::on_ir_pitch (nbtk::c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
   g_blender->set_ir_pitch ((_lane_bank) w->bank, w->lane, f);
 }
 
-void c_standalone_ui::on_gain_out (c_widget *w, float f) {
+void c_standalone_ui::on_gain_out (nbtk::c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
   g_blender->set_gain_out ((_lane_bank) w->bank, w->lane, f);
 }
 
-void c_standalone_ui::on_dry_out (c_widget *w, float f) {
+void c_standalone_ui::on_dry_out (nbtk::c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
   g_blender->set_dry_out ((_lane_bank) w->bank, w->lane, f);
 }
 
-void c_standalone_ui::on_delay (c_widget *w, float f) {
+void c_standalone_ui::on_delay (nbtk::c_widget *w, float f) {
   debug ("lane %d, f=%f", w->lane, f);
   const _lane_bank bank =
     w->bank < BANK_COUNT ? (_lane_bank) w->bank : BANK_AMP;
@@ -174,17 +174,17 @@ void c_standalone_ui::on_delay (c_widget *w, float f) {
   update_stats ();
 }
 
-void c_standalone_ui::on_filebrowse (c_widget *w) {
+void c_standalone_ui::on_filebrowse (nbtk::c_widget *w) {
   debug ("lane %d", w->lane);
 }
 
-void c_standalone_ui::on_fileselected (c_widget *w, const char *path) {
+void c_standalone_ui::on_fileselected (nbtk::c_widget *w, const char *path) {
   debug ("lane %d, path='%s'", w->lane, path);
   // is this the right place for this?
   //g_blender->banks [BANK_AMP].lanes [w->lane].calibrate (NULL, 0);
 }
 
-void c_standalone_ui::on_fileclear (c_widget *w) {
+void c_standalone_ui::on_fileclear (nbtk::c_widget *w) {
   debug ("lane %d", w->lane);
   const _lane_bank bank =
     w->bank < BANK_COUNT ? (_lane_bank) w->bank : BANK_AMP;
@@ -195,19 +195,19 @@ void c_standalone_ui::on_fileclear (c_widget *w) {
   apply_effective_controls ();
 }
 
-void c_standalone_ui::on_mute (c_widget *w, bool b) {
+void c_standalone_ui::on_mute (nbtk::c_widget *w, bool b) {
   if (w->bank < BANK_COUNT && w->lane < NB_NUM_MODELS)
     state.banks [w->bank].lanes [w->lane].lane_mute = b;
   apply_effective_controls ();
 }
 
-void c_standalone_ui::on_dcflip (c_widget *w, bool b) {
+void c_standalone_ui::on_dcflip (nbtk::c_widget *w, bool b) {
   if (w->bank < BANK_COUNT && w->lane < NB_NUM_MODELS)
     state.banks [w->bank].lanes [w->lane].dcflip = b;
   apply_effective_controls ();
 }
 
-void c_standalone_ui::on_calibrate (c_widget *w, bool b) { CP
+void c_standalone_ui::on_calibrate (nbtk::c_widget *w, bool b) { CP
   if (!w)
     return;
     
@@ -228,85 +228,85 @@ void c_standalone_ui::on_calibrate (c_widget *w, bool b) { CP
   update_stats ();
 }
 
-void c_standalone_ui::on_muteall (c_widget *w, bool b) {
+void c_standalone_ui::on_muteall (nbtk::c_widget *w, bool b) {
   debug ("lane %d, b=%d", w->lane, (int) b);
   g_blender->mute_all = b;
 }
 
-void c_standalone_ui::on_vu (c_widget *w, bool b) {
+void c_standalone_ui::on_vu (nbtk::c_widget *w, bool b) {
   (void) w;
   debug ("b=%d", (int) b);
   state.do_vu = b;
   g_blender->do_vu = b;
 }
 
-void c_standalone_ui::on_noisegate (c_widget *w, bool b) {
+void c_standalone_ui::on_noisegate (nbtk::c_widget *w, bool b) {
   (void) w;
   state.noisegate_on = b;
   g_blender->noisegate_on = b;
 }
 
-void c_standalone_ui::on_noisethresh (c_widget *w, float value) {
+void c_standalone_ui::on_noisethresh (nbtk::c_widget *w, float value) {
   (void) w;
   state.noisethresh = value;
   g_blender->noisegate.set_threshold (value);
 }
 
-void c_standalone_ui::on_noiseattack (c_widget *w, float value) {
+void c_standalone_ui::on_noiseattack (nbtk::c_widget *w, float value) {
   (void) w;
   state.noiseattack = value;
   g_blender->noisegate.set_attack (value);
 }
 
-void c_standalone_ui::on_noisehold (c_widget *w, float value) {
+void c_standalone_ui::on_noisehold (nbtk::c_widget *w, float value) {
   (void) w;
   state.noisehold = value;
   g_blender->noisegate.set_hold (value);
 }
 
-void c_standalone_ui::on_noiserelease (c_widget *w, float value) {
+void c_standalone_ui::on_noiserelease (nbtk::c_widget *w, float value) {
   (void) w;
   state.noiserelease = value;
   g_blender->noisegate.set_release (value);
 }
 
-void c_standalone_ui::on_threshgain (c_widget *w, float f) {
+void c_standalone_ui::on_threshgain (nbtk::c_widget *w, float f) {
   (void) w;
   set_threshgain (f);
 }
 
-void c_standalone_ui::on_tuner (c_widget *w, bool b) {
+void c_standalone_ui::on_tuner (nbtk::c_widget *w, bool b) {
   (void) w;
   state.tuner_on = b;
   g_blender->tuner_on = b;
 }
 
-void c_standalone_ui::on_tuner_base_freq (c_widget *w, float value) {
+void c_standalone_ui::on_tuner_base_freq (nbtk::c_widget *w, float value) {
   (void) w;
   state.tuner_base_freq = value;
   g_blender->tuner_base_freq = value;
   g_blender->pitchtracker.set_base_freq ((int) lrintf (value));
 }
 
-void c_standalone_ui::on_calib_target_db (c_widget *w, float value) {
+void c_standalone_ui::on_calib_target_db (nbtk::c_widget *w, float value) {
   (void) w;
   state.calib_target_db = value;
   g_blender->set_calib_target_db (value);
 }
 
-void c_standalone_ui::on_master_gain (c_widget *w, float value) {
+void c_standalone_ui::on_master_gain (nbtk::c_widget *w, float value) {
   (void) w;
   state.master_gain = db_to_gain (value);
   g_blender->set_master_gain (value);
 }
 
-void c_standalone_ui::on_presence (c_widget *w, float value) {
+void c_standalone_ui::on_presence (nbtk::c_widget *w, float value) {
   (void) w;
   state.presence = value;
   g_blender->set_presence (value);
 }
 
-void c_standalone_ui::on_linked_calib (c_widget *w, bool b) {
+void c_standalone_ui::on_linked_calib (nbtk::c_widget *w, bool b) {
   (void) w;
   set_linked_calib_for_bank (visible_bank, b);
   if (visible_bank >= BANK_PEDAL && visible_bank < BANK_COUNT)
@@ -314,7 +314,7 @@ void c_standalone_ui::on_linked_calib (c_widget *w, bool b) {
   g_blender->linked_calib = g_blender->banks [BANK_AMP].linked_calib;
 }
 
-void c_standalone_ui::on_calib_bass (c_widget *w, bool b) {
+void c_standalone_ui::on_calib_bass (nbtk::c_widget *w, bool b) {
   (void) w;
   state.calib_source = b ? 1 : 0;
   if (blender)
@@ -322,21 +322,21 @@ void c_standalone_ui::on_calib_bass (c_widget *w, bool b) {
 }
 
 /* these are UI only
-void c_standalone_ui::on_excl (c_widget *w, int n) {
+void c_standalone_ui::on_excl (nbtk::c_widget *w, int n) {
   debug ("lane %d, b=%d", w->lane, n);
 }
 
-void c_standalone_ui::on_bypass (c_widget *w, bool b) {
+void c_standalone_ui::on_bypass (nbtk::c_widget *w, bool b) {
   debug ("lane %d, b=%d", w->lane, (int) b);
   g_blender->set_bypass (!b);
 }*/
 
-void c_standalone_ui::on_bypass(c_widget *w, bool b) {
+void c_standalone_ui::on_bypass(nbtk::c_widget *w, bool b) {
   state.bypass = !b; // because Enabled button true means not bypassed
   apply_effective_controls();
 }
 
-void c_standalone_ui::on_bank_bypass (c_widget *w, _lane_bank bank, bool b) {
+void c_standalone_ui::on_bank_bypass (nbtk::c_widget *w, _lane_bank bank, bool b) {
   (void) w;
   if (!blender)
     return;
@@ -357,7 +357,7 @@ void c_standalone_ui::on_bank_bypass (c_widget *w, _lane_bank bank, bool b) {
   }
 }
 
-void c_standalone_ui::on_about (c_widget *w) {
+void c_standalone_ui::on_about (nbtk::c_widget *w) {
   debug ("lane %d", w->lane);
 }
 

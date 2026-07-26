@@ -28,12 +28,6 @@
 #include <iostream>
 #ifdef HAVE_GZIP
 #include <unistd.h>
-#endif
-#include "neuralblender.h"
-#include "data.h"
-#include "configfile.h"
-
-#ifdef HAVE_GZIP
 #include "gzip.h"
 #endif
 
@@ -44,6 +38,10 @@
 #ifdef HAVE_SAMPLERATE
 #include <samplerate.h>
 #endif
+
+#include "neuralblender.h"
+#include "data.h"
+#include "configfile.h"
 
 //#define DEBUG
 

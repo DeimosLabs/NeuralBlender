@@ -90,6 +90,79 @@ static bool is_supported_model_filename_lower (const std::string &lower) {
          ;
 }
 
+bool c_neuralblendermainwindow::create (
+    c_neuralblender_ui *ui_,
+    Window parent_,
+    const char *title_,
+    int x, int y, int w, int h,
+    nbtk::t_native_handle owner) {
+
+  if (!create_tk (ui_, &ui_->tk_app, parent_, title_, x, y, w, h, owner))
+    return false;
+
+  auto_close (false);
+  auto_hide_on_close (false);
+  auto_quit_on_close (true);
+  ui_->window = window;
+  return true;
+}
+
+void c_neuralblendermainwindow::show () {
+  if (!widget)
+    return;
+
+  children_mapped = false;
+  widget_show (widget);
+}
+
+void c_neuralblendermainwindow::show_children () {
+  if (!widget || children_mapped)
+    return;
+
+  children_mapped = true;
+  if (ui)
+    ui->sync_page_visibility ();
+}
+
+void c_neuralblendermainwindow::on_expose () {
+  if (!widget)
+    return;
+
+  nbtk::c_toplevelwindow::on_expose ();
+  show_children ();
+}
+
+void c_neuralblendermainwindow::on_resize () { CP
+  if (!widget || !ui)
+    return;
+
+  Metrics_t metrics;
+  os_get_window_metrics (widget, &metrics);
+  if (!metrics.visible)
+    return;
+
+  debug ("mainwindow resize: metrics=%d,%d init=%d,%d",
+         (int) metrics.width, (int) metrics.height,
+         widget->scale.init_width, widget->scale.init_height);
+  nbtk::c_toplevelwindow::on_resize ();
+  ui->on_window_resize (
+      metrics.width / widget->app->hdpi,
+      metrics.height / widget->app->hdpi);
+}
+
+void c_neuralblendermainwindow::on_configure_notify () {
+  if (!ui)
+    return;
+
+  nbtk::c_toplevelwindow::on_configure_notify ();
+  ui->on_window_configured ();
+}
+
+void c_neuralblendermainwindow::on_tk_action (nbtk::t_action_event &event) {
+  if (ui)
+    ui->on_tk_action (event);
+}
+
 bool is_supported_model_filename (const std::string &path) {
   std::string lower = path;
   std::transform (lower.begin (), lower.end (), lower.begin (),
@@ -212,20 +285,20 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   btn_cancel.set_image_default (data_icon_xputty_cancel_png);
 
   label_vuscale.create (&frame1, "VU meter scale dB:", 16, 32, 180, 32);
-  label_vuscale.align = TEXT_LEFT;
+  label_vuscale.align = nbtk::TEXT_LEFT;
   label_vuheadroom.create (&frame1, "VU meter headroom dB:", 16, 72, 180, 32);
-  label_vuheadroom.align = TEXT_LEFT;
+  label_vuheadroom.align = nbtk::TEXT_LEFT;
   label_spacer1.create (&frame1, "", 16, 112, 12, 12);
 
   btn_bypass_doubleclick.create (
     &frame1, "Toggle bypass on doubleclick", 16, 152, 320, 32);
-  btn_bypass_doubleclick.align = TEXT_LEFT;
+  btn_bypass_doubleclick.align = nbtk::TEXT_LEFT;
   btn_bypass_rightclick.create (
     &frame1, "Toggle bypass on right click", 16, 192, 320, 32);
-  btn_bypass_rightclick.align = TEXT_LEFT;
+  btn_bypass_rightclick.align = nbtk::TEXT_LEFT;
   btn_show_tooltips.create (
     &frame1, "Show tooltips", 16, 232, 320, 32);
-  btn_show_tooltips.align = TEXT_LEFT;
+  btn_show_tooltips.align = nbtk::TEXT_LEFT;
   btn_defaults.create (&frame1, "Reset to defaults", 12, 0, 400, 40);
 
   text_vuscale.create (&frame1, "", 220, 28, 120, 36);
@@ -240,7 +313,7 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
 }
 
 void c_prefswindow::on_resize () {
-  c_tktoplevelwindow::on_resize ();
+  nbtk::c_toplevelwindow::on_resize ();
   frame1.move_resize (12, 12, w () - 24, h () - 80);
   
   // bottom about/ok/cancel buttons
@@ -272,11 +345,11 @@ void c_prefswindow::show () { CP
   if (!widget)
     create (ui);
   
-  c_toplevelwindow::show ();
+  nbtk::c_toplevelwindow::show ();
 }
 
 void c_prefswindow::hide () { CP
-  c_toplevelwindow::hide ();
+  nbtk::c_toplevelwindow::hide ();
 }
 
 void c_prefswindow::load_defaults () {
@@ -390,7 +463,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   
   /*test_knob.create (root, "test knob", 16, 400, 64, 64);
   test_listbox.create (root, "test listbox", 100, 400, 200, 80);
-  test_scrollbar.create (root, "", 300, 400, UI_SCROLLBAR_WIDTH, 80);
+  test_scrollbar.create (root, "", 300, 400, NBTK_SCROLLBAR_WIDTH, 80);
   test_listbox.set_scrollbar (&test_scrollbar);
   for (int i = 0; i < 10; i++) {
     char buf [32];
@@ -424,15 +497,87 @@ void c_aboutwindow::on_tk_action (nbtk::t_action_event &event) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// c_neuralblender_filepicker
+
+void c_neuralblender_filepicker::create (
+    c_neuralblender_ui *ui_,
+    nbtk::c_tkappbridge *tk_app,
+    nbtk::t_native_window parent,
+    nbtk::t_native_handle owner,
+    size_t lane_,
+    uint64_t bank_,
+    const char *title_) {
+
+  nbtk::c_filepicker::create (ui_, tk_app, parent, owner, title_);
+  lane = lane_;
+  bank = bank_;
+}
+
+void c_neuralblender_filepicker::show () {
+  if (current_dir.empty () && ui) {
+    const _lane_bank bank_ = bank < BANK_COUNT ? (_lane_bank) bank : BANK_AMP;
+    current_dir = ui->configfile.get_item (cwd_config_key_for_bank_ui (bank_));
+  }
+  if (current_dir.empty ())
+    current_dir = CONFIG_DEFAULT_DIR;
+
+  nbtk::c_filepicker::show ();
+}
+
+void c_neuralblender_filepicker::set_current_dir (std::string str) {
+  current_dir = std::move (str);
+  if (ui && !current_dir.empty ()) {
+    const _lane_bank bank_ = bank < BANK_COUNT ? (_lane_bank) bank : BANK_AMP;
+    ui->configfile.set_item (cwd_config_key_for_bank_ui (bank_), current_dir);
+  }
+  scan_current_dir ();
+}
+
+void c_neuralblender_filepicker::add_files_from_dir (
+    nbtk::c_combobox *cb,
+    const std::string &selected_file_) {
+
+  std::string selected_file = selected_file_;
+  if (selected_file.empty () && ui && lane < NB_NUM_MODELS) {
+    const _lane_bank bank_ = bank < BANK_COUNT ? (_lane_bank) bank : BANK_AMP;
+    selected_file = ui->state.banks [bank_].lanes [lane].filename;
+  }
+
+  nbtk::c_filepicker::add_files_from_dir (cb, selected_file);
+}
+
+void c_neuralblender_filepicker::on_file_select (
+    const std::string &filename) {
+
+  if (!ui || filename.empty ())
+    return;
+
+  const _lane_bank bank_ = bank < BANK_COUNT ? (_lane_bank) bank : BANK_AMP;
+  if (lane >= NB_NUM_MODELS)
+    return;
+
+  current_dir = path_dirname (filename);
+  if (!current_dir.empty ())
+    ui->configfile.set_item (cwd_config_key_for_bank_ui (bank_), current_dir);
+
+  ui->state.banks [bank_].lanes [lane].filename = filename;
+  ui->state.current_dir = current_dir;
+  scan_current_dir ();
+  ui->load_model (bank_, lane, filename.c_str ());
+
+  nbtk::c_combobox *cb = &ui->lanes_for_bank (bank_) [lane].menu_list;
+  cb->clear ();
+  add_files_from_dir (cb);
+  ui->on_fileselected (cb, filename.c_str ());
+  hide ();
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // c_lane_widgets
 
 void c_lane_widgets::on_tk_action (nbtk::t_action_event &event) {
   if (!ui || ui->updating_from_state)
     return;
-
-  proxy.ui = ui;
-  proxy.lane = lane_id;
-  proxy.bank = bank_id;
 
   c_neuralblender_lane_state *lane_state =
     bank_id < BANK_COUNT && lane_id < NB_NUM_MODELS ?
@@ -442,38 +587,37 @@ void c_lane_widgets::on_tk_action (nbtk::t_action_event &event) {
     if (event.source_id != knob.id)
       return false;
 
-    proxy.role = role;
     const float value = knob.value;
     const float g = db_to_gain (value);
     switch (role) {
       case ROLE_GAIN_IN:
         if (lane_state)
           lane_state->gain_in = g;
-        ui->on_gain_in (&proxy, g);
+        ui->on_gain_in (&knob, g);
       break;
 
       case ROLE_IR_PITCH:
         if (lane_state)
           lane_state->ir_pitch_semitones = value;
-        ui->on_ir_pitch (&proxy, value);
+        ui->on_ir_pitch (&knob, value);
       break;
 
       case ROLE_GAIN_OUT:
         if (lane_state)
           lane_state->gain_out = g;
-        ui->on_gain_out (&proxy, g);
+        ui->on_gain_out (&knob, g);
       break;
 
       case ROLE_DRY_OUT:
         if (lane_state)
           lane_state->dry_out = value <= DB_SILENCE ? 0.0f : g;
-        ui->on_dry_out (&proxy, g);
+        ui->on_dry_out (&knob, g);
       break;
 
       case ROLE_DELAY:
         if (lane_state)
           lane_state->delay_ms = value;
-        ui->on_delay (&proxy, value);
+        ui->on_delay (&knob, value);
       break;
 
       default:
@@ -495,40 +639,39 @@ void c_lane_widgets::on_tk_action (nbtk::t_action_event &event) {
       return false;
 
     event.handled = true;
-    proxy.role = role;
     const bool value = button.value;
 
     switch (role) {
       case ROLE_MUTE:
-        ui->on_mute (&proxy, value);
+        ui->on_mute (&button, value);
         if (lane_state)
           lane_state->lane_mute = value;
       break;
 
       case ROLE_EXCL_USE:
-        ui->on_excl_use (&proxy, value);
+        ui->on_excl_use (&button, value);
         ui->sync_widgets_from_state (ui->state);
       break;
 
       case ROLE_BROWSE:
-        ui->on_filebrowse (&proxy);
+        ui->on_filebrowse (&button);
         filepicker.show ();
       break;
 
       case ROLE_CLEAR:
-        ui->on_fileclear (&proxy);
+        ui->on_fileclear (&button);
       break;
 
       case ROLE_DCFLIP:
         if (lane_state)
           lane_state->dcflip = value;
-        ui->on_dcflip (&proxy, value);
+        ui->on_dcflip (&button, value);
       break;
 
       case ROLE_CALIBRATE:
         if (lane_state)
           lane_state->do_calib = value;
-        ui->on_calibrate (&proxy, value);
+        ui->on_calibrate (&button, value);
       break;
 
       default:
@@ -590,18 +733,31 @@ void c_lane_widgets::create (
   }
   snprintf (label, 31, "%s %c", bank_name, (char) ('A' + lane_id));
   lane_root.create (parent, "", x, y, std::max (1, w), std::max (1, h));
+  lane_root.bank = bank_id;
+  lane_root.lane = lane_id;
   lane_frame.create (&lane_root, label, 0, 0, std::max (1, w), std::max (1, h));
+  lane_frame.bank = bank_id;
+  lane_frame.lane = lane_id;
   lane_frame.state = lane_state;
   created = true;
   main_widget = native_owner;
   
   // regular controls
   menu_list.create (&lane_frame, "", 0, 0, 320, 32);
+  menu_list.role = ROLE_LOADFILE;
+  menu_list.bank = bank_id;
+  menu_list.lane = lane_id;
   menu_list.wheel_selects_item = true;
 
   int knobs_right = w - 180;
   knob_gain_in.create (&lane_frame, "Input", 0, 0, 64, 64);
+  knob_gain_in.role = ROLE_GAIN_IN;
+  knob_gain_in.bank = bank_id;
+  knob_gain_in.lane = lane_id;
   knob_ir_pitch.create (&lane_frame, "Pitch", 0, 0, 64, 64);
+  knob_ir_pitch.role = ROLE_IR_PITCH;
+  knob_ir_pitch.bank = bank_id;
+  knob_ir_pitch.lane = lane_id;
   knob_gain_in.set_min (-40);
   knob_gain_in.set_max (40);
   knob_gain_in.set_default (0);
@@ -616,6 +772,9 @@ void c_lane_widgets::create (
   knob_ir_pitch.hide ();
   
   knob_gain_out.create (&lane_frame, "Output", 0, 0, 64, 64);
+  knob_gain_out.role = ROLE_GAIN_OUT;
+  knob_gain_out.bank = bank_id;
+  knob_gain_out.lane = lane_id;
   knob_gain_out.set_min (-40);
   knob_gain_out.set_max (40);
   knob_gain_out.set_default (0);
@@ -623,6 +782,9 @@ void c_lane_widgets::create (
   knob_gain_out.set_step (0.1);
   
   knob_dry_out.create (&lane_frame, "Dry out", 0, 0, 64, 64);
+  knob_dry_out.role = ROLE_DRY_OUT;
+  knob_dry_out.bank = bank_id;
+  knob_dry_out.lane = lane_id;
   knob_dry_out.set_min (-120);
   knob_dry_out.set_max (12);
   knob_dry_out.set_default (-120);
@@ -635,9 +797,21 @@ void c_lane_widgets::create (
   vudata_out.set_l (0.0, 0.0);
   
   btn_browse.create (&lane_frame, "", 0, 0, 100, 40);
+  btn_browse.role = ROLE_BROWSE;
+  btn_browse.bank = bank_id;
+  btn_browse.lane = lane_id;
   btn_clear.create  (&lane_frame, "", 0, 0, 100, 40);
+  btn_clear.role = ROLE_CLEAR;
+  btn_clear.bank = bank_id;
+  btn_clear.lane = lane_id;
   btn_excl.create   (&lane_frame, "Use", 0, 0, 100, 40);
+  btn_excl.role = ROLE_EXCL_USE;
+  btn_excl.bank = bank_id;
+  btn_excl.lane = lane_id;
   btn_mute.create   (&lane_frame, "Mute", 0, 0, 100, 40);
+  btn_mute.role = ROLE_MUTE;
+  btn_mute.bank = bank_id;
+  btn_mute.lane = lane_id;
   btn_excl.is_toggle = true;
   btn_mute.is_toggle = true;
   switch (bank_id) {
@@ -649,13 +823,16 @@ void c_lane_widgets::create (
     break;
   }
   btn_mute.set_value (false);
-  btn_mute.set_image (data_icon_speaker_off_big_png, WSTATE_ON);
-  btn_mute.set_image (data_icon_speaker_on_big_png, WSTATE_OFF);
-  btn_excl.set_image (data_icon_radiobutton_on_png, WSTATE_ON);
-  btn_excl.set_image (data_icon_radiobutton_off_png, WSTATE_OFF);
+  btn_mute.set_image (data_icon_speaker_off_big_png, nbtk::WSTATE_ON);
+  btn_mute.set_image (data_icon_speaker_on_big_png, nbtk::WSTATE_OFF);
+  btn_excl.set_image (data_icon_radiobutton_on_png, nbtk::WSTATE_ON);
+  btn_excl.set_image (data_icon_radiobutton_off_png, nbtk::WSTATE_OFF);
   
   // advanced controls
   knob_delay.create (&lane_frame, "Delay", 0, 0, 64, 64);
+  knob_delay.role = ROLE_DELAY;
+  knob_delay.bank = bank_id;
+  knob_delay.lane = lane_id;
   knob_delay.set_min (0);
   knob_delay.set_max (30);
   knob_delay.set_default (0);
@@ -663,7 +840,13 @@ void c_lane_widgets::create (
   knob_delay.set_step (0.01);
 
   btn_flip.create   (&lane_frame, "", 0, 0, 32, 32);
+  btn_flip.role = ROLE_DCFLIP;
+  btn_flip.bank = bank_id;
+  btn_flip.lane = lane_id;
   btn_calib.create  (&lane_frame, "", 0, 0, 32, 32);
+  btn_calib.role = ROLE_CALIBRATE;
+  btn_calib.bank = bank_id;
+  btn_calib.lane = lane_id;
   btn_flip.is_toggle = true;
   btn_calib.is_toggle = true;
   if (ui && lane_id < NB_NUM_MODELS && bank_id < BANK_COUNT)
@@ -672,13 +855,13 @@ void c_lane_widgets::create (
   //label_calib.create (ui, wp, "Calib.", 0, 0, 75, 32);
   label_frames.create (&lane_frame, "(not loaded)", 0, 0, 75, 24);
   label_frames.size = 10.5f;
-  label_frames.align = TEXT_CENTER;
+  label_frames.align = nbtk::TEXT_CENTER;
   label_trim.create (&lane_frame, "1.0", 0, 0, 75, 24);
   label_trim.size = 10.5f;
-  label_trim.align = TEXT_CENTER;
+  label_trim.align = nbtk::TEXT_CENTER;
   label_engine.create (&lane_frame, "(none)", 0, 0, 120, 24);
   label_engine.size = 10.5f;
-  label_engine.align = TEXT_CENTER;
+  label_engine.align = nbtk::TEXT_CENTER;
   
   btn_browse.set_image_default (data_icon_folder_big_png);
   btn_clear.set_image_default (data_icon_x_big_png);
@@ -691,7 +874,8 @@ void c_lane_widgets::create (
           ? ui->tk_app.backend->root_window (ui->mainwindow.native_handle (), false)
           : 0;
     filepicker.create (
-      ui, &ui->tk_app, root, native_owner, lane_id, bank_id, "Select file");
+      ui, &ui->tk_app, root, native_owner, lane_id, bank_id,
+      bank_id == BANK_CAB ? "Select IR file" : "Select model file");
     filepicker.lane = lane_id;
     filepicker.bank = bank_id;
     filepicker.clear_allowed_filters ();
@@ -707,7 +891,7 @@ void c_lane_widgets::create (
   
   menu_list.set_tooltip ("Currently loaded model/IR, lists others in same directory");
   knob_gain_in.set_tooltip ("Input going into this model (NAM)");
-  knob_ir_pitch.set_tooltip ("Shift the pitch of this IR by hundredths of a semitone");
+  knob_ir_pitch.set_tooltip ("Shift the pitch of this IR by 100ths of a semitone");
   knob_gain_out.set_tooltip ("Scale output from this model");
   knob_dry_out.set_tooltip ("Pass dry signal alongside model output");
   btn_browse.set_tooltip ("Load a model or IR (wav) file");
@@ -805,7 +989,7 @@ void c_lane_widgets::move_resize (
   //move_resize (x, y, w, h);
 }
 
-void c_lane_widgets::set_state (_widget_state state) {
+void c_lane_widgets::set_state (nbtk::_widget_state state) {
   if (lane_state == state)
     return;
 
@@ -914,39 +1098,55 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   mainwindow.set_icon_from_png (data_neuralblender_logo_512_png);
 
   //label_big.create (this, mainwindow.widget, "NeuralBlender", 120, 24, 400, 40);
-  //label_big.align = TEXT_CENTER;
+  //label_big.align = nbtk::TEXT_CENTER;
   //label_big.textsize = 1.5;
   img_logo.create (&cont_toparea, "", 0, 0, 256, 32);
   img_logo.set_png (data_textlogo_1024x128_png);
   
   const int tabbutton_padding = 14;
   btn_tab_pedals.create (&cont_toparea, "PDL", 0, 0, 84, 50);
+  btn_tab_pedals.role = ROLE_BANKSWITCH;
+  btn_tab_pedals.bank = BANK_PEDAL;
+  btn_tab_pedals.page = PAGE_PEDAL;
   btn_tab_pedals.set_image_default (data_icon_power_on_png);
   btn_tab_pedals.padding = tabbutton_padding;
   btn_tab_models.create (&cont_toparea, "AMP", 0, 0, 84, 50);
+  btn_tab_models.role = ROLE_BANKSWITCH;
+  btn_tab_models.bank = BANK_AMP;
+  btn_tab_models.page = PAGE_AMP;
   btn_tab_models.set_image_default (data_icon_power_on_png);
   btn_tab_models.padding = tabbutton_padding;
   btn_tab_cabs.create (&cont_toparea, "CAB", 0, 0, 84, 50);
+  btn_tab_cabs.role = ROLE_BANKSWITCH;
+  btn_tab_cabs.bank = BANK_CAB;
+  btn_tab_cabs.page = PAGE_CAB;
   btn_tab_cabs.set_image_default (data_icon_power_on_png);
   btn_tab_cabs.padding = tabbutton_padding;
   btn_tab_other.create (&cont_toparea, "...", 0, 0, 84, 50);
+  btn_tab_other.role = ROLE_BANKSWITCH;
+  btn_tab_other.bank = BANK_AMP;
+  btn_tab_other.page = PAGE_OTHER;
   
   btn_enable.create (&cont_toparea, "",  20, 12, 40, 40);
+  btn_enable.role = ROLE_BYPASS;
   btn_enable.is_toggle = true;
   btn_enable.set_value (true);
-  btn_enable.set_image (data_icon_power_on_png, WSTATE_ON);
-  btn_enable.set_image (data_icon_power_grey_png, WSTATE_OFF);
+  btn_enable.set_image (data_icon_power_on_png, nbtk::WSTATE_ON);
+  btn_enable.set_image (data_icon_power_grey_png, nbtk::WSTATE_OFF);
   
   //btn_muteall.create (this, mainwindow.widget, "Mute all", 500, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
   btn_muteall.create (&cont_toparea, "", 500, 12, 40, 40);
+  btn_muteall.role = ROLE_MUTEALL;
   btn_muteall.is_toggle = true;
-  btn_muteall.set_image (data_icon_speaker_off_big_png, WSTATE_ON);
-  btn_muteall.set_image (data_icon_speaker_on_big_png, WSTATE_OFF);
+  btn_muteall.set_image (data_icon_speaker_off_big_png, nbtk::WSTATE_ON);
+  btn_muteall.set_image (data_icon_speaker_on_big_png, nbtk::WSTATE_OFF);
   
   btn_noisegate.create (&cont_toparea, "", 0, 0, 40, 40);
+  btn_noisegate.role = ROLE_NOISEGATE;
   btn_noisegate.is_toggle = true;
   btn_noisegate.set_image_default (data_icon_noisegate_png);
   btn_tuner.create (&cont_toparea, "", 0, 0, 40, 40);
+  btn_tuner.role = ROLE_TUNER;
   btn_tuner.is_toggle = true;
   btn_tuner.set_image_default (data_icon_tuner_png);
   
@@ -987,7 +1187,9 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   
   frame_other_volumepresence.create (&cont_other, "", 16, 16, 512, 128);
   knob_mastervolume.create (&frame_other_volumepresence, "Master out", 16, 12, 80, 96);
+  knob_mastervolume.role = ROLE_MASTER;
   knob_presence.create (&frame_other_volumepresence, "Presence", 116, 12, 80, 96);
+  knob_presence.role = ROLE_PRESENCE;
   knob_mastervolume.set_min (-40);
   knob_mastervolume.set_max (12);
   knob_mastervolume.set_value (gain_to_db (state.master_gain));
@@ -1001,11 +1203,15 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   
   frame_other_noisegate.create (&cont_other, "", 16, 16, 512, 128);
   label_other_noisegate.create (&frame_other_noisegate, "Noise gate:", 16, 8, 200, 24);
-  label_other_noisegate.align = TEXT_LEFT;
+  label_other_noisegate.align = nbtk::TEXT_LEFT;
   knob_noisethresh.create (&frame_other_noisegate,  "Thresh",   16, 36, 64, 72);
+  knob_noisethresh.role = ROLE_NOISETHRESH;
   knob_noiseattack.create (&frame_other_noisegate,  "Attack",   76, 36, 64, 72);
+  knob_noiseattack.role = ROLE_NOISEATTACK;
   knob_noisehold.create (&frame_other_noisegate,    "Hold",    136, 36, 64, 72);
+  knob_noisehold.role = ROLE_NOISEHOLD;
   knob_noiserelease.create (&frame_other_noisegate, "Release", 196, 36, 64, 72);
+  knob_noiserelease.role = ROLE_NOISERELEASE;
   knob_noisethresh.set_min (-120);
   knob_noisethresh.set_max (-6);
   knob_noisethresh.set_value (state.noisethresh);
@@ -1036,38 +1242,65 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   label_other_byp.create (&frame_other_linkexcl, "Bypass: ",  x0, y0, 150, 32);
   label_other_link.create (&frame_other_linkexcl, "Link calibration: ", x0, y1, 150, 32);
   label_other_excl.create (&frame_other_linkexcl, "Exclusive mode: ",   x0, y2, 150, 32);
-  label_other_byp.align = TEXT_LEFT;
-  label_other_link.align = TEXT_LEFT;
-  label_other_excl.align = TEXT_LEFT;
+  label_other_byp.align = nbtk::TEXT_LEFT;
+  label_other_link.align = nbtk::TEXT_LEFT;
+  label_other_excl.align = nbtk::TEXT_LEFT;
   btn_other_byp_pedal.create (&frame_other_linkexcl, "Pedal",  x1, y0, 150, 32);
+  btn_other_byp_pedal.role = ROLE_BANK_BYPASS;
+  btn_other_byp_pedal.bank = BANK_PEDAL;
   btn_other_byp_amp.create (&frame_other_linkexcl, "Amp",      x2, y0, 150, 32);
+  btn_other_byp_amp.role = ROLE_BANK_BYPASS;
+  btn_other_byp_amp.bank = BANK_AMP;
   btn_other_byp_cab.create (&frame_other_linkexcl, "Cab/IR",   x3, y0, 150, 32);
+  btn_other_byp_cab.role = ROLE_BANK_BYPASS;
+  btn_other_byp_cab.bank = BANK_CAB;
   btn_other_link_pedal.create (&frame_other_linkexcl, "Pedal", x1, y1, 150, 32);
+  btn_other_link_pedal.role = ROLE_LINKED_CALIB;
+  btn_other_link_pedal.bank = BANK_PEDAL;
   btn_other_link_amp.create (&frame_other_linkexcl, "Amp",     x2, y1, 150, 32);
+  btn_other_link_amp.role = ROLE_LINKED_CALIB;
+  btn_other_link_amp.bank = BANK_AMP;
   btn_other_link_cab.create (&frame_other_linkexcl, "Cab/IR",  x3, y1, 150, 32);
+  btn_other_link_cab.role = ROLE_LINKED_CALIB;
+  btn_other_link_cab.bank = BANK_CAB;
   btn_other_excl_pedal.create (&frame_other_linkexcl, "Pedal", x1, y2, 150, 32);
+  btn_other_excl_pedal.role = ROLE_EXCL_TOGGLE;
+  btn_other_excl_pedal.bank = BANK_PEDAL;
   btn_other_excl_amp.create (&frame_other_linkexcl, "Amp",     x2, y2, 150, 32);
+  btn_other_excl_amp.role = ROLE_EXCL_TOGGLE;
+  btn_other_excl_amp.bank = BANK_AMP;
   btn_other_excl_cab.create (&frame_other_linkexcl, "Cab/IR",  x3, y2, 150, 32);
+  btn_other_excl_cab.role = ROLE_EXCL_TOGGLE;
+  btn_other_excl_cab.bank = BANK_CAB;
   
   frame_other_misc.create (&cont_other, "", 16, 16, 512, 128);
   label_other_tuner.create (&frame_other_misc, "Tuner base frequency: ", 16, 20, 200, 32);
   label_other_calib.create (&frame_other_misc, "Calibration target dB: ", 16, 60, 200, 32);
-  label_other_tuner.align = TEXT_LEFT;
-  label_other_calib.align = TEXT_LEFT;
+  label_other_tuner.align = nbtk::TEXT_LEFT;
+  label_other_calib.align = nbtk::TEXT_LEFT;
   btn_other_vu.create (&frame_other_misc, "VU meters", 16, 100, 200, 32);
+  btn_other_vu.role = ROLE_VUTOGGLE;
   btn_other_bass.create (&frame_other_misc, "Calibrate for bass", 16, 140, 200, 32);
+  btn_other_bass.role = ROLE_CALIBBASS;
   text_other_tuner.create (&frame_other_misc, "", 250, 14, 150, 40);
+  text_other_tuner.role = ROLE_TUNER_BASE_FREQ;
   text_other_calib.create (&frame_other_misc, "", 250, 60, 150, 40);
+  text_other_calib.role = ROLE_CALIB_TARGET_DB;
   btn_other_prefs.create (&frame_other_misc, "Settings", 0, 130, 120, 40);
+  btn_other_prefs.role = ROLE_PREFS;
   btn_other_prefs.set_image_default (data_icon_xputty_gear_png);
   btn_other_about.create (&frame_other_misc, "About...", 0, 130, 120, 40);
+  btn_other_about.role = ROLE_ABOUT;
   btn_other_about.set_image_default (data_icon_xputty_info_png);
   
   btn_other_tuner_down.create (&frame_other_misc, "", 420, 14, 40, 40);
+  btn_other_tuner_down.role = ROLE_TUNER_DOWN;
   btn_other_tuner_down.set_image_default (data_icon_flat_png);
   btn_other_tuner_up.create (&frame_other_misc, "", 468, 14, 40, 40);
+  btn_other_tuner_up.role = ROLE_TUNER_UP;
   btn_other_tuner_up.set_image_default (data_icon_sharp_png);
   btn_other_tuner_default.create (&frame_other_misc, "", 516, 14, 40, 40);
+  btn_other_tuner_default.role = ROLE_TUNER_DEFAULT;
   btn_other_tuner_default.set_image_default (data_icon_tuner_png);
   
   //tuner.create (this, mainwindow.widget, "", 0, 0, 400, 24);
@@ -1098,7 +1331,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_tab_pedals.set_tooltip ("Pedals bank");
   btn_tab_models.set_tooltip ("Amp model bank");
   btn_tab_cabs.set_tooltip ("Cab/IR bank");
-  btn_tab_other.set_tooltip ("More settings");
+  btn_tab_other.set_tooltip ("More settings, right-click to toggle current bank's exclusive mode");
   btn_enable.set_tooltip ("Master BYPASS");
   btn_muteall.set_tooltip ("Master MUTE");
   btn_tuner.set_tooltip ("Enable tuner");
@@ -1348,7 +1581,7 @@ void c_neuralblender_ui::set_linked_calib_for_bank (_lane_bank bank, bool b) {
   state.banks [bank].linked_calib = b;
 }
 
-void c_neuralblender_ui::on_bank_switch (c_widget *w, int n) { CP
+void c_neuralblender_ui::on_bank_switch (nbtk::c_widget *w, int n) { CP
   (void) w;
   if (n >= PAGE_PEDAL && n < PAGE_COUNT) {
     visible_page = (_ui_page) n;
@@ -1513,11 +1746,6 @@ void c_neuralblender_ui::on_tk_action (nbtk::t_action_event &event) {
   if (event.handled)
     return;
 
-  c_widget proxy;
-  proxy.ui = this;
-  proxy.bank = visible_bank;
-  proxy.lane = 0;
-
   auto finish = [&] () {
     event.handled = true;
     sync_widgets_from_state (state);
@@ -1530,29 +1758,25 @@ void c_neuralblender_ui::on_tk_action (nbtk::t_action_event &event) {
     if (event.source_id != button.id)
       return false;
 
-    proxy.role = ROLE_BANKSWITCH;
-    proxy.bank = bank;
-    proxy.page = page;
     const bool right_click = event.mouse_button == Button3;
     if (page == PAGE_OTHER) {
       if (visible_page != PAGE_OTHER && right_click) {
-        proxy.bank = visible_bank;
         const int exclusive_lane =
           exclusive_lane_for_bank (visible_bank) ? 0 : (int) choose_exclusive_lane ();
-        on_excl (&proxy, exclusive_lane);
+        on_excl (nullptr, exclusive_lane);
       } else if (visible_page != PAGE_OTHER) {
-        on_bank_switch (&proxy, page);
+        on_bank_switch (&button, page);
       }
     } else if (page_has_bank (page) &&
         ((right_click && prefs.bypass_rightclick) ||
         (visible_page == page && prefs.bypass_doubleclick))) {
       const bool bypass = !bank_bypass_for_state (state, bank);
       set_bank_bypass_for_state (state, bank, bypass);
-      on_bank_bypass (&proxy, bank, bypass);
+      on_bank_bypass (&button, bank, bypass);
     } else if (page_has_bank (page) && right_click) {
       // Right-click bank buttons are reserved for bank bypass when enabled.
     } else {
-      on_bank_switch (&proxy, page);
+      on_bank_switch (&button, page);
     }
     finish ();
     return true;
@@ -1568,29 +1792,27 @@ void c_neuralblender_ui::on_tk_action (nbtk::t_action_event &event) {
     if (event.source_id != button.id)
       return false;
 
-    proxy.role = role;
-    proxy.bank = bank;
     const bool value = button.value;
 
     switch (role) {
       case ROLE_BYPASS:
         state.bypass = !value;
-        on_bypass (&proxy, value);
+        on_bypass (&button, value);
       break;
 
       case ROLE_MUTEALL:
         state.mute_all = value;
-        on_muteall (&proxy, value);
+        on_muteall (&button, value);
       break;
 
       case ROLE_NOISEGATE:
         state.noisegate_on = value;
-        on_noisegate (&proxy, value);
+        on_noisegate (&button, value);
       break;
 
       case ROLE_TUNER:
         state.tuner_on = value;
-        on_tuner (&proxy, value);
+        on_tuner (&button, value);
         sync_tuner_visibility ();
       break;
 
@@ -1598,7 +1820,7 @@ void c_neuralblender_ui::on_tk_action (nbtk::t_action_event &event) {
         if (bank < BANK_COUNT) {
           const _lane_bank b = (_lane_bank) bank;
           set_bank_bypass_for_state (state, b, value);
-          on_bank_bypass (&proxy, b, value);
+          on_bank_bypass (&button, b, value);
         }
       break;
 
@@ -1608,7 +1830,7 @@ void c_neuralblender_ui::on_tk_action (nbtk::t_action_event &event) {
         if (page_has_bank (visible_page) || bank < BANK_COUNT) {
           const _lane_bank b = bank < BANK_COUNT ? (_lane_bank) bank : visible_bank;
           set_linked_calib_for_bank (b, value);
-          on_linked_calib (&proxy, value);
+          on_linked_calib (&button, value);
         }
       break;
 
@@ -1617,21 +1839,21 @@ void c_neuralblender_ui::on_tk_action (nbtk::t_action_event &event) {
           visible_bank = (_lane_bank) bank;
         if (value) {
           size_t exclusive_lane = choose_exclusive_lane ();
-          on_excl (&proxy, exclusive_lane);
+          on_excl (&button, exclusive_lane);
         } else {
-          on_excl (&proxy, 0);
+          on_excl (&button, 0);
         }
       break;
 
       case ROLE_CALIBBASS:
         state.calib_source = value ? 1 : 0;
-        on_calib_bass (&proxy, value);
+        on_calib_bass (&button, value);
       break;
 
       case ROLE_VUTOGGLE:
         state.do_vu = value;
         vu_on (value);
-        on_vu (&proxy, value);
+        on_vu (&button, value);
       break;
 
       case ROLE_PREFS:
@@ -1648,17 +1870,17 @@ void c_neuralblender_ui::on_tk_action (nbtk::t_action_event &event) {
 
       case ROLE_TUNER_UP:
         state.tuner_base_freq *= SEMITONE_MULTIPLIER;
-        on_tuner_base_freq (&proxy, state.tuner_base_freq);
+        on_tuner_base_freq (&button, state.tuner_base_freq);
       break;
 
       case ROLE_TUNER_DOWN:
         state.tuner_base_freq /= SEMITONE_MULTIPLIER;
-        on_tuner_base_freq (&proxy, state.tuner_base_freq);
+        on_tuner_base_freq (&button, state.tuner_base_freq);
       break;
 
       case ROLE_TUNER_DEFAULT:
         state.tuner_base_freq = 440.0f;
-        on_tuner_base_freq (&proxy, state.tuner_base_freq);
+        on_tuner_base_freq (&button, state.tuner_base_freq);
       break;
 
       default:
@@ -1695,37 +1917,36 @@ void c_neuralblender_ui::on_tk_action (nbtk::t_action_event &event) {
     if (event.source_id != knob.id)
       return false;
 
-    proxy.role = role;
     const float value = knob.value;
     switch (role) {
       case ROLE_MASTER:
         state.master_gain = db_to_gain (value);
-        on_master_gain (&proxy, state.master_gain);
+        on_master_gain (&knob, state.master_gain);
       break;
 
       case ROLE_PRESENCE:
         state.presence = value;
-        on_presence (&proxy, value);
+        on_presence (&knob, value);
       break;
 
       case ROLE_NOISETHRESH:
         state.noisethresh = value;
-        on_noisethresh (&proxy, value);
+        on_noisethresh (&knob, value);
       break;
 
       case ROLE_NOISEATTACK:
         state.noiseattack = value;
-        on_noiseattack (&proxy, value);
+        on_noiseattack (&knob, value);
       break;
 
       case ROLE_NOISEHOLD:
         state.noisehold = value;
-        on_noisehold (&proxy, value);
+        on_noisehold (&knob, value);
       break;
 
       case ROLE_NOISERELEASE:
         state.noiserelease = value;
-        on_noiserelease (&proxy, value);
+        on_noiserelease (&knob, value);
       break;
 
       default:
@@ -1750,12 +1971,11 @@ void c_neuralblender_ui::on_tk_action (nbtk::t_action_event &event) {
     char *end = NULL;
     const float value = std::strtof (textbox.text ().c_str (), &end);
     if (end && end != textbox.text ().c_str ()) {
-      proxy.role = role;
       if (role == ROLE_TUNER_BASE_FREQ)
-        on_tuner_base_freq (&proxy, std::clamp (value, 400.0f, 480.0f));
+        on_tuner_base_freq (&textbox, std::clamp (value, 400.0f, 480.0f));
       else if (role == ROLE_CALIB_TARGET_DB)
         on_calib_target_db (
-          &proxy,
+          &textbox,
           std::clamp (value, CALIB_TARGET_DB_MIN, CALIB_TARGET_DB_MAX));
     }
 
@@ -2003,7 +2223,7 @@ bool c_neuralblender_ui::request_window_size (int w, int h) {
   return mainwindow.request_size (w, h);
 }
 
-void c_neuralblender_ui::on_excl (c_widget *w, int n) {
+void c_neuralblender_ui::on_excl (nbtk::c_widget *w, int n) {
   const _lane_bank bank =
     w && w->bank < BANK_COUNT ? (_lane_bank) w->bank : visible_bank;
 
@@ -2011,8 +2231,6 @@ void c_neuralblender_ui::on_excl (c_widget *w, int n) {
   set_exclusive_lane_for_bank (bank, n);
   if (n > 0 && n <= (int) NB_NUM_MODELS)
     last_exclusive_lane [bank] = (size_t) n;
-  if (!w)
-    return;
 
   switch (bank) {
     case BANK_PEDAL:
@@ -2030,7 +2248,7 @@ void c_neuralblender_ui::on_excl (c_widget *w, int n) {
   //sync_widgets_from_state (state);
 }
 
-void c_neuralblender_ui::on_excl_use (c_widget *w, bool b) {
+void c_neuralblender_ui::on_excl_use (nbtk::c_widget *w, bool b) {
   (void) b;
   if (!w)
     return;
@@ -2205,7 +2423,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
         if (lane.filename.empty ()) {
           bank_lanes [i].menu_list.clear ();
         } else {
-          nbtk::c_filepicker &fp = bank_lanes [i].filepicker;
+          c_neuralblender_filepicker &fp = bank_lanes [i].filepicker;
           if (fp.current_dir.empty ()) {
             const _lane_bank lane_bank = (_lane_bank) bank;
             fp.current_dir =
@@ -2278,13 +2496,13 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
 
     if (lane.lane_mute || state.mute_all || !enabled ||
         visible_bank_bypassed) { CP
-      visible_lanes [i].set_state (WSTATE_DISABLED);
+      visible_lanes [i].set_state (nbtk::WSTATE_DISABLED);
     } else {
-      visible_lanes [i].set_state (WSTATE_NORMAL);
+      visible_lanes [i].set_state (nbtk::WSTATE_NORMAL);
     }
 
     if (exclusive_on) { CP
-      visible_lanes [i].set_state (WSTATE_DISABLED);
+      visible_lanes [i].set_state (nbtk::WSTATE_DISABLED);
       visible_lanes [i].btn_mute.hide ();
       visible_lanes [i].btn_excl.show ();
     } else { CP
@@ -2293,7 +2511,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     }
   }
   if (exclusive_on && !state.mute_all && enabled && !visible_bank_bypassed) {
-    visible_lanes [visible_exclusive_lane - 1].set_state (WSTATE_SELECTED);
+    visible_lanes [visible_exclusive_lane - 1].set_state (nbtk::WSTATE_SELECTED);
   }
 
   updating_from_state = false;

@@ -14,6 +14,25 @@
 #include <cairo/cairo.h>
 #include "native_compat.h"
 
+#define NBTK_BUTTON_RADIUS     12.0
+#define NBTK_CHECKBOX_RADIUS   8.0
+#define NBTK_COMBOBOX_RADIUS   8.0
+#define NBTK_TEXTBOX_RADIUS    8.0
+#define NBTK_MENU_RADIUS       6.0
+#define NBTK_FRAME_RADIUS      12.0
+#define NBTK_TOOLTIP_RADIUS    4.0
+#define NBTK_LIST_RADIUS       6.0
+#define NBTK_SCROLLBAR_WIDTH   16
+#define NBTK_SCROLLBAR_RADIUS  8.0
+#define NBTK_DOUBLECLICK_MS    300
+#define NBTK_MOUSEWHEEL_ROWS   2
+#define NBTK_AUTOSCROLL_MS     20
+
+class c_neuralblender_ui;
+class c_neuralblender;
+
+namespace nbtk {
+
 struct t_gradient;
 struct t_gradientcolors;
 
@@ -64,8 +83,6 @@ enum _scrollbar_orientation {
   SCROLLBAR_VERTICAL,
   SCROLLBAR_HORIZONTAL
 };
-
-namespace nbtk {
 
 using t_native_handle = nbtk_native_handle_t;
 using t_native_window = nbtk_native_window_t;
@@ -198,6 +215,12 @@ public:
   c_widget *action_parent = nullptr;
   std::vector<c_widget *> children;
   uint64_t id = 0;
+  int64_t role = -1;
+  uint64_t lane = (uint64_t) -1;
+  uint64_t bank = (uint64_t) -1;
+  uint64_t page = 0;
+  void *userdata1 = nullptr;
+  void *userdata2 = nullptr;
   
   std::string label;
   std::string tooltip;
@@ -684,7 +707,7 @@ public:
   bool visible = false;
 };
 
-class c_toplevelwindow : public c_nativewindow {
+class c_basetoplevelwindow : public c_nativewindow {
 public:
   void on_close () override;
 };
@@ -804,56 +827,6 @@ protected:
   bool base_image_valid = false;
 };
 
-} // namespace nbtk
-
-enum _widget_role {
-  ROLE_NONE = 0,
-  ROLE_BANKSWITCH,
-  ROLE_ABOUT,
-  ROLE_ABOUTOK,
-  ROLE_PREFS,
-  ROLE_PREFSDEFAULTS,
-  ROLE_PREFSOK,
-  ROLE_PREFSCANCEL,
-  ROLE_MUTE,
-  ROLE_MUTEALL,
-  ROLE_BROWSE,
-  ROLE_LOADFILE,
-  ROLE_CLEAR,
-  ROLE_GAIN_IN,
-  ROLE_IR_PITCH,
-  ROLE_GAIN_OUT,
-  ROLE_DRY_OUT,
-  ROLE_DELAY,
-  ROLE_DCFLIP,
-  ROLE_CALIBRATE,
-  ROLE_CALIBBASS,
-  ROLE_NOISEGATE,
-  ROLE_VUTOGGLE,
-  ROLE_BANK_BYPASS,
-  ROLE_LINKED_CALIB,
-  ROLE_EXCL_TOGGLE,
-  ROLE_ADV_TOGGLE,
-  ROLE_EXCL_USE,
-  ROLE_BYPASS,
-  ROLE_MASTER,
-  ROLE_PRESENCE,
-  ROLE_NOISETHRESH,
-  ROLE_NOISEATTACK,
-  ROLE_NOISEHOLD,
-  ROLE_NOISERELEASE,
-  ROLE_TUNER,
-  ROLE_TUNER_BASE_FREQ,
-  ROLE_TUNER_DOWN,
-  ROLE_TUNER_UP,
-  ROLE_TUNER_DEFAULT,
-  ROLE_CALIB_TARGET_DB,
-  ROLE_UNKNOWN
-};
-
-class c_neuralblender_ui;
-class c_neuralblender;
-
 typedef struct t_gradientcolors {
   float r1 = 0.00, g1 = 0.00, b1 = 0.00, a1 = 1.00,
         r2 = 0.00, g2 = 0.00, b2 = 0.00, a2 = 1.00;
@@ -928,84 +901,18 @@ void tk_path_rounded_rect (cairo_t *cr,
     double r);
 void tk_set_gradient (cairo_t *cr, double h, const t_gradientcolors &colors);
 
+} // namespace nbtk
+
 std::string path_dirname (const std::string &path);
 std::string path_basename (const std::string &path);
 bool is_supported_model_filename (const std::string &path);
 
-class c_widget {
+namespace nbtk {
+
+class c_native_toplevelwindow {
 public:
-  virtual void create (
-      c_neuralblender_ui *ui,
-      nbtk::t_native_handle parent,
-      const char *label,
-      int x, int y, int w, int h);
-  
-  virtual void move_resize (int x, int y, int w, int h);
-  virtual void move (int x, int y);
-  virtual void resize (int w, int h);
-  virtual bool set_label (const char *label);
-  virtual bool set_tooltip (const char *text);
-  // TODO: complete key event propagation/dispatch, widget focus etc.
-  virtual bool on_keydown (XKeyEvent *key);
-  virtual bool on_keyup (XKeyEvent *key);
-  virtual void show ();
-  virtual void hide ();
-  virtual void focus ();
-  virtual void clear_focus ();
-  virtual void on_focus_lost ();
-  
-  void set_state (_widget_state state);
-  const t_gradientcolors *bg_override_for_state (_widget_state state) const;
-  const t_gradientcolors *fg_override_for_state (_widget_state state) const;
-  void expose ();
-  
-  bool get_label_size (int *w, int *h, const char *text = NULL);
-  
-  // -1 for padding x/y means stay at that size
-  void shrinkwrap (int padding_x = 16, int padding_y = -1);
-  int x ();
-  int y ();
-  int w ();
-  int h ();
-  
-  std::string label;
-  std::string tooltip;
-  _widget_role role        = ROLE_UNKNOWN;
-  _widget_style wstyle     = WSTYLE_UNKNOWN;
-  _widget_state wstate     = WSTATE_UNKNOWN;
-  bool created             = false;
-  uint64_t id              = -1;
-  uint64_t lane            = -1;
-  uint64_t bank            = -1;
-  uint64_t page            = 0;
-  int corner_radius        = 4;
-  float text_size          = 1.0;
-  float text_r             = 1.0;
-  float text_g             = 1.0;
-  float text_b             = 1.0;
-  float padding            = 8.0;
-  const t_gradientcolors *bg_colors = NULL;
-  const t_gradientcolors *active_bg_colors = NULL;
-  const t_gradientcolors *active_fg_colors = NULL;
-  const t_gradientcolors *highlight_bg_colors = NULL;
-  const t_gradientcolors *highlight_fg_colors = NULL;
-  const t_gradientcolors *disabled_bg_colors = NULL;
-  const t_gradientcolors *disabled_fg_colors = NULL;
-  nbtk::t_native_handle widget = nullptr;
-  
-  void *userdata1          = NULL;
-  void *userdata2          = NULL;
+  virtual ~c_native_toplevelwindow () = default;
 
-  // backpointers to parent/related objects
-  nbtk::t_native_handle parent = nullptr;
-  c_widget *parent_struct  = NULL;
-  c_neuralblender_ui *ui   = NULL;
-  nbtk::c_filepicker *filepicker = NULL;
-
-};
-
-class c_toplevelwindow : public c_widget {
-public:
   bool create (
       c_neuralblender_ui *ui,
       nbtk::t_native_window parent,
@@ -1025,14 +932,16 @@ public:
   nbtk::t_native_handle native_handle () const;
   bool get_metrics (int *w, int *h, bool *visible = nullptr) const;
   void force_draw ();
-  void set_mouse_cursor (_mouse_cursor cursor);
-  void set_focused_widget (c_widget *w);
+  void set_mouse_cursor (nbtk::_mouse_cursor cursor);
   void clear_focus ();
+  int x ();
+  int y ();
+  int w ();
+  int h ();
   
   virtual void on_expose ();
   virtual void on_resize ();
   virtual void on_configure_notify ();
-  bool on_keydown (XKeyEvent *key) override;
   virtual void on_tk_action (nbtk::t_action_event &event);
   virtual void on_close ()  {};
   
@@ -1042,17 +951,20 @@ public:
   static void cb_key_press (void *w, void *event, void *user_data);
   static void cb_close (void *w, void *user_data);
   
+  uint64_t id = 0;
+  std::string label;
+  c_neuralblender_ui *ui = NULL;
+  nbtk::t_native_handle widget = nullptr;
   Window window = 0;
   Window parent = 0;
-  c_widget *focused_widget = NULL;
 };
 
-class c_tktoplevelwindow;
+class c_toplevelwindow;
 
 class c_tkappbridge : public nbtk::c_app {
 public:
   void invalidate_rect (int x, int y, int w, int h) override;
-  void set_mouse_cursor (_mouse_cursor cursor) override;
+  void set_mouse_cursor (nbtk::_mouse_cursor cursor) override;
   void set_focus (nbtk::c_widget *widget) override;
   void clear_focus (nbtk::c_widget *widget = nullptr) override;
   std::unique_ptr<nbtk::c_popupwindow> create_popup (
@@ -1063,13 +975,13 @@ public:
   nbtk::t_point screen_to_root (nbtk::t_point p) const override;
   void on_action (nbtk::t_action_event &event) override;
 
-  c_tktoplevelwindow *native_window = NULL;
-  c_tktoplevelwindow *action_owner = NULL;
+  c_toplevelwindow *native_window = NULL;
+  c_toplevelwindow *action_owner = NULL;
 };
 
-class c_tktoplevelwindow : public c_toplevelwindow {
+class c_toplevelwindow : public c_native_toplevelwindow {
 public:
-  ~c_tktoplevelwindow ();
+  ~c_toplevelwindow ();
 
   bool create_tk (
       c_neuralblender_ui *ui,
@@ -1118,33 +1030,30 @@ private:
   int tk_surface_h = 0;
 };
 
-namespace nbtk {
-
-class c_filepicker : public ::c_tktoplevelwindow {
+class c_filepicker : public c_toplevelwindow {
 public:
   void create (
-      c_neuralblender_ui *ui,
+      ::c_neuralblender_ui *ui,
       c_tkappbridge *tk_app,
       t_native_window parent,
       t_native_handle owner,
-      size_t lane,
-      uint64_t bank,
       const char *title);
 
-  void show ();
+  virtual void show ();
   void hide ();
   void on_resize () override;
   void on_tk_action (t_action_event &event) override;
   bool on_tk_key_down (int key) override;
 
-  void sync_owner_metadata ();
   void scan_current_dir ();
-  void add_files_from_dir (c_combobox *cb);
+  virtual void add_files_from_dir (
+      c_combobox *cb,
+      const std::string &selected_file = "");
   void clear_allowed_filters ();
   void add_allowed_filter (std::string filter, std::string filter_label);
   void set_active_filter (int index);
   std::string get_current_dir () const;
-  void set_current_dir (std::string str);
+  virtual void set_current_dir (std::string str);
   bool is_visible () const;
   std::string selected_path () const;
 
@@ -1172,84 +1081,3 @@ public:
 };
 
 } // namespace nbtk
-
-class c_mainwindow : public c_tktoplevelwindow {
-public:
-  bool create (
-      c_neuralblender_ui *ui,
-      Window parent,
-      const char *title,
-      int x, int y, int w, int h,
-      nbtk::t_native_handle owner = nullptr);
-
-  void show ();
-  void show_children ();
-  void on_expose () override;
-  void on_resize () override;
-  void on_configure_notify () override;
-  void on_tk_action (nbtk::t_action_event &event) override;
-
-private:
-  bool children_mapped = false;
-};
-
-#include "meter.h"
-
-class c_meterwidget : public nbtk::c_canvas {
-public:
-  void create (nbtk::c_widget *parent,
-               const char *label,
-               int x, int y, int w, int h);
-
-  void show ();
-  void hide ();
-  void move_resize (int x, int y, int w, int h) override;
-  void move (int x, int y) override;
-  void resize (int w, int h) override;
-
-  void set_db_scale (float f);
-  void set_headroom (float f);
-  void set_vudata (c_vudata *v);
-  c_vudata *get_vudata ();
-  bool needs_redraw ();
-  void on_ui_timer ();
-
-  void set_stereo (bool b);
-  void set_l (float level, float hold, bool clip = false, bool xrun = false);
-  void set_r (float level, float hold, bool clip = false, bool xrun = false);
-  void set_compression_gain (float gain);
-  void set_compression_db (float db);
-
-  bool created = false;
-  bool vertical = false;
-  int width = 0;
-  int height = 0;
-  int clip_size = 0;
-  int rec_size = 0;
-  bool rec_enabled = false;
-  c_vudata *data = NULL;
-  float db_scale = DEFAULT_VU_DB;
-
-protected:
-  void render_base (cairo_t *cr) override;
-  void on_paint (cairo_t *cr) override;
-  void on_resize (int w, int h) override;
-
-private:
-  void draw_bar (cairo_t *cr, int at, int th, float level, float hold);
-  void draw_warning_text (cairo_t *cr, const char *text, double x, double y,
-                          double w, double h);
-  void update_geometry ();
-
-  float compressor_gain = 1.0f;
-  bool stereo = true;
-  int met_len = -1;
-  float headroom = DEFAULT_VU_HEADROOM;
-  int ln = 0;
-  int th = 0;
-  int t1 = 0;
-  int t2 = 0;
-  int t3 = 0;
-  int t4 = 0;
-  int tp = 1;
-};

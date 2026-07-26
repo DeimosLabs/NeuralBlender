@@ -12,10 +12,6 @@
 #include <cstdint>
 #include <atomic>
 
-//#ifndef METER_DATA_ONLY
-//#include "ui.h"
-//#endif
-
 #ifdef min
 #undef min
 #endif
@@ -106,3 +102,68 @@ private:
   size_t m_timestamp_xrun_l = 0;
   size_t m_timestamp_xrun_r = 0;
 };
+
+#ifdef HAVE_GUI
+
+#include "widgets.h"
+
+class c_meterwidget : public nbtk::c_canvas {
+public:
+  void create (nbtk::c_widget *parent,
+               const char *label,
+               int x, int y, int w, int h);
+
+  void show ();
+  void hide ();
+  void move_resize (int x, int y, int w, int h) override;
+  void move (int x, int y) override;
+  void resize (int w, int h) override;
+
+  void set_db_scale (float f);
+  void set_headroom (float f);
+  void set_vudata (c_vudata *v);
+  c_vudata *get_vudata ();
+  bool needs_redraw ();
+  void on_ui_timer ();
+
+  void set_stereo (bool b);
+  void set_l (float level, float hold, bool clip = false, bool xrun = false);
+  void set_r (float level, float hold, bool clip = false, bool xrun = false);
+  void set_compression_gain (float gain);
+  void set_compression_db (float db);
+
+  bool created = false;
+  bool vertical = false;
+  int width = 0;
+  int height = 0;
+  int clip_size = 0;
+  int rec_size = 0;
+  bool rec_enabled = false;
+  c_vudata *data = NULL;
+  float db_scale = DEFAULT_VU_DB;
+
+protected:
+  void render_base (cairo_t *cr) override;
+  void on_paint (cairo_t *cr) override;
+  void on_resize (int w, int h) override;
+
+private:
+  void draw_bar (cairo_t *cr, int at, int th, float level, float hold);
+  void draw_warning_text (cairo_t *cr, const char *text, double x, double y,
+                          double w, double h);
+  void update_geometry ();
+
+  float compressor_gain = 1.0f;
+  bool stereo = true;
+  int met_len = -1;
+  float headroom = DEFAULT_VU_HEADROOM;
+  int ln = 0;
+  int th = 0;
+  int t1 = 0;
+  int t2 = 0;
+  int t3 = 0;
+  int t4 = 0;
+  int tp = 1;
+};
+
+#endif

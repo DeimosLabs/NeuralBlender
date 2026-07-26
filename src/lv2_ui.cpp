@@ -44,7 +44,7 @@ uint32_t c_lv2_ui::lane_port (size_t lane, uint32_t first) const {
   return nb_lv2_lane_port (lane, first);
 }
 
-static uint32_t widget_lane_port (const c_widget *w, uint32_t param) {
+static uint32_t widget_lane_port (const nbtk::c_widget *w, uint32_t param) {
   const _lane_bank bank =
     w && w->bank < BANK_COUNT ? (_lane_bank) w->bank : BANK_AMP;
   const size_t lane =
@@ -160,43 +160,43 @@ bool c_lv2_ui::load_model (
   return write_model_path (bank, which, filename);
 }
 
-void c_lv2_ui::on_gain_in (c_widget *w, float f) {
+void c_lv2_ui::on_gain_in (nbtk::c_widget *w, float f) {
   CP
   write_control (widget_lane_port (w, NB_LV2_LANE_GAIN_IN), gain_to_db (f));
 }
 
-void c_lv2_ui::on_ir_pitch (c_widget *w, float f) {
+void c_lv2_ui::on_ir_pitch (nbtk::c_widget *w, float f) {
   CP
   write_control (widget_lane_port (w, NB_LV2_LANE_IR_PITCH), f);
 }
 
-void c_lv2_ui::on_gain_out (c_widget *w, float f) {
+void c_lv2_ui::on_gain_out (nbtk::c_widget *w, float f) {
   CP
   write_control (widget_lane_port (w, NB_LV2_LANE_GAIN_OUT), gain_to_db (f));
 }
 
-void c_lv2_ui::on_dry_out (c_widget *w, float f) {
+void c_lv2_ui::on_dry_out (nbtk::c_widget *w, float f) {
   CP
   write_control (widget_lane_port (w, NB_LV2_LANE_DRY_OUT), gain_to_db (f));
 }
 
-void c_lv2_ui::on_delay (c_widget *w, float f) {
+void c_lv2_ui::on_delay (nbtk::c_widget *w, float f) {
   CP
   write_control (widget_lane_port (w, NB_LV2_LANE_DELAY), f);
 }
 
-void c_lv2_ui::on_filebrowse (c_widget *w) {
+void c_lv2_ui::on_filebrowse (nbtk::c_widget *w) {
   (void) w;
   CP
 }
 
-void c_lv2_ui::on_fileselected (c_widget *w, const char *path) {
+void c_lv2_ui::on_fileselected (nbtk::c_widget *w, const char *path) {
   (void) w;
   (void) path;
   CP
 }
 
-void c_lv2_ui::on_fileclear (c_widget *w) {
+void c_lv2_ui::on_fileclear (nbtk::c_widget *w) {
   CP
   const _lane_bank bank =
     w->bank < BANK_COUNT ? (_lane_bank) w->bank : BANK_AMP;
@@ -204,29 +204,29 @@ void c_lv2_ui::on_fileclear (c_widget *w) {
   write_model_path (bank, w->lane, "");
 }
 
-void c_lv2_ui::on_mute (c_widget *w, bool b) {
+void c_lv2_ui::on_mute (nbtk::c_widget *w, bool b) {
   CP
   write_control (widget_lane_port (w, NB_LV2_LANE_MUTE), b ? 1.0f : 0.0f);
 }
 
-void c_lv2_ui::on_dcflip (c_widget *w, bool b) {
+void c_lv2_ui::on_dcflip (nbtk::c_widget *w, bool b) {
   CP
   write_control (widget_lane_port (w, NB_LV2_LANE_DCFLIP), b ? 1.0f : 0.0f);
 }
 
-void c_lv2_ui::on_calibrate (c_widget *w, bool b) {
+void c_lv2_ui::on_calibrate (nbtk::c_widget *w, bool b) {
   CP
   write_control (
     widget_lane_port (w, NB_LV2_LANE_CALIBRATE), b ? 1.0f : 0.0f);
 }
 
-void c_lv2_ui::on_muteall (c_widget *w, bool b) {
+void c_lv2_ui::on_muteall (nbtk::c_widget *w, bool b) {
   (void) w;
   CP
   write_control (PORT_MUTE_ALL, b ? 1.0f : 0.0f);
 }
 
-void c_lv2_ui::on_excl (c_widget *w, int n) {
+void c_lv2_ui::on_excl (nbtk::c_widget *w, int n) {
   const _lane_bank bank =
     w && w->bank < BANK_COUNT ? (_lane_bank) w->bank : visible_bank;
 
@@ -249,13 +249,13 @@ void c_lv2_ui::on_excl (c_widget *w, int n) {
   sync_widgets_from_state (state);
 }
 
-void c_lv2_ui::on_bypass (c_widget *w, bool b) {
+void c_lv2_ui::on_bypass (nbtk::c_widget *w, bool b) {
   (void) w;
   CP
   write_control (PORT_BYPASS, b ? 1.0f : 0.0f);
 }
 
-void c_lv2_ui::on_bank_bypass (c_widget *w, _lane_bank bank, bool b) {
+void c_lv2_ui::on_bank_bypass (nbtk::c_widget *w, _lane_bank bank, bool b) {
   (void) w;
   CP
   switch (bank) {
@@ -274,18 +274,18 @@ void c_lv2_ui::on_bank_bypass (c_widget *w, _lane_bank bank, bool b) {
   }
 }
 
-void c_lv2_ui::on_about (c_widget *w) {
+void c_lv2_ui::on_about (nbtk::c_widget *w) {
   (void) w;
   CP
 }
 
-void c_lv2_ui::on_vu (c_widget *w, bool b) {
+void c_lv2_ui::on_vu (nbtk::c_widget *w, bool b) {
   (void) w;
   CP
   write_control (PORT_VU_ENABLE, b ? 1.0f : 0.0f);
 }
 
-void c_lv2_ui::on_linked_calib (c_widget *w, bool b) {
+void c_lv2_ui::on_linked_calib (nbtk::c_widget *w, bool b) {
   (void) w;
   CP
   set_linked_calib_for_bank (visible_bank, b);
@@ -305,85 +305,85 @@ void c_lv2_ui::on_linked_calib (c_widget *w, bool b) {
   }
 }
 
-void c_lv2_ui::on_calib_bass (c_widget *w, bool b) {
+void c_lv2_ui::on_calib_bass (nbtk::c_widget *w, bool b) {
   (void) w;
   CP
   state.calib_source = b ? 1 : 0;
   write_control (PORT_CALIB_SOURCE, b ? 1.0f : 0.0f);
 }
 
-void c_lv2_ui::on_noisegate (c_widget *w, bool b) {
+void c_lv2_ui::on_noisegate (nbtk::c_widget *w, bool b) {
   (void) w;
   CP
   state.noisegate_on = b;
   write_control (PORT_NOISEGATE_ENABLED, b ? 1.0f : 0.0f);
 }
 
-void c_lv2_ui::on_noisethresh (c_widget *w, float f) {
+void c_lv2_ui::on_noisethresh (nbtk::c_widget *w, float f) {
   (void) w;
   CP
   state.noisethresh = f;
   write_control (PORT_NOISEGATE_THRESHOLD, f);
 }
 
-void c_lv2_ui::on_noiseattack (c_widget *w, float f) {
+void c_lv2_ui::on_noiseattack (nbtk::c_widget *w, float f) {
   (void) w;
   CP
   state.noiseattack = f;
   write_control (PORT_NOISEGATE_ATTACK, f);
 }
 
-void c_lv2_ui::on_noisehold (c_widget *w, float f) {
+void c_lv2_ui::on_noisehold (nbtk::c_widget *w, float f) {
   (void) w;
   CP
   state.noisehold = f;
   write_control (PORT_NOISEGATE_HOLD, f);
 }
 
-void c_lv2_ui::on_noiserelease (c_widget *w, float f) {
+void c_lv2_ui::on_noiserelease (nbtk::c_widget *w, float f) {
   (void) w;
   CP
   state.noiserelease = f;
   write_control (PORT_NOISEGATE_RELEASE, f);
 }
 
-void c_lv2_ui::on_threshgain (c_widget *w, float f) {
+void c_lv2_ui::on_threshgain (nbtk::c_widget *w, float f) {
   (void) w;
   set_threshgain (f);
 }
 
-void c_lv2_ui::on_tuner (c_widget *w, bool b) {
+void c_lv2_ui::on_tuner (nbtk::c_widget *w, bool b) {
   (void) w;
   CP
   state.tuner_on = b;
   write_control (PORT_TUNER_ON, b ? 1.0f : 0.0f);
 }
 
-void c_lv2_ui::on_tuner_base_freq (c_widget *w, float f) {
+void c_lv2_ui::on_tuner_base_freq (nbtk::c_widget *w, float f) {
   (void) w;
   state.tuner_base_freq = f;
   write_control (PORT_TUNER_BASE_FREQ, f);
 }
 
-void c_lv2_ui::on_calib_target_db (c_widget *w, float f) {
+void c_lv2_ui::on_calib_target_db (nbtk::c_widget *w, float f) {
   (void) w;
   state.calib_target_db = f;
   write_control (PORT_CALIB_TARGET_DB, f);
 }
 
-void c_lv2_ui::on_master_gain (c_widget *w, float f) {
+void c_lv2_ui::on_master_gain (nbtk::c_widget *w, float f) {
   (void) w;
   state.master_gain = db_to_gain (f);
   write_control (PORT_MASTER_GAIN, f);
 }
 
-void c_lv2_ui::on_presence (c_widget *w, float f) {
+void c_lv2_ui::on_presence (nbtk::c_widget *w, float f) {
   (void) w;
   state.presence = f;
   write_control (PORT_PRESENCE, f);
 }
 
-void c_lv2_ui::on_bank_switch (c_widget *w, int n) {
+void c_lv2_ui::on_bank_switch (nbtk::c_widget *w, int n) {
   c_neuralblender_ui::on_bank_switch (w, n);
   write_control (PORT_ACTIVE_PAGE, (float) visible_page);
 }

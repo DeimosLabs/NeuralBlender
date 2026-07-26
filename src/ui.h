@@ -30,20 +30,7 @@
 #include "widgets.h"
 #include "tuner.h"
 
-#define UI_BUTTON_RADIUS     12.0
-#define UI_CHECKBOX_RADIUS   8.0
-#define UI_COMBOBOX_RADIUS   8.0
-#define UI_TEXTBOX_RADIUS    8.0
-#define UI_MENU_RADIUS       6.0
-#define UI_FRAME_RADIUS      12.0
-#define UI_TOOLTIP_RADIUS    4.0
-#define UI_LIST_RADIUS       6.0
-#define UI_SCROLLBAR_WIDTH   16
-#define UI_SCROLLBAR_RADIUS  8.0
 #define UI_STATS_PER_LANE    NB_STATS_PER_LANE
-#define UI_DOUBLECLICK_MS    300
-#define UI_MOUSEWHEEL_ROWS   2
-#define UI_AUTOSCROLL_MS     20
 
 enum _ui_page {
   PAGE_PEDAL = 0,
@@ -51,6 +38,51 @@ enum _ui_page {
   PAGE_CAB,
   PAGE_OTHER,
   PAGE_COUNT
+};
+
+enum _widget_role {
+  ROLE_NONE = 0,
+  ROLE_BANKSWITCH,
+  ROLE_ABOUT,
+  ROLE_ABOUTOK,
+  ROLE_PREFS,
+  ROLE_PREFSDEFAULTS,
+  ROLE_PREFSOK,
+  ROLE_PREFSCANCEL,
+  ROLE_MUTE,
+  ROLE_MUTEALL,
+  ROLE_BROWSE,
+  ROLE_LOADFILE,
+  ROLE_CLEAR,
+  ROLE_GAIN_IN,
+  ROLE_IR_PITCH,
+  ROLE_GAIN_OUT,
+  ROLE_DRY_OUT,
+  ROLE_DELAY,
+  ROLE_DCFLIP,
+  ROLE_CALIBRATE,
+  ROLE_CALIBBASS,
+  ROLE_NOISEGATE,
+  ROLE_VUTOGGLE,
+  ROLE_BANK_BYPASS,
+  ROLE_LINKED_CALIB,
+  ROLE_EXCL_TOGGLE,
+  ROLE_ADV_TOGGLE,
+  ROLE_EXCL_USE,
+  ROLE_BYPASS,
+  ROLE_MASTER,
+  ROLE_PRESENCE,
+  ROLE_NOISETHRESH,
+  ROLE_NOISEATTACK,
+  ROLE_NOISEHOLD,
+  ROLE_NOISERELEASE,
+  ROLE_TUNER,
+  ROLE_TUNER_BASE_FREQ,
+  ROLE_TUNER_DOWN,
+  ROLE_TUNER_UP,
+  ROLE_TUNER_DEFAULT,
+  ROLE_CALIB_TARGET_DB,
+  ROLE_UNKNOWN
 };
 
 class c_neuralblender;
@@ -69,7 +101,7 @@ typedef struct {
 bool read_prefs_from_config  (c_configfile &configfile, t_prefs &prefs);
 bool write_prefs_to_config   (c_configfile &configfile, const t_prefs &prefs);
 
-class c_prefswindow : public c_tktoplevelwindow {
+class c_prefswindow : public nbtk::c_toplevelwindow {
 public:
   void create (c_neuralblender_ui *ui);
   void show ();
@@ -97,9 +129,7 @@ public:
   nbtk::c_checkbox btn_show_tooltips;
 };
 
-class c_aboutwindow;
-
-class c_aboutwindow : public c_tktoplevelwindow {
+class c_aboutwindow : public nbtk::c_toplevelwindow {
 public:
   void create (c_neuralblender_ui *ui);
 
@@ -120,7 +150,47 @@ public:
   nbtk::c_scrollbar test_scrollbar;
 };
 
-class c_lane_widgets;
+class c_neuralblendermainwindow : public nbtk::c_toplevelwindow {
+public:
+  bool create (
+      c_neuralblender_ui *ui,
+      Window parent,
+      const char *title,
+      int x, int y, int w, int h,
+      nbtk::t_native_handle owner = nullptr);
+
+  void show ();
+  void show_children ();
+  void on_expose () override;
+  void on_resize () override;
+  void on_configure_notify () override;
+  void on_tk_action (nbtk::t_action_event &event) override;
+
+private:
+  bool children_mapped = false;
+};
+
+class c_neuralblender_filepicker : public nbtk::c_filepicker {
+public:
+  void create (
+      c_neuralblender_ui *ui,
+      nbtk::c_tkappbridge *tk_app,
+      nbtk::t_native_window parent,
+      nbtk::t_native_handle owner,
+      size_t lane,
+      uint64_t bank,
+      const char *title);
+
+  void show () override;
+  void set_current_dir (std::string str) override;
+  void add_files_from_dir (
+      nbtk::c_combobox *cb,
+      const std::string &selected_file = "") override;
+  void on_file_select (const std::string &filename) override;
+
+  size_t lane = (size_t) -1;
+  uint64_t bank = (uint64_t) -1;
+};
 
 class c_lane_widgets {
 public:
@@ -136,7 +206,7 @@ public:
       int x, int y, int w, int h);
 	      
   void move_resize (int x, int y, int w, int h);
-  void set_state (_widget_state state);
+  void set_state (nbtk::_widget_state state);
   
   //bool user_mute = false;
   size_t lane_id = -1;
@@ -147,7 +217,7 @@ public:
   nbtk::t_native_handle main_widget = nullptr;
   nbtk::c_widget lane_root;
   nbtk::c_frame lane_frame;
-  _widget_state lane_state = WSTATE_NORMAL;
+  nbtk::_widget_state lane_state = nbtk::WSTATE_NORMAL;
   bool created = false;
   //c_container cont_regcontrols;
   //c_container cont_advcontrols;
@@ -172,12 +242,11 @@ public:
   nbtk::c_label label_trim;
   nbtk::c_label label_engine;
   
-  nbtk::c_filepicker filepicker;
+  c_neuralblender_filepicker filepicker;
   
   //c_meterwidget meter_in; // we only have one input
   c_meterwidget meter_out;
   c_vudata vudata_out;
-  c_widget proxy;
 
   void on_tk_action (nbtk::t_action_event &event);
   
@@ -227,38 +296,38 @@ public:
 
   bool load_model (size_t which, const char *filename);
   virtual bool load_model (_lane_bank bank, size_t which, const char *filename) = 0;
-  virtual void on_gain_in (c_widget *w, float f)               = 0;
-  virtual void on_ir_pitch (c_widget *w, float f)              = 0;
-  virtual void on_gain_out (c_widget *w, float f)              = 0;
-  virtual void on_dry_out (c_widget *w, float f)               = 0;
-  virtual void on_delay (c_widget *w, float f)                 = 0;
-  virtual void on_filebrowse (c_widget *w)                     = 0;
-  virtual void on_fileselected (c_widget *w, const char *path) = 0;
-  virtual void on_fileclear (c_widget *w)                      = 0;
-  virtual void on_mute (c_widget *w, bool b)                   = 0;
-  virtual void on_muteall (c_widget *w, bool b)                = 0;
-  virtual void on_dcflip (c_widget *w, bool b)                 = 0;
-  virtual void on_calibrate (c_widget *w, bool b)              = 0;
-  virtual void on_vu (c_widget *w, bool b)                     = 0;
-  virtual void on_linked_calib (c_widget *w, bool b)           = 0;
-  virtual void on_calib_bass (c_widget *w, bool b)             = 0;
-  virtual void on_bypass (c_widget *w, bool b)                 = 0;
-  virtual void on_bank_bypass (c_widget *w, _lane_bank bank, bool b) = 0;
-  virtual void on_noisegate (c_widget *w, bool b)              = 0;
-  virtual void on_noisethresh (c_widget *w, float f)           = 0;
-  virtual void on_noiseattack (c_widget *w, float f)           = 0;
-  virtual void on_noisehold (c_widget *w, float f)             = 0;
-  virtual void on_noiserelease (c_widget *w, float f)          = 0;
-  virtual void on_tuner (c_widget *w, bool b)                  = 0;
-  virtual void on_tuner_base_freq (c_widget *w, float f)       = 0;
-  virtual void on_calib_target_db (c_widget *w, float f)       = 0;
-  virtual void on_master_gain (c_widget *w, float f)           = 0;
-  virtual void on_presence (c_widget *w, float f)              = 0;
-  virtual void on_threshgain (c_widget *w, float f)            = 0;
-  virtual void on_excl (c_widget *w, int n)                       ; // UI only
-          void on_excl_use (c_widget *w, bool b)                  ;
+  virtual void on_gain_in (nbtk::c_widget *w, float f)               = 0;
+  virtual void on_ir_pitch (nbtk::c_widget *w, float f)              = 0;
+  virtual void on_gain_out (nbtk::c_widget *w, float f)              = 0;
+  virtual void on_dry_out (nbtk::c_widget *w, float f)               = 0;
+  virtual void on_delay (nbtk::c_widget *w, float f)                 = 0;
+  virtual void on_filebrowse (nbtk::c_widget *w)                     = 0;
+  virtual void on_fileselected (nbtk::c_widget *w, const char *path) = 0;
+  virtual void on_fileclear (nbtk::c_widget *w)                      = 0;
+  virtual void on_mute (nbtk::c_widget *w, bool b)                   = 0;
+  virtual void on_muteall (nbtk::c_widget *w, bool b)                = 0;
+  virtual void on_dcflip (nbtk::c_widget *w, bool b)                 = 0;
+  virtual void on_calibrate (nbtk::c_widget *w, bool b)              = 0;
+  virtual void on_vu (nbtk::c_widget *w, bool b)                     = 0;
+  virtual void on_linked_calib (nbtk::c_widget *w, bool b)           = 0;
+  virtual void on_calib_bass (nbtk::c_widget *w, bool b)             = 0;
+  virtual void on_bypass (nbtk::c_widget *w, bool b)                 = 0;
+  virtual void on_bank_bypass (nbtk::c_widget *w, _lane_bank bank, bool b) = 0;
+  virtual void on_noisegate (nbtk::c_widget *w, bool b)              = 0;
+  virtual void on_noisethresh (nbtk::c_widget *w, float f)           = 0;
+  virtual void on_noiseattack (nbtk::c_widget *w, float f)           = 0;
+  virtual void on_noisehold (nbtk::c_widget *w, float f)             = 0;
+  virtual void on_noiserelease (nbtk::c_widget *w, float f)          = 0;
+  virtual void on_tuner (nbtk::c_widget *w, bool b)                  = 0;
+  virtual void on_tuner_base_freq (nbtk::c_widget *w, float f)       = 0;
+  virtual void on_calib_target_db (nbtk::c_widget *w, float f)       = 0;
+  virtual void on_master_gain (nbtk::c_widget *w, float f)           = 0;
+  virtual void on_presence (nbtk::c_widget *w, float f)              = 0;
+  virtual void on_threshgain (nbtk::c_widget *w, float f)            = 0;
+  virtual void on_excl (nbtk::c_widget *w, int n)                       ; // UI only
+          void on_excl_use (nbtk::c_widget *w, bool b)                  ;
           void on_tk_action (nbtk::t_action_event &event)         ;
-  virtual void on_bank_switch (c_widget *w, int n)                ;
+  virtual void on_bank_switch (nbtk::c_widget *w, int n)                ;
           void sync_page_visibility ()                            ;
           void ensure_tuner_created ()                            ;
           void sync_tuner_visibility ()                           ;
@@ -276,8 +345,8 @@ public:
   nbtk::t_native_window window;
   c_neuralblender *blender = NULL;
   nbtk::t_native_app app;
-  c_tkappbridge tk_app;
-  c_mainwindow mainwindow;
+  nbtk::c_tkappbridge tk_app;
+  c_neuralblendermainwindow mainwindow;
   c_aboutwindow aboutwindow;
   c_prefswindow prefswindow;
   nbtk::t_native_window parent;
