@@ -109,7 +109,7 @@ public:
   void hide ();
   
   void on_resize () override;
-  void on_tk_action (nbtk::t_action_event &event) override;
+  void on_action (nbtk::t_action_event &event) override;
   void get_prefs_from (t_prefs &prefs);
   void set_prefs_to   (t_prefs &prefs);
   void load_defaults ();
@@ -140,7 +140,7 @@ public:
   void hide ();
   
   void on_resize () override;
-  void on_tk_action (nbtk::t_action_event &event);
+  void on_action (nbtk::t_action_event &event);
 
   c_neuralblender_ui *ui = NULL;
   nbtk::c_frame frame_main;
@@ -167,7 +167,7 @@ public:
   void on_expose () override;
   void on_resize () override;
   void on_configure_notify () override;
-  void on_tk_action (nbtk::t_action_event &event) override;
+  void on_action (nbtk::t_action_event &event) override;
 
 private:
   c_neuralblender_ui *ui = NULL;
@@ -253,7 +253,7 @@ public:
   c_meterwidget meter_out;
   c_vudata vudata_out;
 
-  void on_tk_action (nbtk::t_action_event &event);
+  void on_action (nbtk::t_action_event &event);
   
   int last_x = 0;
   int last_y = 0;
@@ -331,7 +331,7 @@ public:
   virtual void on_threshgain (nbtk::c_widget *w, float f)            = 0;
   virtual void on_excl (nbtk::c_widget *w, int n)                       ; // UI only
           void on_excl_use (nbtk::c_widget *w, bool b)                  ;
-          void on_tk_action (nbtk::t_action_event &event)         ;
+          void on_action (nbtk::t_action_event &event)         ;
   virtual void on_bank_switch (nbtk::c_widget *w, int n)                ;
           void sync_page_visibility ()                            ;
           void ensure_tuner_created ()                            ;

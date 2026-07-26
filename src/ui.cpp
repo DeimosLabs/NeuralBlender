@@ -27,7 +27,7 @@
 #define MIN_WINDOW_WIDTH 620
 #define DEFAULT_WINDOW_WIDTH MIN_WINDOW_WIDTH
 
-#define METER_WIDTH 5
+#define METER_WIDTH 6
 
 extern const char *g_build_timestamp;
 
@@ -94,7 +94,7 @@ void c_neuralblendermainwindow::show () {
     return;
 
   children_mapped = false;
-  widget_show (widget);
+  nbtk::c_toplevelwindow::show ();
 }
 
 void c_neuralblendermainwindow::show_children () {
@@ -118,18 +118,17 @@ void c_neuralblendermainwindow::on_resize () { CP
   if (!widget || !ui)
     return;
 
-  Metrics_t metrics;
-  os_get_window_metrics (widget, &metrics);
-  if (!metrics.visible)
+  int width = 0;
+  int height = 0;
+  bool visible = false;
+  if (!get_metrics (&width, &height, &visible) || !visible)
     return;
 
   debug ("mainwindow resize: metrics=%d,%d init=%d,%d",
-         (int) metrics.width, (int) metrics.height,
+         width, height,
          widget->scale.init_width, widget->scale.init_height);
   nbtk::c_toplevelwindow::on_resize ();
-  ui->on_window_resize (
-      metrics.width / widget->app->hdpi,
-      metrics.height / widget->app->hdpi);
+  ui->on_window_resize (width, height);
 }
 
 void c_neuralblendermainwindow::on_configure_notify () {
@@ -140,9 +139,9 @@ void c_neuralblendermainwindow::on_configure_notify () {
   ui->on_window_configured ();
 }
 
-void c_neuralblendermainwindow::on_tk_action (nbtk::t_action_event &event) {
+void c_neuralblendermainwindow::on_action (nbtk::t_action_event &event) {
   if (ui)
-    ui->on_tk_action (event);
+    ui->on_action (event);
 }
 
 bool is_supported_model_filename (const std::string &path) {
@@ -265,10 +264,10 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
     return;
   set_min_size_to_current ();
 
-  frame1.create (&tk_root, "", 12, 12, w () - 24, h () - 80);
-  btn_ok.create (&tk_root, "OK", 0, 0, 128, 40);
+  frame1.create (&root_widget, "", 12, 12, w () - 24, h () - 80);
+  btn_ok.create (&root_widget, "OK", 0, 0, 128, 40);
   btn_ok.set_image_default (data_icon_xputty_approved_png);
-  btn_cancel.create (&tk_root, "Cancel", 0, 0, 128, 40);
+  btn_cancel.create (&root_widget, "Cancel", 0, 0, 128, 40);
   btn_cancel.set_image_default (data_icon_xputty_cancel_png);
 
   label_vuscale.create (&frame1, "VU meter scale dB:", 16, 32, 180, 32);
@@ -313,7 +312,7 @@ void c_prefswindow::on_resize () { CP
   btn_defaults.move_resize (12, frame1.h - 50, frame1.w - 24, 40);
 }
 
-void c_prefswindow::on_tk_action (nbtk::t_action_event &event) {
+void c_prefswindow::on_action (nbtk::t_action_event &event) {
   if (event.mouse_button != Button1)
     return;
 
@@ -423,7 +422,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
     return;
 
   set_min_size_to_current ();
-  nbtk::c_widget *root = &tk_root;
+  nbtk::c_widget *root = &root_widget;
   const int panel_x = 12;
   const int panel_y = 12;
   const int panel_w = 424;
@@ -464,15 +463,14 @@ void c_aboutwindow::show () { CP
   if (!widget)
     return;
 
-  widget_show_all (widget);
-  expose_widget (widget);
+  nbtk::c_toplevelwindow::show ();
 }
 
 void c_aboutwindow::hide () { CP
   if (!widget)
     return;
 
-  widget_hide (widget);
+  nbtk::c_toplevelwindow::hide ();
 }
 
 void c_aboutwindow::on_resize () { CP
@@ -481,7 +479,7 @@ void c_aboutwindow::on_resize () { CP
   c_toplevelwindow::on_resize ();
 }
 
-void c_aboutwindow::on_tk_action (nbtk::t_action_event &event) {
+void c_aboutwindow::on_action (nbtk::t_action_event &event) {
   if (event.source_id == btn_ok.id && event.mouse_button == Button1) {
     hide ();
     event.handled = true;
@@ -568,7 +566,7 @@ void c_neuralblender_filepicker::on_file_select (
 ////////////////////////////////////////////////////////////////////////////////
 // c_lane_widgets
 
-void c_lane_widgets::on_tk_action (nbtk::t_action_event &event) {
+void c_lane_widgets::on_action (nbtk::t_action_event &event) {
   if (!ui || ui->updating_from_state)
     return;
 
@@ -915,7 +913,7 @@ void c_lane_widgets::move_resize (
   last_w = w;
   last_h = h;
 
-  const int meter_x = w + 6;
+  const int meter_x = w + 5;
   const int host_w = std::max (w, meter_x + METER_WIDTH);
   lane_root.move_resize (x, y, host_w, h);
   lane_frame.move_resize (0, 0, w, h);
@@ -1089,11 +1087,11 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
     return false;
   }
   
-  cont_toparea.create (&mainwindow.tk_root, "", 0, 0, 640, 50);
-  cont_pedals.create (&mainwindow.tk_root, "", 0, 120, 640, 480);
-  cont_models.create (&mainwindow.tk_root, "", 0, 120, 640, 480);
-  cont_cabs.create (&mainwindow.tk_root, "", 0, 120, 640, 480);
-  cont_other.create (&mainwindow.tk_root, "", 0, 120, 640, 480);
+  cont_toparea.create (&mainwindow.root_widget, "", 0, 0, 640, 50);
+  cont_pedals.create (&mainwindow.root_widget, "", 0, 120, 640, 480);
+  cont_models.create (&mainwindow.root_widget, "", 0, 120, 640, 480);
+  cont_cabs.create (&mainwindow.root_widget, "", 0, 120, 640, 480);
+  cont_other.create (&mainwindow.root_widget, "", 0, 120, 640, 480);
   
   mainwindow.set_icon_from_png (data_neuralblender_logo_512_png);
 
@@ -1157,7 +1155,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   
   aboutwindow.create (this);
   prefswindow.create (this);
-  mainwindow.activate_tk ();
+  mainwindow.activate ();
   
   for (i = 0; i < NB_NUM_MODELS; i++) {
     lanes_pedals [i].create (
@@ -1167,11 +1165,11 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
     lanes_cabs [i].create (
     this, &cont_cabs, mainwindow.native_handle (), BANK_CAB, i, 0, 0, 1, 1);
   }
-  meter_in [PAGE_PEDAL].create (&cont_pedals, "", 6, 70, 5, 520);
-  meter_in [PAGE_AMP].create (&cont_models, "", 6, 70, 5, 520);
-  meter_in [PAGE_CAB].create (&cont_cabs, "", 6, 70, 5, 520);
-  meter_in [PAGE_OTHER].create (&cont_other, "", 6, 70, 5, 520);
-  meter_masterout.create (&cont_other, "", 6, 70, 5, 520);
+  meter_in [PAGE_PEDAL].create (&cont_pedals, "", 6, 70, METER_WIDTH, 520);
+  meter_in [PAGE_AMP].create (&cont_models, "", 6, 70, METER_WIDTH, 520);
+  meter_in [PAGE_CAB].create (&cont_cabs, "", 6, 70, METER_WIDTH, 520);
+  meter_in [PAGE_OTHER].create (&cont_other, "", 6, 70, METER_WIDTH, 520);
+  meter_masterout.create (&cont_other, "", 6, 70, METER_WIDTH, 520);
 
   for (i = 0; i < BANK_COUNT; i++) {
     meter_in [i].set_vudata (&vudata_in [i]);
@@ -1443,25 +1441,53 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     if (tuner.created)
       tuner.move_resize (4, 4, window_width - 8, tuner_height);
     
-    const int lane_bottom = lane_top + lane_count * lane_height + total_gap;
     const int panelwidth = window_width - 32;
-    const int meter_h = std::max (1, page_h - 10);
-    const int meter_top = lane_top + 4;
+    auto lane_meter_span = [] (c_lane_widgets *lanes, int count,
+                               int *top, int *height) {
+      int meter_top = 0;
+      int meter_bottom = 0;
+      bool have_meter = false;
+
+      for (int i = 0; i < count; ++i) {
+        const int y0 = lanes [i].lane_root.y + lanes [i].meter_out.y;
+        const int y1 = y0 + lanes [i].meter_out.h;
+        if (!have_meter) {
+          meter_top = y0;
+          meter_bottom = y1;
+          have_meter = true;
+        } else {
+          meter_top = std::min (meter_top, y0);
+          meter_bottom = std::max (meter_bottom, y1);
+        }
+      }
+
+      *top = meter_top;
+      *height = std::max (1, meter_bottom - meter_top);
+    };
+    int meter_top = 0;
+    int meter_h = std::max (1, page_h);
       
+    c_lane_widgets *meter_ref_lanes = lanes_for_bank (visible_bank);
     if (page_has_bank (visible_page)) {
       size_t i;
-      c_lane_widgets *bank_lanes = lanes_for_bank (visible_bank);
       for (i = 0; i < NB_NUM_MODELS; i++) {
-        bank_lanes [i].move_resize (
+        meter_ref_lanes [i].move_resize (
           16, lane_top + i * (lane_height + lane_gap), lane_width, lane_height);
       }
+      lane_meter_span (meter_ref_lanes, NB_NUM_MODELS, &meter_top, &meter_h);
       
       meter_in [visible_bank].move_resize (
-        5, meter_top, 5, meter_h /*std::max (1, lane_bottom - lane_top - 8)*/);
+        5, meter_top, METER_WIDTH, meter_h);
     } else {
+      for (int i = 0; i < NB_NUM_MODELS; i++) {
+        meter_ref_lanes [i].move_resize (
+          16, lane_top + i * (lane_height + lane_gap), lane_width, lane_height);
+      }
+      lane_meter_span (meter_ref_lanes, NB_NUM_MODELS, &meter_top, &meter_h);
+
       meter_in [PAGE_OTHER].move_resize (5, meter_top, METER_WIDTH, meter_h);
       meter_masterout.move_resize (
-        window_width - 5 - METER_WIDTH, meter_top, METER_WIDTH, meter_h);
+        window_width - 4 - METER_WIDTH, meter_top, METER_WIDTH, meter_h);
       frame_other_volumepresence.move_resize (16, 0, panelwidth / 2 - 12, 120);
       frame_other_noisegate.move_resize (panelwidth / 2 + 16, 0, panelwidth / 2, 120);
       frame_other_linkexcl.move_resize (16, 132, panelwidth, 140);
@@ -1736,14 +1762,14 @@ static void sync_bank_tab_icon (
       : data_icon_power_on_png);
 }
 
-void c_neuralblender_ui::on_tk_action (nbtk::t_action_event &event) {
+void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
   if (updating_from_state)
     return;
 
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT && !event.handled; ++bank) {
     c_lane_widgets *bank_lanes = lanes_for_bank ((_lane_bank) bank);
     for (size_t i = 0; i < NB_NUM_MODELS && !event.handled; ++i)
-      bank_lanes [i].on_tk_action (event);
+      bank_lanes [i].on_action (event);
   }
   if (event.handled)
     return;

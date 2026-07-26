@@ -25,6 +25,10 @@ namespace nbtk {
 struct t_native_childlist;
 struct t_native_widget;
 struct t_native_app;
+
+using t_native_handle = t_native_widget *;
+using t_native_window = Window;
+using t_native_display = Display *;
 }
 
 typedef void (*xevfunc)(void *widget, void *user_data);
@@ -226,40 +230,37 @@ struct nbtk::t_native_widget {
   bool dirty;
 };
 
-typedef nbtk::t_native_widget *nbtk_native_handle_t;
-typedef Window nbtk_native_window_t;
-typedef Display *nbtk_native_display_t;
-typedef nbtk::t_native_app nbtk_native_app_t;
+void native_app_init (nbtk::t_native_app *app);
+void native_app_shutdown (nbtk::t_native_app *app);
+void native_app_run_events (nbtk::t_native_app *app);
+void native_app_flush_dirty (nbtk::t_native_app *app);
 
-void main_init (nbtk::t_native_app *app);
-void main_quit (nbtk::t_native_app *app);
-void run_embedded (nbtk::t_native_app *app);
-void draw_dirty_widgets (nbtk::t_native_app *app);
+nbtk::t_native_widget *native_create_window (nbtk::t_native_app *app, Window parent, int x, int y, int w, int h);
+void native_widget_show (nbtk::t_native_widget *w);
+void native_widget_show_all (nbtk::t_native_widget *w);
+void native_widget_hide (nbtk::t_native_widget *w);
+void native_widget_draw (nbtk::t_native_widget *w, void *user_data);
+void native_widget_set_title (nbtk::t_native_widget *w, const char *title);
+void native_widget_set_icon_from_png (nbtk::t_native_widget *w, const unsigned char *png);
+void native_widget_invalidate (nbtk::t_native_widget *w);
 
-nbtk::t_native_widget *create_window (nbtk::t_native_app *app, Window parent, int x, int y, int w, int h);
-void widget_show (nbtk::t_native_widget *w);
-void widget_show_all (nbtk::t_native_widget *w);
-void widget_hide (nbtk::t_native_widget *w);
-void widget_draw (nbtk::t_native_widget *w, void *user_data);
-void widget_set_title (nbtk::t_native_widget *w, const char *title);
-void widget_set_icon_from_png (nbtk::t_native_widget *w, const unsigned char *png);
-void expose_widget (nbtk::t_native_widget *w);
-
-Window os_get_root_window (nbtk::t_native_app *app, int flag);
-void os_get_window_metrics (nbtk::t_native_widget *w, Metrics_t *metrics);
-void os_set_window_min_size (
+Window native_get_root_window (nbtk::t_native_app *app, int flag);
+void native_get_window_metrics (nbtk::t_native_widget *w, Metrics_t *metrics);
+void native_set_window_min_size (
     nbtk::t_native_widget *w, int min_width, int min_height, int base_width, int base_height);
-void os_move_window (Display *dpy, nbtk::t_native_widget *w, int x, int y);
-void os_resize_window (Display *dpy, nbtk::t_native_widget *w, int w_, int h_);
-void os_translate_coords (
+void native_move_window (Display *dpy, nbtk::t_native_widget *w, int x, int y);
+void native_resize_window (Display *dpy, nbtk::t_native_widget *w, int w_, int h_);
+void native_translate_coords (
     nbtk::t_native_widget *w, Window from_window, Window to_window,
     int from_x, int from_y, int *to_x, int *to_y);
-void os_register_wm_delete_window (nbtk::t_native_widget *w);
-void os_set_window_attrb (nbtk::t_native_widget *w);
-void os_set_transient_for_hint (nbtk::t_native_widget *parent, nbtk::t_native_widget *child);
-void os_set_input_mask (nbtk::t_native_widget *w);
+void native_register_wm_delete_window (nbtk::t_native_widget *w);
+void native_set_window_attributes (nbtk::t_native_widget *w);
+void native_set_transient_for_hint (nbtk::t_native_widget *parent, nbtk::t_native_widget *child);
+void native_set_input_mask (nbtk::t_native_widget *w);
+int native_key_from_event (void *event);
+int native_text_from_event (void *event, char *text, int text_size);
 
-void childlist_add_child (nbtk::t_native_childlist *list, nbtk::t_native_widget *child);
+void native_childlist_add_child (nbtk::t_native_childlist *list, nbtk::t_native_widget *child);
 
 void set_widget_color (
     nbtk::t_native_widget *w, Color_state st, Color_mod mod,

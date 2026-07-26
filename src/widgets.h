@@ -4,9 +4,9 @@
  *
  * This started out as a set of wrapper classes around xputty to make it
  * more fit to my style of coding, but then it quickly grew into its own
- * mini-toolkit. I'm keeping it separate from the DSP and UI code, since it
- * may be reused in other projects. Huge thanks to Codex for lots of
- * help with this!!
+ * lightweight UI toolkit. I'm keeping it separate from the DSP and UI code,
+ * since it may be reused in other projects. Huge thanks to Codex for lots
+ * of help with this!!
  */
 
 #pragma once
@@ -19,20 +19,20 @@
 #include <cairo/cairo.h>
 #include "native_compat.h"
 
-#define NBTK_BUTTON_RADIUS     8.0
-#define NBTK_CHECKBOX_RADIUS   6.0
-#define NBTK_COMBOBOX_RADIUS   8.0
-#define NBTK_TEXTBOX_RADIUS    8.0
-#define NBTK_MENU_RADIUS       6.0
-#define NBTK_FRAME_RADIUS      12.0
-#define NBTK_TOOLTIP_RADIUS    4.0
-#define NBTK_LIST_RADIUS       6.0
-#define NBTK_SCROLLBAR_WIDTH   16
-#define NBTK_SCROLLBAR_RADIUS  8.0
-#define NBTK_COMBOBOX_POPUP_MAX_WIDTH 640
-#define NBTK_DOUBLECLICK_MS    300
-#define NBTK_MOUSEWHEEL_ROWS   2
-#define NBTK_AUTOSCROLL_MS     20
+#define NBTK_BUTTON_RADIUS      8.0
+#define NBTK_CHECKBOX_RADIUS    6.0
+#define NBTK_COMBOBOX_RADIUS    8.0
+#define NBTK_TEXTBOX_RADIUS     8.0
+#define NBTK_MENU_RADIUS        6.0
+#define NBTK_FRAME_RADIUS       12.0
+#define NBTK_TOOLTIP_RADIUS     4.0
+#define NBTK_LIST_RADIUS        6.0
+#define NBTK_SCROLLBAR_WIDTH    16
+#define NBTK_SCROLLBAR_RADIUS   8.0
+#define NBTK_POPUP_MAX_WIDTH    640
+#define NBTK_DOUBLECLICK_MS     300
+#define NBTK_MOUSEWHEEL_ROWS    2
+#define NBTK_AUTOSCROLL_MS      20
 
 namespace nbtk {
 
@@ -86,10 +86,6 @@ enum _scrollbar_orientation {
   SCROLLBAR_VERTICAL,
   SCROLLBAR_HORIZONTAL
 };
-
-using t_native_handle = nbtk_native_handle_t;
-using t_native_window = nbtk_native_window_t;
-using t_native_display = nbtk_native_display_t;
 
 struct t_point {
   int x = 0;
@@ -680,6 +676,7 @@ public:
   virtual bool request_size (t_native_handle widget, int w, int h) = 0;
   virtual void move_resize (t_native_handle widget, int x, int y, int w, int h) = 0;
   virtual void set_mouse_cursor (t_native_handle widget, _mouse_cursor cursor) = 0;
+  virtual void set_keyboard_focus (t_native_handle widget) = 0;
   virtual t_native_window root_window (t_native_handle widget, bool is_widget) const = 0;
   virtual t_point root_to_screen (t_native_handle widget, t_point p) const = 0;
   virtual t_point screen_to_root (t_native_handle widget, t_point p) const = 0;
@@ -934,7 +931,7 @@ public:
   virtual void on_expose ();
   virtual void on_resize ();
   virtual void on_configure_notify ();
-  virtual void on_tk_action (nbtk::t_action_event &event);
+  virtual void on_action (nbtk::t_action_event &event);
   virtual void on_close ()  {};
   
   static void cb_expose (void *w, void *user_data);
@@ -948,8 +945,8 @@ public:
   c_app *app_context = NULL;
   c_native_backend *backend = NULL;
   nbtk::t_native_handle widget = nullptr;
-  Window window = 0;
-  Window parent = 0;
+  nbtk::t_native_window window = 0;
+  nbtk::t_native_window parent = 0;
 };
 
 class c_toplevelwindow : public c_native_toplevelwindow {
@@ -957,7 +954,7 @@ public:
   ~c_toplevelwindow ();
 
   bool create (
-      c_app *widget_app,
+      c_app *app,
       nbtk::t_native_window parent,
       const char *title,
       int x, int y, int w, int h,
@@ -967,11 +964,11 @@ public:
   void on_configure_notify () override;
   void on_expose () override;
   void on_close () override;
-  virtual bool on_tk_key_down (int key);
+  virtual bool on_key_down (int key);
   void set_min_size (int w, int h) override;
   void redraw_child (nbtk::c_widget &child, int pad = 1);
-  void activate_tk ();
-  void save_tk_state ();
+  void activate ();
+  void save_state ();
   void auto_hide_on_close (bool b = true);
   void auto_quit_on_close (bool b = true);
 
@@ -983,8 +980,8 @@ public:
   static void cb_key_press (void *w, void *event, void *user_data);
   static void cb_key_release (void *w, void *event, void *user_data);
 
-  c_app *widget_app = NULL;
-  nbtk::c_widget tk_root;
+  c_app *app = NULL;
+  nbtk::c_widget root_widget;
   nbtk::c_widget *focused_widget = NULL;
   nbtk::c_widget *hovered_widget = NULL;
   bool mouse_captured = false;
@@ -993,19 +990,19 @@ public:
   bool handling_close = false;
 
 private:
-  void clear_tk_buffer ();
-  bool ensure_tk_buffer (int w, int h);
+  void clear_buffer ();
+  bool ensure_buffer (int w, int h);
 
-  cairo_surface_t *tk_surface = NULL;
-  cairo_t *tk_cr = NULL;
-  int tk_surface_w = 0;
-  int tk_surface_h = 0;
+  cairo_surface_t *buffer_surface = NULL;
+  cairo_t *buffer_cr = NULL;
+  int buffer_surface_w = 0;
+  int buffer_surface_h = 0;
 };
 
 class c_filepicker : public c_toplevelwindow {
 public:
   void create (
-      c_app *widget_app,
+      c_app *app,
       t_native_window parent,
       t_native_handle owner,
       const char *title);
@@ -1013,8 +1010,8 @@ public:
   virtual void show ();
   void hide ();
   void on_resize () override;
-  void on_tk_action (t_action_event &event) override;
-  bool on_tk_key_down (int key) override;
+  void on_action (t_action_event &event) override;
+  bool on_key_down (int key) override;
 
   void scan_current_dir ();
   virtual void add_files_from_dir (

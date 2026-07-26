@@ -8,13 +8,360 @@
 #include <cstring>
 #include <vector>
 
-#include "native_compat.h"
+#include "widgets.h"
 
 struct nbtk::t_native_childlist {
   std::vector<nbtk::t_native_widget *> children;
 };
 
 static Atom g_wm_delete_window = 0;
+
+static nbtk::t_native_widget *as_native_widget (nbtk::t_native_handle handle) {
+  return (nbtk::t_native_widget *) handle;
+}
+
+static unsigned long x11_color_pixel (
+    Display *display,
+    const nbtk::t_gradientcolors &colors) {
+
+  if (!display)
+    return 0;
+
+  const int screen = DefaultScreen (display);
+  XColor color {};
+  color.red   = (unsigned short) (std::clamp (colors.r1, 0.0f, 1.0f) * 65535.0f);
+  color.green = (unsigned short) (std::clamp (colors.g1, 0.0f, 1.0f) * 65535.0f);
+  color.blue  = (unsigned short) (std::clamp (colors.b1, 0.0f, 1.0f) * 65535.0f);
+  color.flags = DoRed | DoGreen | DoBlue;
+
+  if (XAllocColor (
+          display,
+          DefaultColormap (display, screen),
+          &color))
+    return color.pixel;
+
+  return BlackPixel (display, screen);
+}
+
+static void set_x11_window_background (
+    nbtk::t_native_widget *w,
+    const nbtk::t_gradientcolors &colors) {
+
+  if (!w || !w->app || !w->app->dpy || !w->widget)
+    return;
+
+  Display *display = w->app->dpy;
+  XSetWindowBackground (display, w->widget, x11_color_pixel (display, colors));
+  XClearWindow (display, w->widget);
+}
+
+static void disable_x11_window_background (nbtk::t_native_widget *w) {
+  if (!w || !w->app || !w->app->dpy || !w->widget)
+    return;
+
+  XSetWindowBackgroundPixmap (w->app->dpy, w->widget, None);
+}
+
+static void set_window_hints (Display *display, Window window, int w, int h) {
+  if (!display || !window)
+    return;
+
+  XSizeHints *hints = XAllocSizeHints ();
+  if (!hints)
+    return;
+
+  hints->flags = PMinSize | PBaseSize;
+  hints->min_width = w;
+  hints->min_height = h;
+  hints->base_width = w;
+  hints->base_height = h;
+  XSetWMNormalHints (display, window, hints);
+  XFree (hints);
+}
+
+namespace nbtk {
+
+class c_x11_native_backend : public c_native_backend {
+public:
+  void init_app (t_native_app *app) override {
+    if (app)
+      native_app_init (app);
+  }
+
+  void shutdown_app (t_native_app *app) override {
+    if (app)
+      native_app_shutdown (app);
+  }
+
+  void run_events (t_native_app *app) override {
+    if (app)
+      native_app_run_events (app);
+  }
+
+  void flush_dirty (t_native_app *app) override {
+    if (app)
+      native_app_flush_dirty (app);
+  }
+
+  bool is_running (const t_native_app *app) const override {
+    return app && app->run;
+  }
+
+  t_native_display display (const t_native_app *app) const override {
+    return app ? app->dpy : nullptr;
+  }
+
+  t_native_window default_root_window (t_native_display display) const override {
+    return display ? DefaultRootWindow (display) : 0;
+  }
+
+  bool window_size (
+      t_native_display display,
+      t_native_window window,
+      double hdpi,
+      int *w,
+      int *h) const override {
+
+    if (!display || !window || !w || !h)
+      return false;
+
+    XWindowAttributes attr {};
+    if (!XGetWindowAttributes (display, window, &attr))
+      return false;
+
+    if (attr.width <= 0 || attr.height <= 0)
+      return false;
+
+    const double scale = hdpi > 0.0 ? hdpi : 1.0;
+    *w = (int) (attr.width / scale);
+    *h = (int) (attr.height / scale);
+    return *w > 0 && *h > 0;
+  }
+
+  void invalidate (t_native_handle handle) override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (widget)
+      native_widget_invalidate (widget);
+  }
+
+  void flush (t_native_handle handle) override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (widget && widget->app && widget->app->dpy)
+      XFlush (widget->app->dpy);
+  }
+
+  bool grab_pointer (t_native_handle handle) override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (!widget || !widget->app || !widget->app->dpy)
+      return false;
+
+    const int grab = XGrabPointer (
+        widget->app->dpy,
+        widget->widget,
+        False,
+        ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+        GrabModeAsync,
+        GrabModeAsync,
+        None,
+        None,
+        CurrentTime);
+    return grab == GrabSuccess;
+  }
+
+  void ungrab_pointer (t_native_handle handle) override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (widget && widget->app && widget->app->dpy)
+      XUngrabPointer (widget->app->dpy, CurrentTime);
+  }
+
+  bool query_pointer (t_native_handle handle, t_point *local) const override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (!widget || !widget->app || !widget->app->dpy || !local)
+      return false;
+
+    Window root_return = 0;
+    Window child_return = 0;
+    int root_x = 0;
+    int root_y = 0;
+    int win_x = 0;
+    int win_y = 0;
+    unsigned int mask_return = 0;
+    if (!XQueryPointer (
+        widget->app->dpy,
+        widget->widget,
+        &root_return,
+        &child_return,
+        &root_x,
+        &root_y,
+        &win_x,
+        &win_y,
+        &mask_return))
+      return false;
+
+    const float hdpi = widget->app->hdpi;
+    local->x = (int) (win_x / hdpi);
+    local->y = (int) (win_y / hdpi);
+    return true;
+  }
+
+  void set_window_background (
+      t_native_handle handle,
+      const nbtk::t_gradientcolors &colors) override {
+    set_x11_window_background (as_native_widget (handle), colors);
+  }
+
+  void disable_window_background (t_native_handle handle) override {
+    disable_x11_window_background (as_native_widget (handle));
+  }
+
+  void set_min_size (t_native_handle handle, int w, int h) override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (!widget || !widget->app || !widget->app->dpy)
+      return;
+
+    const float hdpi = widget->app->hdpi > 0.0f ? widget->app->hdpi : 1.0f;
+    const int native_w = std::max (1, (int) (w * hdpi));
+    const int native_h = std::max (1, (int) (h * hdpi));
+    Display *display = widget->app->dpy;
+    set_window_hints (display, widget->widget, native_w, native_h);
+
+    Window root = 0;
+    Window parent = 0;
+    Window *children = NULL;
+    unsigned int nchildren = 0;
+    Window current = widget->widget;
+
+    for (int depth = 0; depth < 8; ++depth) {
+      if (!XQueryTree (
+          display,
+          current,
+          &root,
+          &parent,
+          &children,
+          &nchildren))
+        break;
+
+      if (children)
+        XFree (children);
+
+      if (!parent || parent == root)
+        break;
+
+      set_window_hints (display, parent, native_w, native_h);
+      current = parent;
+    }
+  }
+
+  bool request_size (t_native_handle handle, int w, int h) override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (!widget || !widget->app || !widget->app->dpy)
+      return false;
+
+    const float hdpi = widget->app->hdpi;
+    native_resize_window (
+        widget->app->dpy,
+        widget,
+        std::max (1, (int) (w * hdpi)),
+        std::max (1, (int) (h * hdpi)));
+    return true;
+  }
+
+  void move_resize (t_native_handle handle, int x, int y, int w, int h) override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (!widget || !widget->app)
+      return;
+
+    const float hdpi = widget->app->hdpi;
+    native_move_window (
+        widget->app->dpy,
+        widget,
+        (int) (x * hdpi),
+        (int) (y * hdpi));
+    native_resize_window (
+        widget->app->dpy,
+        widget,
+        std::max (1, (int) (w * hdpi)),
+        std::max (1, (int) (h * hdpi)));
+  }
+
+  void set_mouse_cursor (t_native_handle handle, nbtk::_mouse_cursor cursor) override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (!widget || !widget->app || !widget->app->dpy)
+      return;
+
+    if (cursor == MOUSE_CURSOR_HAND) {
+      Cursor xcursor = XCreateFontCursor (widget->app->dpy, XC_hand2);
+      XDefineCursor (widget->app->dpy, widget->widget, xcursor);
+      XFreeCursor (widget->app->dpy, xcursor);
+    } else {
+      XUndefineCursor (widget->app->dpy, widget->widget);
+    }
+  }
+
+  void set_keyboard_focus (t_native_handle handle) override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (widget && widget->app && widget->app->dpy)
+      XSetInputFocus (
+          widget->app->dpy,
+          widget->widget,
+          RevertToParent,
+          CurrentTime);
+  }
+
+  t_native_window root_window (t_native_handle handle, bool is_widget) const override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (!widget || !widget->app)
+      return 0;
+
+    return native_get_root_window (widget->app, is_widget ? IS_WIDGET : IS_WINDOW);
+  }
+
+  t_point root_to_screen (t_native_handle handle, t_point p) const override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (!widget || !widget->app)
+      return p;
+
+    int sx = p.x;
+    int sy = p.y;
+    const float hdpi = widget->app->hdpi;
+    native_translate_coords (
+        widget,
+        widget->widget,
+        root_window (handle, true),
+        (int) (p.x * hdpi),
+        (int) (p.y * hdpi),
+        &sx,
+        &sy);
+
+    return { (int) (sx / hdpi), (int) (sy / hdpi) };
+  }
+
+  t_point screen_to_root (t_native_handle handle, t_point p) const override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (!widget || !widget->app)
+      return p;
+
+    int rx = p.x;
+    int ry = p.y;
+    const float hdpi = widget->app->hdpi;
+    native_translate_coords (
+        widget,
+        root_window (handle, true),
+        widget->widget,
+        (int) (p.x * hdpi),
+        (int) (p.y * hdpi),
+        &rx,
+        &ry);
+
+    return { (int) (rx / hdpi), (int) (ry / hdpi) };
+  }
+};
+
+std::unique_ptr<c_native_backend> create_native_backend () {
+  return std::make_unique<c_x11_native_backend> ();
+}
+
+} // namespace nbtk
 
 static void init_colors (XColor_t *scheme) {
   if (!scheme)
@@ -111,7 +458,7 @@ static void ensure_cairo (nbtk::t_native_widget *w) {
   w->crb = cairo_create (w->buffer);
 }
 
-void main_init (nbtk::t_native_app *app) {
+void native_app_init (nbtk::t_native_app *app) {
   if (!app)
     return;
 
@@ -129,7 +476,7 @@ void main_init (nbtk::t_native_app *app) {
     g_wm_delete_window = XInternAtom (app->dpy, "WM_DELETE_WINDOW", False);
 }
 
-void main_quit (nbtk::t_native_app *app) {
+void native_app_shutdown (nbtk::t_native_app *app) {
   if (!app)
     return;
 
@@ -165,7 +512,7 @@ static void dispatch_event (nbtk::t_native_app *app, XEvent &event) {
   switch (event.type) {
     case Expose:
       if (event.xexpose.count == 0)
-        widget_draw (w, nullptr);
+        native_widget_draw (w, nullptr);
       break;
     case ConfigureNotify:
       while (app && app->dpy) {
@@ -234,7 +581,7 @@ static void dispatch_event (nbtk::t_native_app *app, XEvent &event) {
   }
 }
 
-void draw_dirty_widgets (nbtk::t_native_app *app) {
+void native_app_flush_dirty (nbtk::t_native_app *app) {
   if (!app || !app->childlist)
     return;
 
@@ -244,7 +591,7 @@ void draw_dirty_widgets (nbtk::t_native_app *app) {
       continue;
 
     w->dirty = false;
-    widget_draw (w, nullptr);
+    native_widget_draw (w, nullptr);
     drew = true;
   }
 
@@ -252,7 +599,7 @@ void draw_dirty_widgets (nbtk::t_native_app *app) {
     XFlush (app->dpy);
 }
 
-void run_embedded (nbtk::t_native_app *app) {
+void native_app_run_events (nbtk::t_native_app *app) {
   if (!app || !app->dpy)
     return;
 
@@ -262,10 +609,10 @@ void run_embedded (nbtk::t_native_app *app) {
     dispatch_event (app, event);
   }
 
-  draw_dirty_widgets (app);
+  native_app_flush_dirty (app);
 }
 
-nbtk::t_native_widget *create_window (nbtk::t_native_app *app, Window parent, int x, int y, int w_, int h_) {
+nbtk::t_native_widget *native_create_window (nbtk::t_native_app *app, Window parent, int x, int y, int w_, int h_) {
   if (!app || !app->dpy)
     return nullptr;
 
@@ -297,12 +644,12 @@ nbtk::t_native_widget *create_window (nbtk::t_native_app *app, Window parent, in
   w->widget = XCreateSimpleWindow (
       app->dpy, parent, x, y, w->width, w->height, 0, bg, bg);
 
-  os_set_input_mask (w);
-  childlist_add_child (app->childlist, w);
+  native_set_input_mask (w);
+  native_childlist_add_child (app->childlist, w);
   return w;
 }
 
-void widget_show (nbtk::t_native_widget *w) {
+void native_widget_show (nbtk::t_native_widget *w) {
   if (!w || !w->app || !w->app->dpy)
     return;
   XMapWindow (w->app->dpy, w->widget);
@@ -310,18 +657,18 @@ void widget_show (nbtk::t_native_widget *w) {
   w->dirty = true;
 }
 
-void widget_show_all (nbtk::t_native_widget *w) {
-  widget_show (w);
+void native_widget_show_all (nbtk::t_native_widget *w) {
+  native_widget_show (w);
 }
 
-void widget_hide (nbtk::t_native_widget *w) {
+void native_widget_hide (nbtk::t_native_widget *w) {
   if (!w || !w->app || !w->app->dpy)
     return;
   XUnmapWindow (w->app->dpy, w->widget);
   w->visible = false;
 }
 
-void widget_draw (nbtk::t_native_widget *w, void *user_data) {
+void native_widget_draw (nbtk::t_native_widget *w, void *user_data) {
   (void) user_data;
   if (!w || !w->app || !w->app->dpy)
     return;
@@ -344,30 +691,30 @@ void widget_draw (nbtk::t_native_widget *w, void *user_data) {
   }
 }
 
-void widget_set_title (nbtk::t_native_widget *w, const char *title) {
+void native_widget_set_title (nbtk::t_native_widget *w, const char *title) {
   if (!w || !w->app || !w->app->dpy)
     return;
   XStoreName (w->app->dpy, w->widget, title ? title : "");
 }
 
-void widget_set_icon_from_png (nbtk::t_native_widget *w, const unsigned char *png) {
+void native_widget_set_icon_from_png (nbtk::t_native_widget *w, const unsigned char *png) {
   (void) w;
   (void) png;
 }
 
-void expose_widget (nbtk::t_native_widget *w) {
+void native_widget_invalidate (nbtk::t_native_widget *w) {
   if (!w)
     return;
 
   w->dirty = true;
 }
 
-Window os_get_root_window (nbtk::t_native_app *app, int flag) {
+Window native_get_root_window (nbtk::t_native_app *app, int flag) {
   (void) flag;
   return app && app->dpy ? DefaultRootWindow (app->dpy) : 0;
 }
 
-void os_get_window_metrics (nbtk::t_native_widget *w, Metrics_t *metrics) {
+void native_get_window_metrics (nbtk::t_native_widget *w, Metrics_t *metrics) {
   if (!metrics)
     return;
   *metrics = {};
@@ -395,7 +742,7 @@ void os_get_window_metrics (nbtk::t_native_widget *w, Metrics_t *metrics) {
 
 }
 
-void os_set_window_min_size (
+void native_set_window_min_size (
     nbtk::t_native_widget *w, int min_width, int min_height, int base_width, int base_height) {
   if (!w || !w->app || !w->app->dpy)
     return;
@@ -408,7 +755,7 @@ void os_set_window_min_size (
   XSetWMNormalHints (w->app->dpy, w->widget, &hints);
 }
 
-void os_move_window (Display *dpy, nbtk::t_native_widget *w, int x, int y) {
+void native_move_window (Display *dpy, nbtk::t_native_widget *w, int x, int y) {
   if (!dpy || !w)
     return;
   w->x = x;
@@ -416,7 +763,7 @@ void os_move_window (Display *dpy, nbtk::t_native_widget *w, int x, int y) {
   XMoveWindow (dpy, w->widget, x, y);
 }
 
-void os_resize_window (Display *dpy, nbtk::t_native_widget *w, int w_, int h_) {
+void native_resize_window (Display *dpy, nbtk::t_native_widget *w, int w_, int h_) {
   if (!dpy || !w)
     return;
   w->width = std::max (1, w_);
@@ -425,7 +772,7 @@ void os_resize_window (Display *dpy, nbtk::t_native_widget *w, int w_, int h_) {
   XResizeWindow (dpy, w->widget, w->width, w->height);
 }
 
-void os_translate_coords (
+void native_translate_coords (
     nbtk::t_native_widget *w, Window from_window, Window to_window,
     int from_x, int from_y, int *to_x, int *to_y) {
   if (!w || !w->app || !w->app->dpy || !to_x || !to_y)
@@ -435,7 +782,7 @@ void os_translate_coords (
       w->app->dpy, from_window, to_window, from_x, from_y, to_x, to_y, &child);
 }
 
-void os_register_wm_delete_window (nbtk::t_native_widget *w) {
+void native_register_wm_delete_window (nbtk::t_native_widget *w) {
   if (!w || !w->app || !w->app->dpy)
     return;
   if (!g_wm_delete_window)
@@ -443,7 +790,7 @@ void os_register_wm_delete_window (nbtk::t_native_widget *w) {
   XSetWMProtocols (w->app->dpy, w->widget, &g_wm_delete_window, 1);
 }
 
-void os_set_window_attrb (nbtk::t_native_widget *w) {
+void native_set_window_attributes (nbtk::t_native_widget *w) {
   if (!w || !w->app || !w->app->dpy)
     return;
   XSetWindowAttributes attrs {};
@@ -451,13 +798,13 @@ void os_set_window_attrb (nbtk::t_native_widget *w) {
   XChangeWindowAttributes (w->app->dpy, w->widget, CWOverrideRedirect, &attrs);
 }
 
-void os_set_transient_for_hint (nbtk::t_native_widget *parent, nbtk::t_native_widget *child) {
+void native_set_transient_for_hint (nbtk::t_native_widget *parent, nbtk::t_native_widget *child) {
   if (!parent || !child || !child->app || !child->app->dpy)
     return;
   XSetTransientForHint (child->app->dpy, child->widget, parent->widget);
 }
 
-void os_set_input_mask (nbtk::t_native_widget *w) {
+void native_set_input_mask (nbtk::t_native_widget *w) {
   if (!w || !w->app || !w->app->dpy)
     return;
   const long mask =
@@ -473,7 +820,44 @@ void os_set_input_mask (nbtk::t_native_widget *w) {
   XSelectInput (w->app->dpy, w->widget, mask);
 }
 
-void childlist_add_child (nbtk::t_native_childlist *list, nbtk::t_native_widget *child) {
+int native_key_from_event (void *event) {
+  XKeyEvent *key = (XKeyEvent *) event;
+  if (!key)
+    return nbtk::KEY_UNKNOWN;
+
+  const KeySym sym = XLookupKeysym (key, 0);
+  switch (sym) {
+    case XK_Tab:       return nbtk::KEY_TAB;
+    case XK_BackSpace: return nbtk::KEY_BACKSPACE;
+    case XK_Delete:    return nbtk::KEY_DELETE;
+    case XK_Up:        return nbtk::KEY_UP;
+    case XK_Down:      return nbtk::KEY_DOWN;
+    case XK_Left:      return nbtk::KEY_LEFT;
+    case XK_Right:     return nbtk::KEY_RIGHT;
+    case XK_Home:      return nbtk::KEY_HOME;
+    case XK_End:       return nbtk::KEY_END;
+    case XK_space:     return nbtk::KEY_SPACE;
+    case XK_Return:
+    case XK_KP_Enter:  return nbtk::KEY_RETURN;
+    case XK_Escape:    return nbtk::KEY_ESCAPE;
+    default:           return nbtk::KEY_UNKNOWN;
+  }
+}
+
+int native_text_from_event (void *event, char *text, int text_size) {
+  XKeyEvent *key = (XKeyEvent *) event;
+  if (!key || !text || text_size <= 0)
+    return 0;
+
+  text [0] = '\0';
+  KeySym ignored = 0;
+  const int len = XLookupString (key, text, text_size - 1, &ignored, NULL);
+  if (len > 0)
+    text [len] = '\0';
+  return len;
+}
+
+void native_childlist_add_child (nbtk::t_native_childlist *list, nbtk::t_native_widget *child) {
   if (list && child)
     list->children.push_back (child);
 }
