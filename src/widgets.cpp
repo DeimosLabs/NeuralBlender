@@ -1124,7 +1124,7 @@ void c_checkbox::draw (cairo_t *cr) {
   if (value) {
     cairo_save (cr);
     cairo_set_source_rgba (
-        cr, colors.fg.r2, colors.fg.g2, colors.fg.b2, colors.fg.a1);
+        cr, colors.fg.r1, colors.fg.g1, colors.fg.b1, colors.fg.a1);
     cairo_set_line_width (cr, std::max (2.0, box * 0.14));
     cairo_set_line_cap (cr, CAIRO_LINE_CAP_ROUND);
     cairo_set_line_join (cr, CAIRO_LINE_JOIN_ROUND);
