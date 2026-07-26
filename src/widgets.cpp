@@ -548,7 +548,7 @@ void c_widget::draw_tree (cairo_t *cr) {
   cairo_restore (cr);
 }
 
-bool c_widget::mouse_down_tree (int px, int py, int button) { CP
+bool c_widget::mouse_down_tree (int px, int py, int button) {
   if (!visible || !enabled || !contains_local (px, py))
     return false;
 
@@ -1174,8 +1174,11 @@ bool c_scrollbar::on_mouse_up (int x_, int y_, int button) {
   c_widget::on_mouse_up (x_, y_, button);
   (void) x_;
   (void) y_;
-  if (button == Button1)
+  if (button == Button1) {
     dragging = false;
+    if (app)
+      app->clear_focus (this);
+  }
   return true;
 }
 
@@ -1431,28 +1434,30 @@ bool c_listbox::set_selected (int index, bool notify) {
   if (index < 0 || index >= (int) rows.size ())
     index = -1;
 
-  if (selected == index)
-    return false;
+  const bool selection_changed = selected != index;
 
   selected = index;
-  bool scrolled = false;
+  int next_first = first_visible;
   if (selected >= 0) {
     if (selected < first_visible) {
-      first_visible = selected;
-      scrolled = true;
+      next_first = selected;
     } else if (selected >= first_visible + visible_rows ()) {
-      first_visible = selected - visible_rows () + 1;
-      scrolled = true;
+      next_first = selected - visible_rows () + 1;
     }
   }
 
-  if (scrolled)
-    sync_scrollbar ();
-  invalidate ();
-  if (notify)
+  const bool scrolled = scroll_to (next_first);
+  if (!scrolled && selection_changed)
+    invalidate ();
+  if (notify && selection_changed)
     on_select (selected);
 
-  return true;
+  return selection_changed || scrolled;
+}
+
+void c_listbox::resize (int w_, int h_) {
+  c_container::resize (w_, h_);
+  scroll_to (first_visible);
 }
 
 void c_listbox::emit_action (bool activated) {
@@ -1511,6 +1516,11 @@ void c_listbox::draw (cairo_t *cr) {
   cairo_select_font_face (
     cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size (cr, size * font_multiplier ());
+  cairo_font_extents_t font_ext {};
+  cairo_font_extents (cr, &font_ext);
+  const double text_baseline =
+    ((double) row_height - font_ext.ascent - font_ext.descent) * 0.5 +
+    font_ext.ascent;
 
   const int visible_count = visible_rows ();
   for (int row = 0; row < visible_count; row++) {
@@ -1546,8 +1556,6 @@ void c_listbox::draw (cairo_t *cr) {
             cr, icon, icon_x, icon_y, icon_size, icon_size);
     }
 
-    cairo_text_extents_t ext {};
-    cairo_text_extents (cr, rows [index].label.c_str (), &ext);
     cairo_set_source_rgba (
       cr, frame.fg.r1, frame.fg.g1, frame.fg.b1, frame.fg.a1);
     cairo_save (cr);
@@ -1556,7 +1564,7 @@ void c_listbox::draw (cairo_t *cr) {
     cairo_move_to (
       cr,
       text_x,
-      y0 + (row_height - ext.height) * 0.5 - ext.y_bearing);
+      y0 + text_baseline);
     cairo_show_text (cr, rows [index].label.c_str ());
     cairo_restore (cr);
   }
@@ -1734,7 +1742,26 @@ bool c_combobox::on_mouse_down (int x_, int y_, int button) {
   }
 
   c_widget::on_mouse_down (x_, y_, button);
-  toggle_on_mouse_up = button == Button1;
+  if (button == Button1) {
+    if (list_visible && popup && !popup->visible) {
+      list_visible = false;
+      listbox.visible = false;
+      toggle_on_mouse_up = false;
+      select_on_popup_mouse_up = false;
+      drag_scroll_dir = 0;
+    }
+
+    if (list_visible) {
+      toggle_on_mouse_up = true;
+    } else {
+      select_on_popup_mouse_up = true;
+      drag_scroll_dir = 0;
+      drag_last_scroll_ms = 0;
+      show_list ();
+      if (app)
+        app->active_combobox = this;
+    }
+  }
 
   return true;
 }
@@ -1907,7 +1934,12 @@ void c_combobox::show_list () {
 
 void c_combobox::hide_list () {
   list_visible = false;
+  toggle_on_mouse_up = false;
+  select_on_popup_mouse_up = false;
+  drag_scroll_dir = 0;
   listbox.visible = false;
+  if (app && app->active_combobox == this)
+    app->active_combobox = nullptr;
   if (app)
     app->set_focus (this);
   if (popup)
@@ -1953,6 +1985,113 @@ void c_combobox::emit_action () {
   event.value = selected >= 0;
   event.mouse_button = last_mouse_button;
   c_widget::on_action (event);
+}
+
+bool c_combobox::on_popup_mouse_down (
+    c_popupwindow *popup_,
+    int x_,
+    int y_,
+    int button) {
+
+  if (button != Button1 || !list_visible || !popup || popup.get () != popup_)
+    return false;
+
+  const int lx = x_ - listbox.x;
+  const int ly = y_ - listbox.y;
+  const int index = listbox.row_at (ly);
+  if (lx < 0 || ly < 0 || lx >= listbox.w || ly >= listbox.h || index < 0)
+    return false;
+
+  select_on_popup_mouse_up = true;
+  toggle_on_mouse_up = false;
+  drag_scroll_dir = 0;
+  drag_last_scroll_ms = 0;
+  listbox.set_selected (index);
+  if (app)
+    app->active_combobox = this;
+
+  return true;
+}
+
+bool c_combobox::on_popup_mouse_move (
+    c_popupwindow *popup_,
+    int x_,
+    int y_) {
+
+  if (!select_on_popup_mouse_up || !popup || popup.get () != popup_)
+    return false;
+
+  const int lx = x_ - listbox.x;
+  const int ly = y_ - listbox.y;
+  const int index = listbox.row_at (ly);
+  if (lx >= 0 && ly >= 0 && lx < listbox.w && ly < listbox.h && index >= 0) {
+    drag_scroll_dir = 0;
+    listbox.set_selected (index);
+  } else if (y_ < 0) {
+    drag_scroll_dir = -1;
+  } else if (y_ >= popup_->h) {
+    drag_scroll_dir = 1;
+  } else {
+    drag_scroll_dir = 0;
+  }
+
+  return true;
+}
+
+bool c_combobox::on_popup_mouse_up (
+    c_popupwindow *popup_,
+    int x_,
+    int y_,
+    int button) {
+
+  if (button != Button1 || !select_on_popup_mouse_up)
+    return false;
+
+  select_on_popup_mouse_up = false;
+  drag_scroll_dir = 0;
+  if (app && app->active_combobox == this)
+    app->active_combobox = nullptr;
+  if (!popup || popup.get () != popup_)
+    return false;
+
+  const t_point screen = popup_->local_to_screen ({ x_, y_ });
+  const t_point combo_screen = local_to_screen ({ 0, 0 });
+  const bool over_combo =
+    screen.x >= combo_screen.x &&
+    screen.y >= combo_screen.y &&
+    screen.x < combo_screen.x + w &&
+    screen.y < combo_screen.y + h;
+
+  if (over_combo)
+    return true;
+
+  const int lx = x_ - listbox.x;
+  const int ly = y_ - listbox.y;
+  const int index = listbox.row_at (ly);
+  if (lx >= 0 && ly >= 0 && lx < listbox.w && ly < listbox.h && index >= 0) {
+    const bool changed = set_selected (index, true);
+    if (!changed && selected >= 0)
+      on_change (selected);
+  }
+
+  hide_list ();
+  return true;
+}
+
+void c_combobox::tick_drag () {
+  if (!select_on_popup_mouse_up || !popup || !popup->visible ||
+      drag_scroll_dir == 0)
+    return;
+
+  const uint64_t now = now_ms ();
+  if (drag_last_scroll_ms && now - drag_last_scroll_ms < 80)
+    return;
+
+  drag_last_scroll_ms = now;
+  if (listbox.scroll_to (listbox.first_visible + drag_scroll_dir)) {
+    if (popup && popup->app && popup->app->backend)
+      popup->app->backend->invalidate (popup->widget);
+  }
 }
 
 void c_combobox::on_change (int index) {
@@ -2945,6 +3084,9 @@ void c_app::clear_focus (c_widget *widget) {
 }
 
 void c_app::tick () {
+  if (active_combobox)
+    active_combobox->tick_drag ();
+
   if (!show_tooltips) {
     hide_tooltip ();
     return;
@@ -3220,6 +3362,17 @@ bool c_popupwindow::takes_focus () const {
   return true;
 }
 
+bool c_popupwindow::on_mouse_up (int x_, int y_, int button) {
+  if (c_combobox *combobox = dynamic_cast<c_combobox *> (owner)) {
+    if (combobox->on_popup_mouse_up (this, x_, y_, button))
+      return true;
+  }
+
+  const bool handled = c_nativewindow::on_mouse_up (x_, y_, button);
+
+  return handled;
+}
+
 void c_popupwindow::on_action (t_action_event &event) {
   if (owner && !event.handled)
     owner->on_action (event);
@@ -3258,7 +3411,25 @@ void c_popupwindow::show () {
   }
 }
 
+static bool tk_widget_is_descendant_of (
+    const c_widget *root,
+    const c_widget *widget) {
+
+  for (const c_widget *w = widget; w; w = w->parent) {
+    if (w == root)
+      return true;
+  }
+
+  return false;
+}
+
 void c_popupwindow::hide () {
+  root.clear_hover_tree ();
+  mouse_captured = false;
+  if (app &&
+      tk_widget_is_descendant_of (&root, app->focused_widget))
+    app->clear_focus (app->focused_widget);
+
   c_nativewindow::hide ();
   if (widget) {
     nbtk::t_native_widget *w = as_native_widget (widget);
@@ -3300,6 +3471,15 @@ void c_popupwindow::cb_button_press (
   c_popupwindow *self = (c_popupwindow *) w->parent_struct;
   const int x = button->x / w->app->hdpi;
   const int y = button->y / w->app->hdpi;
+
+  if (c_combobox *combobox = dynamic_cast<c_combobox *> (self->owner)) {
+    if (combobox->on_popup_mouse_down (self, x, y, button->button)) {
+      self->mouse_captured = false;
+      expose_widget (w);
+      return;
+    }
+  }
+
   if (self->close_on_outside_click () &&
       (x < 0 || y < 0 || x >= self->w || y >= self->h)) {
     self->close_on_release = true;
@@ -3336,6 +3516,14 @@ void c_popupwindow::cb_button_release (
   c_popupwindow *self = (c_popupwindow *) w->parent_struct;
   const int x = button->x / w->app->hdpi;
   const int y = button->y / w->app->hdpi;
+
+  if (c_combobox *combobox = dynamic_cast<c_combobox *> (self->owner)) {
+    if (combobox->on_popup_mouse_up (self, x, y, button->button)) {
+      self->mouse_captured = false;
+      expose_widget (w);
+      return;
+    }
+  }
 
   if (self->mouse_captured && self->app && self->app->focused_widget) {
     t_point local = self->app->focused_widget->root_to_local ({ x, y });
@@ -3375,6 +3563,13 @@ void c_popupwindow::cb_motion (
   c_popupwindow *self = (c_popupwindow *) w->parent_struct;
   const int x = motion->x / w->app->hdpi;
   const int y = motion->y / w->app->hdpi;
+  if (c_combobox *combobox = dynamic_cast<c_combobox *> (self->owner)) {
+    if (combobox->on_popup_mouse_move (self, x, y)) {
+      expose_widget (w);
+      return;
+    }
+  }
+
   if (!self->mouse_captured &&
       (x < 0 || y < 0 || x >= self->w || y >= self->h))
     return;
@@ -3518,7 +3713,7 @@ void c_tooltip::set_text (const char *text) {
   const int text_w =
       std::max (24, (int) std::ceil (ext.x_advance + 16) + pad_x * 2 + 2);
   const int tooltip_w = std::min (420, text_w);
-  const int tooltip_h = 24;
+  const int tooltip_h = std::max (30, (int) ext.y_advance);
   
   move_resize (x, y, tooltip_w, tooltip_h);
   root.move_resize (0, 0, tooltip_w, tooltip_h);

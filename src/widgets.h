@@ -365,6 +365,7 @@ public:
   c_listbox ();
 
   void draw (cairo_t *cr) override;
+  void resize (int w, int h) override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
   bool on_key_down (int key) override;
@@ -437,6 +438,10 @@ public:
   void toggle_list ();
   void sync_list_geometry ();
   void emit_action ();
+  bool on_popup_mouse_down (c_popupwindow *popup, int x, int y, int button);
+  bool on_popup_mouse_move (c_popupwindow *popup, int x, int y);
+  bool on_popup_mouse_up (c_popupwindow *popup, int x, int y, int button);
+  void tick_drag ();
 
   virtual void on_change (int index);
   void update_widget ();
@@ -450,6 +455,9 @@ public:
   std::unique_ptr<c_popupwindow> popup;
   bool list_visible = false;
   bool toggle_on_mouse_up = false;
+  bool select_on_popup_mouse_up = false;
+  int drag_scroll_dir = 0;
+  uint64_t drag_last_scroll_ms = 0;
   bool wheel_selects_item = false;
 };
 
@@ -594,6 +602,7 @@ public:
   c_widget *hovered_widget = nullptr;
   c_widget *tooltip_widget = nullptr;
   c_widget *tooltip_pending_widget = nullptr;
+  c_combobox *active_combobox = nullptr;
   uint64_t tooltip_pending_since = 0;
   int tooltip_root_x = 0;
   int tooltip_root_y = 0;
@@ -700,6 +709,7 @@ public:
   virtual void close ();
   virtual bool close_on_outside_click () const;
   virtual bool takes_focus () const;
+  bool on_mouse_up (int x, int y, int button) override;
   void on_action (t_action_event &event) override;
   void invalidate_rect (int x, int y, int w, int h) override;
   void move_resize (int x, int y, int w, int h) override;
