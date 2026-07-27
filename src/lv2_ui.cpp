@@ -20,8 +20,6 @@
 
 #include "neuralblender.h"
 
-#include <X11/Xlib.h>
-
 #include "ui.h"
 #include "lv2.h"
 
@@ -966,10 +964,10 @@ static LV2UI_Handle instantiate (
   ui->write = write_function;
   ui->controller = controller;
   
-  Window parent = 0;
+  nbtk::t_native_window parent = 0;
   for (int i = 0; features && features [i]; ++i) {
     if (!strcmp (features [i]->URI, LV2_UI__parent)) {
-      parent = (Window) (uintptr_t) features [i]->data;
+      parent = (nbtk::t_native_window) (uintptr_t) features [i]->data;
     } else if (!strcmp (features [i]->URI, LV2_URID__map)) {
       ui->map = (LV2_URID_Map *) features [i]->data;
     } else if (!strcmp (features [i]->URI, LV2_UI__portSubscribe)) {

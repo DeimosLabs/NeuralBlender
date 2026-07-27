@@ -105,7 +105,7 @@ private:
 
 #ifdef HAVE_GUI
 
-#include "widgets.h"
+#include "nbtk.h"
 
 class c_meterwidget : public nbtk::c_canvas {
 public:

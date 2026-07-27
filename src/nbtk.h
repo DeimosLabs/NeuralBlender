@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 #include <cairo/cairo.h>
-#include "native_compat.h"
+#include "native.h"
 
 #define NBTK_BUTTON_RADIUS      8.0
 #define NBTK_CHECKBOX_RADIUS    6.0

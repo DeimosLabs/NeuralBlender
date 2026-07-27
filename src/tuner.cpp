@@ -14,7 +14,7 @@
 #include "cmdline_debug.h"
 
 #ifndef METER_DATA_ONLY
-#include "widgets.h"
+#include "nbtk.h"
 #endif
 
 #ifdef METER_DATA_ONLY

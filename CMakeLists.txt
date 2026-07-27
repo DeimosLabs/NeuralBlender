@@ -38,7 +38,7 @@ endif()
 function(add_neuralblender_gui_library target_name)
   add_library(${target_name} STATIC
     src/ui.cpp
-    src/widgets.cpp
+    src/nbtk.cpp
     src/native_x11.cpp
     src/timestamp.cpp
     src/meter.cpp

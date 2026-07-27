@@ -8,13 +8,19 @@
 #include <cstring>
 #include <vector>
 
-#include "widgets.h"
+#include "nbtk.h"
 
 struct nbtk::t_native_childlist {
   std::vector<nbtk::t_native_widget *> children;
 };
 
 static Atom g_wm_delete_window = 0;
+
+static void native_move_window (Display *dpy, nbtk::t_native_widget *w, int x, int y);
+static void native_resize_window (Display *dpy, nbtk::t_native_widget *w, int w_, int h_);
+static void native_translate_coords (
+    nbtk::t_native_widget *w, Window from_window, Window to_window,
+    int from_x, int from_y, int *to_x, int *to_y);
 
 static nbtk::t_native_widget *as_native_widget (nbtk::t_native_handle handle) {
   return (nbtk::t_native_widget *) handle;
@@ -363,34 +369,6 @@ std::unique_ptr<c_native_backend> create_native_backend () {
 
 } // namespace nbtk
 
-static void init_colors (XColor_t *scheme) {
-  if (!scheme)
-    return;
-
-  auto init = [] (Colors &c) {
-    const double fg[4] = { 0.85, 0.85, 0.85, 1.0 };
-    const double bg[4] = { 0.13, 0.13, 0.13, 1.0 };
-    const double base[4] = { 0.10, 0.10, 0.10, 1.0 };
-    const double text[4] = { 0.95, 0.95, 0.95, 1.0 };
-    const double shadow[4] = { 0.02, 0.02, 0.02, 1.0 };
-    const double frame[4] = { 0.45, 0.45, 0.45, 1.0 };
-    const double light[4] = { 0.75, 0.75, 0.75, 1.0 };
-    std::memcpy (c.fg, fg, sizeof (fg));
-    std::memcpy (c.bg, bg, sizeof (bg));
-    std::memcpy (c.base, base, sizeof (base));
-    std::memcpy (c.text, text, sizeof (text));
-    std::memcpy (c.shadow, shadow, sizeof (shadow));
-    std::memcpy (c.frame, frame, sizeof (frame));
-    std::memcpy (c.light, light, sizeof (light));
-  };
-
-  init (scheme->normal);
-  init (scheme->prelight);
-  init (scheme->selected);
-  init (scheme->active);
-  init (scheme->insensitive);
-}
-
 static nbtk::t_native_widget *find_widget_by_window (nbtk::t_native_childlist *list, Window window) {
   if (!list)
     return nullptr;
@@ -466,12 +444,7 @@ void native_app_init (nbtk::t_native_app *app) {
   app->dpy = XOpenDisplay (nullptr);
   app->run = app->dpy != nullptr;
   app->hdpi = 1.0f;
-  app->small_font = 12;
-  app->normal_font = 14;
-  app->big_font = 20;
   app->childlist = new nbtk::t_native_childlist;
-  app->color_scheme = new XColor_t;
-  init_colors (app->color_scheme);
   if (app->dpy)
     g_wm_delete_window = XInternAtom (app->dpy, "WM_DELETE_WINDOW", False);
 }
@@ -493,9 +466,6 @@ void native_app_shutdown (nbtk::t_native_app *app) {
     delete app->childlist;
     app->childlist = nullptr;
   }
-
-  delete app->color_scheme;
-  app->color_scheme = nullptr;
 
   if (app->dpy) {
     XCloseDisplay (app->dpy);
@@ -634,7 +604,6 @@ nbtk::t_native_widget *native_create_window (nbtk::t_native_app *app, Window par
   w->scale.ascale = 1.0f;
   w->scale.gravity = NONE;
   w->childlist = new nbtk::t_native_childlist;
-  w->color_scheme = app->color_scheme;
   w->visible = false;
   w->owns_native_window = true;
   w->dirty = true;
@@ -655,10 +624,6 @@ void native_widget_show (nbtk::t_native_widget *w) {
   XMapWindow (w->app->dpy, w->widget);
   w->visible = true;
   w->dirty = true;
-}
-
-void native_widget_show_all (nbtk::t_native_widget *w) {
-  native_widget_show (w);
 }
 
 void native_widget_hide (nbtk::t_native_widget *w) {
@@ -755,7 +720,7 @@ void native_set_window_min_size (
   XSetWMNormalHints (w->app->dpy, w->widget, &hints);
 }
 
-void native_move_window (Display *dpy, nbtk::t_native_widget *w, int x, int y) {
+static void native_move_window (Display *dpy, nbtk::t_native_widget *w, int x, int y) {
   if (!dpy || !w)
     return;
   w->x = x;
@@ -763,7 +728,7 @@ void native_move_window (Display *dpy, nbtk::t_native_widget *w, int x, int y) {
   XMoveWindow (dpy, w->widget, x, y);
 }
 
-void native_resize_window (Display *dpy, nbtk::t_native_widget *w, int w_, int h_) {
+static void native_resize_window (Display *dpy, nbtk::t_native_widget *w, int w_, int h_) {
   if (!dpy || !w)
     return;
   w->width = std::max (1, w_);
@@ -772,7 +737,7 @@ void native_resize_window (Display *dpy, nbtk::t_native_widget *w, int w_, int h
   XResizeWindow (dpy, w->widget, w->width, w->height);
 }
 
-void native_translate_coords (
+static void native_translate_coords (
     nbtk::t_native_widget *w, Window from_window, Window to_window,
     int from_x, int from_y, int *to_x, int *to_y) {
   if (!w || !w->app || !w->app->dpy || !to_x || !to_y)
@@ -857,75 +822,51 @@ int native_text_from_event (void *event, char *text, int text_size) {
   return len;
 }
 
+int native_button_from_event (void *event) {
+  XButtonEvent *button = (XButtonEvent *) event;
+  return button ? (int) button->button : 0;
+}
+
+int native_event_x (void *event) {
+  XEvent *xevent = (XEvent *) event;
+  if (!xevent)
+    return 0;
+
+  switch (xevent->type) {
+    case ButtonPress:
+    case ButtonRelease:
+      return xevent->xbutton.x;
+
+    case MotionNotify:
+      return xevent->xmotion.x;
+
+    default:
+      return 0;
+  }
+}
+
+int native_event_y (void *event) {
+  XEvent *xevent = (XEvent *) event;
+  if (!xevent)
+    return 0;
+
+  switch (xevent->type) {
+    case ButtonPress:
+    case ButtonRelease:
+      return xevent->xbutton.y;
+
+    case MotionNotify:
+      return xevent->xmotion.y;
+
+    default:
+      return 0;
+  }
+}
+
 void native_childlist_add_child (nbtk::t_native_childlist *list, nbtk::t_native_widget *child) {
   if (list && child)
     list->children.push_back (child);
 }
-
-static Colors *colors_for_state (XColor_t *scheme, Color_state st) {
-  if (!scheme)
-    return nullptr;
-  switch (st) {
-    case PRELIGHT_: return &scheme->prelight;
-    case SELECTED_: return &scheme->selected;
-    case ACTIVE_: return &scheme->active;
-    case INSENSITIVE_: return &scheme->insensitive;
-    case NORMAL_:
-    default: return &scheme->normal;
-  }
-}
-
-static double *color_slot (Colors *colors, Color_mod mod) {
-  if (!colors)
-    return nullptr;
-  switch (mod) {
-    case FORGROUND_: return colors->fg;
-    case BACKGROUND_: return colors->bg;
-    case BASE_: return colors->base;
-    case TEXT_: return colors->text;
-    case SHADOW_: return colors->shadow;
-    case FRAME_: return colors->frame;
-    case LIGHT_: return colors->light;
-    default: return colors->fg;
-  }
-}
-
-void set_widget_color (
-    nbtk::t_native_widget *w, Color_state st, Color_mod mod,
-    double r, double g, double b, double a) {
-  Colors *colors = get_color_scheme (w, st);
-  double *slot = color_slot (colors, mod);
-  if (!slot)
-    return;
-  slot[0] = r;
-  slot[1] = g;
-  slot[2] = b;
-  slot[3] = a;
-}
-
-Colors *get_color_scheme (nbtk::t_native_widget *w, Color_state st) {
-  XColor_t *scheme = w && w->color_scheme
-    ? w->color_scheme
-    : (w && w->app ? w->app->color_scheme : nullptr);
-  return colors_for_state (scheme, st);
-}
-
-static void use_color (nbtk::t_native_widget *w, Color_state st, Color_mod mod) {
-  if (!w || !w->crb)
-    return;
-  Colors *colors = get_color_scheme (w, st);
-  double *slot = color_slot (colors, mod);
-  if (slot)
-    cairo_set_source_rgba (w->crb, slot[0], slot[1], slot[2], slot[3]);
-}
-
-void use_text_color_scheme (nbtk::t_native_widget *w, Color_state st) { use_color (w, st, TEXT_); }
-void use_fg_color_scheme (nbtk::t_native_widget *w, Color_state st) { use_color (w, st, FORGROUND_); }
-void use_bg_color_scheme (nbtk::t_native_widget *w, Color_state st) { use_color (w, st, BACKGROUND_); }
-void use_base_color_scheme (nbtk::t_native_widget *w, Color_state st) { use_color (w, st, BASE_); }
-void use_frame_color_scheme (nbtk::t_native_widget *w, Color_state st) { use_color (w, st, FRAME_); }
-void use_light_color_scheme (nbtk::t_native_widget *w, Color_state st) { use_color (w, st, LIGHT_); }
-void use_shadow_color_scheme (nbtk::t_native_widget *w, Color_state st) { use_color (w, st, SHADOW_); }
 
 struct png_stream {
   const unsigned char *data = nullptr;
@@ -945,14 +886,4 @@ cairo_surface_t *cairo_image_surface_create_from_stream (const unsigned char *da
     return nullptr;
   png_stream stream { data, 0 };
   return cairo_image_surface_create_from_png_stream (read_png_stream, &stream);
-}
-
-void add_tooltip (nbtk::t_native_widget *w, const char *text) {
-  (void) w;
-  (void) text;
-}
-
-void tooltip_set_text (nbtk::t_native_widget *w, const char *text) {
-  (void) w;
-  (void) text;
 }

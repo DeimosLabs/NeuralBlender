@@ -1355,8 +1355,6 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   mainwindow.show ();
   sync_tuner_visibility ();
   CP
-  //XFlush (display);
-  CP
   //do_set_min_size = true;
   return true;
 }

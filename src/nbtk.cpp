@@ -14,7 +14,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "widgets.h"
+#include "nbtk.h"
 
 #include "data/data.h"
 
@@ -3242,7 +3242,7 @@ void c_popupwindow::show () {
   c_nativewindow::show ();
   if (widget) {
     nbtk::t_native_widget *w = as_native_widget (widget);
-    native_widget_show_all (w);
+    native_widget_show (w);
     if (app && app->backend)
       pointer_grabbed = app->backend->grab_pointer (widget);
     if (takes_focus () && app && app->backend)
@@ -3306,16 +3306,16 @@ void c_popupwindow::cb_button_press (
 
   (void) user_data;
   nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
-  XButtonEvent *button = (XButtonEvent *) event;
-  if (!w || !w->parent_struct || !button)
+  if (!w || !w->parent_struct || !event)
     return;
 
   c_popupwindow *self = (c_popupwindow *) w->parent_struct;
-  const int x = button->x / w->app->hdpi;
-  const int y = button->y / w->app->hdpi;
+  const int button = native_button_from_event (event);
+  const int x = native_event_x (event) / w->app->hdpi;
+  const int y = native_event_y (event) / w->app->hdpi;
 
   if (c_combobox *combobox = dynamic_cast<c_combobox *> (self->owner)) {
-    if (combobox->on_popup_mouse_down (self, x, y, button->button)) {
+    if (combobox->on_popup_mouse_down (self, x, y, button)) {
       self->mouse_captured = false;
       native_widget_invalidate (w);
       return;
@@ -3331,7 +3331,7 @@ void c_popupwindow::cb_button_press (
   const bool handled = self->on_mouse_down (
       x,
       y,
-      button->button);
+      button);
   self->mouse_captured = false;
   if (handled && self->app && self->app->focused_widget) {
     t_point local = self->app->focused_widget->root_to_local ({ x, y });
@@ -3351,16 +3351,16 @@ void c_popupwindow::cb_button_release (
 
   (void) user_data;
   nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
-  XButtonEvent *button = (XButtonEvent *) event;
-  if (!w || !w->parent_struct || !button)
+  if (!w || !w->parent_struct || !event)
     return;
 
   c_popupwindow *self = (c_popupwindow *) w->parent_struct;
-  const int x = button->x / w->app->hdpi;
-  const int y = button->y / w->app->hdpi;
+  const int button = native_button_from_event (event);
+  const int x = native_event_x (event) / w->app->hdpi;
+  const int y = native_event_y (event) / w->app->hdpi;
 
   if (c_combobox *combobox = dynamic_cast<c_combobox *> (self->owner)) {
-    if (combobox->on_popup_mouse_up (self, x, y, button->button)) {
+    if (combobox->on_popup_mouse_up (self, x, y, button)) {
       self->mouse_captured = false;
       native_widget_invalidate (w);
       return;
@@ -3370,7 +3370,7 @@ void c_popupwindow::cb_button_release (
   if (self->mouse_captured && self->app && self->app->focused_widget) {
     t_point local = self->app->focused_widget->root_to_local ({ x, y });
     self->app->focused_widget->on_mouse_up (
-        local.x, local.y, button->button);
+        local.x, local.y, button);
     self->mouse_captured = false;
     native_widget_invalidate (w);
     return;
@@ -3386,7 +3386,7 @@ void c_popupwindow::cb_button_release (
   self->on_mouse_up (
       x,
       y,
-      button->button);
+      button);
   self->mouse_captured = false;
   native_widget_invalidate (w);
 }
@@ -3398,13 +3398,12 @@ void c_popupwindow::cb_motion (
 
   (void) user_data;
   nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
-  XMotionEvent *motion = (XMotionEvent *) event;
-  if (!w || !w->parent_struct || !motion)
+  if (!w || !w->parent_struct || !event)
     return;
 
   c_popupwindow *self = (c_popupwindow *) w->parent_struct;
-  const int x = motion->x / w->app->hdpi;
-  const int y = motion->y / w->app->hdpi;
+  const int x = native_event_x (event) / w->app->hdpi;
+  const int y = native_event_y (event) / w->app->hdpi;
   if (c_combobox *combobox = dynamic_cast<c_combobox *> (self->owner)) {
     if (combobox->on_popup_mouse_move (self, x, y)) {
       native_widget_invalidate (w);
@@ -3480,7 +3479,7 @@ void c_tooltip::show () {
   c_nativewindow::show ();
   if (widget) {
     nbtk::t_native_widget *w = as_native_widget (widget);
-    native_widget_show_all (w);
+    native_widget_show (w);
     if (app && app->backend)
       app->backend->invalidate (widget);
   }
@@ -3631,26 +3630,6 @@ static const t_statecolors &colors_for (
     default:
       return control_colors_for_state (g_colors->button, state);
   }
-}
-
-
-// we need to keep this for now
-static void set_widget_color_all_states (
-    nbtk::t_native_widget *w,
-    Color_mod mod,
-    const float r,
-    const float g,
-    const float b,
-    const float a = 1.0f) {
-
-  if (!w)
-    return;
-
-  set_widget_color (w, NORMAL_,      mod, r, g, b, a);
-  set_widget_color (w, PRELIGHT_,    mod, r, g, b, a);
-  set_widget_color (w, SELECTED_,    mod, r, g, b, a);
-  set_widget_color (w, ACTIVE_,      mod, r, g, b, a);
-  set_widget_color (w, INSENSITIVE_, mod, r, g, b, a);
 }
 
 static bool get_widget_size  (nbtk::t_native_widget *w, int *rx, int *ry, int *rw, int *rh) {
@@ -3966,10 +3945,8 @@ void c_native_toplevelwindow::show () {
   if (!widget)
     return;
 
-  native_widget_show_all (widget);
+  native_widget_show (widget);
   native_widget_draw (widget, NULL);
-  /*if (widget->app && widget->app->dpy)
-    XFlush (widget->app->dpy);*/
 }
 
 void c_native_toplevelwindow::hide () {
@@ -4055,8 +4032,6 @@ void c_native_toplevelwindow::force_draw () {
 }
 
 void c_native_toplevelwindow::clear_focus () {
-  if (widget && widget->app && widget->app->key_snooper == widget)
-    widget->app->key_snooper = NULL;
 }
 
 int c_native_toplevelwindow::x () {
@@ -4510,20 +4485,20 @@ void c_toplevelwindow::cb_button_press (
 
   (void) user_data;
   nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
-  XButtonEvent *button = (XButtonEvent *) event;
-  if (!w || !w->parent_struct || !button)
+  if (!w || !w->parent_struct || !event)
     return;
 
   c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->app) {
     self->activate ();
     self->app->hide_tooltip ();
-    const int rx = button->x / w->app->hdpi;
-    const int ry = button->y / w->app->hdpi;
+    const int button = native_button_from_event (event);
+    const int rx = native_event_x (event) / w->app->hdpi;
+    const int ry = native_event_y (event) / w->app->hdpi;
     const bool handled = self->root_widget.mouse_down_tree (
       rx,
       ry,
-      button->button);
+      button);
     self->app->mouse_captured = false;
     if (handled && self->app->focused_widget) {
       nbtk::t_point local =
@@ -4546,22 +4521,22 @@ void c_toplevelwindow::cb_button_release (
 
   (void) user_data;
   nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
-  XButtonEvent *button = (XButtonEvent *) event;
-  if (!w || !w->parent_struct || !button)
+  if (!w || !w->parent_struct || !event)
     return;
 
   c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->app) {
     self->activate ();
-    const int rx = button->x / w->app->hdpi;
-    const int ry = button->y / w->app->hdpi;
+    const int button = native_button_from_event (event);
+    const int rx = native_event_x (event) / w->app->hdpi;
+    const int ry = native_event_y (event) / w->app->hdpi;
     if (self->app->mouse_captured && self->app->focused_widget) {
       nbtk::t_point local =
         self->app->focused_widget->root_to_local ({ rx, ry });
       self->app->focused_widget->on_mouse_up (
-        local.x, local.y, button->button);
+        local.x, local.y, button);
     } else {
-      self->root_widget.mouse_up_tree (rx, ry, button->button);
+      self->root_widget.mouse_up_tree (rx, ry, button);
     }
     self->app->mouse_captured = false;
     self->save_state ();
@@ -4576,15 +4551,14 @@ void c_toplevelwindow::cb_motion (
 
   (void) user_data;
   nbtk::t_native_widget *w = (nbtk::t_native_widget *) w_;
-  XMotionEvent *motion = (XMotionEvent *) event;
-  if (!w || !w->parent_struct || !motion)
+  if (!w || !w->parent_struct || !event)
     return;
 
   c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->app) {
     self->activate ();
-    const int rx = motion->x / w->app->hdpi;
-    const int ry = motion->y / w->app->hdpi;
+    const int rx = native_event_x (event) / w->app->hdpi;
+    const int ry = native_event_y (event) / w->app->hdpi;
     if (self->app->mouse_captured && self->app->focused_widget) {
       nbtk::t_point local =
         self->app->focused_widget->root_to_local ({ rx, ry });

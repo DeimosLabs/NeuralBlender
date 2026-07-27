@@ -15,7 +15,7 @@
 #include <cstring>
 
 #ifndef METER_DATA_ONLY
-#include "widgets.h"
+#include "nbtk.h"
 #endif
 
 #define CMDLINE_DEBUG_COLOR ANSI_CYAN

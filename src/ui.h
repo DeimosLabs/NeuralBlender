@@ -26,7 +26,7 @@
 #include <vector>
 
 #include "configfile.h"
-#include "widgets.h"
+#include "nbtk.h"
 #include "tuner.h"
 
 #define UI_STATS_PER_LANE    NB_STATS_PER_LANE

@@ -59,7 +59,7 @@ private:
 
 #if defined (HAVE_GUI)
 
-#include "widgets.h"
+#include "nbtk.h"
 
 class c_tunerwidget : public nbtk::c_canvas {
 public:

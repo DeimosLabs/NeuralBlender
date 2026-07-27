@@ -51,9 +51,9 @@
 
 //#define STANDALONE // done for us by build system (currently cmake)
 
-static constexpr double MAX_IR_SECONDS = 10.0;
+static constexpr double MAX_IR_SECONDS = 3.0;
 static constexpr size_t WAV_READ_CHUNK_FRAMES = 8192;
-static constexpr uint32_t MAX_IR_PARTITIONS = 512;
+static constexpr uint32_t MAX_IR_PARTITIONS = 1024; // about 1.4sec at 64smp. buffer
 
 // a few helper functions
 
