@@ -761,13 +761,28 @@ void c_button::draw (cairo_t *cr) {
 
 bool c_button::on_mouse_down (int x_, int y_, int button) {
   c_widget::on_mouse_down (x_, y_, button);
+  mouse_down_inside =
+    x_ >= 0 &&
+    y_ >= 0 &&
+    x_ < w &&
+    y_ < h;
   if (app)
     app->set_focus (this);
   return true;
 }
 
 bool c_button::on_mouse_up (int x_, int y_, int button) {
+  const bool was_pressed_inside = mouse_down_inside;
+  const bool released_inside =
+    x_ >= 0 &&
+    y_ >= 0 &&
+    x_ < w &&
+    y_ < h;
+  mouse_down_inside = false;
   c_widget::on_mouse_up (x_, y_, button);
+  if (!was_pressed_inside || !released_inside)
+    return true;
+
   if (is_toggle)
     value = !value;
 
@@ -4718,6 +4733,7 @@ bool c_toplevelwindow::create (
 
   app->focused_widget = nullptr;
   app->hovered_widget = nullptr;
+  app->mouse_capture_widget = nullptr;
   app->mouse_captured = false;
   app->embedded_window = nullptr;
   app->cr = nullptr;
@@ -4744,6 +4760,7 @@ void c_toplevelwindow::activate () {
   app->action_toplevel = this;
   app->focused_widget = focused_widget;
   app->hovered_widget = hovered_widget;
+  app->mouse_capture_widget = mouse_capture_widget;
   app->mouse_captured = mouse_captured;
 }
 
@@ -4753,6 +4770,7 @@ void c_toplevelwindow::save_state () {
 
   focused_widget = app->focused_widget;
   hovered_widget = app->hovered_widget;
+  mouse_capture_widget = app->mouse_capture_widget;
   mouse_captured = app->mouse_captured;
 }
 
@@ -4929,6 +4947,7 @@ void c_toplevelwindow::cb_button_press (
       ry,
       button);
     self->app->mouse_captured = false;
+    self->app->mouse_capture_widget = nullptr;
     if (handled && self->app->focused_widget) {
       nbtk::t_point local =
         self->app->focused_widget->root_to_local ({ rx, ry });
@@ -4937,6 +4956,8 @@ void c_toplevelwindow::cb_button_press (
         local.y >= 0 &&
         local.x < self->app->focused_widget->w &&
         local.y < self->app->focused_widget->h;
+      if (self->app->mouse_captured)
+        self->app->mouse_capture_widget = self->app->focused_widget;
     }
     self->save_state ();
   }
@@ -4959,15 +4980,16 @@ void c_toplevelwindow::cb_button_release (
     const int button = native_button_from_event (event);
     const int rx = native_event_x (event) / w->app->hdpi;
     const int ry = native_event_y (event) / w->app->hdpi;
-    if (self->app->mouse_captured && self->app->focused_widget) {
+    if (self->app->mouse_captured && self->app->mouse_capture_widget) {
       nbtk::t_point local =
-        self->app->focused_widget->root_to_local ({ rx, ry });
-      self->app->focused_widget->on_mouse_up (
+        self->app->mouse_capture_widget->root_to_local ({ rx, ry });
+      self->app->mouse_capture_widget->on_mouse_up (
         local.x, local.y, button);
     } else {
       self->root_widget.mouse_up_tree (rx, ry, button);
     }
     self->app->mouse_captured = false;
+    self->app->mouse_capture_widget = nullptr;
     self->save_state ();
   }
   native_widget_invalidate (w);
@@ -4988,10 +5010,10 @@ void c_toplevelwindow::cb_motion (
     self->activate ();
     const int rx = native_event_x (event) / w->app->hdpi;
     const int ry = native_event_y (event) / w->app->hdpi;
-    if (self->app->mouse_captured && self->app->focused_widget) {
+    if (self->app->mouse_captured && self->app->mouse_capture_widget) {
       nbtk::t_point local =
-        self->app->focused_widget->root_to_local ({ rx, ry });
-      self->app->focused_widget->on_mouse_move (local.x, local.y);
+        self->app->mouse_capture_widget->root_to_local ({ rx, ry });
+      self->app->mouse_capture_widget->on_mouse_move (local.x, local.y);
     } else {
       self->root_widget.update_hover_tree (rx, ry);
       self->app->update_tooltip (self->app->hovered_widget, rx, ry);

@@ -312,6 +312,7 @@ public:
 
   bool is_toggle = false;
   bool value = false;
+  bool mouse_down_inside = false;
   float padding = 8.0f;
 
 private:
@@ -673,6 +674,7 @@ public:
   c_widget *hovered_widget = nullptr;
   c_widget *tooltip_widget = nullptr;
   c_widget *tooltip_pending_widget = nullptr;
+  c_widget *mouse_capture_widget = nullptr;
   c_combobox *active_combobox = nullptr;
   uint64_t tooltip_pending_since = 0;
   int tooltip_root_x = 0;
@@ -1023,6 +1025,7 @@ public:
   nbtk::c_widget root_widget;
   nbtk::c_widget *focused_widget = NULL;
   nbtk::c_widget *hovered_widget = NULL;
+  nbtk::c_widget *mouse_capture_widget = NULL;
   bool mouse_captured = false;
   bool hide_on_close = true;
   bool quit_on_close = false;
