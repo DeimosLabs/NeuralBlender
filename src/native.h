@@ -178,6 +178,7 @@ void native_set_window_attributes (nbtk::t_native_widget *w);
 void native_set_transient_for_hint (nbtk::t_native_widget *parent, nbtk::t_native_widget *child);
 void native_set_input_mask (nbtk::t_native_widget *w);
 int native_key_from_event (void *event);
+int native_key_mods_from_event (void *event);
 int native_text_from_event (void *event, char *text, int text_size);
 int native_button_from_event (void *event);
 int native_event_x (void *event);

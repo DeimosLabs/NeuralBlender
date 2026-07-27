@@ -156,9 +156,17 @@ enum e_key {
   KEY_RIGHT,
   KEY_HOME,
   KEY_END,
+  KEY_PAGE_UP,
+  KEY_PAGE_DOWN,
   KEY_SPACE,
   KEY_RETURN,
   KEY_ESCAPE
+};
+
+enum e_key_mod {
+  KEYMOD_SHIFT = 1 << 0,
+  KEYMOD_CTRL  = 1 << 1,
+  KEYMOD_ALT   = 1 << 2
 };
 
 class c_widget {
@@ -182,6 +190,7 @@ public:
   virtual bool on_key_down (int key);
   virtual bool on_key_up (int key);
   virtual bool on_text_input (const char *text);
+  virtual bool on_tab (bool shift);
   virtual void clear_hover ();
   virtual _mouse_cursor mouse_cursor () const;
   virtual void on_event (t_event &event);
@@ -237,6 +246,7 @@ public:
   bool enabled = true;
   bool wants_mouse = false;
   bool wants_hover = false;
+  bool wants_keyboard_focus = false;
   bool doublebuffer = false;
   bool mouse_inside = false;
   bool hovered = false;
@@ -263,7 +273,7 @@ public:
   void clear_hover () override;
   _mouse_cursor mouse_cursor () const override;
 
-  float size = 13.0f;
+  float fontsize = 13.0f;
   bool link = false;
 };
 
@@ -330,6 +340,8 @@ class c_container;
 struct t_listrow {
   std::string label;
   std::string path;
+  size_t size;
+  int32_t timestamp;
   bool directory = false;
   bool symlink = false;
 };
@@ -423,7 +435,7 @@ public:
   int selected = -1;
   int first_visible = 0;
   int row_height = 24;
-  float size = 13.0f;
+  float fontsize = 13.0f;
   bool activate_on_doubleclick = true;
   bool activate_on_click_again = false;
   bool activate_on_single_click = false;
@@ -519,7 +531,7 @@ public:
   float drag_sensitivity = 0.005f;
   bool reset_on_doubleclick = true;
   bool show_value = true;
-  float size = 12.0f;
+  float fontsize = 12.0f;
 
 private:
   void emit_action ();
@@ -537,6 +549,8 @@ public:
 
   void draw (cairo_t *cr) override;
   bool on_mouse_down (int x, int y, int button) override;
+  bool on_mouse_up (int x, int y, int button) override;
+  bool on_mouse_move (int x, int y) override;
   bool on_key_down (int key) override;
   bool on_text_input (const char *text) override;
 
@@ -545,10 +559,31 @@ public:
 
   std::string value;
   size_t cursor = 0;
-  float size = 13.0f;
+  size_t selection_anchor = 0;
+  float fontsize = 13.0f;
 
 private:
   void emit_action ();
+  bool has_selection () const;
+  size_t selection_start () const;
+  size_t selection_end () const;
+  void clear_selection ();
+  bool erase_selection ();
+  void select_all ();
+  void select_word_at (size_t pos);
+  bool word_bounds_at (size_t pos, size_t *start, size_t *end) const;
+  void select_word_drag_to (size_t pos);
+  size_t cursor_from_x (cairo_t *cr, double text_x) const;
+  double text_width_to (cairo_t *cr, size_t pos) const;
+  void scroll_cursor_into_view (cairo_t *cr, double clip_w);
+
+  bool selecting = false;
+  bool selecting_words = false;
+  size_t word_drag_start = 0;
+  size_t word_drag_end = 0;
+  double scroll_x = 0.0;
+  uint64_t last_click_ms = 0;
+  int click_count = 0;
 };
 
 class c_staticimage : public c_widget {
@@ -574,6 +609,7 @@ public:
   virtual bool dispatch_key_down (int key);
   virtual bool dispatch_key_up (int key);
   virtual void dispatch_text_input (const char *text);
+  virtual bool focus_next (bool reverse);
   virtual void invalidate_rect (int x, int y, int w, int h);
   virtual void set_mouse_cursor (_mouse_cursor cursor);
   virtual void set_focus (c_widget *widget);
@@ -643,6 +679,9 @@ public:
   int tooltip_root_y = 0;
   uint64_t tooltip_delay = 400;
   bool mouse_captured = false;
+  bool key_shift = false;
+  bool key_ctrl = false;
+  bool key_alt = false;
   float font_scale = 1.0f;
 };
 
@@ -1001,6 +1040,13 @@ private:
 
 class c_filepicker : public c_toplevelwindow {
 public:
+  class c_path_textbox : public c_textbox {
+  public:
+    bool on_tab (bool shift) override;
+
+    c_filepicker *filepicker = nullptr;
+  };
+
   void create (
       c_app *app,
       t_native_window parent,
@@ -1014,6 +1060,7 @@ public:
   bool on_key_down (int key) override;
 
   void scan_current_dir ();
+  bool complete_path_from_textbox ();
   virtual void add_files_from_dir (
       c_combobox *cb,
       const std::string &selected_file = "");
@@ -1028,7 +1075,8 @@ public:
   virtual void on_file_select (const std::string &filename);
 
   c_frame frame;
-  c_label label_path;
+  //c_label label_path;
+  c_path_textbox text_path;
   c_listbox listbox;
   c_scrollbar vscrollbar;
   c_combobox combo_filter;
@@ -1046,6 +1094,11 @@ public:
   std::vector<t_listrow> rows;
   t_native_handle owner_widget = nullptr;
   bool show_hidden = false;
+  bool sort_case_sensitive = false;
+  std::string last_completion_text;
+  std::string last_completion_dir_path;
+  bool last_completion_was_dir = false;
+  bool last_completion_can_focus_list = false;
 };
 
 } // namespace nbtk

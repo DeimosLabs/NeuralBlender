@@ -801,12 +801,29 @@ int native_key_from_event (void *event) {
     case XK_Right:     return nbtk::KEY_RIGHT;
     case XK_Home:      return nbtk::KEY_HOME;
     case XK_End:       return nbtk::KEY_END;
+    case XK_Page_Up:   return nbtk::KEY_PAGE_UP;
+    case XK_Page_Down: return nbtk::KEY_PAGE_DOWN;
     case XK_space:     return nbtk::KEY_SPACE;
     case XK_Return:
     case XK_KP_Enter:  return nbtk::KEY_RETURN;
     case XK_Escape:    return nbtk::KEY_ESCAPE;
     default:           return nbtk::KEY_UNKNOWN;
   }
+}
+
+int native_key_mods_from_event (void *event) {
+  XKeyEvent *key = (XKeyEvent *) event;
+  if (!key)
+    return 0;
+
+  int mods = 0;
+  if (key->state & ShiftMask)
+    mods |= nbtk::KEYMOD_SHIFT;
+  if (key->state & ControlMask)
+    mods |= nbtk::KEYMOD_CTRL;
+  if (key->state & Mod1Mask)
+    mods |= nbtk::KEYMOD_ALT;
+  return mods;
 }
 
 int native_text_from_event (void *event, char *text, int text_size) {

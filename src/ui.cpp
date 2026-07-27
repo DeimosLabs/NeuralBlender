@@ -438,12 +438,12 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   for (int i = 0; g_about_text [i]; i++) {
     label_text [i].create (
       &frame_main, g_about_text [i], 0, 240 + i * 24, panel_w, 24);
-    label_text [i].size = 13.0f;
+    label_text [i].fontsize = 13.0f;
   }
 
   /*label_link.create (
     &frame_main, "http://deimos.ca/neuralblender", 0, 336, panel_w, 24);
-  label_link.size = 13.0f;
+  label_link.fontsize = 13.0f;
   label_link.link = true;*/
   label_text [4].link = true;
   label_text [5].link = true;
@@ -451,7 +451,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   char buf [64];
   snprintf (buf, sizeof (buf), "Build timestamp: %s", g_build_timestamp);
   label_build.create (&frame_main, buf, 0, 390, panel_w, 20);
-  label_build.size = 10.0f;
+  label_build.fontsize = 10.0f;
 
   btn_ok.create (root, "OK", 310, 424, 128, 40);
   btn_ok.set_image_default (data_icon_xputty_approved_png);
@@ -845,13 +845,13 @@ void c_lane_widgets::create (
   //label_flip.create (ui, wp, "DC flip", 0, 0, 75, 32);
   //label_calib.create (ui, wp, "Calib.", 0, 0, 75, 32);
   label_frames.create (&lane_frame, "(not loaded)", 0, 0, 75, 24);
-  label_frames.size = 10.5f;
+  label_frames.fontsize = 10.5f;
   label_frames.align = nbtk::TEXT_CENTER;
   label_trim.create (&lane_frame, "1.0", 0, 0, 75, 24);
-  label_trim.size = 10.5f;
+  label_trim.fontsize = 10.5f;
   label_trim.align = nbtk::TEXT_CENTER;
   label_engine.create (&lane_frame, "(none)", 0, 0, 120, 24);
-  label_engine.size = 10.5f;
+  label_engine.fontsize = 10.5f;
   label_engine.align = nbtk::TEXT_CENTER;
   
   btn_browse.set_image_default (data_icon_folder_big_png);

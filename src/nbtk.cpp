@@ -5,7 +5,9 @@
  */
 
 #include <string.h>
+#include <strings.h>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <dirent.h>
@@ -103,6 +105,33 @@ static constexpr t_statecolors sc (
     nbtk::t_gradientcolors bg,
     nbtk::t_gradientcolors fg) {
   return { bg, fg };
+}
+
+static bool widget_has_focus (const c_widget &widget) {
+  if (!widget.app)
+    return false;
+
+  if (widget.app->focused_widget == &widget)
+    return true;
+
+  return widget.toplevel && widget.toplevel->focused_widget == &widget;
+}
+
+static t_listrow make_listrow (
+    const std::string &label,
+    const std::string &path = "",
+    bool directory = false,
+    bool symlink = false,
+    size_t size = 0,
+    int32_t timestamp = 0) {
+  t_listrow row;
+  row.label = label;
+  row.path = path;
+  row.size = size;
+  row.timestamp = timestamp;
+  row.directory = directory;
+  row.symlink = symlink;
+  return row;
 }
 
 // Floats galore. Bring a row boat.
@@ -287,6 +316,11 @@ bool c_widget::on_text_input (const char *text) {
   return false;
 }
 
+bool c_widget::on_tab (bool shift) {
+  (void) shift;
+  return false;
+}
+
 void c_widget::clear_hover () {
   on_mouse_leave ();
 }
@@ -355,7 +389,7 @@ bool c_widget::mouse_down_tree (int px, int py, int button) {
   return on_mouse_down (lx, ly, button);
 }
 
-bool c_widget::mouse_up_tree (int px, int py, int button) { CP
+bool c_widget::mouse_up_tree (int px, int py, int button) {
   if (!visible || !enabled || !contains_local (px, py))
     return false;
 
@@ -479,7 +513,7 @@ void c_label::draw (cairo_t *cr) {
 
   cairo_select_font_face (
     cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  const float font_size = size * font_multiplier ();
+  const float font_size = fontsize * font_multiplier ();
   cairo_set_font_size (cr, font_size);
   if (!enabled)
     tk_set_text_fg (cr, false);
@@ -591,6 +625,7 @@ static void tk_draw_surface_scaled (
 c_button::c_button () {
   wants_mouse = true;
   wants_hover = true;
+  wants_keyboard_focus = true;
   corner_radius = NBTK_BUTTON_RADIUS;
 }
 
@@ -599,22 +634,24 @@ c_button::~c_button () {
 }
 
 cairo_surface_t *c_button::image_for_state () const {
-  if (pressed && hovered && img_down_hover) return img_down_hover;
+  const bool highlight = hovered || widget_has_focus (*this);
+  if (pressed && highlight && img_down_hover) return img_down_hover;
   if (pressed && img_down)                  return img_down;
-  if (!value && hovered && img_off_hover)   return img_off_hover;
-  if (hovered && img_hover)                 return img_hover;
+  if (!value && highlight && img_off_hover) return img_off_hover;
+  if (highlight && img_hover)               return img_hover;
   if (value && img_on)                      return img_on;
   if (img_default)                          return img_default;
   return img_off;
 }
 
 static nbtk::_widget_state tk_button_state (const c_button &button) {
-  if (button.pressed && button.hovered) return WSTATE_DOWN_HOVER;
-  if (button.pressed)                   return WSTATE_DOWN;
-  if (!button.value && button.hovered)  return WSTATE_OFF_HOVER;
-  if (button.value && button.hovered)   return WSTATE_ON_HOVER;
-  if (button.hovered)                   return nbtk::WSTATE_HOVER;
-  if (button.value)                     return nbtk::WSTATE_ON;
+  const bool highlight = button.hovered || widget_has_focus (button);
+  if (button.pressed && highlight) return WSTATE_DOWN_HOVER;
+  if (button.pressed)              return WSTATE_DOWN;
+  if (!button.value && highlight)  return WSTATE_OFF_HOVER;
+  if (button.value && highlight)   return WSTATE_ON_HOVER;
+  if (highlight)                   return nbtk::WSTATE_HOVER;
+  if (button.value)                return nbtk::WSTATE_ON;
   return nbtk::WSTATE_OFF;
 }
 
@@ -797,6 +834,7 @@ void c_checkbox::draw (cairo_t *cr) {
   if (!cr)
     return;
 
+  const bool highlight = hovered || widget_has_focus (*this);
   const t_statecolors &colors = colors_for (
       WSTYLE_BUTTON,
       enabled ? tk_button_state (*this) : nbtk::WSTATE_DISABLED);
@@ -808,7 +846,7 @@ void c_checkbox::draw (cairo_t *cr) {
   tk_set_gradient (cr, box, colors.bg);
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, box, colors.fg);
-  cairo_set_line_width (cr, hovered ? 2.5 : 2.0);
+  cairo_set_line_width (cr, highlight ? 2.5 : 2.0);
   cairo_stroke (cr);
 
   if (value) {
@@ -1143,6 +1181,7 @@ void c_container::on_action (t_action_event &event) {
 c_listbox::c_listbox () {
   wants_mouse = true;
   wants_hover = true;
+  wants_keyboard_focus = true;
   corner_radius = NBTK_LIST_RADIUS;
 }
 
@@ -1155,7 +1194,7 @@ void c_listbox::clear () {
 }
 
 void c_listbox::add (const std::string &text) {
-  rows.push_back ({ text, "", false, false });
+  rows.push_back (make_listrow (text));
   sync_scrollbar ();
   invalidate ();
 }
@@ -1164,7 +1203,7 @@ void c_listbox::set_items (const std::vector<std::string> &items_) {
   rows.clear ();
   rows.reserve (items_.size ());
   for (const std::string &item : items_)
-    rows.push_back ({ item, "", false, false });
+    rows.push_back (make_listrow (item));
   if (selected >= (int) rows.size ())
     selected = -1;
   scroll_to (first_visible);
@@ -1312,20 +1351,24 @@ void c_listbox::draw (cairo_t *cr) {
   static cairo_surface_t *file_icon =
     cairo_image_surface_create_from_stream (data_icon_picker_file_png);
 
+  const bool focused = widget_has_focus (*this);
   const t_statecolors &frame = colors_for (WSTYLE_FRAME, nbtk::WSTATE_NORMAL);
+  const t_statecolors &focus_colors = colors_for (WSTYLE_FRAME, nbtk::WSTATE_SELECTED);
   const t_statecolors &sel = colors_for (WSTYLE_BUTTON, nbtk::WSTATE_ON);
   const t_statecolors &hover = colors_for (WSTYLE_BUTTON, nbtk::WSTATE_HOVER);
   const nbtk::t_gradientcolors &bg = nbtk::get_colortheme ()->window_bg;
-  const nbtk::t_gradientcolors outline = {
-    frame.fg.r2, frame.fg.g2, frame.fg.b2, frame.fg.a2,
-    frame.fg.r1, frame.fg.g1, frame.fg.b1, frame.fg.a1
-  };
+  const nbtk::t_gradientcolors outline = focused ?
+    focus_colors.fg :
+    nbtk::t_gradientcolors {
+      frame.fg.r2, frame.fg.g2, frame.fg.b2, frame.fg.a2,
+      frame.fg.r1, frame.fg.g1, frame.fg.b1, frame.fg.a1
+    };
 
   tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   cairo_set_source_rgba (cr, bg.r1, bg.g1, bg.b1, bg.a1);
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, h, outline);
-  cairo_set_line_width (cr, 1.5);
+  cairo_set_line_width (cr, focused ? 2.0 : 1.5);
   cairo_stroke (cr);
 
   cairo_save (cr);
@@ -1334,7 +1377,7 @@ void c_listbox::draw (cairo_t *cr) {
 
   cairo_select_font_face (
     cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (cr, size * font_multiplier ());
+  cairo_set_font_size (cr, fontsize * font_multiplier ());
   cairo_font_extents_t font_ext {};
   cairo_font_extents (cr, &font_ext);
   const double text_baseline =
@@ -1453,6 +1496,8 @@ bool c_listbox::on_mouse_up (int x_, int y_, int button) { CP
 }
 
 bool c_listbox::on_key_down (int key) {
+  const int page_step = std::max (1, visible_rows () - 1);
+
   switch (key) {
     case KEY_UP:
       if (!rows.empty ())
@@ -1464,6 +1509,21 @@ bool c_listbox::on_key_down (int key) {
         set_selected (
             selected < 0 ? 0 : std::min ((int) rows.size () - 1, selected + 1),
             true);
+      return true;
+
+    case KEY_PAGE_UP:
+      if (selected >= 0)
+        set_selected (std::max (0, selected - page_step), true);
+      else
+        scroll_to (first_visible - page_step);
+      return true;
+
+    case KEY_PAGE_DOWN:
+      if (selected >= 0)
+        set_selected (
+            std::min ((int) rows.size () - 1, selected + page_step), true);
+      else
+        scroll_to (first_visible + page_step);
       return true;
 
     case KEY_RETURN:
@@ -1479,6 +1539,7 @@ bool c_listbox::on_key_down (int key) {
 c_combobox::c_combobox () {
   wants_mouse = true;
   wants_hover = true;
+  wants_keyboard_focus = true;
   corner_radius = NBTK_COMBOBOX_RADIUS;
 }
 
@@ -1502,9 +1563,10 @@ void c_combobox::draw (cairo_t *cr) {
   if (!cr)
     return;
 
+  const bool highlight = hovered || widget_has_focus (*this);
   const t_statecolors &colors = colors_for (
       WSTYLE_BUTTON,
-      pressed ? WSTATE_DOWN : hovered ? nbtk::WSTATE_HOVER : nbtk::WSTATE_NORMAL);
+      pressed ? WSTATE_DOWN : highlight ? nbtk::WSTATE_HOVER : nbtk::WSTATE_NORMAL);
 
   tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   tk_set_gradient (cr, h, colors.bg);
@@ -1745,7 +1807,7 @@ int c_combobox::measure_dropdown_width () {
   cairo_select_font_face (
       cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   const float font_scale = app ? app->font_scale : 1.0f;
-  cairo_set_font_size (cr, listbox.size * text_size * font_scale);
+  cairo_set_font_size (cr, listbox.fontsize * text_size * font_scale);
 
   double widest = 0.0;
   for (const std::string &item : items) {
@@ -1988,6 +2050,7 @@ void c_combobox::update_widget () {
 c_knob::c_knob () {
   wants_mouse = true;
   wants_hover = true;
+  wants_keyboard_focus = true;
 }
 
 float c_knob::quantize (float value_) const {
@@ -2059,12 +2122,13 @@ void c_knob::draw (cairo_t *cr) {
   if (!cr)
     return;
 
+  const bool highlight = hovered || widget_has_focus (*this);
   const t_statecolors &colors = colors_for (
     WSTYLE_BUTTON,
-    pressed ? WSTATE_DOWN : hovered ? nbtk::WSTATE_HOVER : nbtk::WSTATE_NORMAL);
+    pressed ? WSTATE_DOWN : highlight ? nbtk::WSTATE_HOVER : nbtk::WSTATE_NORMAL);
 
   const int label_h = label.empty () ? 0 :
-    std::max (14, (int) (size * font_multiplier () + 4));
+    std::max (14, (int) (fontsize * font_multiplier () + 4));
   const int knob_h = std::max (1, h - label_h);
   const double cx = w * 0.5;
   const double cy = knob_h * 0.5;
@@ -2081,13 +2145,13 @@ void c_knob::draw (cairo_t *cr) {
     cairo_fill_preserve (cr);
 
     tk_set_gradient (cr, radius * 2.0, colors.fg);
-    cairo_set_line_width (cr, hovered ? 2.4 : 1.8);
+    cairo_set_line_width (cr, highlight ? 2.4 : 1.8);
     cairo_stroke (cr);
   }
 
   const double a0 = 3.0 * M_PI / 4.0;
   const double a1 = angle_from_value ();
-  if (hovered || dragging) {
+  if (highlight || dragging) {
     const t_statecolors &on_colors = colors_for (WSTYLE_BUTTON, nbtk::WSTATE_ON);
     cairo_set_source_rgba (
         cr,
@@ -2117,7 +2181,7 @@ void c_knob::draw (cairo_t *cr) {
 
   cairo_select_font_face (
     cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (cr, size * font_multiplier ());
+  cairo_set_font_size (cr, fontsize * font_multiplier ());
   tk_set_text_fg (cr, enabled);
 
   char text [64] = {};
@@ -2255,9 +2319,18 @@ static size_t tk_utf8_next_pos (const std::string &s, size_t pos) {
   return pos;
 }
 
+static bool tk_textbox_word_char (const std::string &s, size_t pos) {
+  if (pos >= s.size ())
+    return false;
+
+  const unsigned char c = (unsigned char) s [pos];
+  return c >= 0x80 || std::isalnum (c) || c == '_';
+}
+
 c_textbox::c_textbox () {
   wants_mouse = true;
   wants_hover = true;
+  wants_keyboard_focus = true;
   align = TEXT_LEFT;
   corner_radius = NBTK_TEXTBOX_RADIUS;
 }
@@ -2297,24 +2370,40 @@ void c_textbox::draw (cairo_t *cr) {
 
   cairo_select_font_face (
     cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (cr, size * font_multiplier ());
-  tk_set_text_fg (cr, enabled);
+  cairo_set_font_size (cr, fontsize * font_multiplier ());
 
   cairo_text_extents_t extents {};
   cairo_text_extents (cr, value.c_str (), &extents);
-  const double tx = tk_aligned_text_x (
-      w, extents, pad, focused ? TEXT_LEFT : align);
-  const double ty = ((double) h - extents.height) * 0.5 - extents.y_bearing;
+  const double clip_w = std::max (0.0, (double) w - pad * 2.0);
+  if (focused)
+    scroll_cursor_into_view (cr, clip_w);
 
+  const double aligned_x = tk_aligned_text_x (
+      w, extents, pad, focused ? TEXT_LEFT : align);
+  const double tx = focused ? pad - scroll_x : aligned_x;
+  const double ty = ((double) h - extents.height) * 0.5 - extents.y_bearing;
+  const double sel_y = std::max (3.0, ty - extents.height - 2.0);
+  const double sel_h = std::max (8.0, extents.height + 5.0);
+
+  if (focused && has_selection ()) {
+    const size_t a = selection_start ();
+    const size_t b = selection_end ();
+    const double sx = tx + text_width_to (cr, a);
+    const double sw = text_width_to (cr, b) - text_width_to (cr, a);
+    const t_statecolors &sel = colors_for (WSTYLE_BUTTON, nbtk::WSTATE_ON);
+    cairo_set_source_rgba (
+        cr, sel.bg.r1, sel.bg.g1, sel.bg.b1, std::max (0.35f, sel.bg.a1));
+    cairo_rectangle (cr, sx, sel_y, std::max (1.0, sw), sel_h);
+    cairo_fill (cr);
+  }
+
+  tk_set_text_fg (cr, enabled);
   cairo_move_to (cr, tx, ty);
   cairo_show_text (cr, value.c_str ());
 
-  if (focused) {
+  if (focused && !has_selection ()) {
     cursor = std::min (cursor, value.size ());
-    const std::string before_cursor = value.substr (0, cursor);
-    cairo_text_extents_t cursor_extents {};
-    cairo_text_extents (cr, before_cursor.c_str (), &cursor_extents);
-    const double cx = tx + cursor_extents.x_advance + 1.0;
+    const double cx = tx + text_width_to (cr, cursor) + 1.0;
 
     cairo_set_line_width (cr, 1.0);
     cairo_move_to (cr, cx, 8.0);
@@ -2333,13 +2422,118 @@ bool c_textbox::on_mouse_down (int x_, int y_, int button) {
   if (app)
     app->set_focus (this);
 
-  cursor = value.size ();
+  cairo_surface_t *surface =
+    cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 1, 1);
+  cairo_t *cr = cairo_create (surface);
+  cairo_select_font_face (
+    cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  cairo_set_font_size (cr, fontsize * font_multiplier ());
+
+  const double pad = 8.0 * font_multiplier ();
+  cursor = cursor_from_x (cr, (double) x_ - pad + scroll_x);
+
+  cairo_destroy (cr);
+  cairo_surface_destroy (surface);
+
+  const uint64_t now = now_ms ();
+  if (now - last_click_ms <= NBTK_DOUBLECLICK_MS)
+    click_count++;
+  else
+    click_count = 1;
+  last_click_ms = now;
+
+  if (click_count >= 3) {
+    select_all ();
+    click_count = 0;
+    selecting = false;
+    selecting_words = false;
+  } else if (click_count == 2) {
+    select_word_at (cursor);
+    word_drag_start = selection_start ();
+    word_drag_end = selection_end ();
+    selecting = true;
+    selecting_words = true;
+  } else {
+    selection_anchor = cursor;
+    selecting = true;
+    selecting_words = false;
+  }
+
+  invalidate ();
+  return true;
+}
+
+bool c_textbox::on_mouse_up (int x_, int y_, int button) {
+  c_widget::on_mouse_up (x_, y_, button);
+  if (button == Button1) {
+    selecting = false;
+    selecting_words = false;
+  }
+  return true;
+}
+
+bool c_textbox::on_mouse_move (int x_, int y_) {
+  c_widget::on_mouse_move (x_, y_);
+  if (!selecting)
+    return true;
+
+  if (y_ < 0) {
+    if (selecting_words) {
+      selection_anchor = word_drag_end;
+      cursor = 0;
+    } else {
+      cursor = 0;
+    }
+    invalidate ();
+    return true;
+  }
+
+  if (y_ >= h) {
+    if (selecting_words) {
+      selection_anchor = word_drag_start;
+      cursor = value.size ();
+    } else {
+      cursor = value.size ();
+    }
+    invalidate ();
+    return true;
+  }
+
+  cairo_surface_t *surface =
+    cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 1, 1);
+  cairo_t *cr = cairo_create (surface);
+  cairo_select_font_face (
+    cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  cairo_set_font_size (cr, fontsize * font_multiplier ());
+
+  const double pad = 8.0 * font_multiplier ();
+  const size_t next_cursor = cursor_from_x (cr, (double) x_ - pad + scroll_x);
+  if (selecting_words)
+    select_word_drag_to (next_cursor);
+  else
+    cursor = next_cursor;
+
+  cairo_destroy (cr);
+  cairo_surface_destroy (surface);
   invalidate ();
   return true;
 }
 
 bool c_textbox::on_key_down (int key) {
   bool changed = false;
+  const bool shift = app && app->key_shift;
+
+  auto move_cursor = [&] (size_t next) {
+    if (shift) {
+      if (!has_selection ())
+        selection_anchor = cursor;
+      cursor = next;
+    } else {
+      cursor = next;
+      clear_selection ();
+    }
+    invalidate ();
+  };
 
   switch (key) {
     case KEY_RETURN:
@@ -2355,40 +2549,54 @@ bool c_textbox::on_key_down (int key) {
       return true;
 
     case KEY_BACKSPACE: {
-      const size_t prev = tk_utf8_prev_pos (value, cursor);
-      if (prev < cursor) {
-        value.erase (prev, cursor - prev);
-        cursor = prev;
+      if (erase_selection ()) {
         changed = true;
+      } else {
+        const size_t prev = tk_utf8_prev_pos (value, cursor);
+        if (prev < cursor) {
+          value.erase (prev, cursor - prev);
+          cursor = prev;
+          clear_selection ();
+          changed = true;
+        }
       }
     } break;
 
     case KEY_DELETE: {
-      const size_t next = tk_utf8_next_pos (value, cursor);
-      if (next > cursor) {
-        value.erase (cursor, next - cursor);
+      if (erase_selection ()) {
         changed = true;
+      } else {
+        const size_t next = tk_utf8_next_pos (value, cursor);
+        if (next > cursor) {
+          value.erase (cursor, next - cursor);
+          clear_selection ();
+          changed = true;
+        }
       }
     } break;
 
     case KEY_LEFT:
-      cursor = tk_utf8_prev_pos (value, cursor);
-      invalidate ();
+      move_cursor (
+          shift ? tk_utf8_prev_pos (value, cursor) :
+                  (has_selection () ? selection_start () :
+                                     tk_utf8_prev_pos (value, cursor)));
       return true;
 
     case KEY_RIGHT:
-      cursor = tk_utf8_next_pos (value, cursor);
-      invalidate ();
+      move_cursor (
+          shift ? tk_utf8_next_pos (value, cursor) :
+                  (has_selection () ? selection_end () :
+                                     tk_utf8_next_pos (value, cursor)));
       return true;
 
+    case KEY_UP:
     case KEY_HOME:
-      cursor = 0;
-      invalidate ();
+      move_cursor (0);
       return true;
 
+    case KEY_DOWN:
     case KEY_END:
-      cursor = value.size ();
-      invalidate ();
+      move_cursor (value.size ());
       return true;
 
     default:
@@ -2407,9 +2615,19 @@ bool c_textbox::on_text_input (const char *text) {
   if (!text || !text [0])
     return false;
 
+  std::string printable;
+  for (const unsigned char *p = (const unsigned char *) text; *p; ++p) {
+    if (*p >= 0x20 && *p != 0x7f)
+      printable.push_back ((char) *p);
+  }
+  if (printable.empty ())
+    return true;
+
   cursor = std::min (cursor, value.size ());
-  value.insert (cursor, text);
-  cursor += strlen (text);
+  erase_selection ();
+  value.insert (cursor, printable);
+  cursor += printable.size ();
+  selection_anchor = cursor;
   label = value;
   invalidate ();
   return true;
@@ -2423,6 +2641,10 @@ bool c_textbox::set_text (const char *text_) {
   value = next;
   label = value;
   cursor = value.size ();
+  selection_anchor = cursor;
+  selecting = false;
+  selecting_words = false;
+  scroll_x = 0.0;
   invalidate ();
   return true;
 }
@@ -2437,6 +2659,146 @@ void c_textbox::emit_action () {
   event.source_id = id;
   event.mouse_button = last_mouse_button;
   on_action (event);
+}
+
+bool c_textbox::has_selection () const {
+  return selection_start () < selection_end ();
+}
+
+size_t c_textbox::selection_start () const {
+  return std::min (std::min (cursor, value.size ()),
+                   std::min (selection_anchor, value.size ()));
+}
+
+size_t c_textbox::selection_end () const {
+  return std::max (std::min (cursor, value.size ()),
+                   std::min (selection_anchor, value.size ()));
+}
+
+void c_textbox::clear_selection () {
+  selection_anchor = cursor;
+}
+
+bool c_textbox::erase_selection () {
+  if (!has_selection ())
+    return false;
+
+  const size_t a = selection_start ();
+  const size_t b = selection_end ();
+  value.erase (a, b - a);
+  cursor = a;
+  selection_anchor = cursor;
+  return true;
+}
+
+void c_textbox::select_all () {
+  selection_anchor = 0;
+  cursor = value.size ();
+}
+
+void c_textbox::select_word_at (size_t pos) {
+  size_t start = 0;
+  size_t end = 0;
+  word_bounds_at (pos, &start, &end);
+
+  selection_anchor = start;
+  cursor = end;
+}
+
+bool c_textbox::word_bounds_at (size_t pos, size_t *start_, size_t *end_) const {
+  if (value.empty ()) {
+    if (start_)
+      *start_ = 0;
+    if (end_)
+      *end_ = 0;
+    return false;
+  }
+
+  pos = std::min (pos, value.size ());
+  if (pos == value.size ())
+    pos = tk_utf8_prev_pos (value, pos);
+
+  const bool want_word = tk_textbox_word_char (value, pos);
+  size_t start = pos;
+  while (start > 0) {
+    const size_t prev = tk_utf8_prev_pos (value, start);
+    if (tk_textbox_word_char (value, prev) != want_word)
+      break;
+    start = prev;
+  }
+
+  size_t end = tk_utf8_next_pos (value, pos);
+  while (end < value.size () &&
+         tk_textbox_word_char (value, end) == want_word) {
+    end = tk_utf8_next_pos (value, end);
+  }
+
+  if (start_)
+    *start_ = start;
+  if (end_)
+    *end_ = end;
+  return true;
+}
+
+void c_textbox::select_word_drag_to (size_t pos) {
+  size_t start = 0;
+  size_t end = 0;
+  word_bounds_at (pos, &start, &end);
+
+  if (end <= word_drag_start) {
+    selection_anchor = word_drag_end;
+    cursor = start;
+  } else {
+    selection_anchor = word_drag_start;
+    cursor = end;
+  }
+}
+
+double c_textbox::text_width_to (cairo_t *cr, size_t pos) const {
+  if (!cr || value.empty ())
+    return 0.0;
+
+  pos = std::min (pos, value.size ());
+  cairo_text_extents_t ext {};
+  cairo_text_extents (cr, value.substr (0, pos).c_str (), &ext);
+  return ext.x_advance;
+}
+
+size_t c_textbox::cursor_from_x (cairo_t *cr, double text_x) const {
+  if (!cr || text_x <= 0.0)
+    return 0;
+
+  size_t best = value.size ();
+  size_t prev = 0;
+  double prev_w = 0.0;
+  for (size_t pos = 0; pos < value.size (); ) {
+    const size_t next = tk_utf8_next_pos (value, pos);
+    const double next_w = text_width_to (cr, next);
+    if (text_x < (prev_w + next_w) * 0.5)
+      return prev;
+    prev = next;
+    prev_w = next_w;
+    pos = next;
+  }
+
+  return best;
+}
+
+void c_textbox::scroll_cursor_into_view (cairo_t *cr, double clip_w) {
+  if (!cr || clip_w <= 0.0) {
+    scroll_x = 0.0;
+    return;
+  }
+
+  const double cursor_x = text_width_to (cr, cursor);
+  const double margin = 4.0 * font_multiplier ();
+  if (cursor_x - scroll_x > clip_w - margin)
+    scroll_x = cursor_x - clip_w + margin;
+  if (cursor_x - scroll_x < margin)
+    scroll_x = cursor_x - margin;
+
+  const double full_w = text_width_to (cr, value.size ());
+  scroll_x = std::clamp (scroll_x, 0.0, std::max (0.0, full_w - clip_w + margin));
 }
 
 void c_button::set_image (const unsigned char *pngdata, nbtk::_widget_state which) {
@@ -2934,6 +3296,13 @@ void c_app::dispatch_mouse_move (int x, int y) {
 }
 
 bool c_app::dispatch_key_down (int key) {
+  if (key == KEY_TAB) {
+    if (focused_widget && focused_widget->on_tab (key_shift))
+      return true;
+    focus_next (key_shift);
+    return true;
+  }
+
   if (focused_widget && focused_widget->on_key_down (key))
     return true;
 
@@ -2950,6 +3319,52 @@ bool c_app::dispatch_key_up (int key) {
 void c_app::dispatch_text_input (const char *text) {
   if (focused_widget)
     focused_widget->on_text_input (text);
+}
+
+static void collect_focusable_widgets (
+    c_widget *widget,
+    std::vector<c_widget *> &focusable) {
+
+  if (!widget || !widget->visible || !widget->enabled)
+    return;
+
+  if (widget->wants_keyboard_focus)
+    focusable.push_back (widget);
+
+  for (c_widget *child : widget->children)
+    collect_focusable_widgets (child, focusable);
+}
+
+bool c_app::focus_next (bool reverse) {
+  c_widget *base = nullptr;
+  if (active_toplevel)
+    base = &active_toplevel->root_widget;
+  else
+    base = root;
+
+  std::vector<c_widget *> focusable;
+  collect_focusable_widgets (base, focusable);
+  if (focusable.empty ())
+    return false;
+
+  c_widget *current = focused_widget;
+  if (active_toplevel && active_toplevel->focused_widget)
+    current = active_toplevel->focused_widget;
+
+  auto it = std::find (focusable.begin (), focusable.end (), current);
+  if (it == focusable.end ()) {
+    set_focus (reverse ? focusable.back () : focusable.front ());
+    return true;
+  }
+
+  size_t index = (size_t) std::distance (focusable.begin (), it);
+  if (reverse)
+    index = index == 0 ? focusable.size () - 1 : index - 1;
+  else
+    index = (index + 1) % focusable.size ();
+
+  set_focus (focusable [index]);
+  return true;
 }
 
 void c_app::tick () {
@@ -3437,6 +3852,13 @@ void c_popupwindow::cb_key_press (
     return;
 
   c_popupwindow *self = (c_popupwindow *) w->parent_struct;
+  if (self->app) {
+    const int mods = native_key_mods_from_event (event);
+    self->app->key_shift = mods & KEYMOD_SHIFT;
+    self->app->key_ctrl = mods & KEYMOD_CTRL;
+    self->app->key_alt = mods & KEYMOD_ALT;
+  }
+
   const int tk_key = native_key_from_event (event);
   bool handled = false;
   if (tk_key != KEY_UNKNOWN && self->app)
@@ -3460,6 +3882,13 @@ void c_popupwindow::cb_key_release (
     return;
 
   c_popupwindow *self = (c_popupwindow *) w->parent_struct;
+  if (self->app) {
+    const int mods = native_key_mods_from_event (event);
+    self->app->key_shift = mods & KEYMOD_SHIFT;
+    self->app->key_ctrl = mods & KEYMOD_CTRL;
+    self->app->key_alt = mods & KEYMOD_ALT;
+  }
+
   const int tk_key = native_key_from_event (event);
   if (tk_key != KEY_UNKNOWN && self->app)
     self->app->dispatch_key_up (tk_key);
@@ -3492,7 +3921,7 @@ void c_tooltip::set_text (const char *text) {
     frame.corner_radius = NBTK_TOOLTIP_RADIUS;
     label.create (&frame, "", 6, 3, 1, 1);
     label.align = TEXT_LEFT;
-    label.size = 11.0f;
+    label.fontsize = 11.0f;
   }
 
   label.label = str;
@@ -3516,7 +3945,7 @@ void c_tooltip::set_text (const char *text) {
   cairo_t *measure_cr = cairo_create (measure_surface);
   cairo_select_font_face (
       measure_cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (measure_cr, label.size * label.font_multiplier ());
+  cairo_set_font_size (measure_cr, label.fontsize * label.font_multiplier ());
   cairo_text_extents_t ext {};
   cairo_text_extents (measure_cr, str, &ext);
   cairo_destroy (measure_cr);
@@ -4632,6 +5061,11 @@ void c_toplevelwindow::cb_key_press (
 
   self->activate ();
 
+  const int mods = native_key_mods_from_event (event);
+  self->app->key_shift = mods & nbtk::KEYMOD_SHIFT;
+  self->app->key_ctrl = mods & nbtk::KEYMOD_CTRL;
+  self->app->key_alt = mods & nbtk::KEYMOD_ALT;
+
   const int tk_key = native_key_from_event (event);
   bool handled = false;
   if (tk_key != nbtk::KEY_UNKNOWN)
@@ -4663,6 +5097,11 @@ void c_toplevelwindow::cb_key_release (
 
   self->activate ();
 
+  const int mods = native_key_mods_from_event (event);
+  self->app->key_shift = mods & nbtk::KEYMOD_SHIFT;
+  self->app->key_ctrl = mods & nbtk::KEYMOD_CTRL;
+  self->app->key_alt = mods & nbtk::KEYMOD_ALT;
+
   const int tk_key = native_key_from_event (event);
   if (tk_key != nbtk::KEY_UNKNOWN)
     self->app->dispatch_key_up (tk_key);
@@ -4685,6 +5124,121 @@ static std::string path_join (const std::string &dir, const std::string &name) {
   return dir + "/" + name;
 }
 
+static bool path_is_absolute (const std::string &path) {
+  return !path.empty () && path.front () == '/';
+}
+
+static std::string path_normalize (const std::string &path) {
+  if (path.empty ())
+    return "";
+
+  const bool absolute = path_is_absolute (path);
+  std::vector<std::string> parts;
+
+  size_t pos = 0;
+  while (pos <= path.size ()) {
+    size_t end = path.find ('/', pos);
+    if (end == std::string::npos)
+      end = path.size ();
+
+    std::string part = path.substr (pos, end - pos);
+    if (part.empty () || part == ".") {
+    } else if (part == "..") {
+      if (!parts.empty () && parts.back () != "..") {
+        parts.pop_back ();
+      } else if (!absolute) {
+        parts.push_back (part);
+      }
+    } else {
+      parts.push_back (std::move (part));
+    }
+
+    if (end == path.size ())
+      break;
+    pos = end + 1;
+  }
+
+  std::string ret = absolute ? "/" : "";
+  for (size_t i = 0; i < parts.size (); i++) {
+    if (!ret.empty () && ret.back () != '/')
+      ret += '/';
+    ret += parts [i];
+  }
+
+  if (ret.empty ())
+    return absolute ? "/" : ".";
+
+  return ret;
+}
+
+static std::string filepicker_scan_dir_for_prefix (
+    const std::string &current_dir,
+    const std::string &typed_dir) {
+
+  if (typed_dir.empty ())
+    return current_dir;
+
+  if (path_is_absolute (typed_dir))
+    return path_normalize (typed_dir);
+
+  return path_normalize (
+      path_join (current_dir.empty () ? "." : current_dir, typed_dir));
+}
+
+static bool filepicker_prefix_match (
+    const std::string &label,
+    const std::string &prefix,
+    bool case_sensitive) {
+
+  if (prefix.size () > label.size ())
+    return false;
+
+  if (case_sensitive)
+    return !label.compare (0, prefix.size (), prefix);
+
+  return !strncasecmp (label.c_str (), prefix.c_str (), prefix.size ());
+}
+
+static std::string filepicker_common_prefix (
+    const std::vector<nbtk::t_listrow> &rows,
+    bool case_sensitive) {
+
+  if (rows.empty ())
+    return "";
+
+  std::string prefix = rows [0].label;
+  for (size_t i = 1; i < rows.size (); i++) {
+    const std::string &label = rows [i].label;
+    size_t n = 0;
+    const size_t max_n = std::min (prefix.size (), label.size ());
+    while (n < max_n) {
+      const unsigned char a = (unsigned char) prefix [n];
+      const unsigned char b = (unsigned char) label [n];
+      if (case_sensitive ? a != b : std::tolower (a) != std::tolower (b))
+        break;
+      n++;
+    }
+    prefix.resize (n);
+    if (prefix.empty ())
+      break;
+  }
+
+  return prefix;
+}
+
+static bool filepicker_same_dir (
+    const std::string &a,
+    const std::string &b) {
+
+  std::string aa = path_normalize (a.empty () ? "." : a);
+  std::string bb = path_normalize (b.empty () ? "." : b);
+  while (aa.size () > 1 && aa.back () == '/')
+    aa.pop_back ();
+  while (bb.size () > 1 && bb.back () == '/')
+    bb.pop_back ();
+  return aa == bb;
+}
+
 static std::string path_parent_dir (const std::string &path) {
   if (path.empty () || path == "/")
     return "/";
@@ -4693,7 +5247,7 @@ static std::string path_parent_dir (const std::string &path) {
   while (trimmed.size () > 1 && trimmed.back () == '/')
     trimmed.pop_back ();
 
-  return nbtk::path_dirname (trimmed);
+  return path_normalize (nbtk::path_dirname (trimmed));
 }
 
 static std::string filepicker_dirname (const std::string &path) {
@@ -4753,6 +5307,85 @@ static bool filepicker_accepts_file (
   return false;
 }
 
+static bool filepicker_label_less (
+    const std::string &a,
+    const std::string &b,
+    bool case_sensitive) {
+  if (case_sensitive)
+    return a < b;
+
+  const int cmp = strcasecmp (a.c_str (), b.c_str ());
+  if (cmp)
+    return cmp < 0;
+
+  return a < b;
+}
+
+static bool filepicker_row_less (
+    const nbtk::t_listrow &a,
+    const nbtk::t_listrow &b,
+    bool case_sensitive) {
+  return filepicker_label_less (a.label, b.label, case_sensitive);
+}
+
+static void filepicker_scan_completion_rows (
+    const std::string &dir_path,
+    bool show_hidden,
+    bool sort_case_sensitive,
+    const std::vector<std::string> &accepted_suffixes,
+    std::vector<nbtk::t_listrow> &out) {
+
+  out.clear ();
+  DIR *dir = opendir (dir_path.empty () ? "." : dir_path.c_str ());
+  if (!dir)
+    return;
+
+  std::vector<nbtk::t_listrow> dir_rows;
+  std::vector<nbtk::t_listrow> file_rows;
+
+  struct dirent *entry = NULL;
+  while ((entry = readdir (dir))) {
+    const char *name = entry->d_name;
+    if (!name || !strcmp (name, ".") || !strcmp (name, ".."))
+      continue;
+    if (!show_hidden && name [0] == '.')
+      continue;
+
+    const std::string full = path_join (dir_path.empty () ? "." : dir_path, name);
+    struct stat lst;
+    const bool is_symlink =
+      !lstat (full.c_str (), &lst) && S_ISLNK (lst.st_mode);
+
+    struct stat st;
+    if (stat (full.c_str (), &st))
+      continue;
+
+    if (S_ISDIR (st.st_mode)) {
+      dir_rows.push_back (nbtk::make_listrow (
+            std::string (name) + "/", full, true, is_symlink));
+    } else if (S_ISREG (st.st_mode) &&
+               filepicker_accepts_file (accepted_suffixes, name)) {
+      file_rows.push_back (nbtk::make_listrow (name, full, false, is_symlink));
+    }
+  }
+  closedir (dir);
+
+  std::sort (
+      dir_rows.begin (), dir_rows.end (),
+      [sort_case_sensitive] (const nbtk::t_listrow &a, const nbtk::t_listrow &b) {
+        return filepicker_row_less (a, b, sort_case_sensitive);
+      });
+  std::sort (
+      file_rows.begin (), file_rows.end (),
+      [sort_case_sensitive] (const nbtk::t_listrow &a, const nbtk::t_listrow &b) {
+        return filepicker_row_less (a, b, sort_case_sensitive);
+      });
+
+  out.reserve (dir_rows.size () + file_rows.size ());
+  out.insert (out.end (), dir_rows.begin (), dir_rows.end ());
+  out.insert (out.end (), file_rows.begin (), file_rows.end ());
+}
+
 static std::vector<std::string> split_filepicker_filter (
     const std::string &filter) {
   std::vector<std::string> ret;
@@ -4800,11 +5433,14 @@ void nbtk::c_filepicker::create (
   auto_quit_on_close (false);
 
   frame.create (&root_widget, "", 8, 8, 504, 360);
-  label_path.create (&frame, "", 12, 10, 480, 24);
-  label_path.align = TEXT_LEFT;
-  label_path.size = 12.0f;
+  //label_path.create (&frame, "", 12, 10, 480, 24);
+  //label_path.align = TEXT_LEFT;
+  //label_path.fontsize = 12.0f;
+  text_path.create (&frame, "", 12, 10, 480, 30);
+  text_path.filepicker = this;
+  text_path.fontsize = 12.0f;
 
-  listbox.create (&frame, "", 12, 42, 456, 300);
+  listbox.create (&frame, "", 12, 50, 456, 300);
   listbox.activate_on_click_again = true;
   listbox.activate_on_doubleclick = false;
   listbox.set_vscrollbar (&vscrollbar);
@@ -4896,7 +5532,7 @@ void nbtk::c_filepicker::on_resize () {
   const int button_w = 120;
   const int button_h = 40;
   const int button_y = std::max (pad, wh - pad - button_h);
-  const int list_y = 42;
+  const int list_y = 56;
   const int frame_h = std::max (80, button_y - pad * 2);
   const int frame_w = std::max (120, ww - pad * 2);
   const int scroll_w = NBTK_SCROLLBAR_WIDTH;
@@ -4904,7 +5540,7 @@ void nbtk::c_filepicker::on_resize () {
   const int list_w = std::max (24, frame_w - 36 - scroll_w);
 
   frame.move_resize (pad, pad, frame_w, frame_h);
-  label_path.move_resize (12, 10, std::max (24, frame_w - 24), 24);
+  text_path.move_resize (12, 12, std::max (24, frame_w - 24), 32);
   listbox.move_resize (12, list_y, list_w, list_h);
   vscrollbar.move_resize (12 + list_w + 4, list_y, scroll_w, list_h);
   listbox.sync_scrollbar ();
@@ -4919,6 +5555,21 @@ void nbtk::c_filepicker::on_resize () {
 }
 
 void nbtk::c_filepicker::on_action (t_action_event &event) {
+  if (event.source_id == text_path.id) {
+    event.handled = true;
+    const std::string text = text_path.text ();
+    const std::string path = path_normalize (
+        path_is_absolute (text) ? text : path_join (current_dir, text));
+
+    struct stat st;
+    if (!stat (path.c_str (), &st) && S_ISDIR (st.st_mode)) {
+      set_current_dir (path);
+      if (app)
+        app->set_focus (&listbox);
+    }
+    return;
+  }
+
   if (event.source_id == btn_cancel.id) {
     event.handled = true;
     hide ();
@@ -4968,9 +5619,117 @@ bool nbtk::c_filepicker::on_key_down (int key) {
   return nbtk::c_toplevelwindow::on_key_down (key);
 }
 
+bool nbtk::c_filepicker::c_path_textbox::on_tab (bool shift) {
+  if (shift || !filepicker)
+    return false;
+
+  return filepicker->complete_path_from_textbox ();
+}
+
+bool nbtk::c_filepicker::complete_path_from_textbox () {
+  const std::string typed = text_path.text ();
+  if (typed.empty ())
+    return true;
+
+  if (typed == last_completion_text) {
+    if (last_completion_was_dir) {
+      set_current_dir (last_completion_dir_path);
+      last_completion_text.clear ();
+      last_completion_dir_path.clear ();
+      last_completion_was_dir = false;
+      last_completion_can_focus_list = false;
+    } else if (last_completion_can_focus_list && app) {
+      app->set_focus (&listbox);
+    }
+    return true;
+  }
+
+  last_completion_text.clear ();
+  last_completion_dir_path.clear ();
+  last_completion_was_dir = false;
+  last_completion_can_focus_list = false;
+
+  const std::string typed_dir = filepicker_dirname (typed);
+  const std::string typed_base = nbtk::path_basename (typed);
+  const bool have_typed_dir = typed.find ('/') != std::string::npos;
+  const std::string scan_dir = have_typed_dir
+    ? filepicker_scan_dir_for_prefix (current_dir, typed_dir)
+    : current_dir;
+  std::string output_prefix;
+  if (have_typed_dir) {
+    output_prefix = path_is_absolute (typed_dir)
+      ? path_normalize (typed_dir)
+      : path_normalize (typed_dir);
+    if (output_prefix == ".")
+      output_prefix.clear ();
+    else if (output_prefix != "/" && !output_prefix.empty ())
+      output_prefix += "/";
+  }
+
+  std::vector<t_listrow> candidate_rows;
+  const std::vector<t_listrow> *source_rows = &rows;
+  if (!filepicker_same_dir (scan_dir, current_dir)) {
+    filepicker_scan_completion_rows (
+        scan_dir,
+        show_hidden,
+        sort_case_sensitive,
+        accepted_suffixes,
+        candidate_rows);
+    source_rows = &candidate_rows;
+  }
+
+  std::vector<t_listrow> matches;
+  for (const t_listrow &row : *source_rows) {
+    if (row.label == "../" && typed_base.rfind ("..", 0) != 0)
+      continue;
+    if (filepicker_prefix_match (row.label, typed_base, true))
+      matches.push_back (row);
+  }
+
+  if (matches.empty ()) {
+    last_completion_text = typed;
+    last_completion_can_focus_list = false;
+    return true;
+  }
+
+  const std::string common = filepicker_common_prefix (
+      matches, true);
+  if (common.empty ()) {
+    last_completion_text = typed;
+    last_completion_can_focus_list = true;
+    return true;
+  }
+
+  const std::string completed_text = output_prefix + common;
+  text_path.set_text (completed_text.c_str ());
+  text_path.cursor = text_path.value.size ();
+  text_path.selection_anchor = text_path.cursor;
+  last_completion_text = completed_text;
+  last_completion_can_focus_list = true;
+
+  const std::string completed_base = nbtk::path_basename (completed_text);
+  for (size_t i = 0; i < rows.size (); i++) {
+    if (filepicker_prefix_match (rows [i].label, completed_base, true)) {
+      listbox.set_selected ((int) i);
+      break;
+    }
+  }
+
+  if (matches.size () == 1 && matches [0].directory) {
+    last_completion_dir_path = matches [0].path;
+    last_completion_was_dir = true;
+  }
+
+  return true;
+}
+
 void nbtk::c_filepicker::scan_current_dir () {
   filelist.clear ();
   rows.clear ();
+  last_completion_text.clear ();
+  last_completion_dir_path.clear ();
+  last_completion_was_dir = false;
+  last_completion_can_focus_list = false;
 
   if (current_dir.empty ()) {
     listbox.clear ();
@@ -4988,7 +5747,7 @@ void nbtk::c_filepicker::scan_current_dir () {
   std::vector<t_listrow> file_rows;
 
   if (current_dir != "/")
-    dir_rows.push_back ({ "../", path_parent_dir (current_dir), true });
+    dir_rows.push_back (make_listrow ("../", path_parent_dir (current_dir), true));
 
   struct dirent *entry = NULL;
   while ((entry = readdir (dir))) {
@@ -5009,22 +5768,31 @@ void nbtk::c_filepicker::scan_current_dir () {
       continue;
 
     if (S_ISDIR (st.st_mode)) {
-      dir_rows.push_back ({ std::string (name) + "/", full, true, is_symlink });
+      dir_rows.push_back (make_listrow (
+            std::string (name) + "/", full, true, is_symlink));
     } else if (S_ISREG (st.st_mode) &&
                filepicker_accepts_file (accepted_suffixes, name)) {
-      file_rows.push_back ({ name, full, false, is_symlink });
+      file_rows.push_back (make_listrow (name, full, false, is_symlink));
       filelist.push_back (name);
     }
   }
   closedir (dir);
 
-  std::sort (filelist.begin (), filelist.end ());
+  std::sort (
+      filelist.begin (), filelist.end (),
+      [this] (const std::string &a, const std::string &b) {
+        return filepicker_label_less (a, b, sort_case_sensitive);
+      });
   std::sort (
       dir_rows.begin (), dir_rows.end (),
-      [] (const t_listrow &a, const t_listrow &b) { return a.label < b.label; });
+      [this] (const t_listrow &a, const t_listrow &b) {
+        return filepicker_row_less (a, b, sort_case_sensitive);
+      });
   std::sort (
       file_rows.begin (), file_rows.end (),
-      [] (const t_listrow &a, const t_listrow &b) { return a.label < b.label; });
+      [this] (const t_listrow &a, const t_listrow &b) {
+        return filepicker_row_less (a, b, sort_case_sensitive);
+      });
 
   rows.reserve (dir_rows.size () + file_rows.size ());
   rows.insert (rows.end (), dir_rows.begin (), dir_rows.end ());
@@ -5033,8 +5801,9 @@ void nbtk::c_filepicker::scan_current_dir () {
   listbox.selected = -1;
   listbox.first_visible = 0;
   listbox.set_rows (rows);
-  label_path.label = current_dir;
-  label_path.invalidate ();
+  //label_path.label = current_dir;
+  //label_path.invalidate ();
+  text_path.set_text (current_dir.c_str ());
   debug (
       "scan '%s': %zu dirs, %zu model files",
       current_dir.c_str (),
@@ -5101,7 +5870,7 @@ std::string nbtk::c_filepicker::get_current_dir () const {
 }
 
 void nbtk::c_filepicker::set_current_dir (std::string str) {
-  current_dir = std::move (str);
+  current_dir = path_normalize (str);
   scan_current_dir ();
 }
 
