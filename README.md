@@ -7,6 +7,7 @@ Features:
   - Full impulse response (convolution) for cab sim
   - Reads gzipped files
   - Complete stompbox->amp->cab/IR signal flow with 3 "banks" of models
+  - 8-band parametric pre and post EQ
   - Can load up to 4 models on each bank simultaneously 
   - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
   - Standalone app and LV2 plugin
