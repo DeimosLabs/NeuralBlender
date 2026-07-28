@@ -194,12 +194,15 @@ struct c_neuralblender_bank_state {
   bool linked_calib = false;
 };
 
+extern float g_defaultfreqs [];
+extern _eq_band_mode g_defaultmodes [];
+
 struct c_eq_state {
   c_eq_state () {
-    const float defaultfreqs [EQ_NUM_BANDS] = {
-      20.0f, 50.0f, 100.0f, 250.0f,
-      1000.0f, 4000.0f, 8000.0f, 11000.0f
-    };
+    /*const float defaultfreqs [EQ_NUM_BANDS] = {
+      50.0f, 100.0f, 250.0f, 500.0f,
+      1000.0f, 2000.0f, 4000.0f, 8000.0f
+    };*/
     const _eq_band_mode defaultmodes [EQ_NUM_BANDS] = {
       EQ_HIPASS, EQ_LOWSHELF, EQ_CURVE, EQ_CURVE,
       EQ_CURVE, EQ_CURVE, EQ_HISHELF, EQ_LOWPASS
@@ -207,8 +210,8 @@ struct c_eq_state {
 
     for (int i = 0; i < EQ_NUM_BANDS; ++i) {
       enabled [i] = false;
-      mode [i] = defaultmodes [i];
-      freq [i] = defaultfreqs [i];
+      mode [i] = g_defaultmodes [i];
+      freq [i] = g_defaultfreqs [i];
       gain_db [i] = 0.0f;
       q [i] = 1.0f;
     }
@@ -328,6 +331,7 @@ public:
   void set_samplerate (int sr);
   void reset ();
   void process_block (float *buf, uint32_t nframes);
+  bool set_enabled (int band, bool enabled);
   void set_band (int band, float freq, float gain_db, float q, 
                  _eq_band_mode mode = EQ_KEEP);
   
@@ -589,6 +593,15 @@ public:
   void set_pedal_bypass (bool bypass);
   void set_amp_bypass (bool bypass);
   void set_cab_bypass (bool bypass);
+  bool set_eq_bypass (_lane_bank bank, bool bypass);
+  bool set_eq_band (
+      _lane_bank bank,
+      size_t band,
+      bool enabled,
+      _eq_band_mode mode,
+      float freq,
+      float gain_db,
+      float q);
   bool lane_mute (_lane_bank bank, size_t which) const;
   bool bypass () const;
   bool pedal_bypass () const;

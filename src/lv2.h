@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 
 #include <lv2/atom/atom.h>
 #include <lv2/atom/forge.h>
@@ -243,6 +244,32 @@ static inline bool nb_lv2_decode_eq_port (
   return true;
 }
 
+static inline const char *nb_lv2_eq_bank_symbol (_lane_bank bank) {
+  return bank == BANK_EQPOST ? "eqpost" : "eqpre";
+}
+
+static inline const char *nb_lv2_eq_param_symbol (uint32_t param) {
+  switch (param) {
+    case NB_LV2_EQ_ENABLED: return "enabled";
+    case NB_LV2_EQ_MODE:    return "mode";
+    case NB_LV2_EQ_FREQ:    return "freq";
+    case NB_LV2_EQ_GAIN:    return "gain";
+    case NB_LV2_EQ_Q:       return "q";
+    default:                return "unknown";
+  }
+}
+
+static inline void nb_lv2_eq_state_uri (
+    char *buf, size_t bufsize, _lane_bank bank, size_t band, uint32_t param) {
+  snprintf (
+    buf,
+    bufsize,
+    NB_URI "#%s_%c_%s",
+    nb_lv2_eq_bank_symbol (bank),
+    (char) ('A' + band),
+    nb_lv2_eq_param_symbol (param));
+}
+
 static inline uint32_t nb_lv2_bank_lane_port (
     _lane_bank bank, size_t lane, uint32_t param) {
   uint32_t first = PORT_A_GAIN_IN;
@@ -327,6 +354,7 @@ public:
   LV2_URID urid_atom_URID = 0;
   LV2_URID urid_model [NB_NUM_MODELS] = { 0 };
   LV2_URID urid_bank_model [BANK_COUNT] [NB_NUM_MODELS] = {};
+  LV2_URID urid_eq_param [BANK_COUNT] [EQ_NUM_BANDS] [NB_LV2_EQ_PORT_COUNT] = {};
   LV2_URID urid_meters = 0;
   LV2_URID urid_stats = 0;
   LV2_URID urid_calib_target_db = 0;
@@ -415,6 +443,18 @@ public:
       map->map (map->handle, NB_URI "#EqPostBypass");
     urid_bank_bypass [BANK_CAB] =
       map->map (map->handle, NB_URI "#CabBypass");
+
+    for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
+      const size_t bank = (size_t) b;
+      for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
+        for (uint32_t param = 0; param < NB_LV2_EQ_PORT_COUNT; ++param) {
+          char uri [128];
+          nb_lv2_eq_state_uri (uri, sizeof (uri), b, band, param);
+          urid_eq_param [bank] [band] [param] =
+            map->map (map->handle, uri);
+        }
+      }
+    }
 
     return true;
   }

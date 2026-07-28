@@ -84,7 +84,7 @@ static void apply_eq_state (
   eq.on = !bypass;
 
   for (int i = 0; i < EQ_NUM_BANDS; ++i) {
-    eq.enabled [i] = state.enabled [i];
+    eq.set_enabled (i, state.enabled [i]);
     eq.set_band (
       i,
       state.freq [i],
@@ -334,25 +334,23 @@ void c_standalone_ui::on_eq_band (
   if (!blender || band >= EQ_NUM_BANDS)
     return;
 
-  c_eq *eq = nullptr;
   c_eq_state *eq_state = nullptr;
   if (bank == BANK_EQPRE) {
-    eq = &blender->eq_pre;
     eq_state = &state.eqpre;
   } else if (bank == BANK_EQPOST) {
-    eq = &blender->eq_post;
     eq_state = &state.eqpost;
   } else {
     return;
   }
 
-  eq->enabled [band] = eq_state->enabled [band];
-  eq->set_band (
-    (int) band,
+  blender->set_eq_band (
+    bank,
+    band,
+    eq_state->enabled [band],
+    eq_state->mode [band],
     eq_state->freq [band],
     eq_state->gain_db [band],
-    eq_state->q [band],
-    eq_state->mode [band]);
+    eq_state->q [band]);
 }
 
 void c_standalone_ui::on_linked_calib (nbtk::c_widget *w, bool b) {
@@ -396,7 +394,7 @@ void c_standalone_ui::on_bank_bypass (nbtk::c_widget *w, _lane_bank bank, bool b
     break;
 
     case BANK_EQPRE:
-      blender->eq_pre.on = !b;
+      blender->set_eq_bypass (bank, b);
     break;
 
     case BANK_CAB:
@@ -404,7 +402,7 @@ void c_standalone_ui::on_bank_bypass (nbtk::c_widget *w, _lane_bank bank, bool b
     break;
 
     case BANK_EQPOST:
-      blender->eq_post.on = !b;
+      blender->set_eq_bypass (bank, b);
     break;
 
     case BANK_AMP:

@@ -565,9 +565,13 @@ void c_eq::set_band (int band_,
   if (b < 0 || b >= EQ_NUM_BANDS)
     return;
   
-  freq [b] = std::clamp (freq_, 20.0f, 20000.0f);
-  gain_db [b] = std::clamp (gain_db_, -36.0f, +36.0f);
-  q [b] = std::clamp (q_, 0.01f, 100.0f);
+  const float next_freq = std::clamp (freq_, 20.0f, 20000.0f);
+  const float next_gain_db = std::clamp (gain_db_, -36.0f, +36.0f);
+  const float next_q = std::clamp (q_, 0.01f, 100.0f);
+
+  freq [b] = next_freq;
+  gain_db [b] = next_gain_db;
+  q [b] = next_q;
   if (mode_ != EQ_KEEP) {
     mode [b] = mode_;
   } else {
@@ -596,6 +600,15 @@ void c_eq::process_block (float *buf, uint32_t nframes) {
     for (uint32_t i = 0; i < nframes; ++i)
       buf [i] = band.process (buf [i]);
   }
+}
+
+bool c_eq::set_enabled (int band_, bool enabled_) {
+  const int b = band_;
+  if (b < 0 || b >= EQ_NUM_BANDS)
+    return false;
+
+  enabled [b] = enabled_;
+  return true;
 }
 
 static void eq_to_state (const c_eq &eq, c_eq_state &state) {
@@ -2367,6 +2380,49 @@ void c_neuralblender::set_amp_bypass (bool b) {
 void c_neuralblender::set_cab_bypass (bool b) {
   m_cab_bypass.store (b, std::memory_order_relaxed);
   request_mix_update ();
+}
+
+static c_eq *eq_for_bank (c_neuralblender *blender, _lane_bank bank) {
+  if (!blender)
+    return nullptr;
+
+  switch (bank) {
+    case BANK_EQPRE:
+      return &blender->eq_pre;
+
+    case BANK_EQPOST:
+      return &blender->eq_post;
+
+    default:
+      return nullptr;
+  }
+}
+
+bool c_neuralblender::set_eq_bypass (_lane_bank bank, bool bypass) {
+  c_eq *eq = eq_for_bank (this, bank);
+  if (!eq)
+    return false;
+
+  eq->on = !bypass;
+  return true;
+}
+
+bool c_neuralblender::set_eq_band (
+    _lane_bank bank,
+    size_t band,
+    bool enabled,
+    _eq_band_mode mode,
+    float freq,
+    float gain_db,
+    float q) {
+
+  c_eq *eq = eq_for_bank (this, bank);
+  if (!eq || band >= EQ_NUM_BANDS)
+    return false;
+
+  eq->set_enabled ((int) band, enabled);
+  eq->set_band ((int) band, freq, gain_db, q, mode);
+  return true;
 }
 
 bool c_neuralblender::lane_mute (_lane_bank bank, size_t which) const {

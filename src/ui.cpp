@@ -2204,6 +2204,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
     c_eq_state &eq =
       bank == BANK_EQPRE ? state.eqpre : state.eqpost;
     const size_t band = widget->lane;
+    bool changed_parameter = false;
 
     switch ((_widget_role) widget->role) {
       case ROLE_EQ_ENABLED:
@@ -2215,6 +2216,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
           static_cast<nbtk::c_combobox *> (widget)->selected + 1,
           (int) EQ_HIPASS,
           (int) EQ_LOWPASS);
+        changed_parameter = true;
       break;
 
       case ROLE_EQ_FREQ:
@@ -2222,6 +2224,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
           static_cast<nbtk::c_knob *> (widget)->value,
           20.0f,
           20000.0f);
+        changed_parameter = true;
       break;
 
       case ROLE_EQ_GAIN:
@@ -2229,6 +2232,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
           static_cast<nbtk::c_slider *> (widget)->real_value (),
           -36.0f,
           36.0f);
+        changed_parameter = true;
       break;
 
       case ROLE_EQ_Q:
@@ -2236,11 +2240,15 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
           static_cast<nbtk::c_knob *> (widget)->value,
           0.01f,
           100.0f);
+        changed_parameter = true;
       break;
 
       default:
         return false;
     }
+
+    if (eq_auto_enable && changed_parameter)
+      eq.enabled [band] = true;
 
     on_eq_band (widget, bank, band);
     finish ();

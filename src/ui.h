@@ -510,6 +510,7 @@ public:
   size_t last_exclusive_lane [BANK_COUNT] = {0, 0, 0}; // 1-based lane remembered when exclusive mode is off
   bool ui_ready;
   bool updating_from_state = false;
+  bool eq_auto_enable = true;
   bool calib_default = false;
   bool config_file_read = false;
   bool config_file_written = false;
