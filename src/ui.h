@@ -33,7 +33,9 @@
 
 enum _ui_page {
   PAGE_PEDAL = 0,
+  PAGE_EQPRE,
   PAGE_AMP,
+  PAGE_EQPOST,
   PAGE_CAB,
   PAGE_OTHER,
   PAGE_COUNT
@@ -41,7 +43,7 @@ enum _ui_page {
 
 enum _widget_role {
   ROLE_NONE = 0,
-  ROLE_BANKSWITCH,
+  ROLE_PAGESWITCH,
   ROLE_ABOUT,
   ROLE_ABOUTOK,
   ROLE_PREFS,
@@ -81,11 +83,17 @@ enum _widget_role {
   ROLE_TUNER_UP,
   ROLE_TUNER_DEFAULT,
   ROLE_CALIB_TARGET_DB,
+  ROLE_EQ_ENABLED,
+  ROLE_EQ_MODE,
+  ROLE_EQ_FREQ,
+  ROLE_EQ_GAIN,
+  ROLE_EQ_Q,
   ROLE_UNKNOWN
 };
 
 class c_neuralblender;
 struct c_neuralblender_state;
+struct c_eq_state;
 class c_neuralblender_ui;
 //class c_filepicker;
 
@@ -213,6 +221,7 @@ public:
       int x, int y, int w, int h);
 	      
   void move_resize (int x, int y, int w, int h);
+  void sync_from_state (const c_eq_state &state);
   void set_state (nbtk::_widget_state state);
   
   //bool user_mute = false;
@@ -261,6 +270,68 @@ public:
   int last_y = 0;
   int last_w = 0;
   int last_h = 0;
+};
+
+class c_freqknob : public nbtk::c_knob {
+public:
+  std::string get_value_string () const override {
+    return "";
+  }
+
+  std::string get_label_text () const override {
+    return nbtk::c_knob::get_value_string () + "Hz";
+  }
+};
+
+class c_qknob : public nbtk::c_knob {
+public:
+  std::string get_value_string () const override {
+    return "";
+  }
+
+  std::string get_label_text () const override {
+    return "Q=" + nbtk::c_knob::get_value_string ();
+  }
+};
+
+class c_gainslider : public nbtk::c_slider {
+public:
+  std::string get_label_text () const override {
+    return nbtk::c_slider::get_value_string () + "dB";
+  }
+};
+
+class c_eqband_widgets {
+public:
+  //nbtk::c_container   container;
+  c_gainslider        slider_gain;
+  nbtk::c_checkbox    btn_on;
+  nbtk::c_combobox    menu_mode;
+  c_freqknob          knob_freq;
+  c_qknob             knob_q;
+};
+
+class c_eqpage_widgets {
+public:
+  void create (
+      c_neuralblender_ui *ui,
+      nbtk::c_widget *parent,
+      nbtk::t_native_handle native_owner,
+      size_t bank_id,
+      //size_t lane_id,
+      int x, int y, int w, int h);
+  
+  void move_resize (int x, int y, int w, int h);
+  void sync_from_state (const c_eq_state &state);
+  void set_state (nbtk::_widget_state state);
+  
+  nbtk::c_frame       frame;
+  //nbtk::c_canvas      graph;
+  nbtk::c_label       label;
+  nbtk::c_frame   cont_bands;
+  c_eqband_widgets    bands [EQ_NUM_BANDS];
+  
+  c_neuralblender_ui  *ui;
 };
 
 class c_neuralblender_ui {
@@ -331,22 +402,23 @@ public:
   virtual void on_master_gain (nbtk::c_widget *w, float f)           = 0;
   virtual void on_presence (nbtk::c_widget *w, float f)              = 0;
   virtual void on_threshgain (nbtk::c_widget *w, float f)            = 0;
+  virtual void on_eq_band (nbtk::c_widget *w, _lane_bank bank, size_t band) = 0;
   virtual void on_excl (nbtk::c_widget *w, int n)                       ; // UI only
           void on_excl_use (nbtk::c_widget *w, bool b)                  ;
-          void on_action (nbtk::t_action_event &event)         ;
+          void on_action (nbtk::t_action_event &event)                  ;
   virtual void on_bank_switch (nbtk::c_widget *w, int n)                ;
-          void sync_page_visibility ()                            ;
-          void ensure_tuner_created ()                            ;
-          void sync_tuner_visibility ()                           ;
-  virtual void on_window_resize (int w, int h)                    ;
-          void on_window_configured ()                            ;
-  virtual bool request_window_size (int w, int h)                 ;
-          void on_about ()                                        ;
-          void on_prefs ()                                        ;
-          void on_prefs_ok ()                                     ;
-  virtual void apply_prefs (t_prefs &p)                           ;
-  virtual void write_prefs_to (t_prefs &p)                        ;
-          void apply_ui_prefs (t_prefs &p)                        ;
+          void sync_page_visibility ()                                  ;
+          void ensure_tuner_created ()                                  ;
+          void sync_tuner_visibility ()                                 ;
+  virtual void on_window_resize (int w, int h)                          ;
+          void on_window_configured ()                                  ;
+  virtual bool request_window_size (int w, int h)                       ;
+          void on_about ()                                              ;
+          void on_prefs ()                                              ;
+          void on_prefs_ok ()                                           ;
+  virtual void apply_prefs (t_prefs &p)                                 ;
+  virtual void write_prefs_to (t_prefs &p)                              ;
+          void apply_ui_prefs (t_prefs &p)                              ;
 	  
   nbtk::t_native_display display = NULL;
   nbtk::t_native_window window;
@@ -362,12 +434,16 @@ public:
   
   nbtk::c_container cont_toparea;
   nbtk::c_container cont_pedals;
+  nbtk::c_container cont_eqpre;
   nbtk::c_container cont_models;
+  nbtk::c_container cont_eqpost;
   nbtk::c_container cont_cabs;
   nbtk::c_container cont_other;
   nbtk::c_imagebutton img_logo;
   nbtk::c_button btn_tab_pedals;
+  nbtk::c_button btn_tab_eqpre;
   nbtk::c_button btn_tab_models;
+  nbtk::c_button btn_tab_eqpost;
   nbtk::c_button btn_tab_cabs;
   nbtk::c_button btn_tab_other;
   nbtk::c_button btn_enable;
@@ -389,12 +465,14 @@ public:
   nbtk::c_label  label_other_byp;
   nbtk::c_label  label_other_link;
   nbtk::c_label  label_other_excl;
+  nbtk::c_checkbox btn_other_byp_pedal;
+  nbtk::c_checkbox btn_other_byp_eq1;
+  nbtk::c_checkbox btn_other_byp_amp;
+  nbtk::c_checkbox btn_other_byp_eq2;
+  nbtk::c_checkbox btn_other_byp_cab;
   nbtk::c_checkbox btn_other_link_pedal;
   nbtk::c_checkbox btn_other_link_amp;
   nbtk::c_checkbox btn_other_link_cab;
-  nbtk::c_checkbox btn_other_byp_pedal;
-  nbtk::c_checkbox btn_other_byp_amp;
-  nbtk::c_checkbox btn_other_byp_cab;
   nbtk::c_checkbox btn_other_excl_pedal;
   nbtk::c_checkbox btn_other_excl_amp;
   nbtk::c_checkbox btn_other_excl_cab;
@@ -411,12 +489,14 @@ public:
   nbtk::c_button btn_other_prefs;
   nbtk::c_button btn_other_about;
   
-  c_lane_widgets lanes_pedals [NB_NUM_MODELS];
-  c_lane_widgets lanes_models [NB_NUM_MODELS];
-  c_lane_widgets lanes_cabs [NB_NUM_MODELS];
-  c_meterwidget  meter_in [PAGE_COUNT];
-  c_meterwidget  meter_masterout;
-  c_tunerwidget  tuner;
+  c_lane_widgets   lanes_pedals [NB_NUM_MODELS];
+  c_lane_widgets   lanes_models [NB_NUM_MODELS];
+  c_lane_widgets   lanes_cabs [NB_NUM_MODELS];
+  c_meterwidget    meter_in [PAGE_COUNT];
+  c_meterwidget    meter_masterout;
+  c_tunerwidget    tuner;
+  c_eqpage_widgets eqpage_pre;
+  c_eqpage_widgets eqpage_post;
   
   t_prefs        prefs;
   

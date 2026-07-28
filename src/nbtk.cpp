@@ -506,6 +506,235 @@ void c_frame::draw (cairo_t *cr) {
   cairo_stroke (cr);
 }
 
+static std::string tk_format_value (float value, float step) {
+  char text [64] = {};
+
+  if (fabsf (step) >= 0.99f)
+    snprintf (text, sizeof (text), "%d", (int) std::round (value));
+  else if (fabsf (step) >= 0.09f)
+    snprintf (text, sizeof (text), "%.1f", value);
+  else
+    snprintf (text, sizeof (text), "%.2f", value);
+
+  return text;
+}
+
+static int tk_measure_text_width (const std::string &text, float fontsize) {
+  cairo_surface_t *surface =
+    cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 1, 1);
+  cairo_t *cr = cairo_create (surface);
+  cairo_set_font_size (cr, fontsize);
+
+  cairo_text_extents_t ext;
+  cairo_text_extents (cr, text.c_str (), &ext);
+
+  cairo_destroy (cr);
+  cairo_surface_destroy (surface);
+  return (int) std::ceil (ext.x_advance);
+}
+
+float c_valuewidget::quantize_value (float value_) const {
+  if (step <= 0.0f)
+    return value_;
+
+  return min + std::round ((value_ - min) / step) * step;
+}
+
+bool c_valuewidget::set_value (float value_, bool notify) {
+  const float old = value;
+  value = std::clamp (quantize_value (value_), min, max);
+  if (fabsf (value - old) < 0.000001f)
+    return false;
+
+  invalidate ();
+  if (notify)
+    emit_action ();
+
+  return true;
+}
+
+c_valuewidget::~c_valuewidget () = default;
+
+void c_valuewidget::set_range (float min_, float max_) {
+  min = min_;
+  max = max_;
+  if (max < min)
+    std::swap (min, max);
+  set_value (value, false);
+}
+
+void c_valuewidget::set_min (float min_) {
+  min = min_;
+  if (max < min)
+    max = min;
+  set_value (value, false);
+}
+
+void c_valuewidget::set_max (float max_) {
+  max = max_;
+  if (min > max)
+    min = max;
+  set_value (value, false);
+}
+
+void c_valuewidget::set_default (float value_) {
+  default_value = value_;
+}
+
+void c_valuewidget::set_step (float step_) {
+  step = std::max (0.0f, step_);
+}
+
+float c_valuewidget::normalized_value () const {
+  const float range = max - min;
+  if (fabsf (range) < 0.000001f)
+    return 0.0f;
+
+  return std::clamp ((value - min) / range, 0.0f, 1.0f);
+}
+
+float c_valuewidget::value_from_normalized (float normalized) const {
+  return min + std::clamp (normalized, 0.0f, 1.0f) * (max - min);
+}
+
+std::string c_valuewidget::get_value_string () const {
+  return tk_format_value (value, step);
+}
+
+std::string c_valuewidget::get_label_text () const {
+  return label;
+}
+
+bool c_valuewidget::parse_value_string (
+    const std::string &text,
+    float &out) const {
+
+  const char *str = text.c_str ();
+  char *end = nullptr;
+  const float parsed = strtof (str, &end);
+  if (end == str)
+    return false;
+
+  while (*end && isspace ((unsigned char) *end))
+    end++;
+  if (*end)
+    return false;
+
+  out = parsed;
+  return true;
+}
+
+bool c_valuewidget::hit_value_label (int x_, int y_) const {
+  return value_label_rect ().contains (x_, y_);
+}
+
+void c_valuewidget::show_value_editor () {
+  if (!app)
+    return;
+
+  if (!value_editor) {
+    value_editor = std::make_unique<c_valueeditor_popup> ();
+    value_editor->create_for_value (app, this);
+  }
+
+  const std::string text = get_value_string ();
+  value_editor->textbox.set_text (text.c_str ());
+  value_editor->textbox.cursor = value_editor->textbox.text ().size ();
+  value_editor->textbox.selection_anchor = 0;
+  value_editor->show_near_owner ();
+}
+
+void c_valuewidget::emit_action () {
+  t_action_event event;
+  event.source = this;
+  event.source_id = id;
+  event.mouse_button = last_mouse_button;
+  on_action (event);
+}
+
+int c_valuewidget::label_extent () const {
+  const std::string text = get_label_text ();
+  if (label_position == LABEL_NONE || text.empty ())
+    return 0;
+
+  return std::max (
+      14,
+      (int) std::ceil (label_fontsize * font_multiplier () + 4.0f)) +
+    label_gap;
+}
+
+t_rect c_valuewidget::value_area_rect () const {
+  const int extent = label_extent ();
+  if (extent <= 0)
+    return { 0, 0, w, h };
+
+  switch (label_position) {
+    case LABEL_ABOVE:
+      return { 0, extent, w, std::max (0, h - extent) };
+
+    case LABEL_BELOW:
+      return { 0, 0, w, std::max (0, h - extent) };
+
+    case LABEL_LEFT:
+      return { extent, 0, std::max (0, w - extent), h };
+
+    case LABEL_RIGHT:
+      return { 0, 0, std::max (0, w - extent), h };
+
+    case LABEL_NONE:
+    default:
+      return { 0, 0, w, h };
+  }
+}
+
+t_rect c_valuewidget::value_label_rect () const {
+  const int extent = label_extent ();
+  if (extent <= 0)
+    return { 0, 0, 0, 0 };
+
+  switch (label_position) {
+    case LABEL_ABOVE:
+      return { 0, 0, w, extent - label_gap };
+
+    case LABEL_BELOW:
+      return { 0, std::max (0, h - extent + label_gap), w, extent - label_gap };
+
+    case LABEL_LEFT:
+      return { 0, 0, extent - label_gap, h };
+
+    case LABEL_RIGHT:
+      return { std::max (0, w - extent + label_gap), 0, extent - label_gap, h };
+
+    case LABEL_NONE:
+    default:
+      return { 0, 0, 0, 0 };
+  }
+}
+
+void c_valuewidget::draw_value_label (cairo_t *cr) {
+  if (!cr)
+    return;
+
+  const std::string text = get_label_text ();
+  const t_rect r = value_label_rect ();
+  if (text.empty () || r.w <= 0 || r.h <= 0)
+    return;
+
+  cairo_save (cr);
+  cairo_rectangle (cr, r.x, r.y, r.w, r.h);
+  cairo_clip (cr);
+  cairo_set_font_size (cr, label_fontsize * font_multiplier ());
+  tk_set_text_fg (cr, enabled);
+  cairo_text_extents_t ext {};
+  cairo_text_extents (cr, text.c_str (), &ext);
+  cairo_move_to (
+      cr,
+      r.x + ((double) r.w - ext.width) * 0.5 - ext.x_bearing,
+      r.y + ((double) r.h - ext.height) * 0.5 - ext.y_bearing);
+  cairo_show_text (cr, text.c_str ());
+  cairo_restore (cr);
+}
+
 static double tk_aligned_text_x (
     int w,
     const cairo_text_extents_t &ext,
@@ -961,6 +1190,7 @@ c_scrollbar::c_scrollbar () {
   wants_mouse = true;
   wants_hover = true;
   corner_radius = NBTK_SCROLLBAR_RADIUS;
+  step = 0.05f;
 }
 
 bool c_scrollbar::set_value (float value_, bool notify) {
@@ -1074,9 +1304,31 @@ bool c_scrollbar::on_mouse_down (int x_, int y_, int button) {
   last_mouse_button = button;
 
   if (button == Button4)
-    return set_value (value - step, true) || true;
+    return c_scrollbar::set_value (value - step, true) || true;
   if (button == Button5)
-    return set_value (value + step, true) || true;
+    return c_scrollbar::set_value (value + step, true) || true;
+
+  if (button == Button2) {
+    if (app)
+      app->set_focus (this);
+
+    const t_rect thumb = thumb_rect ();
+    if (orientation == SCROLLBAR_HORIZONTAL) {
+      const int track_w = std::max (1, w - 4);
+      const int travel = std::max (1, track_w - thumb.w);
+      c_scrollbar::set_value (
+        (float) (x_ - 2 - thumb.w / 2) / (float) travel,
+        true);
+    } else {
+      const int track_h = std::max (1, h - 4);
+      const int travel = std::max (1, track_h - thumb.h);
+      c_scrollbar::set_value (
+        (float) (y_ - 2 - thumb.h / 2) / (float) travel,
+        true);
+    }
+    return true;
+  }
+
   if (button != Button1)
     return true;
 
@@ -1092,7 +1344,7 @@ bool c_scrollbar::on_mouse_down (int x_, int y_, int button) {
   } else {
     const bool before = orientation == SCROLLBAR_HORIZONTAL ?
       x_ < thumb.x : y_ < thumb.y;
-    set_value (value + (before ? -page_size : page_size), true);
+    c_scrollbar::set_value (value + (before ? -page_size : page_size), true);
   }
 
   return true;
@@ -1100,9 +1352,9 @@ bool c_scrollbar::on_mouse_down (int x_, int y_, int button) {
 
 bool c_scrollbar::on_mouse_up (int x_, int y_, int button) {
   if (button == Button4)
-    return set_value (value - step, true) || true;
+    return c_scrollbar::set_value (value - step, true) || true;
   if (button == Button5)
-    return set_value (value + step, true) || true;
+    return c_scrollbar::set_value (value + step, true) || true;
 
   c_widget::on_mouse_up (x_, y_, button);
   (void) x_;
@@ -1123,13 +1375,13 @@ bool c_scrollbar::on_mouse_move (int x_, int y_) {
   if (orientation == SCROLLBAR_HORIZONTAL) {
     const int track_w = std::max (1, w - 4);
     const int travel = std::max (1, track_w - thumb.w);
-    set_value (
+    c_scrollbar::set_value (
       drag_start_value + (float) (x_ - drag_start_x) / (float) travel,
       true);
   } else {
     const int track_h = std::max (1, h - 4);
     const int travel = std::max (1, track_h - thumb.h);
-    set_value (
+    c_scrollbar::set_value (
       drag_start_value + (float) (y_ - drag_start_y) / (float) travel,
       true);
   }
@@ -1141,6 +1393,238 @@ void c_scrollbar::on_mouse_leave () {
     return;
 
   c_widget::on_mouse_leave ();
+}
+
+void c_slider::draw (cairo_t *cr) {
+  if (label_extent () <= 0) {
+    const t_rect track = slider_track_rect ();
+    if (track.x == 0 && track.y == 0 && track.w == w && track.h == h) {
+      c_scrollbar::draw (cr);
+      return;
+    }
+
+    cairo_save (cr);
+    cairo_translate (cr, track.x, track.y);
+    cairo_rectangle (cr, 0, 0, track.w, track.h);
+    cairo_clip (cr);
+
+    const int old_w = w;
+    const int old_h = h;
+    w = track.w;
+    h = track.h;
+    c_scrollbar::draw (cr);
+    w = old_w;
+    h = old_h;
+    cairo_restore (cr);
+    return;
+  }
+
+  draw_value_label (cr);
+
+  const t_rect r = slider_track_rect ();
+  if (r.w <= 0 || r.h <= 0)
+    return;
+
+  cairo_save (cr);
+  cairo_translate (cr, r.x, r.y);
+  cairo_rectangle (cr, 0, 0, r.w, r.h);
+  cairo_clip (cr);
+
+  const int old_w = w;
+  const int old_h = h;
+  w = r.w;
+  h = r.h;
+  c_scrollbar::draw (cr);
+  w = old_w;
+  h = old_h;
+
+  cairo_restore (cr);
+}
+
+t_rect c_slider::slider_track_rect () const {
+  const t_rect r = value_area_rect ();
+  if (track_size <= 0)
+    return r;
+
+  if (orientation == SCROLLBAR_HORIZONTAL) {
+    const int track_h = std::min (r.h, std::max (1, track_size));
+    return {
+      r.x,
+      r.y + (r.h - track_h) / 2,
+      r.w,
+      track_h
+    };
+  }
+
+  const int track_w = std::min (r.w, std::max (1, track_size));
+  return {
+    r.x + (r.w - track_w) / 2,
+    r.y,
+    track_w,
+    r.h
+  };
+}
+
+template <class Func>
+static bool with_value_area_geometry (c_slider *slider, const t_rect &r, Func func) {
+  if (!slider)
+    return false;
+
+  const int old_x = slider->x;
+  const int old_y = slider->y;
+  const int old_w = slider->w;
+  const int old_h = slider->h;
+  slider->x += r.x;
+  slider->y += r.y;
+  slider->w = r.w;
+  slider->h = r.h;
+  const bool result = func ();
+  slider->x = old_x;
+  slider->y = old_y;
+  slider->w = old_w;
+  slider->h = old_h;
+  return result;
+}
+
+bool c_slider::on_mouse_down (int x_, int y_, int button) {
+  if (button == Button4) {
+    last_mouse_button = button;
+    return set_value (slider_value + slider_step, true) || true;
+  }
+  if (button == Button5) {
+    last_mouse_button = button;
+    return set_value (slider_value - slider_step, true) || true;
+  }
+
+  const uint64_t now = now_ms ();
+  if (button == Button1 &&
+      edit_on_label_doubleclick &&
+      hit_value_label (x_, y_)) {
+    if (now - last_click_ms < NBTK_DOUBLECLICK_MS) {
+      last_click_ms = 0;
+      c_widget::on_mouse_down (x_, y_, button);
+      last_mouse_button = button;
+      show_value_editor ();
+      return true;
+    }
+    last_click_ms = now;
+    return c_widget::on_mouse_down (x_, y_, button);
+  }
+
+  const t_rect r = slider_track_rect ();
+  if (r.w <= 0 || r.h <= 0)
+    return true;
+
+  if (button == Button1 && reset_on_doubleclick && r.contains (x_, y_)) {
+    if (now - last_click_ms < NBTK_DOUBLECLICK_MS) {
+      last_click_ms = 0;
+      c_widget::on_mouse_down (x_, y_, button);
+      last_mouse_button = button;
+      set_value (default_value, true);
+      return true;
+    }
+    last_click_ms = now;
+  }
+
+  if (!r.contains (x_, y_) && button != Button4 && button != Button5)
+    return c_widget::on_mouse_down (x_, y_, button);
+
+  return with_value_area_geometry (this, r, [&] {
+    return c_scrollbar::on_mouse_down (x_ - r.x, y_ - r.y, button);
+  });
+}
+
+bool c_slider::on_mouse_up (int x_, int y_, int button) {
+  const t_rect r = slider_track_rect ();
+  return with_value_area_geometry (this, r, [&] {
+    return c_scrollbar::on_mouse_up (x_ - r.x, y_ - r.y, button);
+  });
+}
+
+bool c_slider::on_mouse_move (int x_, int y_) {
+  const t_rect r = slider_track_rect ();
+  return with_value_area_geometry (this, r, [&] {
+    return c_scrollbar::on_mouse_move (x_ - r.x, y_ - r.y);
+  });
+}
+
+float c_slider::quantize (float value_) const {
+  if (slider_step <= 0.0f)
+    return value_;
+
+  return min + std::round ((value_ - min) / slider_step) * slider_step;
+}
+
+float c_slider::normalized_from_real (float value_) const {
+  const float range = max - min;
+  if (fabsf (range) < 0.000001f)
+    return 0.0f;
+
+  const float normalized = std::clamp ((value_ - min) / range, 0.0f, 1.0f);
+  return orientation == SCROLLBAR_VERTICAL ? 1.0f - normalized : normalized;
+}
+
+float c_slider::real_from_normalized (float value_) const {
+  float normalized = std::clamp (value_, 0.0f, 1.0f);
+  if (orientation == SCROLLBAR_VERTICAL)
+    normalized = 1.0f - normalized;
+
+  return min + normalized * (max - min);
+}
+
+void c_slider::sync_real_from_normalized () {
+  slider_value = std::clamp (quantize (real_from_normalized (value)), min, max);
+}
+
+bool c_slider::set_value (float value_, bool notify) {
+  slider_value = std::clamp (quantize (value_), min, max);
+  return c_scrollbar::set_value (normalized_from_real (slider_value), notify);
+}
+
+void c_slider::set_range (float min_, float max_) {
+  c_valuewidget::set_range (min_, max_);
+  set_value (slider_value, false);
+  set_step (slider_step);
+}
+
+void c_slider::set_min (float min_) {
+  c_valuewidget::set_min (min_);
+  set_value (slider_value, false);
+  set_step (slider_step);
+}
+
+void c_slider::set_max (float max_) {
+  c_valuewidget::set_max (max_);
+  set_value (slider_value, false);
+  set_step (slider_step);
+}
+
+void c_slider::set_step (float step_) {
+  slider_step = std::max (0.0f, step_);
+  step = slider_step;
+  const float range = max - min;
+  c_scrollbar::set_step (
+    range > 0.000001f && slider_step > 0.0f
+      ? slider_step / range
+      : 0.0f);
+}
+
+float c_slider::real_value () const {
+  return std::clamp (quantize (real_from_normalized (value)), min, max);
+}
+
+std::string c_slider::get_value_string () const {
+  return tk_format_value (slider_value, slider_step);
+}
+
+void c_slider::emit_action () {
+  sync_real_from_normalized ();
+
+  t_action_event event;
+  event.source = this;
+  event.source_id = id;
+  event.mouse_button = last_mouse_button;
+  on_action (event);
 }
 
 void c_container::draw (cairo_t *cr) {
@@ -2129,55 +2613,32 @@ c_knob::c_knob () {
   wants_keyboard_focus = true;
 }
 
-float c_knob::quantize (float value_) const {
-  if (step <= 0.0f)
-    return value_;
-
-  return min + std::round ((value_ - min) / step) * step;
-}
-
 bool c_knob::set_value (float value_, bool notify) {
-  const float old = value;
-  value = std::clamp (quantize (value_), min, max);
-  if (fabsf (value - old) < 0.000001f)
-    return false;
-
-  invalidate ();
-  if (notify)
-    emit_action ();
-
-  return true;
-}
-
-void c_knob::set_range (float min_, float max_) {
-  min = min_;
-  max = max_;
-  if (max < min)
-    std::swap (min, max);
-  set_value (value, false);
-}
-
-void c_knob::set_min (float min_) {
-  set_range (min_, max);
-}
-
-void c_knob::set_max (float max_) {
-  set_range (min, max_);
-}
-
-void c_knob::set_default (float value_) {
-  default_value = value_;
-}
-
-void c_knob::set_step (float step_) {
-  step = step_;
+  return c_valuewidget::set_value (value_, notify);
 }
 
 float c_knob::normalized_value () const {
   if (max <= min)
     return 0.0f;
 
-  return std::clamp ((value - min) / (max - min), 0.0f, 1.0f);
+  const float linear = std::clamp ((value - min) / (max - min), 0.0f, 1.0f);
+  if (log_taper <= 0.0f || fabsf (log_taper - 1.0f) < 0.000001f)
+    return linear;
+
+  return std::clamp (powf (linear, 1.0f / log_taper), 0.0f, 1.0f);
+}
+
+float c_knob::value_from_normalized (float normalized) const {
+  const float n = std::clamp (normalized, 0.0f, 1.0f);
+  if (max <= min)
+    return min;
+
+  const float tapered =
+    (log_taper <= 0.0f || fabsf (log_taper - 1.0f) < 0.000001f) ?
+      n :
+      powf (n, log_taper);
+
+  return min + std::clamp (tapered, 0.0f, 1.0f) * (max - min);
 }
 
 float c_knob::angle_from_value () const {
@@ -2186,15 +2647,26 @@ float c_knob::angle_from_value () const {
   return start + normalized_value () * sweep;
 }
 
-void c_knob::emit_action () {
-  t_action_event event;
-  event.source = this;
-  event.source_id = id;
-  event.mouse_button = last_mouse_button;
-  on_action (event);
+std::string c_knob::get_value_string () const {
+  return c_valuewidget::get_value_string ();
 }
 
-void c_knob::draw (cairo_t *cr) {
+std::string c_knob::get_label_text () const {
+  return label;
+}
+
+bool c_knob::hit_value_label (int x_, int y_) const {
+  const std::string text = get_label_text ();
+  if (text.empty ())
+    return false;
+
+  const int label_h =
+    std::max (14, (int) (fontsize * font_multiplier () + 4));
+  return t_rect { 0, std::max (0, h - label_h), w, label_h }
+    .contains (x_, y_);
+}
+
+void c_knob::draw (cairo_t *cr, bool draw_label, bool draw_value) {
   if (!cr)
     return;
 
@@ -2203,7 +2675,8 @@ void c_knob::draw (cairo_t *cr) {
     WSTYLE_BUTTON,
     pressed ? WSTATE_DOWN : highlight ? nbtk::WSTATE_HOVER : nbtk::WSTATE_NORMAL);
 
-  const int label_h = label.empty () ? 0 :
+  const std::string label_text = get_label_text ();
+  const int label_h = (!draw_label || label_text.empty ()) ? 0 :
     std::max (14, (int) (fontsize * font_multiplier () + 4));
   const int knob_h = std::max (1, h - label_h);
   const double cx = w * 0.5;
@@ -2265,35 +2738,41 @@ void c_knob::draw (cairo_t *cr) {
   cairo_set_font_size (cr, fontsize * font_multiplier ());
   tk_set_text_fg (cr, enabled);
 
-  char text [64] = {};
-  if (show_value) {
-    if (fabsf (step) >= 0.99f)
-      snprintf (text, sizeof (text), "%d", (int) std::round (value));
-    else if (fabsf (step) >= 0.09f)
-      snprintf (text, sizeof (text), "%.1f", value);
-    else
-      snprintf (text, sizeof (text), "%.2f", value);
+  if (draw_value) {
+    const std::string text = get_value_string ();
 
     cairo_text_extents_t ext {};
-    cairo_text_extents (cr, text, &ext);
+    cairo_text_extents (cr, text.c_str (), &ext);
     cairo_move_to (
       cr,
       cx - ext.width * 0.5 - ext.x_bearing,
       cy - ext.height * 0.5 - ext.y_bearing);
-    cairo_show_text (cr, text);
+    cairo_show_text (cr, text.c_str ());
   }
 
-  if (!label.empty ()) {
+  if (draw_label && !label_text.empty ()) {
     cairo_text_extents_t ext {};
-    cairo_text_extents (cr, label.c_str (), &ext);
+    cairo_text_extents (cr, label_text.c_str (), &ext);
     cairo_move_to (
       cr,
       cx - ext.width * 0.5 - ext.x_bearing,
       h - label_h * 0.5 + ext.height * 0.5);
-    cairo_show_text (cr, label.c_str ());
+    cairo_show_text (cr, label_text.c_str ());
   }
 
   cairo_restore (cr);
+}
+
+void c_knob::draw (cairo_t *cr) {
+  draw (cr, true, show_value);
+}
+
+c_simpleknob::c_simpleknob () {
+  show_value = false;
+}
+
+std::string c_simpleknob::get_label_text () const {
+  return get_value_string ();
 }
 
 bool c_knob::on_mouse_down (int x_, int y_, int button) {
@@ -2309,9 +2788,13 @@ bool c_knob::on_mouse_down (int x_, int y_, int button) {
     return true;
 
   const uint64_t now = now_ms ();
-  if (reset_on_doubleclick && now - last_click_ms < 350) {
+  if (now - last_click_ms < NBTK_DOUBLECLICK_MS) {
     last_click_ms = 0;
-    set_value (default_value, true);
+    if (edit_on_label_doubleclick && hit_value_label (x_, y_)) {
+      show_value_editor ();
+    } else if (reset_on_doubleclick) {
+      set_value (default_value, true);
+    }
     return true;
   }
   last_click_ms = now;
@@ -2321,7 +2804,7 @@ bool c_knob::on_mouse_down (int x_, int y_, int button) {
 
   dragging = true;
   drag_start_y = y_;
-  drag_start_value = value;
+  drag_start_normalized = normalized_value ();
   return true;
 }
 
@@ -2346,12 +2829,11 @@ bool c_knob::on_mouse_move (int x_, int y_) {
   if (!dragging)
     return true;
 
-  const float range = max - min;
-  if (range <= 0.0f)
+  if (max <= min)
     return true;
 
-  const float delta = (float) (drag_start_y - y_) * drag_sensitivity * range;
-  set_value (drag_start_value + delta, true);
+  const float delta = (float) (drag_start_y - y_) * drag_sensitivity;
+  set_value (value_from_normalized (drag_start_normalized + delta), true);
   return true;
 }
 
@@ -3859,6 +4341,15 @@ void c_popupwindow::cb_button_release (
   const int x = native_event_x (event) / w->app->hdpi;
   const int y = native_event_y (event) / w->app->hdpi;
 
+  if (c_valueeditor_popup *editor =
+        dynamic_cast<c_valueeditor_popup *> (self)) {
+    if (editor->ignore_next_mouse_up) {
+      editor->ignore_next_mouse_up = false;
+      native_widget_invalidate (w);
+      return;
+    }
+  }
+
   if (c_combobox *combobox = dynamic_cast<c_combobox *> (self->owner)) {
     if (combobox->on_popup_mouse_up (self, x, y, button)) {
       self->mouse_captured = false;
@@ -3946,12 +4437,22 @@ void c_popupwindow::cb_key_press (
 
   const int tk_key = native_key_from_event (event);
   bool handled = false;
+  if (c_valueeditor_popup *editor =
+        dynamic_cast<c_valueeditor_popup *> (self)) {
+    if (tk_key == KEY_RETURN || tk_key == KEY_ESCAPE)
+      handled = editor->on_key_down (tk_key);
+  }
   if (tk_key != KEY_UNKNOWN && self->app)
-    handled = self->app->dispatch_key_down (tk_key);
+    handled = handled || self->app->dispatch_key_down (tk_key);
   if (!handled && tk_key != KEY_UNKNOWN)
     handled = self->on_key_down (tk_key);
   if (!handled && tk_key != KEY_UNKNOWN && self->owner)
     self->owner->on_key_down (tk_key);
+
+  char text [32] = {};
+  const int len = native_text_from_event (event, text, sizeof (text));
+  if (len > 0 && text [0] >= 32 && self->app)
+    self->app->dispatch_text_input (text);
 
   native_widget_invalidate (w);
 }
@@ -3979,6 +4480,94 @@ void c_popupwindow::cb_key_release (
     self->app->dispatch_key_up (tk_key);
 
   native_widget_invalidate (w);
+}
+
+void c_valueeditor_popup::create_for_value (
+    c_app *app_,
+    c_valuewidget *owner_) {
+
+  value_widget = owner_;
+  t_native_handle native_owner =
+    app_ && app_->active_toplevel ? app_->active_toplevel->widget : NULL;
+
+  create_native_for_owner (app_, owner_, native_owner, 120, 30);
+  root.corner_radius = NBTK_TEXTBOX_RADIUS;
+
+  textbox.create (&root, "", 4, 4, 112, 22);
+  textbox.fontsize = 13.0f;
+}
+
+void c_valueeditor_popup::show_near_owner () {
+  if (!value_widget || !app)
+    return;
+
+  const std::string text = value_widget->get_value_string ();
+  const int text_w = tk_measure_text_width (text, textbox.fontsize);
+  const int editor_w = std::clamp (
+      std::max ({ value_widget->w, text_w + 28, 84 }),
+      84,
+      180);
+  const int editor_h = 30;
+
+  move_resize (x, y, editor_w, editor_h);
+  textbox.move_resize (4, 4, editor_w - 8, editor_h - 8);
+
+  t_point p = value_widget->local_to_screen ({ 0, value_widget->h + 2 });
+  if (app->root) {
+    const t_point root_screen = app->root_to_screen ({ 0, 0 });
+    const int right = root_screen.x + app->root->w;
+    const int bottom = root_screen.y + app->root->h;
+
+    if (p.x + editor_w > right)
+      p.x = std::max (root_screen.x, right - editor_w);
+    if (p.y + editor_h > bottom)
+      p.y = value_widget->local_to_screen ({ 0, -editor_h - 2 }).y;
+    p.y = std::max (root_screen.y, p.y);
+  }
+
+  show_at_screen_pos (p.x, p.y);
+  ignore_next_mouse_up = true;
+  textbox.cursor = textbox.text ().size ();
+  textbox.selection_anchor = 0;
+  if (app)
+    app->set_focus (&textbox);
+}
+
+void c_valueeditor_popup::commit () {
+  if (!value_widget) {
+    close ();
+    return;
+  }
+
+  float parsed = 0.0f;
+  if (value_widget->parse_value_string (textbox.text (), parsed))
+    value_widget->set_value (parsed, true);
+
+  close ();
+}
+
+bool c_valueeditor_popup::on_key_down (int key) {
+  if (key == KEY_RETURN) {
+    commit ();
+    return true;
+  }
+
+  if (key == KEY_ESCAPE) {
+    close ();
+    return true;
+  }
+
+  return c_popupwindow::on_key_down (key);
+}
+
+void c_valueeditor_popup::on_action (t_action_event &event) {
+  if (event.source == &textbox) {
+    event.handled = true;
+    commit ();
+    return;
+  }
+
+  c_popupwindow::on_action (event);
 }
 
 bool c_tooltip::close_on_outside_click () const {

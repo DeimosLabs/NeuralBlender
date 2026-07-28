@@ -19,13 +19,156 @@ cd "$srcdir/lv2" || {
   exit 1
 }
 
+startport=99
+mode_hipass=1
+mode_lowshelf=2
+mode_curve=3
+mode_hishelf=4
+mode_lowpass=5
+
+generate_one_eq_port() {
+  local eq="$1"
+  local band="$2"
+  local param="$3"
+  local mode
+  local freq
+  local default
+  local minimum
+  local maximum
+  local property=""
+
+  case "$band" in
+    A)
+      mode="$mode_hipass"
+      freq=20
+    ;;
+    
+    B)
+      mode="$mode_lowshelf"
+      freq=50
+    ;;
+    
+    C)
+      mode="$mode_curve"
+      freq=100
+    ;;
+    
+    D)
+      mode="$mode_curve"
+      freq=250
+    ;;
+    
+    E)
+      mode="$mode_curve"
+      freq=1000
+    ;;
+    
+    F)
+      mode="$mode_curve"
+      freq=4000
+    ;;
+    
+    G)
+      mode="$mode_hishelf"
+      freq=8000
+    ;;
+    
+    H)
+      mode="$mode_lowpass"
+      freq=11000
+    ;;
+  esac
+
+  case "$param" in
+    "enabled")
+      property="        lv2:portProperty lv2:toggled ;"
+      default=0
+      minimum=0
+      maximum=1
+    ;;
+    
+    "mode")
+      property="        lv2:portProperty lv2:integer ;"
+      default="$mode"
+      minimum=1
+      maximum=5
+    ;;
+    
+    "freq")
+      default="$freq"
+      minimum=20
+      maximum=20000
+    ;;
+    
+    "gain")
+      default=0
+      minimum=-36
+      maximum=36
+    ;;
+    
+    "q")
+      default=1
+      minimum=0.01
+      maximum=100
+    ;;
+  esac
+
+  cat << EOF
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index ${portnum} ;
+        lv2:symbol "${eq}_${band}_${param}" ;
+        lv2:name "$eq $band $param" ;
+${property}
+        lv2:default ${default} ;
+        lv2:minimum ${minimum} ;
+        lv2:maximum ${maximum}
+      ] ,
+EOF
+
+  portnum=$((portnum + 1))
+}
+
+generate_eq_ports() {
+  for eq in eqpre eqpost; do
+    for band in A B C D E F G H; do
+      generate_one_eq_port "$eq" "$band" enabled
+      generate_one_eq_port "$eq" "$band" mode
+      generate_one_eq_port "$eq" "$band" freq
+      generate_one_eq_port "$eq" "$band" gain
+      generate_one_eq_port "$eq" "$band" q
+    done
+  done
+}
+
+insert_eq() {
+  while IFS="" read -r line; do
+    case "$line" in
+      "@@INSERT_EQ_PORTS_HERE")
+        generate_eq_ports
+      ;;
+
+      *@@portnum*)
+        echo "${line//@@portnum/$portnum}"
+        portnum=$((portnum + 1))
+      ;;
+      
+      *)
+        echo "$line"
+      ;;
+    esac
+  done
+}
+
 mkdir -p "$destdir/lv2"
 echo -n "$0 cwd:"; pwd -P
 for file in *.ttl.in; do
+  portnum="$startport"
   echo "$file -> $destdir/lv2/${file%.in}"
   if [ "$include_ui" = 1 ]; then
-    sed 's,^[[:space:]]*@@UI,,' "$file" > "$destdir/lv2/${file%.in}"
+    sed 's,^[[:space:]]*@@UI,,' "$file" | insert_eq > "$destdir/lv2/${file%.in}"
   else
-    grep -v '^[[:space:]]*@@UI' "$file" > "$destdir/lv2/${file%.in}"
+    grep -v '^[[:space:]]*@@UI' "$file" | insert_eq > "$destdir/lv2/${file%.in}"
   fi
 done

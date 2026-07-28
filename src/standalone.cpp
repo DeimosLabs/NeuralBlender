@@ -75,6 +75,25 @@ static void signal_handler (int) {
 
 #ifdef HAVE_GUI
 
+static constexpr _lane_bank STANDALONE_MODEL_BANKS [] = {
+  BANK_PEDAL, BANK_AMP, BANK_CAB
+};
+
+static void apply_eq_state (
+    c_eq &eq, const c_eq_state &state, bool bypass) {
+  eq.on = !bypass;
+
+  for (int i = 0; i < EQ_NUM_BANDS; ++i) {
+    eq.enabled [i] = state.enabled [i];
+    eq.set_band (
+      i,
+      state.freq [i],
+      state.gain_db [i],
+      state.q [i],
+      state.mode [i]);
+  }
+}
+
 class c_standalone_ui : public c_neuralblender_ui {
 public:
   c_standalone_ui (c_neuralblender *b) 
@@ -108,6 +127,7 @@ public:
   void on_calib_target_db (nbtk::c_widget *w, float f);
   void on_master_gain (nbtk::c_widget *w, float f);
   void on_presence (nbtk::c_widget *w, float f);
+  void on_eq_band (nbtk::c_widget *w, _lane_bank bank, size_t band);
   //void on_excl (nbtk::c_widget *w, int which);
   void on_bypass (nbtk::c_widget *w, bool b);
   void on_bank_bypass (nbtk::c_widget *w, _lane_bank bank, bool b);
@@ -308,6 +328,33 @@ void c_standalone_ui::on_presence (nbtk::c_widget *w, float value) {
   g_blender->set_presence (value);
 }
 
+void c_standalone_ui::on_eq_band (
+    nbtk::c_widget *w, _lane_bank bank, size_t band) {
+  (void) w;
+  if (!blender || band >= EQ_NUM_BANDS)
+    return;
+
+  c_eq *eq = nullptr;
+  c_eq_state *eq_state = nullptr;
+  if (bank == BANK_EQPRE) {
+    eq = &blender->eq_pre;
+    eq_state = &state.eqpre;
+  } else if (bank == BANK_EQPOST) {
+    eq = &blender->eq_post;
+    eq_state = &state.eqpost;
+  } else {
+    return;
+  }
+
+  eq->enabled [band] = eq_state->enabled [band];
+  eq->set_band (
+    (int) band,
+    eq_state->freq [band],
+    eq_state->gain_db [band],
+    eq_state->q [band],
+    eq_state->mode [band]);
+}
+
 void c_standalone_ui::on_linked_calib (nbtk::c_widget *w, bool b) {
   (void) w;
   set_linked_calib_for_bank (visible_bank, b);
@@ -348,8 +395,16 @@ void c_standalone_ui::on_bank_bypass (nbtk::c_widget *w, _lane_bank bank, bool b
       blender->set_pedal_bypass (b);
     break;
 
+    case BANK_EQPRE:
+      blender->eq_pre.on = !b;
+    break;
+
     case BANK_CAB:
       blender->set_cab_bypass (b);
+    break;
+
+    case BANK_EQPOST:
+      blender->eq_post.on = !b;
     break;
 
     case BANK_AMP:
@@ -376,8 +431,8 @@ void c_standalone_ui::apply_effective_controls () {
   if (!blender)
     return;
 
-  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
-    const _lane_bank b = (_lane_bank) bank;
+  for (_lane_bank b : STANDALONE_MODEL_BANKS) {
+    const size_t bank = (size_t) b;
     c_neuralblender_bank_state &bank_state = state.banks [bank];
     blender->banks [bank].linked_calib = bank_state.linked_calib;
     blender->set_exclusive_lane (b, bank_state.exclusive_lane);
@@ -405,7 +460,9 @@ void c_standalone_ui::apply_effective_controls () {
   blender->linked_calib = blender->banks [BANK_AMP].linked_calib;
   blender->set_bypass (state.bypass);
   blender->set_pedal_bypass (state.pedal_bypass);
+  apply_eq_state (blender->eq_pre, state.eqpre, state.eqpre_bypass);
   blender->set_amp_bypass (state.amp_bypass);
+  apply_eq_state (blender->eq_post, state.eqpost, state.eqpost_bypass);
   blender->set_cab_bypass (state.cab_bypass);
 }
 
@@ -461,9 +518,11 @@ static void ui_main () {
   c_neuralblender_state state;
   g_blender->get_state (state);
   if (g_ui->calib_default) {
-    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
+    for (_lane_bank bank_id : STANDALONE_MODEL_BANKS) {
+      const size_t bank = (size_t) bank_id;
       for (size_t i = 0; i < NB_NUM_MODELS; ++i)
         state.banks [bank].lanes [i].do_calib = true;
+    }
   }
   g_ui->sync_widgets_from_state (state);
   g_ui->apply_effective_controls ();

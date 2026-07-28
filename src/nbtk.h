@@ -45,6 +45,14 @@ enum _textalign {
   TEXT_RIGHT
 };
 
+enum _label_position {
+  LABEL_NONE,
+  LABEL_ABOVE,
+  LABEL_BELOW,
+  LABEL_LEFT,
+  LABEL_RIGHT
+};
+
 enum _widget_style {
   WSTYLE_BUTTON, // TODO: decide what to do with these 2 vs redundant IMAGE_..
   WSTYLE_TOGGLE,
@@ -112,6 +120,7 @@ class c_popupwindow;
 class c_native_backend;
 class c_tooltip;
 class c_filepicker;
+class c_valueeditor_popup;
 
 enum class e_event_type {
   unknown,
@@ -264,6 +273,47 @@ public:
   _widget_state state = WSTATE_NORMAL;
 };
 
+class c_valuewidget : public c_widget {
+public:
+  ~c_valuewidget () override;
+
+  virtual bool set_value (float value, bool notify = false);
+  virtual void set_range (float min, float max);
+  virtual void set_min (float min);
+  virtual void set_max (float max);
+  virtual void set_default (float value);
+  virtual void set_step (float step);
+  virtual float normalized_value () const;
+  virtual float value_from_normalized (float normalized) const;
+  virtual std::string get_value_string () const;
+  virtual std::string get_label_text () const;
+  virtual bool parse_value_string (const std::string &text, float &out) const;
+  virtual bool hit_value_label (int x, int y) const;
+  virtual void show_value_editor ();
+  virtual void emit_action ();
+  virtual t_rect value_area_rect () const;
+  virtual t_rect value_label_rect () const;
+  virtual void draw_value_label (cairo_t *cr);
+
+  float min = 0.0f;
+  float max = 1.0f;
+  float value = 0.0f;
+  float default_value = 0.0f;
+  float step = 0.01f;
+  _label_position label_position = LABEL_NONE;
+  float label_fontsize = 12.0f;
+  int label_gap = 4;
+  bool reset_on_doubleclick = true;
+  bool edit_on_label_doubleclick = true;
+
+protected:
+  int label_extent () const;
+  float quantize_value (float value) const;
+
+private:
+  std::unique_ptr<c_valueeditor_popup> value_editor;
+};
+
 class c_label : public c_widget {
 public:
   void draw (cairo_t *cr) override;
@@ -360,7 +410,7 @@ struct t_listrow {
   bool symlink = false;
 };
 
-class c_scrollbar : public c_widget {
+class c_scrollbar : public c_valuewidget {
 public:
   c_scrollbar ();
 
@@ -370,17 +420,15 @@ public:
   bool on_mouse_move (int x, int y) override;
   void on_mouse_leave () override;
 
-  bool set_value (float value, bool notify = false);
+  bool set_value (float value, bool notify = false) override;
   void set_page_size (float value);
-  void set_step (float value);
+  void set_step (float value) override;
   void set_container (c_container *container);
   void set_orientation (_scrollbar_orientation orientation);
   t_rect thumb_rect () const;
-  void emit_action ();
+  void emit_action () override;
 
-  float value = 0.0f;
   float page_size = 0.1f;
-  float step = 0.05f;
   _scrollbar_orientation orientation = SCROLLBAR_VERTICAL;
   c_container *container = nullptr;
 
@@ -389,6 +437,34 @@ private:
   int drag_start_x = 0;
   int drag_start_y = 0;
   float drag_start_value = 0.0f;
+};
+
+class c_slider : public c_scrollbar {
+public:
+  void draw (cairo_t *cr) override;
+  bool on_mouse_down (int x, int y, int button) override;
+  bool on_mouse_up (int x, int y, int button) override;
+  bool on_mouse_move (int x, int y) override;
+  bool set_value (float value, bool notify = false) override;
+  void set_range (float min, float max) override;
+  void set_min (float min) override;
+  void set_max (float max) override;
+  void set_step (float step) override;
+  float real_value () const;
+  std::string get_value_string () const override;
+  void emit_action () override;
+  virtual t_rect slider_track_rect () const;
+
+  float slider_value = 0.0f;
+  float slider_step = 0.05f;
+  int track_size = 0;
+
+private:
+  float quantize (float value) const;
+  float normalized_from_real (float value) const;
+  float real_from_normalized (float value) const;
+  void sync_real_from_normalized ();
+  uint64_t last_click_ms = 0;
 };
 
 class c_container : public c_widget {
@@ -517,10 +593,17 @@ public:
   bool dropdown_width_dirty = true;
 };
 
-class c_knob : public c_widget {
+enum _knob_doubleclick_action {
+  _KNOB_DOUBLECLICK_NONE,
+  _KNOB_DOUBLECLICK_SETDEFAULT,
+  _KNOB_DOUBLECLICK_EDIT
+};
+
+class c_knob : public c_valuewidget {
 public:
   c_knob ();
-
+  
+  virtual void draw (cairo_t *cr, bool show_label, bool show_value);
   void draw (cairo_t *cr) override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
@@ -528,33 +611,32 @@ public:
   bool on_key_down (int key) override;
   void on_mouse_leave () override;
 
-  bool set_value (float value, bool notify = false);
-  void set_range (float min, float max);
-  void set_min (float min);
-  void set_max (float max);
-  void set_default (float value);
-  void set_step (float step);
-  float normalized_value () const;
+  bool set_value (float value, bool notify = false) override;
+  float normalized_value () const override;
+  float value_from_normalized (float normalized) const override;
   float angle_from_value () const;
+  std::string get_value_string () const override;
+  std::string get_label_text () const override;
+  bool hit_value_label (int x, int y) const override;
 
-  float min = 0.0f;
-  float max = 1.0f;
-  float value = 0.0f;
-  float default_value = 0.0f;
-  float step = 0.01f;
   float drag_sensitivity = 0.005f;
-  bool reset_on_doubleclick = true;
+  float log_taper = 1.0f;
   bool show_value = true;
   float fontsize = 12.0f;
+  _knob_doubleclick_action doubleclick_action = _KNOB_DOUBLECLICK_SETDEFAULT;
 
 private:
-  void emit_action ();
-  float quantize (float value) const;
-
   bool dragging = false;
   int drag_start_y = 0;
-  float drag_start_value = 0.0f;
+  float drag_start_normalized = 0.0f;
   uint64_t last_click_ms = 0;
+};
+
+// same as c_knob, except its label reflects its value
+class c_simpleknob : public c_knob {
+public:
+  c_simpleknob ();
+  std::string get_label_text () const override;
 };
 
 class c_textbox : public c_widget {
@@ -805,6 +887,19 @@ public:
   t_native_handle widget = nullptr;
   bool pointer_grabbed = false;
   bool close_on_release = false;
+};
+
+class c_valueeditor_popup : public c_popupwindow {
+public:
+  void create_for_value (c_app *app, c_valuewidget *owner);
+  void show_near_owner ();
+  void commit ();
+  bool on_key_down (int key) override;
+  void on_action (t_action_event &event) override;
+
+  c_valuewidget *value_widget = nullptr;
+  c_textbox textbox;
+  bool ignore_next_mouse_up = false;
 };
 
 class c_tooltip : public c_popupwindow {

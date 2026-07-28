@@ -1144,13 +1144,19 @@ nb:CabD
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1
-    ] , [
+    ] ,
+    
+    
+@@INSERT_EQ_PORTS_HERE
+    
+    
+    [
         a lv2:InputPort , atom:AtomPort ;
         <http://lv2plug.in/ns/ext/resize-port#minimumSize> 8192 ;
         atom:bufferType atom:Sequence ;
         atom:supports patch:Message ;
         lv2:designation lv2:control ;
-        lv2:index 99 ;
+        lv2:index @@portnum ;
         lv2:symbol "CONTROL" ;
         lv2:name "Control"
     ] , [
@@ -1159,13 +1165,13 @@ nb:CabD
         atom:bufferType atom:Sequence ;
         atom:supports patch:Message ;
         lv2:designation lv2:control ;
-        lv2:index 100 ;
+        lv2:index @@portnum ;
         lv2:symbol "NOTIFY" ;
         lv2:name "Notify"
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 101 ;
+        lv2:index @@portnum ;
         lv2:symbol "vu_enable" ;
         lv2:name "VU Meters" ;
         lv2:default 1 ;
@@ -1175,7 +1181,7 @@ nb:CabD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 102 ;
+        lv2:index @@portnum ;
         lv2:symbol "mute_all" ;
         lv2:name "Mute All" ;
         lv2:default 0 ;
@@ -1185,7 +1191,7 @@ nb:CabD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 103 ;
+        lv2:index @@portnum ;
         lv2:symbol "pedal_exclusive_lane" ;
         lv2:name "Pedal Exclusive Lane" ;
         lv2:default 0 ;
@@ -1195,7 +1201,7 @@ nb:CabD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 104 ;
+        lv2:index @@portnum ;
         lv2:symbol "exclusive_lane" ;
         lv2:name "Amp Exclusive Lane" ;
         lv2:default 0 ;
@@ -1205,7 +1211,7 @@ nb:CabD
     ] , [
         a lv2:InputPort ,
           lv2:ControlPort ;
-        lv2:index 105 ;
+        lv2:index @@portnum ;
         lv2:symbol "cab_exclusive_lane" ;
         lv2:name "Cab/IR Exclusive Lane" ;
         lv2:default 0 ;
@@ -1215,7 +1221,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-        lv2:index 106 ;
+        lv2:index @@portnum ;
 	        lv2:symbol "pedal_linked_calib" ;
 	        lv2:name "Pedal Linked Calibration" ;
 	        lv2:default 0 ;
@@ -1225,7 +1231,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-        lv2:index 107 ;
+        lv2:index @@portnum ;
 	        lv2:symbol "linked_calib" ;
 	        lv2:name "Amp Linked Calibration" ;
 	        lv2:default 0 ;
@@ -1235,7 +1241,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-        lv2:index 108 ;
+        lv2:index @@portnum ;
 	        lv2:symbol "cab_linked_calib" ;
 	        lv2:name "Cab/IR Linked Calibration" ;
 	        lv2:default 0 ;
@@ -1245,7 +1251,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 109 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "calib_source" ;
 	        lv2:name "Calibration Source" ;
 	        lv2:default 0 ;
@@ -1255,7 +1261,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 110 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "calib_target_db" ;
 	        lv2:name "Calibration Target (dB)" ;
 	        lv2:default -18.0 ;
@@ -1264,7 +1270,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 111 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "noisegate_enabled" ;
 	        lv2:name "Noisegate Enable" ;
 	        lv2:default 0 ;
@@ -1274,7 +1280,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 112 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "noisegate_threshold" ;
 	        lv2:name "Noisegate Threshold (dB)" ;
 	        lv2:default -60.0 ;
@@ -1283,7 +1289,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 113 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "noisegate_attack" ;
 	        lv2:name "Noisegate Attack (ms)" ;
 	        lv2:default 5.0 ;
@@ -1292,7 +1298,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 114 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "noisegate_hold" ;
 	        lv2:name "Noisegate Hold (ms)" ;
 	        lv2:default 20.0 ;
@@ -1301,7 +1307,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 115 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "noisegate_release" ;
 	        lv2:name "Noisegate Release (ms)" ;
 	        lv2:default 50.0 ;
@@ -1310,7 +1316,7 @@ nb:CabD
 	    ] , [
 	        a lv2:OutputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 116 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "noisegate_gain" ;
 	        lv2:name "Noisegate Gain" ;
 	        lv2:minimum 0.0 ;
@@ -1318,7 +1324,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 117 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "tuner_on" ;
 	        lv2:name "Tuner Enable" ;
 	        lv2:default 0 ;
@@ -1328,7 +1334,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 118 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "tuner_base_freq" ;
 	        lv2:name "Tuner Base Frequency" ;
 	        lv2:default 440.0 ;
@@ -1337,7 +1343,7 @@ nb:CabD
 	    ] , [
 	        a lv2:OutputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 119 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "tuner_note" ;
 	        lv2:name "Tuner Note" ;
 	        lv2:minimum 0.0 ;
@@ -1345,7 +1351,7 @@ nb:CabD
 	    ] , [
 	        a lv2:OutputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 120 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "tuner_cents_off" ;
 	        lv2:name "Tuner Cents Off" ;
 	        lv2:minimum -50.0 ;
@@ -1353,7 +1359,7 @@ nb:CabD
 	    ] , [
 	        a lv2:OutputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 121 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "tuner_freq" ;
 	        lv2:name "Tuner Frequency" ;
 	        lv2:minimum 0.0 ;
@@ -1361,7 +1367,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 122 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "master_gain" ;
 	        lv2:name "Master Gain" ;
 	        lv2:default 0.0 ;
@@ -1370,7 +1376,7 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 123 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "presence" ;
 	        lv2:name "Presence" ;
 	        lv2:default 0.0 ;
@@ -1379,17 +1385,17 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 124 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "active_page" ;
 	        lv2:name "Active Page" ;
-	        lv2:default 1 ;
+	        lv2:default 2 ;
 	        lv2:minimum 0 ;
-	        lv2:maximum 3 ;
+	        lv2:maximum 5 ;
 	        lv2:portProperty lv2:integer
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 125 ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "pedal_bypass" ;
 	        lv2:name "Pedal Bypass" ;
 	        lv2:default 0 ;
@@ -1399,7 +1405,17 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 126 ;
+	        lv2:index @@portnum ;
+	        lv2:symbol "eqpre_bypass" ;
+	        lv2:name "Pre EQ Bypass" ;
+	        lv2:default 1 ;
+	        lv2:minimum 0 ;
+	        lv2:maximum 1 ;
+	        lv2:portProperty lv2:toggled
+	    ] , [
+	        a lv2:InputPort ,
+	          lv2:ControlPort ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "amp_bypass" ;
 	        lv2:name "Amp Bypass" ;
 	        lv2:default 0 ;
@@ -1409,7 +1425,17 @@ nb:CabD
 	    ] , [
 	        a lv2:InputPort ,
 	          lv2:ControlPort ;
-	        lv2:index 127 ;
+	        lv2:index @@portnum ;
+	        lv2:symbol "eqpost_bypass" ;
+	        lv2:name "Post EQ Bypass" ;
+	        lv2:default 1 ;
+	        lv2:minimum 0 ;
+	        lv2:maximum 1 ;
+	        lv2:portProperty lv2:toggled
+	    ] , [
+	        a lv2:InputPort ,
+	          lv2:ControlPort ;
+	        lv2:index @@portnum ;
 	        lv2:symbol "cab_bypass" ;
 	        lv2:name "Cab/IR Bypass" ;
 	        lv2:default 0 ;

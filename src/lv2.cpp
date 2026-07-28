@@ -61,6 +61,11 @@ struct Plugin : public c_lv2_urids {
   const float *lane_mute    [BANK_COUNT] [NB_NUM_MODELS] = {};
   const float *dcflip       [BANK_COUNT] [NB_NUM_MODELS] = {};
   const float *calibrate    [BANK_COUNT] [NB_NUM_MODELS] = {};
+  const float *eq_enabled   [BANK_COUNT] [EQ_NUM_BANDS] = {};
+  const float *eq_mode      [BANK_COUNT] [EQ_NUM_BANDS] = {};
+  const float *eq_freq      [BANK_COUNT] [EQ_NUM_BANDS] = {};
+  const float *eq_gain      [BANK_COUNT] [EQ_NUM_BANDS] = {};
+  const float *eq_q         [BANK_COUNT] [EQ_NUM_BANDS] = {};
   const float *bypass       = NULL;
   const float *vu_enable    = NULL;
   const float *mute_all     = NULL;
@@ -92,6 +97,11 @@ struct Plugin : public c_lv2_urids {
   float last_lane_mute      [BANK_COUNT] [NB_NUM_MODELS] = {};
   float last_dcflip         [BANK_COUNT] [NB_NUM_MODELS] = {};
   float last_calibrate      [BANK_COUNT] [NB_NUM_MODELS] = {};
+  float last_eq_enabled     [BANK_COUNT] [EQ_NUM_BANDS] = {};
+  float last_eq_mode        [BANK_COUNT] [EQ_NUM_BANDS] = {};
+  float last_eq_freq        [BANK_COUNT] [EQ_NUM_BANDS] = {};
+  float last_eq_gain        [BANK_COUNT] [EQ_NUM_BANDS] = {};
+  float last_eq_q           [BANK_COUNT] [EQ_NUM_BANDS] = {};
   float last_bypass         = 1.0;
   float last_vu_enable      = 1.0;
   float last_mute_all       = 0.0;
@@ -108,7 +118,7 @@ struct Plugin : public c_lv2_urids {
   float last_tuner_base_freq = 440.0;
   float last_master_gain = 0.0;
   float last_presence = 0.0;
-  float last_active_page = 1.0;
+  float last_active_page = 2.0;
   float last_bank_bypass [BANK_COUNT] = { 0.0 };
   bool base_lane_mute [BANK_COUNT] [NB_NUM_MODELS] = {};
   bool host_bypass = false;
@@ -160,6 +170,30 @@ struct Plugin : public c_lv2_urids {
   
 };
 
+static bool lv2_is_model_bank (_lane_bank bank) {
+  return bank == BANK_PEDAL || bank == BANK_AMP || bank == BANK_CAB;
+}
+
+static bool lv2_is_bank (_lane_bank bank) {
+  return bank >= BANK_PEDAL && bank < BANK_COUNT;
+}
+
+static c_eq *lv2_eq_for_bank (Plugin *self, _lane_bank bank) {
+  if (!self)
+    return NULL;
+
+  switch (bank) {
+    case BANK_EQPRE:
+      return &self->blender.eq_pre;
+
+    case BANK_EQPOST:
+      return &self->blender.eq_post;
+
+    default:
+      return NULL;
+  }
+}
+
 static bool read_changed (const float *port, float &last, float &value) {
   if (!port)
     return false;
@@ -183,7 +217,7 @@ static bool read_changed_bool (const float *port, float &last, bool &value) {
 
 static bool calib_enabled_for_lane (
     Plugin *self, _lane_bank bank, size_t which) {
-  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT ||
+  if (!self || !lv2_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return false;
 
@@ -199,8 +233,8 @@ static void apply_effective_controls (Plugin *self) {
 
   self->blender.set_bypass (self->host_bypass);
 
-  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
-    const _lane_bank b = (_lane_bank) bank;
+  for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+    const size_t bank = (size_t) b;
     const int exclusive_lane = (int) lrintf (self->last_exclusive_lane [bank]);
     self->blender.banks [bank].exclusive_lane =
       std::clamp (exclusive_lane, 0, (int) NB_NUM_MODELS);
@@ -220,7 +254,7 @@ static void apply_effective_controls (Plugin *self) {
 
 static void run_calibration (
     Plugin *self, _lane_bank bank, size_t which, bool enabled) {
-  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT ||
+  if (!self || !lv2_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return;
 
@@ -235,7 +269,7 @@ static void run_calibration (
 }
 
 static void run_linked_calibration (Plugin *self, _lane_bank bank) {
-  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT)
+  if (!self || !lv2_is_model_bank (bank))
     return;
 
   self->blender.calibrate_linked (bank, self->blender.calib_source == 1);
@@ -262,7 +296,8 @@ static void loader_main (Plugin *self) { CP
       self->loader_cv.wait_for(lock, std::chrono::milliseconds (50), [&] {
         if (self->restore_in_progress.load (std::memory_order_acquire))
           return false;
-        for (size_t b = BANK_PEDAL; b < BANK_COUNT; ++b) {
+        for (_lane_bank bank_id : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+          const size_t b = (size_t) bank_id;
           if (self->pending_calibrate_all [b])
             return true;
           for (size_t i = 0; i < NB_NUM_MODELS; ++i)
@@ -279,7 +314,10 @@ static void loader_main (Plugin *self) { CP
       if (self->restore_in_progress.load (std::memory_order_acquire))
         continue;
 
-      for (size_t b = BANK_PEDAL; b < BANK_COUNT && !do_load; ++b) {
+      for (_lane_bank bank_id : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+        if (do_load)
+          break;
+        const size_t b = (size_t) bank_id;
         for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
           if (self->pending_load [b] [i]) {
             bank = (_lane_bank) b;
@@ -293,7 +331,8 @@ static void loader_main (Plugin *self) { CP
       }
 
       if (!do_load) {
-        for (size_t b = BANK_PEDAL; b < BANK_COUNT; ++b) {
+        for (_lane_bank bank_id : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+          const size_t b = (size_t) bank_id;
           if (self->pending_calibrate_all [b]) {
             bank = (_lane_bank) b;
             self->pending_calibrate_all [b] = false;
@@ -304,7 +343,10 @@ static void loader_main (Plugin *self) { CP
       }
 
       if (!do_load && !do_calib_all) {
-        for (size_t b = BANK_PEDAL; b < BANK_COUNT && !do_calib; ++b) {
+        for (_lane_bank bank_id : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+          if (do_calib)
+            break;
+          const size_t b = (size_t) bank_id;
           for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
             if (self->pending_calibrate [b] [i]) {
               bank = (_lane_bank) b;
@@ -321,7 +363,10 @@ static void loader_main (Plugin *self) { CP
       }
 
       if (!do_load && !do_calib_all && !do_calib) {
-        for (size_t b = BANK_PEDAL; b < BANK_COUNT && !do_ir_pitch; ++b) {
+        for (_lane_bank bank_id : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+          if (do_ir_pitch)
+            break;
+          const size_t b = (size_t) bank_id;
           for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
             if (self->pending_ir_pitch [b] [i]) {
               bank = (_lane_bank) b;
@@ -405,8 +450,7 @@ static void loader_main (Plugin *self) { CP
 // THIS RUNS IN DSP THREAD
 static void request_load (
     Plugin *self, _lane_bank bank, size_t which, const char *path) {
-  if (!self || !path || !path [0] ||
-      bank < BANK_PEDAL || bank >= BANK_COUNT ||
+  if (!self || !path || !path [0] || !lv2_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return;
     
@@ -431,7 +475,7 @@ static void request_calibrate_linked (Plugin *self, _lane_bank bank);
 
 static void request_ir_pitch (
     Plugin *self, _lane_bank bank, size_t which, float semitones) {
-  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT ||
+  if (!self || !lv2_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return;
 
@@ -444,7 +488,7 @@ static void request_ir_pitch (
 
 static void clear_model_slot (
     Plugin *self, _lane_bank bank, size_t which, bool notify) {
-  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT ||
+  if (!self || !lv2_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return;
 
@@ -484,7 +528,7 @@ static void get_state_path_features (
 
 static void request_calibrate (
     Plugin *self, _lane_bank bank, size_t which, bool enabled) {
-  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT ||
+  if (!self || !lv2_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return;
 
@@ -500,7 +544,7 @@ static void request_calibrate (
 }
 
 static void request_calibrate_linked (Plugin *self, _lane_bank bank) {
-  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT)
+  if (!self || !lv2_is_model_bank (bank))
     return;
 
   {
@@ -523,8 +567,8 @@ static void set_calib_target_db (Plugin *self, float db) {
 
   self->last_calib_target_db = self->blender.banks [BANK_AMP].lanes [0].calib_target_db;
 
-  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
-    const _lane_bank b = (_lane_bank) bank;
+  for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+    const size_t bank = (size_t) b;
     if (self->blender.banks [bank].linked_calib) {
       request_calibrate_linked (self, b);
     } else {
@@ -544,8 +588,14 @@ static bool get_bank_bypass (Plugin *self, _lane_bank bank) {
     case BANK_PEDAL:
       return self->blender.pedal_bypass ();
 
+    case BANK_EQPRE:
+      return !self->blender.eq_pre.on;
+
     case BANK_CAB:
       return self->blender.cab_bypass ();
+
+    case BANK_EQPOST:
+      return !self->blender.eq_post.on;
 
     case BANK_AMP:
     default:
@@ -554,7 +604,7 @@ static bool get_bank_bypass (Plugin *self, _lane_bank bank) {
 }
 
 static void set_bank_bypass (Plugin *self, _lane_bank bank, bool bypass) {
-  if (!self || bank < BANK_PEDAL || bank >= BANK_COUNT)
+  if (!self || !lv2_is_bank (bank))
     return;
 
   self->last_bank_bypass [bank] = bypass ? 1.0f : 0.0f;
@@ -564,8 +614,16 @@ static void set_bank_bypass (Plugin *self, _lane_bank bank, bool bypass) {
       self->blender.set_pedal_bypass (bypass);
     break;
 
+    case BANK_EQPRE:
+      self->blender.eq_pre.on = !bypass;
+    break;
+
     case BANK_CAB:
       self->blender.set_cab_bypass (bypass);
+    break;
+
+    case BANK_EQPOST:
+      self->blender.eq_post.on = !bypass;
     break;
 
     case BANK_AMP:
@@ -595,7 +653,10 @@ static LV2_State_Status save (
              sizeof (bypass),
              self->urid_atom_Int,
              LV2_STATE_IS_POD);
+    }
 
+    for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+      const size_t bank = (size_t) b;
       for (int i = 0; i < NB_NUM_MODELS; i++) {
         const std::string filename =
           self->blender.banks [bank].lanes [i].model_filename ();
@@ -617,8 +678,8 @@ static LV2_State_Status save (
 
       if (abstract_path && free_path && free_path->free_path)
         free_path->free_path (free_path->handle, abstract_path);
-        }
       }
+    }
 
     return LV2_STATE_SUCCESS;
 }
@@ -667,7 +728,10 @@ static LV2_State_Status restore (
         (*(const int32_t *) bank_bypass_value) != 0);
       self->notify_bank_bypass [bank] = true;
     }
+  }
 
+  for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+    const size_t bank = (size_t) b;
     for (int i = 0; i < NB_NUM_MODELS; i++) {
       const void *p =
         retrieve (handle,
@@ -824,6 +888,8 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   
   self->blender.set_samplerate ((uint32_t)rate);
   self->last_calib_target_db = self->blender.banks [BANK_AMP].lanes [0].calib_target_db;
+  self->last_bank_bypass [BANK_EQPRE] = 1.0f;
+  self->last_bank_bypass [BANK_EQPOST] = 1.0f;
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     self->meter_in [bank].samplerate = (int) rate;
     self->meter_in [bank].redraw_interval = 1.0f / LV2_METER_FPS;
@@ -916,6 +982,33 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
 
       case NB_LV2_LANE_CALIBRATE:
         self->calibrate [bank] [lane] = (const float *) data;
+      break;
+    }
+    return;
+  }
+
+  size_t eq_band = 0;
+  uint32_t eq_param = 0;
+  if (nb_lv2_decode_eq_port (port, &bank, &eq_band, &eq_param)) {
+    switch (eq_param) {
+      case NB_LV2_EQ_ENABLED:
+        self->eq_enabled [bank] [eq_band] = (const float *) data;
+      break;
+
+      case NB_LV2_EQ_MODE:
+        self->eq_mode [bank] [eq_band] = (const float *) data;
+      break;
+
+      case NB_LV2_EQ_FREQ:
+        self->eq_freq [bank] [eq_band] = (const float *) data;
+      break;
+
+      case NB_LV2_EQ_GAIN:
+        self->eq_gain [bank] [eq_band] = (const float *) data;
+      break;
+
+      case NB_LV2_EQ_Q:
+        self->eq_q [bank] [eq_band] = (const float *) data;
       break;
     }
     return;
@@ -1026,8 +1119,16 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
       self->bank_bypass [BANK_PEDAL] = (const float *) data;
     break;
 
+    case PORT_EQPRE_BYPASS:
+      self->bank_bypass [BANK_EQPRE] = (const float *) data;
+    break;
+
     case PORT_AMP_BYPASS:
       self->bank_bypass [BANK_AMP] = (const float *) data;
+    break;
+
+    case PORT_EQPOST_BYPASS:
+      self->bank_bypass [BANK_EQPOST] = (const float *) data;
     break;
 
     case PORT_CAB_BYPASS:
@@ -1077,7 +1178,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     
     // model loaded from UI?
     bool sent_path_notify = false;
-    for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+    for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+      const size_t bank = (size_t) b;
       for (i = 0; i < NB_NUM_MODELS; i++) {
         if (self->notify_path [bank] [i]) {
           debug ("notify_path [%d][%d]", (int) bank, i);
@@ -1133,9 +1235,11 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       const LV2_Atom_Object *obj = (const LV2_Atom_Object *)&ev->body;
       
 	      if (obj->body.otype == self->urid_patch_Get) {
-	        for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
+	        for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+            const size_t bank = (size_t) b;
 	          for (i = 0; i < NB_NUM_MODELS; i++)
 	            self->notify_path [bank] [i] = true;
+          }
 	        for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
 	          self->notify_bank_bypass [bank] = true;
 	        self->restored_from_state = false;
@@ -1178,7 +1282,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       const char *path =
         (const char *) LV2_ATOM_BODY_CONST (value);
       
-      for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+      for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+        const size_t bank = (size_t) b;
         for (i = 0; i < NB_NUM_MODELS; i++) {
           if (prop == self->urid_bank_model [bank] [i]) {
             if (path && path [0])
@@ -1234,23 +1339,24 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     }
   }
 
-  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+  for (_lane_bank bnk : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+    const size_t bank = (size_t) bnk;
     if (read_changed (
           self->exclusive_lane [bank], self->last_exclusive_lane [bank], v)) { CP
-      self->blender.set_exclusive_lane ((_lane_bank) bank, (int) lrintf (v));
+      self->blender.set_exclusive_lane (bnk, (int) lrintf (v));
       if (bank == BANK_AMP)
         apply_effective_controls (self);
     }
   }
 
-  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+  for (_lane_bank bank_id : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+    const size_t bank = (size_t) bank_id;
     if (read_changed_bool (
           self->linked_calib [bank], self->last_linked_calib [bank], b)) { CP
       self->blender.banks [bank].linked_calib = b;
       self->blender.linked_calib =
         self->blender.banks [BANK_AMP].linked_calib;
 
-      const _lane_bank bank_id = (_lane_bank) bank;
       if (self->blender.banks [bank].linked_calib) {
         request_calibrate_linked (self, bank_id);
       } else {
@@ -1269,8 +1375,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	    if (v != self->last_calib_source) { CP
 	      self->last_calib_source = v;
 	      self->blender.calib_source = (int) lrintf (v);
-	      for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
-	        const _lane_bank bank_id = (_lane_bank) bank;
+	      for (_lane_bank bank_id : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+          const size_t bank = (size_t) bank_id;
 	        if (self->blender.banks [bank].linked_calib) {
 	          request_calibrate_linked (self, bank_id);
 	        } else {
@@ -1327,10 +1433,77 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	  if (read_changed (
           self->presence, self->last_presence, v))
 	    self->blender.set_presence (v);
+
+  for (_lane_bank bnk : { BANK_EQPRE, BANK_EQPOST }) {
+    c_eq *eq = lv2_eq_for_bank (self, bnk);
+    if (!eq)
+      continue;
+
+    const size_t bank = (size_t) bnk;
+    for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
+      bool changed = false;
+      float tmp = 0.0f;
+
+      if (read_changed_bool (
+            self->eq_enabled [bank] [band],
+            self->last_eq_enabled [bank] [band],
+            eq->enabled [band])) {
+        CP
+        changed = true;
+      }
+
+      if (read_changed (
+            self->eq_mode [bank] [band],
+            self->last_eq_mode [bank] [band],
+            tmp)) {
+        CP
+        const int mode =
+          std::clamp ((int) lrintf (tmp), (int) EQ_HIPASS, (int) EQ_LOWPASS);
+        eq->mode [band] = (_eq_band_mode) mode;
+        changed = true;
+      }
+
+      if (read_changed (
+            self->eq_freq [bank] [band],
+            self->last_eq_freq [bank] [band],
+            tmp)) {
+        CP
+        eq->freq [band] = std::clamp (tmp, 20.0f, 20000.0f);
+        changed = true;
+      }
+
+      if (read_changed (
+            self->eq_gain [bank] [band],
+            self->last_eq_gain [bank] [band],
+            tmp)) {
+        CP
+        eq->gain_db [band] = std::clamp (tmp, -36.0f, 36.0f);
+        changed = true;
+      }
+
+      if (read_changed (
+            self->eq_q [bank] [band],
+            self->last_eq_q [bank] [band],
+            tmp)) {
+        CP
+        eq->q [band] = std::clamp (tmp, 0.01f, 100.0f);
+        changed = true;
+      }
+
+      if (changed) {
+        eq->set_band (
+          (int) band,
+          eq->freq [band],
+          eq->gain_db [band],
+          eq->q [band],
+          eq->mode [band]);
+      }
+    }
+  }
 	  
   // check all lane parameters
-  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
-    const _lane_bank bnk = (_lane_bank) bank;
+  for (_lane_bank bnk : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+    const size_t bank = (size_t) bnk;
 
     for (i = 0; i < NB_NUM_MODELS; i++) {
       if (read_changed (

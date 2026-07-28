@@ -47,10 +47,22 @@ static uint32_t widget_lane_port (const nbtk::c_widget *w, uint32_t param) {
   return nb_lv2_bank_lane_port (bank, lane, param);
 }
 
+static uint32_t widget_eq_port (const nbtk::c_widget *w, uint32_t param) {
+  const _lane_bank bank =
+    w && w->bank == BANK_EQPOST ? BANK_EQPOST : BANK_EQPRE;
+  const size_t band =
+    w && w->lane < EQ_NUM_BANDS ? w->lane : 0;
+  return nb_lv2_eq_port (bank, band, param);
+}
+
+static bool lv2_ui_is_model_bank (_lane_bank bank) {
+  return bank == BANK_PEDAL || bank == BANK_AMP || bank == BANK_CAB;
+}
+
 bool c_lv2_ui::write_model_path (
     _lane_bank bank, size_t which, const char *filename) {
   if (updating_from_host || !write || !map ||
-      bank < BANK_PEDAL || bank >= BANK_COUNT ||
+      !lv2_ui_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return false;
 
@@ -258,6 +270,14 @@ void c_lv2_ui::on_bank_bypass (nbtk::c_widget *w, _lane_bank bank, bool b) {
       write_control (PORT_PEDAL_BYPASS, b ? 1.0f : 0.0f);
     break;
 
+    case BANK_EQPRE:
+      write_control (PORT_EQPRE_BYPASS, b ? 1.0f : 0.0f);
+    break;
+
+    case BANK_EQPOST:
+      write_control (PORT_EQPOST_BYPASS, b ? 1.0f : 0.0f);
+    break;
+
     case BANK_CAB:
       write_control (PORT_CAB_BYPASS, b ? 1.0f : 0.0f);
     break;
@@ -376,6 +396,50 @@ void c_lv2_ui::on_presence (nbtk::c_widget *w, float f) {
   (void) w;
   state.presence = f;
   write_control (PORT_PRESENCE, f);
+}
+
+void c_lv2_ui::on_eq_band (
+    nbtk::c_widget *w, _lane_bank bank, size_t band) {
+  if (!w || band >= EQ_NUM_BANDS)
+    return;
+
+  const c_eq_state &eq_state =
+    bank == BANK_EQPOST ? state.eqpost : state.eqpre;
+
+  switch ((_widget_role) w->role) {
+    case ROLE_EQ_ENABLED:
+      write_control (
+        widget_eq_port (w, NB_LV2_EQ_ENABLED),
+        eq_state.enabled [band] ? 1.0f : 0.0f);
+    break;
+
+    case ROLE_EQ_MODE:
+      write_control (
+        widget_eq_port (w, NB_LV2_EQ_MODE),
+        (float) eq_state.mode [band]);
+    break;
+
+    case ROLE_EQ_FREQ:
+      write_control (
+        widget_eq_port (w, NB_LV2_EQ_FREQ),
+        eq_state.freq [band]);
+    break;
+
+    case ROLE_EQ_GAIN:
+      write_control (
+        widget_eq_port (w, NB_LV2_EQ_GAIN),
+        eq_state.gain_db [band]);
+    break;
+
+    case ROLE_EQ_Q:
+      write_control (
+        widget_eq_port (w, NB_LV2_EQ_Q),
+        eq_state.q [band]);
+    break;
+
+    default:
+    break;
+  }
 }
 
 void c_lv2_ui::on_bank_switch (nbtk::c_widget *w, int n) {
@@ -608,13 +672,19 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
   }
 
   if (port == PORT_PEDAL_BYPASS ||
+      port == PORT_EQPRE_BYPASS ||
       port == PORT_AMP_BYPASS ||
+      port == PORT_EQPOST_BYPASS ||
       port == PORT_CAB_BYPASS) {
     const bool bypassed = value >= 0.5f;
     if (port == PORT_PEDAL_BYPASS)
       state.pedal_bypass = bypassed;
+    else if (port == PORT_EQPRE_BYPASS)
+      state.eqpre_bypass = bypassed;
     else if (port == PORT_CAB_BYPASS)
       state.cab_bypass = bypassed;
+    else if (port == PORT_EQPOST_BYPASS)
+      state.eqpost_bypass = bypassed;
     else
       state.amp_bypass = bypassed;
     sync_widgets_from_state (state);
@@ -708,7 +778,8 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
 
 void c_lv2_ui::set_model_path (
     _lane_bank bank, size_t which, const char *path) {
-  if (bank < BANK_PEDAL || bank >= BANK_COUNT || which >= NB_NUM_MODELS)
+  if ((bank != BANK_PEDAL && bank != BANK_AMP && bank != BANK_CAB) ||
+      which >= NB_NUM_MODELS)
     return;
 
   const char *p = path ? path : "";
@@ -728,7 +799,8 @@ void c_lv2_ui::set_model_path (
 }
 
 void c_lv2_ui::set_model_property (LV2_URID property, const char *path) {
-  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+  for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+    const size_t bank = (size_t) b;
     for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
       if (property == urid_bank_model [bank] [i]) {
         set_model_path ((_lane_bank) bank, i, path);
@@ -769,15 +841,18 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
       if (count >= banked_need) {
         size_t n = 0;
         for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+          const _lane_bank bank_id = (_lane_bank) bank;
           c_lane_widgets *bank_lanes =
-            lanes_for_bank ((_lane_bank) bank);
+            lv2_ui_is_model_bank (bank_id) ? lanes_for_bank (bank_id) : NULL;
 
           vudata_in [bank].set_l_smooth (values [n], values [n + 1]);
           n += 2;
 
           for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
-            bank_lanes [lane].vudata_out.set_l_smooth (
-              values [n], values [n + 1]);
+            if (bank_lanes) {
+              bank_lanes [lane].vudata_out.set_l_smooth (
+                values [n], values [n + 1]);
+            }
             n += 2;
           }
         }
@@ -874,8 +949,16 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
           set_port_value (PORT_PEDAL_BYPASS, bypassed ? 1.0f : 0.0f);
         break;
 
+        case BANK_EQPRE:
+          set_port_value (PORT_EQPRE_BYPASS, bypassed ? 1.0f : 0.0f);
+        break;
+
         case BANK_CAB:
           set_port_value (PORT_CAB_BYPASS, bypassed ? 1.0f : 0.0f);
+        break;
+
+        case BANK_EQPOST:
+          set_port_value (PORT_EQPOST_BYPASS, bypassed ? 1.0f : 0.0f);
         break;
 
         case BANK_AMP:
@@ -926,11 +1009,14 @@ void c_lv2_ui::subscribe_ports () {
     PORT_PRESENCE,
     PORT_ACTIVE_PAGE,
     PORT_PEDAL_BYPASS,
+    PORT_EQPRE_BYPASS,
     PORT_AMP_BYPASS,
+    PORT_EQPOST_BYPASS,
     PORT_CAB_BYPASS,
   };
 
-  for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+  for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+    const size_t bank = (size_t) b;
     for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
       for (uint32_t param = 0; param < NB_LV2_LANE_PORT_COUNT; param++) {
         subscribe->subscribe (

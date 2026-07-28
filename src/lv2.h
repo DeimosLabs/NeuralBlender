@@ -131,7 +131,12 @@ enum nb_lv2_port {
   PORT_CAB_D_DCFLIP,
   PORT_CAB_D_CALIBRATE,
 
-	  PORT_CONTROL,
+  PORT_EQPRE_FIRST,
+  PORT_EQPRE_LAST = PORT_EQPRE_FIRST + EQ_NUM_BANDS * 5 - 1,
+  PORT_EQPOST_FIRST,
+  PORT_EQPOST_LAST = PORT_EQPOST_FIRST + EQ_NUM_BANDS * 5 - 1,
+
+  PORT_CONTROL,
   PORT_NOTIFY,
   PORT_VU_ENABLE,
   PORT_MUTE_ALL,
@@ -158,7 +163,9 @@ enum nb_lv2_port {
   PORT_PRESENCE,
   PORT_ACTIVE_PAGE,
   PORT_PEDAL_BYPASS,
+  PORT_EQPRE_BYPASS,
   PORT_AMP_BYPASS,
+  PORT_EQPOST_BYPASS,
   PORT_CAB_BYPASS,
 
   PORT_COUNT,
@@ -179,8 +186,61 @@ enum nb_lv2_lane_param {
   NB_LV2_LANE_PORT_COUNT
 };
 
+enum nb_lv2_eq_param {
+  NB_LV2_EQ_ENABLED = 0,
+  NB_LV2_EQ_MODE,
+  NB_LV2_EQ_FREQ,
+  NB_LV2_EQ_GAIN,
+  NB_LV2_EQ_Q,
+
+  NB_LV2_EQ_PORT_COUNT
+};
+
 static inline uint32_t nb_lv2_lane_port (size_t lane, uint32_t first) {
   return first + (uint32_t) lane * NB_LV2_LANE_PORT_COUNT;
+}
+
+static inline uint32_t nb_lv2_eq_port (
+    _lane_bank bank, size_t band, uint32_t param) {
+  const uint32_t first =
+      (bank == BANK_EQPOST) ? PORT_EQPOST_FIRST : PORT_EQPRE_FIRST;
+  return first + (uint32_t) band * NB_LV2_EQ_PORT_COUNT + param;
+}
+
+static inline bool nb_lv2_decode_eq_port (
+    uint32_t port,
+    _lane_bank *bank,
+    size_t *band,
+    uint32_t *param) {
+
+  uint32_t first = 0;
+  _lane_bank b = BANK_EQPRE;
+
+  if (port >= PORT_EQPRE_FIRST && port <= PORT_EQPRE_LAST) {
+    first = PORT_EQPRE_FIRST;
+    b = BANK_EQPRE;
+  } else if (port >= PORT_EQPOST_FIRST && port <= PORT_EQPOST_LAST) {
+    first = PORT_EQPOST_FIRST;
+    b = BANK_EQPOST;
+  } else {
+    return false;
+  }
+
+  const uint32_t offset = port - first;
+  const uint32_t p = offset % NB_LV2_EQ_PORT_COUNT;
+  const size_t i = (size_t) (offset / NB_LV2_EQ_PORT_COUNT);
+
+  if (i >= EQ_NUM_BANDS)
+    return false;
+
+  if (bank)
+    *bank = b;
+  if (band)
+    *band = i;
+  if (param)
+    *param = p;
+
+  return true;
 }
 
 static inline uint32_t nb_lv2_bank_lane_port (
@@ -347,8 +407,12 @@ public:
       map->map (map->handle, NB_URI "#CalibBass");
     urid_bank_bypass [BANK_PEDAL] =
       map->map (map->handle, NB_URI "#PedalBypass");
+    urid_bank_bypass [BANK_EQPRE] =
+      map->map (map->handle, NB_URI "#EqPreBypass");
     urid_bank_bypass [BANK_AMP] =
       map->map (map->handle, NB_URI "#AmpBypass");
+    urid_bank_bypass [BANK_EQPOST] =
+      map->map (map->handle, NB_URI "#EqPostBypass");
     urid_bank_bypass [BANK_CAB] =
       map->map (map->handle, NB_URI "#CabBypass");
 
@@ -417,6 +481,7 @@ public:
   void on_calib_target_db (nbtk::c_widget *w, float f) override;
   void on_master_gain (nbtk::c_widget *w, float f) override;
   void on_presence (nbtk::c_widget *w, float f) override;
+  void on_eq_band (nbtk::c_widget *w, _lane_bank bank, size_t band) override;
   void on_bank_switch (nbtk::c_widget *w, int n) override;
   int idle () override;
   void apply_prefs (t_prefs &p) override;

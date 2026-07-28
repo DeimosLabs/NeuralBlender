@@ -125,7 +125,9 @@ enum _eq_band_mode {
 
 enum _lane_bank {
   BANK_PEDAL = 0,
+  BANK_EQPRE,
   BANK_AMP,
+  BANK_EQPOST,
   BANK_CAB,
   BANK_COUNT
 };
@@ -192,6 +194,34 @@ struct c_neuralblender_bank_state {
   bool linked_calib = false;
 };
 
+struct c_eq_state {
+  c_eq_state () {
+    const float defaultfreqs [EQ_NUM_BANDS] = {
+      20.0f, 50.0f, 100.0f, 250.0f,
+      1000.0f, 4000.0f, 8000.0f, 11000.0f
+    };
+    const _eq_band_mode defaultmodes [EQ_NUM_BANDS] = {
+      EQ_HIPASS, EQ_LOWSHELF, EQ_CURVE, EQ_CURVE,
+      EQ_CURVE, EQ_CURVE, EQ_HISHELF, EQ_LOWPASS
+    };
+
+    for (int i = 0; i < EQ_NUM_BANDS; ++i) {
+      enabled [i] = false;
+      mode [i] = defaultmodes [i];
+      freq [i] = defaultfreqs [i];
+      gain_db [i] = 0.0f;
+      q [i] = 1.0f;
+    }
+  }
+
+  bool on = false;
+  bool enabled [EQ_NUM_BANDS] = {};
+  _eq_band_mode mode [EQ_NUM_BANDS] = {};
+  float freq [EQ_NUM_BANDS] = {};
+  float gain_db [EQ_NUM_BANDS] = {};
+  float q [EQ_NUM_BANDS] = {};
+};
+
 struct c_neuralblender_state {
   c_neuralblender_state () : lanes (banks [BANK_AMP].lanes) { }
   c_neuralblender_state (const c_neuralblender_state &other)
@@ -221,8 +251,12 @@ struct c_neuralblender_state {
     calib_source = other.calib_source;
     
     pedal_bypass = other.pedal_bypass;
+    eqpre_bypass = other.eqpre_bypass;
     amp_bypass   = other.amp_bypass;
+    eqpost_bypass = other.eqpost_bypass;
     cab_bypass   = other.cab_bypass;
+    eqpre = other.eqpre;
+    eqpost = other.eqpost;
 
     for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
       banks [bank] = other.banks [bank];
@@ -233,7 +267,9 @@ struct c_neuralblender_state {
   std::string current_dir;
   bool bypass             = false;
   bool pedal_bypass       = false;
+  bool eqpre_bypass       = true;
   bool amp_bypass         = false;
+  bool eqpost_bypass      = true;
   bool cab_bypass         = false;
   bool mute_all           = false;
   bool do_excl            = false;
@@ -252,6 +288,8 @@ struct c_neuralblender_state {
   int calib_source        = 0; // 0=guitar, 1=bass
   
   c_neuralblender_bank_state banks [BANK_COUNT];
+  c_eq_state eqpre;
+  c_eq_state eqpost;
   c_neuralblender_lane_state (&lanes) [NB_NUM_MODELS];
 };
 
@@ -286,14 +324,16 @@ private:
 
 class c_eq {
 public:
+  c_eq ();
   void set_samplerate (int sr);
   void reset ();
   void process_block (float *buf, uint32_t nframes);
   void set_band (int band, float freq, float gain_db, float q, 
                  _eq_band_mode mode = EQ_KEEP);
   
-  bool on                           = true;
+  bool on                           = false;
   int samplerate                    = 0;
+  bool enabled       [EQ_NUM_BANDS] = { false };
   _eq_band_mode mode [EQ_NUM_BANDS] = { EQ_OFF };
   float freq         [EQ_NUM_BANDS] = { 0 };
   float gain_db      [EQ_NUM_BANDS] = { 0 };

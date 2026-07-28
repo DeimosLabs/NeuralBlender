@@ -531,15 +531,21 @@ void c_eq::set_samplerate (int sr) {
   }
 }
 
+float g_defaultfreqs [] = { 50.0f,    100.0f,    250.0f,   500.0f,
+                            1000.0f,  2000.0f,  4000.0f,  8000.0f };
+_eq_band_mode g_defaultmodes [] = { EQ_HIPASS, EQ_LOWSHELF, EQ_CURVE, EQ_CURVE,
+                                  EQ_CURVE, EQ_CURVE, EQ_HISHELF, EQ_LOWPASS };
+
+c_eq::c_eq () {
+  reset ();
+}
+
 void c_eq::reset () {
-  static float defaultfreqs [] = { 20.0f,    50.0f,    100.0f,   250.0f,
-                                   1000.0f,  4000.0f,  8000.0f,  11000.0f };
-  static _eq_band_mode defaultmodes [] = { EQ_HIPASS, EQ_LOWSHELF, EQ_CURVE, EQ_CURVE,
-                                    EQ_CURVE, EQ_CURVE, EQ_HISHELF, EQ_LOWPASS };
                              
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
-    freq [i] = defaultfreqs [i];
-    mode [i] = defaultmodes [i];
+    enabled [i] = false;
+    freq [i] = g_defaultfreqs [i];
+    mode [i] = g_defaultmodes [i];
     gain_db [i] = 0.0f;
     q [i] = 1.0f;
     if (samplerate > 0)
@@ -582,12 +588,25 @@ void c_eq::process_block (float *buf, uint32_t nframes) {
   if (!buf || nframes == 0)
     return;
 
-  for (auto &band : bands) {
-    if (band.mode == EQ_OFF)
+  for (int b = 0; b < EQ_NUM_BANDS; ++b) {
+    c_biquad &band = bands [b];
+    if (!enabled [b] || band.mode == EQ_OFF)
       continue;
 
     for (uint32_t i = 0; i < nframes; ++i)
       buf [i] = band.process (buf [i]);
+  }
+}
+
+static void eq_to_state (const c_eq &eq, c_eq_state &state) {
+  state.on = eq.on;
+
+  for (int i = 0; i < EQ_NUM_BANDS; ++i) {
+    state.enabled [i] = eq.enabled [i];
+    state.mode [i] = eq.mode [i];
+    state.freq [i] = eq.freq [i];
+    state.gain_db [i] = eq.gain_db [i];
+    state.q [i] = eq.q [i];
   }
 }
 
@@ -2417,8 +2436,12 @@ bool c_neuralblender::consistent_calib_state (bool &enabled,
 void c_neuralblender::get_state (c_neuralblender_state &state) const {
   state.bypass          = bypass ();
   state.pedal_bypass    = pedal_bypass ();
+  state.eqpre_bypass    = !eq_pre.on;
   state.amp_bypass      = amp_bypass ();
+  state.eqpost_bypass   = !eq_post.on;
   state.cab_bypass      = cab_bypass ();
+  eq_to_state (eq_pre, state.eqpre);
+  eq_to_state (eq_post, state.eqpost);
   state.do_vu           = do_vu;
   state.mute_all        = mute_all;
   state.master_gain     = master_gain;
@@ -2946,9 +2969,17 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     render_bank (
       BANK_PEDAL, process_in, m_stage_buf_a.data (), nframes,
       pedal_mask, pedal_mask, 0, 1);
+
+    if (eq_pre.on)
+      eq_pre.process_block (m_stage_buf_a.data (), nframes);
+
     render_bank (
       BANK_AMP, m_stage_buf_a.data (), m_stage_buf_b.data (), nframes,
       mask, mask, 0, 1);
+
+    if (eq_post.on)
+      eq_post.process_block (m_stage_buf_b.data (), nframes);
+
     render_bank (
       BANK_CAB, m_stage_buf_b.data (), out, nframes,
       cab_mask, cab_mask, 0, 1);
