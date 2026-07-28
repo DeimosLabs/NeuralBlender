@@ -73,6 +73,7 @@
 #define NB_XFADE_MS              10.0f
 #define NB_LANE_XFADE_MS         NB_XFADE_MS
 #define TUNER_THRESH_DB          -40.0f
+#define EQ_NUM_BANDS             8
 
 #ifndef NB_DEBUG_RATE_HELPERS
 #define NB_DEBUG_RATE_HELPERS
@@ -111,6 +112,16 @@ struct c_printfps {
 //#define DEBUG_SHOW_RATE(x)
 //#endif
 #endif
+
+enum _eq_band_mode {
+  EQ_OFF,
+  EQ_HIPASS,
+  EQ_LOWSHELF,
+  EQ_CURVE,
+  EQ_HISHELF,
+  EQ_LOWPASS,
+  EQ_KEEP // means don't change current setting
+};
 
 enum _lane_bank {
   BANK_PEDAL = 0,
@@ -242,6 +253,52 @@ struct c_neuralblender_state {
   
   c_neuralblender_bank_state banks [BANK_COUNT];
   c_neuralblender_lane_state (&lanes) [NB_NUM_MODELS];
+};
+
+class c_biquad {
+public:
+  void set_peak (float sr, float freq, float gain_db, float q,
+                 _eq_band_mode = EQ_KEEP);
+  void disable ();
+  inline float process (float x) {
+    const float y = b0 * x + z1;
+    z1 = b1 * x - a1 * y + z2;
+    z2 = b2 * x - a2 * y;
+    return y;
+  }
+  inline void reset () {
+    z1 = 0.0f;
+    z2 = 0.0f;
+  }
+  
+  _eq_band_mode mode = EQ_OFF;
+
+private:
+  float b0 = 1.0f;
+  float b1 = 0.0f;
+  float b2 = 0.0f;
+  float a1 = 0.0f;
+  float a2 = 0.0f;
+
+  float z1 = 0.0f;
+  float z2 = 0.0f;
+};
+
+class c_eq {
+public:
+  void set_samplerate (int sr);
+  void reset ();
+  void process_block (float *buf, uint32_t nframes);
+  void set_band (int band, float freq, float gain_db, float q, 
+                 _eq_band_mode mode = EQ_KEEP);
+  
+  bool on                           = true;
+  int samplerate                    = 0;
+  _eq_band_mode mode [EQ_NUM_BANDS] = { EQ_OFF };
+  float freq         [EQ_NUM_BANDS] = { 0 };
+  float gain_db      [EQ_NUM_BANDS] = { 0 };
+  float q            [EQ_NUM_BANDS] = { 0 };
+  c_biquad bands [EQ_NUM_BANDS];
 };
 
 // a simple but effective noise gate
@@ -527,6 +584,8 @@ public:
   c_noisegate noisegate;
   c_model_bank banks [BANK_COUNT];
   c_pitchtracker pitchtracker;
+  c_eq eq_pre;
+  c_eq eq_post;
   
   float master_gain = 1.0f;
   float presence = 0.0f;

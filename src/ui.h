@@ -109,6 +109,7 @@ public:
   void hide ();
   
   void on_resize () override;
+  bool on_key_down (int key) override;
   void on_action (nbtk::t_action_event &event) override;
   void get_prefs_from (t_prefs &prefs);
   void set_prefs_to   (t_prefs &prefs);
@@ -140,6 +141,7 @@ public:
   void hide ();
   
   void on_resize () override;
+  bool on_key_down (int key) override;
   void on_action (nbtk::t_action_event &event);
 
   c_neuralblender_ui *ui = NULL;
@@ -363,7 +365,7 @@ public:
   nbtk::c_container cont_models;
   nbtk::c_container cont_cabs;
   nbtk::c_container cont_other;
-  nbtk::c_staticimage img_logo;
+  nbtk::c_imagebutton img_logo;
   nbtk::c_button btn_tab_pedals;
   nbtk::c_button btn_tab_models;
   nbtk::c_button btn_tab_cabs;
@@ -378,6 +380,7 @@ public:
   nbtk::c_knob   knob_presence;
   nbtk::c_frame  frame_other_noisegate;
   nbtk::c_label  label_other_noisegate;
+  nbtk::c_button btn_other_noisegate;
   nbtk::c_knob   knob_noisethresh;
   nbtk::c_knob   knob_noiseattack;
   nbtk::c_knob   knob_noisehold;

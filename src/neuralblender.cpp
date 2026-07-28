@@ -396,6 +396,202 @@ static SF_VIRTUAL_IO g_sndfile_mem_vio {
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
+// c_biquad, c_eq
+
+void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
+                         _eq_band_mode mode_) {
+  if (samplerate <= 0.0f)
+    return;
+  
+  if (mode_ != EQ_KEEP)
+    mode = mode_;
+  
+  freq = std::clamp (freq, 20.0f, samplerate * 0.45f);
+  q = std::clamp (q, 0.05f, 50.0f);
+  
+  const float pi = 3.14159265358979323846f;
+  const float a = powf (10.0f, gain_db / 40.0f);
+  const float w0 = 2.0f * pi * freq / samplerate;
+  const float cw = cosf (w0);
+  const float sw = sinf (w0);
+  const float alpha = sw / (2.0f * q);
+  float a0_, a1_, a2_, inv_a0, b0_, b1_, b2_;
+  
+  switch (mode) {
+    case EQ_OFF:
+      disable ();
+      return;
+    break;
+    
+    case EQ_CURVE:
+      b0_ = 1.0f + alpha * a;
+      b1_ = -2.0f * cw;
+      b2_ = 1.0f - alpha * a;
+      a0_ = 1.0f + alpha / a;
+      a1_ = -2.0f * cw;
+      a2_ = 1.0f - alpha / a;
+
+      inv_a0 = 1.0f / a0_;
+    break;
+    
+    case EQ_LOWPASS:
+      b0_ = (1.0f - cw) * 0.5f;
+      b1_ =  1.0f - cw;
+      b2_ = (1.0f - cw) * 0.5f;
+      a0_ =  1.0f + alpha;
+      a1_ = -2.0f * cw;
+      a2_ =  1.0f - alpha;
+
+      inv_a0 = 1.0f / a0_;
+    break;
+
+    case EQ_HIPASS:
+      b0_ = (1.0f + cw) * 0.5f;
+      b1_ = -(1.0f + cw);
+      b2_ = (1.0f + cw) * 0.5f;
+      a0_ =  1.0f + alpha;
+      a1_ = -2.0f * cw;
+      a2_ =  1.0f - alpha;
+
+      inv_a0 = 1.0f / a0_;
+    break;
+
+    case EQ_LOWSHELF: {
+
+      float A = powf (10.0f, gain_db / 40.0f);
+      float sqrtA = sqrtf (A);
+
+      // shelf slope version
+      float S = std::clamp (q, 0.05f, 1.0f);
+      float shelf_alpha = sw * 0.5f *
+        sqrtf (std::max (0.0f, (A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f));
+
+      b0_ =    A * ((A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha);
+      b1_ =  2.0f * A * ((A - 1.0f) - (A + 1.0f) * cw);
+      b2_ =    A * ((A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha);
+      a0_ =        (A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha;
+      a1_ = -2.0f * ((A - 1.0f) + (A + 1.0f) * cw);
+      a2_ =        (A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha;
+
+      inv_a0 = 1.0f / a0_;
+    }
+    break;
+
+    case EQ_HISHELF: {
+
+      float A = powf (10.0f, gain_db / 40.0f);
+      float sqrtA = sqrtf (A);
+
+      float S = std::clamp (q, 0.05f, 1.0f);
+      float shelf_alpha = sw * 0.5f *
+        sqrtf (std::max (0.0f, (A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f));
+
+      b0_ =    A * ((A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha);
+      b1_ = -2.0f * A * ((A - 1.0f) + (A + 1.0f) * cw);
+      b2_ =    A * ((A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha);
+      a0_ =        (A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha;
+      a1_ =  2.0f * ((A - 1.0f) - (A + 1.0f) * cw);
+      a2_ =        (A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha;
+
+      inv_a0 = 1.0f / a0_;
+    }
+    break;
+
+    case EQ_KEEP:
+      disable ();
+      return;
+  }
+
+  b0 = b0_ * inv_a0;
+  b1 = b1_ * inv_a0;
+  b2 = b2_ * inv_a0;
+  a1 = a1_ * inv_a0;
+  a2 = a2_ * inv_a0;
+}
+
+void c_biquad::disable () { CP
+  b0 = 1.0f;
+  b1 = b2 = a1 = a2 = z1 = z2 = 0.0f;
+  mode = EQ_OFF;
+}
+
+void c_eq::set_samplerate (int sr) {
+  samplerate = sr;
+  if (samplerate <= 0) {
+    for (int i = 0; i < EQ_NUM_BANDS; i++)
+      bands [i].disable ();
+    return;
+  }
+
+  for (int i = 0; i < EQ_NUM_BANDS; i++) {
+    if (mode [i] == EQ_OFF || freq [i] <= 0.0f)
+      bands [i].disable ();
+    else
+      bands [i].set_peak (sr, freq [i], gain_db [i], q [i], mode [i]);
+  }
+}
+
+void c_eq::reset () {
+  static float defaultfreqs [] = { 20.0f,    50.0f,    100.0f,   250.0f,
+                                   1000.0f,  4000.0f,  8000.0f,  11000.0f };
+  static _eq_band_mode defaultmodes [] = { EQ_HIPASS, EQ_LOWSHELF, EQ_CURVE, EQ_CURVE,
+                                    EQ_CURVE, EQ_CURVE, EQ_HISHELF, EQ_LOWPASS };
+                             
+  for (int i = 0; i < EQ_NUM_BANDS; i++) {
+    freq [i] = defaultfreqs [i];
+    mode [i] = defaultmodes [i];
+    gain_db [i] = 0.0f;
+    q [i] = 1.0f;
+    if (samplerate > 0)
+      bands [i].set_peak (samplerate, freq [i], gain_db [i], q [i], mode [i]);
+    else
+      bands [i].disable ();
+  }
+}
+
+void c_eq::set_band (int band_,
+                     float freq_,
+                     float gain_db_,
+                     float q_,
+                     _eq_band_mode mode_) {
+  const int b = band_;
+
+  if (b < 0 || b >= EQ_NUM_BANDS)
+    return;
+  
+  freq [b] = std::clamp (freq_, 20.0f, 20000.0f);
+  gain_db [b] = std::clamp (gain_db_, -36.0f, +36.0f);
+  q [b] = std::clamp (q_, 0.01f, 100.0f);
+  if (mode_ != EQ_KEEP) {
+    mode [b] = mode_;
+  } else {
+    if (mode [b] == EQ_OFF)
+      mode [b] = EQ_CURVE;
+  }
+
+  if (samplerate <= 0) {
+    bands [band_].disable ();
+    return;
+  }
+  
+  bands [b].set_peak (
+    samplerate, freq [b], gain_db [b], q [b], this->mode [b]);
+}
+
+void c_eq::process_block (float *buf, uint32_t nframes) {
+  if (!buf || nframes == 0)
+    return;
+
+  for (auto &band : bands) {
+    if (band.mode == EQ_OFF)
+      continue;
+
+    for (uint32_t i = 0; i < nframes; ++i)
+      buf [i] = band.process (buf [i]);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // c_noisegate
 // TODO: add UI settings for attack, hold, delay
 
@@ -2015,6 +2211,10 @@ void c_neuralblender::set_samplerate (uint32_t sr) { CP
     meter_masterout->samplerate = (int) sr;
   
   m_conv_presence.set_samplerate (sr);
+
+  eq_pre.set_samplerate (sr);
+  eq_post.set_samplerate (sr);
+
   debug ("end");
 }
 
@@ -2759,9 +2959,17 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     render_bank (
       BANK_PEDAL, process_in, m_stage_buf_a.data (), nframes,
       pedal_mask, pedal_mask, 0, 1);
+
+    if (eq_pre.on)
+      eq_pre.process_block (m_stage_buf_a.data (), nframes);
+
     render_bank (
       BANK_AMP, m_stage_buf_a.data (), m_stage_buf_b.data (), nframes,
       xfade_old_mask, xfade_new_mask, xfade_pos, xfade_len);
+
+    if (eq_post.on)
+      eq_post.process_block (m_stage_buf_b.data (), nframes);
+
     render_bank (
       BANK_CAB, m_stage_buf_b.data (), out, nframes,
       cab_mask, cab_mask, 0, 1);
@@ -2784,8 +2992,9 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     const float dry_gain = cosf (angle);
     const float wet_gain = sinf (angle);
 
-    for (uint32_t i = 0; i < nframes; i++)
+    for (uint32_t i = 0; i < nframes; i++) {
       out [i] = out [i] * dry_gain + m_presence_buf [i] * wet_gain;
+    }
   }
 
   final_clamp (out, nframes, master_gain);

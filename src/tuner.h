@@ -87,6 +87,7 @@ protected:
   void render_base (cairo_t *cr) override;
   void on_paint (cairo_t *cr) override;
   void on_resize (int w, int h) override;
+  void on_mouseup_left () override;
 
   std::deque<int> hist_notes;
   std::deque<int> hist_cents;

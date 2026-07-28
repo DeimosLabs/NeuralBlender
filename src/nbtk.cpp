@@ -215,6 +215,21 @@ t_command_event::t_command_event () {
   type = e_event_type::command;
 }
 
+static void tk_update_widget_context (
+    c_widget *widget,
+    c_app *app,
+    c_toplevelwindow *toplevel) {
+
+  if (!widget)
+    return;
+
+  widget->app = app;
+  widget->toplevel = toplevel;
+
+  for (c_widget *child : widget->children)
+    tk_update_widget_context (child, app, toplevel);
+}
+
 void c_widget::create (
     c_widget *parent_,
     const char *label_,
@@ -235,6 +250,9 @@ void c_widget::create (
 
   if (parent)
     parent->children.push_back (this);
+
+  for (c_widget *child : children)
+    tk_update_widget_context (child, app, toplevel);
 }
 
 void c_widget::draw (cairo_t *cr) {
@@ -510,9 +528,9 @@ static double tk_aligned_text_x (
 void c_label::draw (cairo_t *cr) {
   if (!cr)
     return;
-
-  cairo_select_font_face (
-    cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  
+  //cairo_select_font_face (
+  //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   const float font_size = fontsize * font_multiplier ();
   cairo_set_font_size (cr, font_size);
   if (!enabled)
@@ -532,8 +550,9 @@ void c_label::draw (cairo_t *cr) {
     (h - ext.height) * 0.5 - ext.y_bearing);
   cairo_show_text (cr, label.c_str ());
 
-  if (link) {
-    const double underline_y = (h + ext.height) * 0.5 + 2.0 * font_multiplier ();
+  if (link && (hovered || widget_has_focus (*this))) {
+    const double underline_y =
+      (h + ext.height) * 0.5 + 2.0 * font_multiplier ();
     cairo_move_to (cr, text_x + ext.x_bearing, underline_y);
     cairo_line_to (cr, text_x + ext.x_bearing + ext.width, underline_y);
     cairo_set_line_width (cr, 1.0);
@@ -563,6 +582,8 @@ bool c_label::on_mouse_down (int x_, int y_, int button) {
     return c_widget::on_mouse_down (x_, y_, button);
 
   c_widget::on_mouse_down (x_, y_, button);
+  if (app)
+    app->set_focus (this);
   if (button == Button1)
     tk_open_link (label);
 
@@ -573,6 +594,14 @@ bool c_label::on_mouse_move (int x_, int y_) {
   (void) x_;
   (void) y_;
   return link;
+}
+
+bool c_label::on_key_down (int key) {
+  if (!link || (key != KEY_RETURN && key != KEY_SPACE))
+    return false;
+
+  tk_open_link (label);
+  return true;
 }
 
 void c_label::on_mouse_enter () {
@@ -803,7 +832,7 @@ bool c_button::on_mouse_move (int x_, int y_) {
 }
 
 bool c_button::on_key_down (int key) {
-  if (key != KEY_SPACE)
+  if (key != KEY_SPACE && key != KEY_RETURN)
     return false;
 
   if (is_toggle)
@@ -837,6 +866,38 @@ bool c_button::set_value (bool value_) {
   if (changed)
     invalidate ();
   return changed;
+}
+
+c_imagebutton::c_imagebutton () {
+  draw_frame = false;
+}
+
+void c_imagebutton::draw (cairo_t *cr) {
+  if (!cr)
+    return;
+
+  if (draw_frame) {
+    c_button::draw (cr);
+    return;
+  }
+
+  cairo_surface_t *img = image_for_state ();
+  if (img && cairo_surface_status (img) == CAIRO_STATUS_SUCCESS) {
+    tk_draw_surface_scaled (cr, img, 0, 0, w, h);
+    return;
+  }
+
+  cairo_set_font_size (cr, 14.0 * font_multiplier ());
+  tk_set_text_fg (cr, enabled);
+  cairo_text_extents_t ext;
+  cairo_text_extents (cr, label.c_str (), &ext);
+  const double text_x = tk_aligned_text_x (
+      w, ext, 8.0 * font_multiplier (), align);
+  cairo_move_to (
+    cr,
+    text_x,
+    (h - ext.height) * 0.5 - ext.y_bearing);
+  cairo_show_text (cr, label.c_str ());
 }
 
 c_checkbox::c_checkbox () {
@@ -878,8 +939,8 @@ void c_checkbox::draw (cairo_t *cr) {
     cairo_restore (cr);
   }
 
-  cairo_select_font_face (
-    cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  //cairo_select_font_face (
+  //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size (cr, 13.0 * font_multiplier ());
   tk_set_text_fg (cr, enabled);
   cairo_text_extents_t ext {};
@@ -1390,8 +1451,8 @@ void c_listbox::draw (cairo_t *cr) {
   cairo_rectangle (cr, 2, 2, std::max (0, w - 4), std::max (0, h - 4));
   cairo_clip (cr);
 
-  cairo_select_font_face (
-    cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  //cairo_select_font_face (
+  //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size (cr, fontsize * font_multiplier ());
   cairo_font_extents_t font_ext {};
   cairo_font_extents (cr, &font_ext);
@@ -1595,8 +1656,8 @@ void c_combobox::draw (cairo_t *cr) {
   const int text_w = std::max (1, w - arrow_w - text_x - 6);
   const std::string text = selected_text ().empty () ? label : selected_text ();
 
-  cairo_select_font_face (
-    cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  //cairo_select_font_face (
+  //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size (cr, 13.0 * font_multiplier ());
   cairo_text_extents_t ext {};
   cairo_text_extents (cr, text.c_str (), &ext);
@@ -1819,8 +1880,8 @@ int c_combobox::measure_dropdown_width () {
     return measured_dropdown_width;
   }
 
-  cairo_select_font_face (
-      cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  //cairo_select_font_face (
+  //    cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   const float font_scale = app ? app->font_scale : 1.0f;
   cairo_set_font_size (cr, listbox.fontsize * text_size * font_scale);
 
@@ -2152,6 +2213,7 @@ void c_knob::draw (cairo_t *cr) {
   const double knob_y = cy - knob_size * 0.5;
   const double radius = std::max (4.0, knob_size * 0.5 - 5.0);
   const double indicator_radius = std::max (3.0, knob_size * 0.45);
+  const double highlight_radius = indicator_radius * 0.8;
 
   cairo_save (cr);
   if (!draw_nbtk_knob_image (cr, knob_x, knob_y, knob_size)) {
@@ -2167,6 +2229,10 @@ void c_knob::draw (cairo_t *cr) {
   const double a0 = 3.0 * M_PI / 4.0;
   const double a1 = angle_from_value ();
   if (highlight || dragging) {
+    tk_set_solid_source (cr, nbtk::get_colortheme ()->text_fg);
+    cairo_set_line_width (cr, 0.3);
+    cairo_arc (cr, cx, cy, highlight_radius, 0, 2 * M_PI);
+    cairo_stroke (cr);
     const t_statecolors &on_colors = colors_for (WSTYLE_BUTTON, nbtk::WSTATE_ON);
     cairo_set_source_rgba (
         cr,
@@ -2194,8 +2260,8 @@ void c_knob::draw (cairo_t *cr) {
     2.0 * M_PI);
   cairo_fill (cr);
 
-  cairo_select_font_face (
-    cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  //cairo_select_font_face (
+  //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size (cr, fontsize * font_multiplier ());
   tk_set_text_fg (cr, enabled);
 
@@ -2354,7 +2420,7 @@ void c_textbox::draw (cairo_t *cr) {
   if (!cr)
     return;
 
-  const bool focused = app && app->focused_widget == this;
+  const bool focused = widget_has_focus (*this);
   const t_statecolors &frame = colors_for (WSTYLE_FRAME, nbtk::WSTATE_NORMAL);
   const t_statecolors &focus_colors = colors_for (WSTYLE_FRAME, nbtk::WSTATE_SELECTED);
   const nbtk::t_gradientcolors &bg = nbtk::get_colortheme ()->window_bg;
@@ -2383,8 +2449,8 @@ void c_textbox::draw (cairo_t *cr) {
       std::max (0.0, (double) h - 4.0));
   cairo_clip (cr);
 
-  cairo_select_font_face (
-    cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  //cairo_select_font_face (
+  //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size (cr, fontsize * font_multiplier ());
 
   cairo_text_extents_t extents {};
@@ -2440,8 +2506,8 @@ bool c_textbox::on_mouse_down (int x_, int y_, int button) {
   cairo_surface_t *surface =
     cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 1, 1);
   cairo_t *cr = cairo_create (surface);
-  cairo_select_font_face (
-    cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  //cairo_select_font_face (
+  //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size (cr, fontsize * font_multiplier ());
 
   const double pad = 8.0 * font_multiplier ();
@@ -2517,8 +2583,8 @@ bool c_textbox::on_mouse_move (int x_, int y_) {
   cairo_surface_t *surface =
     cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 1, 1);
   cairo_t *cr = cairo_create (surface);
-  cairo_select_font_face (
-    cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  //cairo_select_font_face (
+  //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size (cr, fontsize * font_multiplier ());
 
   const double pad = 8.0 * font_multiplier ();
@@ -3200,6 +3266,9 @@ void c_widget::hide () {
   if (!visible)
     return;
 
+  if (app)
+    app->clear_focus (this);
+
   visible = false;
   invalidate ();
 }
@@ -3343,7 +3412,8 @@ static void collect_focusable_widgets (
   if (!widget || !widget->visible || !widget->enabled)
     return;
 
-  if (widget->wants_keyboard_focus)
+  const c_label *label = dynamic_cast<c_label *> (widget);
+  if (widget->wants_keyboard_focus || (label && label->link))
     focusable.push_back (widget);
 
   for (c_widget *child : widget->children)
@@ -3958,8 +4028,8 @@ void c_tooltip::set_text (const char *text) {
   cairo_surface_t *measure_surface =
       cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 1, 1);
   cairo_t *measure_cr = cairo_create (measure_surface);
-  cairo_select_font_face (
-      measure_cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  //cairo_select_font_face (
+  //    measure_cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
   cairo_set_font_size (measure_cr, label.fontsize * label.font_multiplier ());
   cairo_text_extents_t ext {};
   cairo_text_extents (measure_cr, str, &ext);
@@ -4948,7 +5018,10 @@ void c_toplevelwindow::cb_button_press (
       button);
     self->app->mouse_captured = false;
     self->app->mouse_capture_widget = nullptr;
-    if (handled && self->app->focused_widget) {
+    if (handled &&
+        self->app->focused_widget &&
+        self->app->focused_widget->visible &&
+        self->app->focused_widget->enabled) {
       nbtk::t_point local =
         self->app->focused_widget->root_to_local ({ rx, ry });
       self->app->mouse_captured =
@@ -5480,11 +5553,11 @@ void nbtk::c_filepicker::create (
   btn_show_hidden.is_toggle = true;
   btn_show_hidden.set_value (show_hidden);
 
-  btn_ok.create (&root_widget, "OK", 342, 380, 80, 30);
-  btn_ok.set_image_default (data_icon_xputty_approved_png);
-
   btn_cancel.create (&root_widget, "Cancel", 432, 380, 80, 30);
   btn_cancel.set_image_default (data_icon_xputty_cancel_png);
+
+  btn_ok.create (&root_widget, "OK", 342, 380, 80, 30);
+  btn_ok.set_image_default (data_icon_xputty_approved_png);
 
   on_resize ();
 }

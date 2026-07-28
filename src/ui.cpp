@@ -265,16 +265,14 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   set_min_size_to_current ();
 
   frame1.create (&root_widget, "", 12, 12, w () - 24, h () - 80);
-  btn_ok.create (&root_widget, "OK", 0, 0, 128, 40);
-  btn_ok.set_image_default (data_icon_xputty_approved_png);
-  btn_cancel.create (&root_widget, "Cancel", 0, 0, 128, 40);
-  btn_cancel.set_image_default (data_icon_xputty_cancel_png);
 
   label_vuscale.create (&frame1, "VU meter scale dB:", 16, 32, 180, 32);
   label_vuscale.align = nbtk::TEXT_LEFT;
   label_vuheadroom.create (&frame1, "VU meter headroom dB:", 16, 72, 180, 32);
   label_vuheadroom.align = nbtk::TEXT_LEFT;
   label_spacer1.create (&frame1, "", 16, 112, 12, 12);
+  text_vuscale.create (&frame1, "", 220, 28, 120, 36);
+  text_vuheadroom.create (&frame1, "", 220, 68, 120, 36);
 
   btn_calib_default.create (
     &frame1, "Calibrate default on", 16, 152, 320, 32);
@@ -289,9 +287,6 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
     &frame1, "Show tooltips", 16, 272, 320, 32);
   btn_show_tooltips.align = nbtk::TEXT_LEFT;
   btn_defaults.create (&frame1, "Reset to defaults", 12, 0, 400, 40);
-
-  text_vuscale.create (&frame1, "", 220, 28, 120, 36);
-  text_vuheadroom.create (&frame1, "", 220, 68, 120, 36);
   
   text_vuscale.set_tooltip ("Minimum dB value visible on VU meters");
   text_vuheadroom.set_tooltip ("Extra headroom given to VU meters above 0dB");
@@ -299,6 +294,11 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   btn_bypass_doubleclick.set_tooltip ("Toggle bypassing banks when clicking the top button again");
   btn_bypass_rightclick.set_tooltip ("Toggle bypassing banks when right-clicking the top button");
   btn_show_tooltips.set_tooltip ("No idea what this does");
+  
+  btn_cancel.create (&root_widget, "Cancel", 0, 0, 128, 40);
+  btn_cancel.set_image_default (data_icon_xputty_cancel_png);
+  btn_ok.create (&root_widget, "OK", 0, 0, 128, 40);
+  btn_ok.set_image_default (data_icon_xputty_approved_png);
   on_resize ();
 }
 
@@ -312,8 +312,17 @@ void c_prefswindow::on_resize () { CP
   btn_defaults.move_resize (12, frame1.h - 50, frame1.w - 24, 40);
 }
 
+bool c_prefswindow::on_key_down (int key) {
+  if (key == nbtk::KEY_ESCAPE) {
+    hide ();
+    return true;
+  }
+
+  return nbtk::c_toplevelwindow::on_key_down (key);
+}
+
 void c_prefswindow::on_action (nbtk::t_action_event &event) {
-  if (event.mouse_button != Button1)
+  if (event.mouse_button != 0 && event.mouse_button != Button1)
     return;
 
   if (event.source_id == btn_defaults.id) {
@@ -479,8 +488,18 @@ void c_aboutwindow::on_resize () { CP
   c_toplevelwindow::on_resize ();
 }
 
+bool c_aboutwindow::on_key_down (int key) {
+  if (key == nbtk::KEY_ESCAPE) {
+    hide ();
+    return true;
+  }
+
+  return nbtk::c_toplevelwindow::on_key_down (key);
+}
+
 void c_aboutwindow::on_action (nbtk::t_action_event &event) {
-  if (event.source_id == btn_ok.id && event.mouse_button == Button1) {
+  if (event.source_id == btn_ok.id &&
+      (event.mouse_button == 0 || event.mouse_button == Button1)) {
     hide ();
     event.handled = true;
   }
@@ -733,13 +752,89 @@ void c_lane_widgets::create (
   created = true;
   main_widget = native_owner;
   
-  // regular controls
+  knob_delay.create (&lane_frame, "Delay", 0, 0, 64, 64);
+  knob_delay.role = ROLE_DELAY;
+  knob_delay.bank = bank_id;
+  knob_delay.lane = lane_id;
+  knob_delay.set_min (0);
+  knob_delay.set_max (30);
+  knob_delay.set_default (0);
+  knob_delay.set_value (0);
+  knob_delay.set_step (0.01);
+
   menu_list.create (&lane_frame, "", 0, 0, 320, 32);
   menu_list.role = ROLE_LOADFILE;
   menu_list.bank = bank_id;
   menu_list.lane = lane_id;
   menu_list.wheel_selects_item = true;
 
+  meter_out.create (&lane_root, "", 0, 0, METER_WIDTH, 120);
+  meter_out.set_vudata (&vudata_out);
+  meter_out.set_stereo (false);
+  vudata_out.set_l (0.0, 0.0);
+  
+  btn_browse.create (&lane_frame, "", 0, 0, 100, 40);
+  btn_browse.role = ROLE_BROWSE;
+  btn_browse.bank = bank_id;
+  btn_browse.lane = lane_id;
+  btn_clear.create  (&lane_frame, "", 0, 0, 100, 40);
+  btn_clear.role = ROLE_CLEAR;
+  btn_clear.bank = bank_id;
+  btn_clear.lane = lane_id;
+  btn_excl.set_image (data_icon_radiobutton_on_png, nbtk::WSTATE_ON);
+  btn_excl.set_image (data_icon_radiobutton_off_png, nbtk::WSTATE_OFF);
+  
+  btn_calib.create  (&lane_frame, "", 0, 0, 32, 32);
+  btn_calib.role = ROLE_CALIBRATE;
+  btn_calib.bank = bank_id;
+  btn_calib.lane = lane_id;
+  btn_flip.create   (&lane_frame, "", 0, 0, 32, 32);
+  btn_flip.role = ROLE_DCFLIP;
+  btn_flip.bank = bank_id;
+  btn_flip.lane = lane_id;
+  btn_flip.is_toggle = true;
+  btn_calib.is_toggle = true;
+  if (ui && lane_id < NB_NUM_MODELS && bank_id < BANK_COUNT)
+    btn_calib.set_value (ui->state.banks [bank_id].lanes [lane_id].do_calib);
+  //label_flip.create (ui, wp, "DC flip", 0, 0, 75, 32);
+  //label_calib.create (ui, wp, "Calib.", 0, 0, 75, 32);
+  label_frames.create (&lane_frame, "(not loaded)", 0, 0, 75, 24);
+  label_frames.fontsize = 10.5f;
+  label_frames.align = nbtk::TEXT_CENTER;
+  label_trim.create (&lane_frame, "1.0", 0, 0, 75, 24);
+  label_trim.fontsize = 10.5f;
+  label_trim.align = nbtk::TEXT_CENTER;
+  label_engine.create (&lane_frame, "(none)", 0, 0, 120, 24);
+  label_engine.fontsize = 10.5f;
+  label_engine.align = nbtk::TEXT_CENTER;
+  
+  btn_excl.create   (&lane_frame, "Use", 0, 0, 100, 40);
+  btn_excl.role = ROLE_EXCL_USE;
+  btn_excl.bank = bank_id;
+  btn_excl.lane = lane_id;
+  btn_mute.create   (&lane_frame, "Mute", 0, 0, 100, 40);
+  btn_mute.role = ROLE_MUTE;
+  btn_mute.bank = bank_id;
+  btn_mute.lane = lane_id;
+  btn_excl.is_toggle = true;
+  btn_mute.is_toggle = true;
+  switch (bank_id) { // uhh wuh duh fuh
+    case BANK_PEDAL:
+    break;
+    case BANK_AMP:
+    break;
+    case BANK_CAB:
+    break;
+  }
+  btn_mute.set_value (false);
+  btn_mute.set_image (data_icon_speaker_off_big_png, nbtk::WSTATE_ON);
+  btn_mute.set_image (data_icon_speaker_on_big_png, nbtk::WSTATE_OFF);
+
+  btn_browse.set_image_default (data_icon_folder_big_png);
+  btn_clear.set_image_default (data_icon_x_big_png);
+  btn_calib.set_image_default (data_icon_calib_big_png);
+  btn_flip.set_image_default (data_icon_phase_big_png);
+  
   int knobs_right = w - 180;
   knob_gain_in.create (&lane_frame, "Input", 0, 0, 64, 64);
   knob_gain_in.role = ROLE_GAIN_IN;
@@ -762,16 +857,6 @@ void c_lane_widgets::create (
   knob_ir_pitch.set_step (0.01);
   knob_ir_pitch.hide ();
   
-  knob_gain_out.create (&lane_frame, "Output", 0, 0, 64, 64);
-  knob_gain_out.role = ROLE_GAIN_OUT;
-  knob_gain_out.bank = bank_id;
-  knob_gain_out.lane = lane_id;
-  knob_gain_out.set_min (-40);
-  knob_gain_out.set_max (40);
-  knob_gain_out.set_default (0);
-  knob_gain_out.set_value (0);
-  knob_gain_out.set_step (0.1);
-  
   knob_dry_out.create (&lane_frame, "Dry out", 0, 0, 64, 64);
   knob_dry_out.role = ROLE_DRY_OUT;
   knob_dry_out.bank = bank_id;
@@ -782,82 +867,15 @@ void c_lane_widgets::create (
   knob_dry_out.set_value (-120);
   knob_dry_out.set_step (0.1);
   
-  meter_out.create (&lane_root, "", 0, 0, METER_WIDTH, 120);
-  meter_out.set_vudata (&vudata_out);
-  meter_out.set_stereo (false);
-  vudata_out.set_l (0.0, 0.0);
-  
-  btn_browse.create (&lane_frame, "", 0, 0, 100, 40);
-  btn_browse.role = ROLE_BROWSE;
-  btn_browse.bank = bank_id;
-  btn_browse.lane = lane_id;
-  btn_clear.create  (&lane_frame, "", 0, 0, 100, 40);
-  btn_clear.role = ROLE_CLEAR;
-  btn_clear.bank = bank_id;
-  btn_clear.lane = lane_id;
-  btn_excl.create   (&lane_frame, "Use", 0, 0, 100, 40);
-  btn_excl.role = ROLE_EXCL_USE;
-  btn_excl.bank = bank_id;
-  btn_excl.lane = lane_id;
-  btn_mute.create   (&lane_frame, "Mute", 0, 0, 100, 40);
-  btn_mute.role = ROLE_MUTE;
-  btn_mute.bank = bank_id;
-  btn_mute.lane = lane_id;
-  btn_excl.is_toggle = true;
-  btn_mute.is_toggle = true;
-  switch (bank_id) {
-    case BANK_PEDAL:
-    break;
-    case BANK_AMP:
-    break;
-    case BANK_CAB:
-    break;
-  }
-  btn_mute.set_value (false);
-  btn_mute.set_image (data_icon_speaker_off_big_png, nbtk::WSTATE_ON);
-  btn_mute.set_image (data_icon_speaker_on_big_png, nbtk::WSTATE_OFF);
-  btn_excl.set_image (data_icon_radiobutton_on_png, nbtk::WSTATE_ON);
-  btn_excl.set_image (data_icon_radiobutton_off_png, nbtk::WSTATE_OFF);
-  
-  // advanced controls
-  knob_delay.create (&lane_frame, "Delay", 0, 0, 64, 64);
-  knob_delay.role = ROLE_DELAY;
-  knob_delay.bank = bank_id;
-  knob_delay.lane = lane_id;
-  knob_delay.set_min (0);
-  knob_delay.set_max (30);
-  knob_delay.set_default (0);
-  knob_delay.set_value (0);
-  knob_delay.set_step (0.01);
-
-  btn_flip.create   (&lane_frame, "", 0, 0, 32, 32);
-  btn_flip.role = ROLE_DCFLIP;
-  btn_flip.bank = bank_id;
-  btn_flip.lane = lane_id;
-  btn_calib.create  (&lane_frame, "", 0, 0, 32, 32);
-  btn_calib.role = ROLE_CALIBRATE;
-  btn_calib.bank = bank_id;
-  btn_calib.lane = lane_id;
-  btn_flip.is_toggle = true;
-  btn_calib.is_toggle = true;
-  if (ui && lane_id < NB_NUM_MODELS && bank_id < BANK_COUNT)
-    btn_calib.set_value (ui->state.banks [bank_id].lanes [lane_id].do_calib);
-  //label_flip.create (ui, wp, "DC flip", 0, 0, 75, 32);
-  //label_calib.create (ui, wp, "Calib.", 0, 0, 75, 32);
-  label_frames.create (&lane_frame, "(not loaded)", 0, 0, 75, 24);
-  label_frames.fontsize = 10.5f;
-  label_frames.align = nbtk::TEXT_CENTER;
-  label_trim.create (&lane_frame, "1.0", 0, 0, 75, 24);
-  label_trim.fontsize = 10.5f;
-  label_trim.align = nbtk::TEXT_CENTER;
-  label_engine.create (&lane_frame, "(none)", 0, 0, 120, 24);
-  label_engine.fontsize = 10.5f;
-  label_engine.align = nbtk::TEXT_CENTER;
-  
-  btn_browse.set_image_default (data_icon_folder_big_png);
-  btn_clear.set_image_default (data_icon_x_big_png);
-  btn_calib.set_image_default (data_icon_calib_big_png);
-  btn_flip.set_image_default (data_icon_phase_big_png);
+  knob_gain_out.create (&lane_frame, "Output", 0, 0, 64, 64);
+  knob_gain_out.role = ROLE_GAIN_OUT;
+  knob_gain_out.bank = bank_id;
+  knob_gain_out.lane = lane_id;
+  knob_gain_out.set_min (-40);
+  knob_gain_out.set_max (40);
+  knob_gain_out.set_default (0);
+  knob_gain_out.set_value (0);
+  knob_gain_out.set_step (0.1);
   
   if (ui && lane_id < NB_NUM_MODELS) {
     nbtk::t_native_window root =
@@ -1099,9 +1117,12 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   //label_big.align = nbtk::TEXT_CENTER;
   //label_big.textsize = 1.5;
   img_logo.create (&cont_toparea, "", 0, 0, 256, 32);
-  img_logo.set_png (data_textlogo_1024x128_png);
+  img_logo.set_image_default (data_textlogo_1024x128_png);
+  img_logo.set_image_hover (data_textlogo_highlight_1024x128_png);
+  img_logo.set_tooltip ("Click for tuner");
+  img_logo.role = ROLE_TUNER;
   
-  const int tabbutton_padding = 14;
+  const int tabbutton_padding = 16;
   btn_tab_pedals.create (&cont_toparea, "PDL", 0, 0, 84, 50);
   btn_tab_pedals.role = ROLE_BANKSWITCH;
   btn_tab_pedals.bank = BANK_PEDAL;
@@ -1125,28 +1146,28 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_tab_other.bank = BANK_AMP;
   btn_tab_other.page = PAGE_OTHER;
   
-  btn_enable.create (&cont_toparea, "",  20, 12, 40, 40);
-  btn_enable.role = ROLE_BYPASS;
-  btn_enable.is_toggle = true;
-  btn_enable.set_value (true);
-  btn_enable.set_image (data_icon_power_on_png, nbtk::WSTATE_ON);
-  btn_enable.set_image (data_icon_power_grey_png, nbtk::WSTATE_OFF);
+  btn_noisegate.create (&cont_toparea, "", 0, 0, 40, 40);
+  btn_noisegate.role = ROLE_NOISEGATE;
+  btn_noisegate.is_toggle = true;
+  btn_noisegate.set_image_default (data_icon_noisegate_png);
+
+  btn_tuner.create (&cont_toparea, "", 0, 0, 40, 40);
+  btn_tuner.role = ROLE_TUNER;
+  btn_tuner.is_toggle = true;
+  btn_tuner.set_image_default (data_icon_tuner_png);
   
-  //btn_muteall.create (this, mainwindow.widget, "Mute all", 500, 12, 120, 40, WSTYLE_IMAGE_TOGGLE);
   btn_muteall.create (&cont_toparea, "", 500, 12, 40, 40);
   btn_muteall.role = ROLE_MUTEALL;
   btn_muteall.is_toggle = true;
   btn_muteall.set_image (data_icon_speaker_off_big_png, nbtk::WSTATE_ON);
   btn_muteall.set_image (data_icon_speaker_on_big_png, nbtk::WSTATE_OFF);
   
-  btn_noisegate.create (&cont_toparea, "", 0, 0, 40, 40);
-  btn_noisegate.role = ROLE_NOISEGATE;
-  btn_noisegate.is_toggle = true;
-  btn_noisegate.set_image_default (data_icon_noisegate_png);
-  btn_tuner.create (&cont_toparea, "", 0, 0, 40, 40);
-  btn_tuner.role = ROLE_TUNER;
-  btn_tuner.is_toggle = true;
-  btn_tuner.set_image_default (data_icon_tuner_png);
+  btn_enable.create (&cont_toparea, "",  20, 12, 40, 40);
+  btn_enable.role = ROLE_BYPASS;
+  btn_enable.is_toggle = true;
+  btn_enable.set_value (true);
+  btn_enable.set_image (data_icon_power_on_png, nbtk::WSTATE_ON);
+  btn_enable.set_image (data_icon_power_grey_png, nbtk::WSTATE_OFF);
   
   btn_enable.padding =    12;
   btn_muteall.padding =   12;
@@ -1199,16 +1220,21 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   knob_presence.set_default (0);
   knob_presence.set_step (0.01);
   
-  frame_other_noisegate.create (&cont_other, "", 16, 16, 512, 128);
+  frame_other_noisegate.create (&cont_other, "", 24, 16, 512, 128);
   label_other_noisegate.create (&frame_other_noisegate, "Noise gate:", 16, 8, 200, 24);
   label_other_noisegate.align = nbtk::TEXT_LEFT;
-  knob_noisethresh.create (&frame_other_noisegate,  "Thresh",   16, 36, 64, 72);
+  //btn_other_noisegate.create (&frame_other_noisegate, "", 24, 40, 48, 48);
+  //btn_other_noisegate.role = ROLE_NOISEGATE;
+  //btn_other_noisegate.is_toggle = true;
+  //btn_other_noisegate.set_image_default (data_icon_noisegate_png);
+
+  knob_noisethresh.create (&frame_other_noisegate,  "Thresh",   20, 36, 64, 72);
   knob_noisethresh.role = ROLE_NOISETHRESH;
-  knob_noiseattack.create (&frame_other_noisegate,  "Attack",   76, 36, 64, 72);
+  knob_noiseattack.create (&frame_other_noisegate,  "Attack",   80, 36, 64, 72);
   knob_noiseattack.role = ROLE_NOISEATTACK;
-  knob_noisehold.create (&frame_other_noisegate,    "Hold",    136, 36, 64, 72);
+  knob_noisehold.create (&frame_other_noisegate,    "Hold",    140, 36, 64, 72);
   knob_noisehold.role = ROLE_NOISEHOLD;
-  knob_noiserelease.create (&frame_other_noisegate, "Release", 196, 36, 64, 72);
+  knob_noiserelease.create (&frame_other_noisegate, "Release", 200, 36, 64, 72);
   knob_noiserelease.role = ROLE_NOISERELEASE;
   knob_noisethresh.set_min (-120);
   knob_noisethresh.set_max (-6);
@@ -1272,25 +1298,8 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_other_excl_cab.bank = BANK_CAB;
   
   frame_other_misc.create (&cont_other, "", 16, 16, 512, 128);
-  label_other_tuner.create (&frame_other_misc, "Tuner base frequency: ", 16, 20, 200, 32);
-  label_other_calib.create (&frame_other_misc, "Calibration target dB: ", 16, 60, 200, 32);
-  label_other_tuner.align = nbtk::TEXT_LEFT;
-  label_other_calib.align = nbtk::TEXT_LEFT;
-  btn_other_vu.create (&frame_other_misc, "VU meters", 16, 100, 200, 32);
-  btn_other_vu.role = ROLE_VUTOGGLE;
-  btn_other_bass.create (&frame_other_misc, "Calibrate for bass", 16, 140, 200, 32);
-  btn_other_bass.role = ROLE_CALIBBASS;
   text_other_tuner.create (&frame_other_misc, "", 250, 14, 150, 40);
   text_other_tuner.role = ROLE_TUNER_BASE_FREQ;
-  text_other_calib.create (&frame_other_misc, "", 250, 60, 150, 40);
-  text_other_calib.role = ROLE_CALIB_TARGET_DB;
-  btn_other_prefs.create (&frame_other_misc, "Settings", 0, 130, 120, 40);
-  btn_other_prefs.role = ROLE_PREFS;
-  btn_other_prefs.set_image_default (data_icon_xputty_gear_png);
-  btn_other_about.create (&frame_other_misc, "About...", 0, 130, 120, 40);
-  btn_other_about.role = ROLE_ABOUT;
-  btn_other_about.set_image_default (data_icon_xputty_info_png);
-  
   btn_other_tuner_down.create (&frame_other_misc, "", 420, 14, 40, 40);
   btn_other_tuner_down.role = ROLE_TUNER_DOWN;
   btn_other_tuner_down.set_image_default (data_icon_flat_png);
@@ -1300,6 +1309,23 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_other_tuner_default.create (&frame_other_misc, "", 516, 14, 40, 40);
   btn_other_tuner_default.role = ROLE_TUNER_DEFAULT;
   btn_other_tuner_default.set_image_default (data_icon_tuner_png);
+  text_other_calib.create (&frame_other_misc, "", 250, 60, 150, 40);
+  text_other_calib.role = ROLE_CALIB_TARGET_DB;
+  label_other_tuner.create (&frame_other_misc, "Tuner base frequency: ", 16, 20, 200, 32);
+  label_other_calib.create (&frame_other_misc, "Calibration target dB: ", 16, 60, 200, 32);
+  label_other_tuner.align = nbtk::TEXT_LEFT;
+  label_other_calib.align = nbtk::TEXT_LEFT;
+  btn_other_vu.create (&frame_other_misc, "VU meters", 16, 100, 200, 32);
+  btn_other_vu.role = ROLE_VUTOGGLE;
+  btn_other_bass.create (&frame_other_misc, "Calibrate for bass", 16, 140, 200, 32);
+  btn_other_bass.role = ROLE_CALIBBASS;
+  
+  btn_other_prefs.create (&frame_other_misc, "Settings", 0, 130, 120, 40);
+  btn_other_prefs.role = ROLE_PREFS;
+  btn_other_prefs.set_image_default (data_icon_xputty_gear_png);
+  btn_other_about.create (&frame_other_misc, "About...", 0, 130, 120, 40);
+  btn_other_about.role = ROLE_ABOUT;
+  btn_other_about.set_image_default (data_icon_xputty_info_png);
   
   //tuner.create (this, mainwindow.widget, "", 0, 0, 400, 24);
   if (blender)
@@ -1334,6 +1360,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_muteall.set_tooltip ("Master MUTE");
   btn_tuner.set_tooltip ("Enable tuner");
   btn_noisegate.set_tooltip ("Enable noisegate");
+  btn_other_noisegate.set_tooltip ("Enable noisegate");
   knob_mastervolume.set_tooltip ("Master output volume from plugin");
   knob_presence.set_tooltip ("Presence: applies a builtin high-frequency IR to output");
   knob_noisethresh.set_tooltip ("Noisegate threshold");
@@ -1412,7 +1439,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     
     const int btnl = 16;
           int btnh = std::max (50, toparea / 2 - 12);
-          int btnw = std::min (88, btnh * 2);
+          int btnw = std::min (76, btnh * 2);
               btnw = std::max (btnw, window_width / 8);
     if (btnh > window_width / 12)
       btnh = window_width / 12;
@@ -1420,13 +1447,13 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     const int btnt = toparea - btnh; //toparea / 2 + 8;
     
     btn_tab_pedals.move_resize  (btnl,                  btnt, btnw, btnh);
-    btn_tab_models.move_resize  (btnl + (btnw + 4),     btnt, btnw, btnh);
+    btn_tab_models.move_resize  (btnl + (btnw + 4) * 1, btnt, btnw, btnh);
     btn_tab_cabs.move_resize    (btnl + (btnw + 4) * 2, btnt, btnw, btnh);
     btn_tab_other.move_resize   (btnl + (btnw + 4) * 3, btnt, btnw, btnh);
-    btn_enable.move_resize      (btnr - (btnh + 4) * 4, btnt, btnh, btnh);
-    btn_muteall.move_resize     (btnr - (btnh + 4) * 3, btnt, btnh, btnh);
-    btn_tuner.move_resize       (btnr - (btnh + 4) * 2, btnt, btnh, btnh);
-    btn_noisegate.move_resize   (btnr - (btnh + 4)    , btnt, btnh, btnh);
+    btn_noisegate.move_resize   (btnr - (btnh + 4) * 4, btnt, btnh, btnh);
+    btn_tuner.move_resize       (btnr - (btnh + 4) * 3, btnt, btnh, btnh);
+    btn_muteall.move_resize     (btnr - (btnh + 4) * 2, btnt, btnh, btnh);
+    btn_enable.move_resize      (btnr - (btnh + 4)    , btnt, btnh, btnh);
     
     int btnpad = btn_tab_pedals.h / 4;
     btn_tab_pedals.padding = btnpad;
@@ -1486,8 +1513,9 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
       meter_in [PAGE_OTHER].move_resize (5, meter_top, METER_WIDTH, meter_h);
       meter_masterout.move_resize (
         window_width - 4 - METER_WIDTH, meter_top, METER_WIDTH, meter_h);
-      frame_other_volumepresence.move_resize (16, 0, panelwidth / 2 - 12, 120);
-      frame_other_noisegate.move_resize (panelwidth / 2 + 16, 0, panelwidth / 2, 120);
+      const int panelsplit = panelwidth * 2 / 5;
+      frame_other_volumepresence.move_resize (16, 0, panelsplit - 12, 120);
+      frame_other_noisegate.move_resize (panelsplit + 16, 0, panelwidth - panelsplit, 120);
       frame_other_linkexcl.move_resize (16, 132, panelwidth, 140);
       int frameothersize = frame_other_linkexcl.y + frame_other_linkexcl.h + 12;
       frame_other_misc.move_resize (
@@ -1837,8 +1865,8 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       break;
 
       case ROLE_TUNER:
-        state.tuner_on = value;
-        on_tuner (&button, value);
+        state.tuner_on = &button == &img_logo ? true : value;
+        on_tuner (&button, state.tuner_on);
         sync_tuner_visibility ();
       break;
 
@@ -1920,7 +1948,9 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
   if (handle_button (btn_enable, ROLE_BYPASS, visible_bank) ||
       handle_button (btn_muteall, ROLE_MUTEALL, visible_bank) ||
       handle_button (btn_noisegate, ROLE_NOISEGATE, visible_bank) ||
+      handle_button (btn_other_noisegate, ROLE_NOISEGATE, visible_bank) ||
       handle_button (btn_tuner, ROLE_TUNER, visible_bank) ||
+      handle_button (img_logo, ROLE_TUNER, visible_bank) ||
       handle_button (btn_other_byp_pedal, ROLE_BANK_BYPASS, BANK_PEDAL) ||
       handle_button (btn_other_byp_amp, ROLE_BANK_BYPASS, BANK_AMP) ||
       handle_button (btn_other_byp_cab, ROLE_BANK_BYPASS, BANK_CAB) ||
@@ -1939,6 +1969,14 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       handle_button (btn_other_tuner_default, ROLE_TUNER_DEFAULT, visible_bank))
     return;
 
+  if (event.source_id == tuner.id) {
+    state.tuner_on = false;
+    on_tuner (&tuner, false);
+    sync_tuner_visibility ();
+    finish ();
+    return;
+  }
+
   auto handle_knob = [&] (nbtk::c_knob &knob, _widget_role role) {
     if (event.source_id != knob.id)
       return false;
@@ -1947,7 +1985,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
     switch (role) {
       case ROLE_MASTER:
         state.master_gain = db_to_gain (value);
-        on_master_gain (&knob, state.master_gain);
+        on_master_gain (&knob, value);
       break;
 
       case ROLE_PRESENCE:
@@ -2068,6 +2106,7 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
   vu_on (state.do_vu);
 
   btn_noisegate.set_value (state.noisegate_on);
+  btn_other_noisegate.set_value (state.noisegate_on);
   knob_mastervolume.set_value (gain_to_db (state.master_gain));
   knob_presence.set_value (state.presence);
   knob_noisethresh.set_value (state.noisethresh);
@@ -2414,6 +2453,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   sync_page_visibility ();
   
   btn_noisegate.set_value (state.noisegate_on);
+  btn_other_noisegate.set_value (state.noisegate_on);
   knob_mastervolume.set_value (gain_to_db (state.master_gain));
   knob_presence.set_value (state.presence);
   knob_noisethresh.set_value (state.noisethresh);

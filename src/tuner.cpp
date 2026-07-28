@@ -334,6 +334,15 @@ void c_tunerwidget::set_pitch (float freq, float note, float cents) {
   ui_needs_redraw.store (true, std::memory_order_release);
 }
 
+void c_tunerwidget::on_mouseup_left () {
+  nbtk::t_action_event event;
+  event.source = this;
+  event.source_id = id;
+  event.mouse_button = Button1;
+  event.value = false;
+  on_action (event);
+}
+
 bool c_tunerwidget::on_ui_timer () {
   if (!created || !visible)
     return false;

@@ -219,6 +219,7 @@ public:
   void invalidate ();
   void invalidate_rect (int x, int y, int w, int h);
   void set_tooltip (const char *text);
+  void set_font (cairo_t *cr) {}
   
   c_app *app = nullptr;
   c_toplevelwindow *toplevel = nullptr;
@@ -268,6 +269,7 @@ public:
   void draw (cairo_t *cr) override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_move (int x, int y) override;
+  bool on_key_down (int key) override;
   void on_mouse_enter () override;
   void on_mouse_leave () override;
   void clear_hover () override;
@@ -315,8 +317,10 @@ public:
   bool mouse_down_inside = false;
   float padding = 8.0f;
 
-private:
+protected:
   cairo_surface_t *image_for_state () const;
+
+private:
   void destroy_images ();
 
   cairo_surface_t *img_off          = nullptr;
@@ -327,6 +331,15 @@ private:
   cairo_surface_t *img_off_hover    = nullptr;
   cairo_surface_t *img_default      = nullptr;
   const unsigned char *img_default_source = nullptr;
+};
+
+class c_imagebutton : public c_button {
+public:
+  c_imagebutton ();
+
+  void draw (cairo_t *cr) override;
+
+  bool draw_frame = false;
 };
 
 class c_checkbox : public c_button {
