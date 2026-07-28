@@ -40,22 +40,22 @@ generate_one_eq_port() {
   case "$band" in
     A)
       mode="$mode_hipass"
-      freq=20
+      freq=50
     ;;
     
     B)
       mode="$mode_lowshelf"
-      freq=50
+      freq=100
     ;;
     
     C)
       mode="$mode_curve"
-      freq=100
+      freq=250
     ;;
     
     D)
       mode="$mode_curve"
-      freq=250
+      freq=500
     ;;
     
     E)
@@ -65,17 +65,17 @@ generate_one_eq_port() {
     
     F)
       mode="$mode_curve"
-      freq=4000
+      freq=2000
     ;;
     
     G)
       mode="$mode_hishelf"
-      freq=8000
+      freq=4000
     ;;
     
     H)
       mode="$mode_lowpass"
-      freq=11000
+      freq=8000
     ;;
   esac
 
