@@ -1129,7 +1129,7 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   const int checkbox = 28;
   const int menu_h = 28;
   const int knob_w = std::min (64, std::max (42, band_w - 8));
-  const int menu_w = std::min (92, std::max (44, band_w - 8));
+  const int menu_w = std::min (80, std::max (44, band_w - 8));
   const int knob_h = 68;
   const int controls_h = label_h + checkbox + menu_h + knob_h * 2 + 12;
   const int slider_top = inner_y;

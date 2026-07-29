@@ -390,7 +390,41 @@ void c_tunerwidget::render_base (cairo_t *cr) {
   cairo_stroke (cr);
 }
 
-static const char *note_names [12] = {
+#ifdef UNICODE_SHARPS_FLATS
+
+static const char *note_names_sharps [12] = {
+  "C-",
+  "C♯",
+  "D-",
+  "D♯",
+  "E-",
+  "F-",
+  "F♯",
+  "G-",
+  "G♯",
+  "A-",
+  "A♯",
+  "B-",
+};
+
+static const char *note_names_flats [12] = {
+  "C-",
+  "D♭",
+  "D-",
+  "E♭",
+  "E-",
+  "F-",
+  "G♭",
+  "G-",
+  "A♭",
+  "A-",
+  "B♭",
+  "B-",
+};
+
+#else
+
+static const char *note_names_sharps [12] = {
   "C-",
   "C#",
   "D-",
@@ -404,6 +438,23 @@ static const char *note_names [12] = {
   "A#",
   "B-",
 };
+
+static const char *note_names_flats [12] = {
+  "C-",
+  "Db",
+  "D-",
+  "Eb",
+  "E-",
+  "F-",
+  "Gb",
+  "G-",
+  "Ab",
+  "A-",
+  "Bb",
+  "B-",
+};
+
+#endif
 
 void c_tunerwidget::on_paint (cairo_t *cr) { //DEBUG_SHOW_RATE ("tuner redraw: ")
   char buf [32];
@@ -437,6 +488,9 @@ void c_tunerwidget::on_paint (cairo_t *cr) { //DEBUG_SHOW_RATE ("tuner redraw: "
       stable_tuning = false;
   
   if (valid) {
+    const char **note_names = note_names_sharps;
+    if (show_flats)
+      note_names = note_names_flats;
     snprintf (buf, 31, "%s%d", note_names [((int) current_note) % 12],
               (int) (-1 + current_note / 12));
     float x = (float) width / 2.0 + (current_cents / 50.0 * (float) width / 2.0);

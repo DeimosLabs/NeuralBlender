@@ -199,10 +199,6 @@ extern _eq_band_mode g_defaultmodes [];
 
 struct c_eq_state {
   c_eq_state () {
-    /*const float defaultfreqs [EQ_NUM_BANDS] = {
-      50.0f, 100.0f, 250.0f, 500.0f,
-      1000.0f, 2000.0f, 4000.0f, 8000.0f
-    };*/
     const _eq_band_mode defaultmodes [EQ_NUM_BANDS] = {
       EQ_HIPASS, EQ_LOWSHELF, EQ_CURVE, EQ_CURVE,
       EQ_CURVE, EQ_CURVE, EQ_HISHELF, EQ_LOWPASS

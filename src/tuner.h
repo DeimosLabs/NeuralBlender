@@ -14,6 +14,7 @@
 
 #define INTUNE_THRESHOLD   2 // in cents
 #define INTUNE_DELAY       5 // frames/redraws
+#define UNICODE_SHARPS_FLATS
 
 class c_pitchtracker {
 public:
@@ -82,6 +83,7 @@ public:
   bool created = false;
   int width = 0;
   int height = 0;
+  bool show_flats = false;
 
 protected:
   void render_base (cairo_t *cr) override;

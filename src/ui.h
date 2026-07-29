@@ -275,8 +275,8 @@ public:
 
 class c_freqknob : public nbtk::c_knob {
 public:
-  std::string get_value_string () const override {
-    return "";
+  c_freqknob () {
+    show_value = false;
   }
 
   std::string get_label_string () const override {
@@ -286,8 +286,8 @@ public:
 
 class c_qknob : public nbtk::c_knob {
 public:
-  std::string get_value_string () const override {
-    return "";
+  c_qknob () {
+    show_value = false;
   }
 
   std::string get_label_string () const override {
@@ -297,8 +297,8 @@ public:
 
 class c_gainknob : public nbtk::c_knob {
 public:
-  std::string get_value_string () const override {
-    return "";
+  c_gainknob () {
+    show_value = false;
   }
 
   std::string get_label_string () const override {

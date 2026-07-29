@@ -4646,10 +4646,10 @@ void c_valueeditor_popup::show_near_owner () {
   const std::string text = value_widget->get_value_string ();
   const int text_w = tk_measure_text_width (text, textbox.fontsize);
   const int editor_w = std::clamp (
-      std::max ({ value_widget->w, text_w + 28, 84 }),
+      std::max ({ value_widget->w, text_w + 32, 120 }),
       84,
       180);
-  const int editor_h = 30;
+  const int editor_h = 40;
 
   move_resize (x, y, editor_w, editor_h);
   textbox.move_resize (4, 4, editor_w - 8, editor_h - 8);
