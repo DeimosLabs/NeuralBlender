@@ -1375,8 +1375,12 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
     this, &cont_cabs, mainwindow.native_handle (), BANK_CAB, i, 0, 0, 1, 1);
   }
   meter_in [PAGE_PEDAL].create (&cont_pedals, "", 6, 70, METER_WIDTH, 520);
+  meter_in [PAGE_EQPRE].create (&cont_eqpre, "", 6, 70, METER_WIDTH, 520);
   meter_in [PAGE_AMP].create (&cont_models, "", 6, 70, METER_WIDTH, 520);
+  meter_in [PAGE_EQPOST].create (&cont_eqpost, "", 6, 70, METER_WIDTH, 520);
   meter_in [PAGE_CAB].create (&cont_cabs, "", 6, 70, METER_WIDTH, 520);
+  meter_eqout [0].create (&cont_eqpre, "", 6, 70, METER_WIDTH, 520);
+  meter_eqout [1].create (&cont_eqpost, "", 6, 70, METER_WIDTH, 520);
   meter_in [PAGE_OTHER].create (&cont_other, "", 6, 70, METER_WIDTH, 520);
   meter_masterout.create (&cont_other, "", 6, 70, METER_WIDTH, 520);
 
@@ -1388,6 +1392,10 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   meter_in [PAGE_OTHER].set_vudata (&vudata_masterin);
   meter_in [PAGE_OTHER].set_stereo (false);
   vudata_masterin.set_l (0.0, 0.0);
+  meter_eqout [0].set_vudata (&vudata_in [BANK_AMP]);
+  meter_eqout [0].set_stereo (false);
+  meter_eqout [1].set_vudata (&vudata_in [BANK_CAB]);
+  meter_eqout [1].set_stereo (false);
   meter_masterout.set_vudata (&vudata_masterout);
   meter_masterout.set_stereo (false);
   vudata_masterout.set_l (0.0, 0.0);
@@ -1537,7 +1545,9 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
       blender->banks [BANK_CAB].meters_out [i]   = &lanes_cabs [i].vudata_out;
     }
     blender->banks [BANK_PEDAL].meter_in = &vudata_in [BANK_PEDAL];
+    blender->banks [BANK_EQPRE].meter_in = &vudata_in [BANK_EQPRE];
     blender->banks [BANK_AMP].meter_in   = &vudata_in [BANK_AMP];
+    blender->banks [BANK_EQPOST].meter_in = &vudata_in [BANK_EQPOST];
     blender->banks [BANK_CAB].meter_in   = &vudata_in [BANK_CAB];
     blender->meter_masterin              = &vudata_masterin;
     blender->meter_masterout             = &vudata_masterout;
@@ -1704,6 +1714,14 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     eqpage_post.move_resize (16, lane_top, lane_width, lane_stack_h);
 
     if (visible_page == PAGE_EQPRE || visible_page == PAGE_EQPOST) {
+      const int eq_meter = visible_page == PAGE_EQPRE ? 0 : 1;
+      const _lane_bank eq_bank = bank_for_page (visible_page);
+      meter_top = lane_top + 4;
+      meter_h = std::max (1, lane_stack_h - 8);
+      meter_in [eq_bank].move_resize (
+        5, meter_top, METER_WIDTH, meter_h);
+      meter_eqout [eq_meter].move_resize (
+        16 + lane_width + 5, meter_top, METER_WIDTH, meter_h);
     } else if (page_has_bank (visible_page)) {
       c_lane_widgets *meter_ref_lanes = lanes_for_bank (visible_bank);
       size_t i;
@@ -1811,6 +1829,11 @@ void c_neuralblender_ui::redraw_visible_meters () {
   if (visible_page == PAGE_OTHER) {
     redraw_meter (meter_in [PAGE_OTHER]);
     redraw_meter (meter_masterout);
+  } else if (visible_page == PAGE_EQPRE || visible_page == PAGE_EQPOST) {
+    const int eq_meter = visible_page == PAGE_EQPRE ? 0 : 1;
+    const _lane_bank eq_bank = bank_for_page (visible_page);
+    redraw_meter (meter_in [eq_bank]);
+    redraw_meter (meter_eqout [eq_meter]);
   } else {
     redraw_meter (meter_in [visible_bank]);
     c_lane_widgets *bank_lanes = lanes_for_bank (visible_bank);
@@ -1852,7 +1875,7 @@ void c_neuralblender_ui::on_bank_switch (nbtk::c_widget *w, int n) { CP
   (void) w;
   if (n >= PAGE_PEDAL && n < PAGE_COUNT) {
     visible_page = (_ui_page) n;
-    if (page_has_bank (visible_page))
+    if (visible_page != PAGE_OTHER)
       visible_bank = bank_for_page (visible_page);
   }
 
@@ -2370,6 +2393,8 @@ void c_neuralblender_ui::set_threshgain (float f) {
   meter_in [BANK_PEDAL].set_compression_gain (f);
   for (size_t bank = BANK_PEDAL + 1; bank < BANK_COUNT; ++bank)
     meter_in [bank].set_compression_gain (1.0f);
+  meter_eqout [0].set_compression_gain (1.0f);
+  meter_eqout [1].set_compression_gain (1.0f);
   meter_in [PAGE_OTHER].set_compression_gain (f);
   meter_masterout.set_compression_gain (1.0f);
 }
@@ -2395,6 +2420,10 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
     meter_in [bank].set_headroom (headroom_db);
     vudata_in [bank].set_db_scale (scale_db);
     vudata_in [bank].set_headroom (headroom_db);
+  }
+  for (size_t i = 0; i < 2; ++i) {
+    meter_eqout [i].set_db_scale (scale_db);
+    meter_eqout [i].set_headroom (headroom_db);
   }
   meter_in [PAGE_OTHER].set_db_scale (scale_db);
   meter_in [PAGE_OTHER].set_headroom (headroom_db);
@@ -2527,6 +2556,10 @@ void c_neuralblender_ui::vu_on (bool b) { CP
     for (size_t i = 0; i < NB_NUM_MODELS; i++)
       bank_lanes [i].meter_out.show ();
   }
+  meter_in [BANK_EQPRE].show ();
+  meter_in [BANK_EQPOST].show ();
+  meter_eqout [0].show ();
+  meter_eqout [1].show ();
   meter_in [PAGE_OTHER].show ();
   meter_masterout.show ();
   //on_vu (&btn_vu, b);
@@ -2542,6 +2575,10 @@ void c_neuralblender_ui::vu_off () { CP
     for (size_t i = 0; i < NB_NUM_MODELS; i++)
       bank_lanes [i].meter_out.hide ();
   }
+  meter_in [BANK_EQPRE].hide ();
+  meter_in [BANK_EQPOST].hide ();
+  meter_eqout [0].hide ();
+  meter_eqout [1].hide ();
   meter_in [PAGE_OTHER].hide ();
   meter_masterout.hide ();
   //on_vu (&btn_vu, false);
@@ -2855,6 +2892,10 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
       for (size_t i = 0; i < NB_NUM_MODELS; ++i)
         bank_lanes [i].meter_out.show ();
     }
+    meter_in [BANK_EQPRE].show ();
+    meter_in [BANK_EQPOST].show ();
+    meter_eqout [0].show ();
+    meter_eqout [1].show ();
     meter_in [PAGE_OTHER].show ();
     meter_masterout.show ();
   } else {
@@ -2865,6 +2906,10 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
       for (size_t i = 0; i < NB_NUM_MODELS; ++i)
         bank_lanes [i].meter_out.hide ();
     }
+    meter_in [BANK_EQPRE].hide ();
+    meter_in [BANK_EQPOST].hide ();
+    meter_eqout [0].hide ();
+    meter_eqout [1].hide ();
     meter_in [PAGE_OTHER].hide ();
     meter_masterout.hide ();
   }

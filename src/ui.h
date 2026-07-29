@@ -509,6 +509,7 @@ public:
   c_lane_widgets   lanes_models [NB_NUM_MODELS];
   c_lane_widgets   lanes_cabs [NB_NUM_MODELS];
   c_meterwidget    meter_in [PAGE_COUNT];
+  c_meterwidget    meter_eqout [2];
   c_meterwidget    meter_masterout;
   c_tunerwidget    tuner;
   c_eqpage_widgets eqpage_pre;
