@@ -139,6 +139,19 @@ generate_eq_ports() {
       generate_one_eq_port "$eq" "$band" gain
       generate_one_eq_port "$eq" "$band" q
     done
+    cat << EOF
+    [
+        a lv2:InputPort ,
+          lv2:ControlPort ;
+        lv2:index ${portnum} ;
+        lv2:symbol "${eq}_master_gain" ;
+        lv2:name "$eq master gain" ;
+        lv2:default 0 ;
+        lv2:minimum -36 ;
+        lv2:maximum 36
+      ] ,
+EOF
+    portnum=$((portnum + 1))
   done
 }
 
