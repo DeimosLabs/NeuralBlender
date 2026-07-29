@@ -186,9 +186,10 @@ bool c_vudata::update () {
       changed = true;
     }
 
-    if (abs_l > 0.999f)
+    const float clip_threshold = clip_threshold_gain ();
+    if (abs_l >= clip_threshold)
       m_timestamp_clip_l = now;
-    if (abs_r > 0.999f)
+    if (abs_r >= clip_threshold)
       m_timestamp_clip_r = now;
     if (xrun_l.load ())
       m_timestamp_xrun_l = now;
@@ -310,6 +311,10 @@ float c_vudata::peak_l () const {
 
 float c_vudata::peak_r () const {
   return db_scaled (m_peak_r.load ());
+}
+
+float c_vudata::clip_threshold_gain () const {
+  return db_to_gain (clip_threshold_db);
 }
 
 void c_vudata::acknowledge () {
@@ -706,7 +711,13 @@ void c_meterwidget::set_compression_db (float db) {
   set_compression_gain (powf (10.0f, db / 20.0f));
 }
 
-void c_meterwidget::draw_bar (cairo_t *cr, int at, int bar_th, float level, float hold) {
+void c_meterwidget::draw_bar (
+    cairo_t *cr,
+    int at,
+    int bar_th,
+    float level,
+    float hold,
+    bool clipped) {
   level = std::clamp (level, 0.0f, 1.0f);
   hold = std::clamp (hold, 0.0f, 1.0f);
 
@@ -731,19 +742,24 @@ void c_meterwidget::draw_bar (cairo_t *cr, int at, int bar_th, float level, floa
     }
     
     if (w > 0 && h > 0) {
-      cairo_pattern_t *gradient = nullptr;
-      if (vertical)
-        gradient = cairo_pattern_create_linear (0, height - rec_size, 0, clip_size);
-      else
-        gradient = cairo_pattern_create_linear (rec_size, 0, width - clip_size, 0);
-
-      cairo_pattern_add_color_stop_rgb (gradient, 0.00, 0.0, 0.9, 0.0);
-      cairo_pattern_add_color_stop_rgb (gradient, 0.66, 1.0, 1.0, 0.0);
-      cairo_pattern_add_color_stop_rgb (gradient, 1.00, 1.0, 0.0, 0.0);
       cairo_rectangle (cr, x, y, w, h);
-      cairo_set_source (cr, gradient);
-      cairo_fill (cr);
-      cairo_pattern_destroy (gradient);
+      if (clipped) {
+        cairo_set_source_rgb (cr, 0.95, 0.0, 0.0);
+        cairo_fill (cr);
+      } else {
+        cairo_pattern_t *gradient = nullptr;
+        if (vertical)
+          gradient = cairo_pattern_create_linear (0, height - rec_size, 0, clip_size);
+        else
+          gradient = cairo_pattern_create_linear (rec_size, 0, width - clip_size, 0);
+
+        cairo_pattern_add_color_stop_rgb (gradient, 0.00, 0.0, 0.9, 0.0);
+        cairo_pattern_add_color_stop_rgb (gradient, 0.66, 1.0, 1.0, 0.0);
+        cairo_pattern_add_color_stop_rgb (gradient, 1.00, 1.0, 0.0, 0.0);
+        cairo_set_source (cr, gradient);
+        cairo_fill (cr);
+        cairo_pattern_destroy (gradient);
+      }
     }
   }
   
@@ -823,14 +839,22 @@ void c_meterwidget::on_paint (cairo_t *cr) {
   if (!data)
     return;
 
+  const float clip_threshold = data->clip_threshold_gain ();
+  const bool clip_l = data->clip_l.load () ||
+                      data->linear_l () >= clip_threshold ||
+                      data->linear_peak_l () >= clip_threshold;
+  const bool clip_r = data->clip_r.load () ||
+                      data->linear_r () >= clip_threshold ||
+                      data->linear_peak_r () >= clip_threshold;
   if (stereo) {
-    draw_bar (cr, t1, t2 - t1, data->l (), data->peak_l ());
-    draw_bar (cr, t3, t4 - t3, data->r (), data->peak_r ());
+    draw_bar (cr, t1, t2 - t1, data->l (), data->peak_l (), clip_l);
+    draw_bar (cr, t3, t4 - t3, data->r (), data->peak_r (), clip_r);
   } else {
-    draw_bar (cr, t1, t2 - t1, data->l (), data->peak_l ());
+    draw_bar (cr, t1, t2 - t1, data->l (), data->peak_l (),
+              clip_l || clip_r);
   }
 
-  const bool clipped = data->clip_l.load () || data->clip_r.load ();
+  const bool clipped = clip_l || clip_r;
   const bool xruns = data->xrun_l.load () || data->xrun_r.load ();
 
   if (clipped) {
@@ -842,7 +866,7 @@ void c_meterwidget::on_paint (cairo_t *cr) {
         cairo_rectangle (cr, width - clip_size, 0, clip_size, height);
       cairo_fill (cr);
     } else {
-      draw_warning_text (cr, "CLIP", width * 0.72, 0, width * 0.28, height);
+      //draw_warning_text (cr, "CLIP", width * 0.72, 0, width * 0.28, height);
     }
   }
 

@@ -2024,7 +2024,9 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
 
 c_neuralblender::c_neuralblender () { CP
   banks [BANK_PEDAL].meter_in = NULL;
+  banks [BANK_EQPRE].meter_in = NULL;
   banks [BANK_AMP].meter_in = NULL;
+  banks [BANK_EQPOST].meter_in = NULL;
   banks [BANK_CAB].meter_in = NULL;
 
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
@@ -2842,7 +2844,9 @@ void c_neuralblender::update_input_meter (_lane_bank bank, float *in, uint32_t n
   c_vudata *meter = nullptr;
   switch (bank) {
     case BANK_PEDAL: meter = banks [BANK_PEDAL].meter_in; break;
+    case BANK_EQPRE: meter = banks [BANK_EQPRE].meter_in; break;
     case BANK_AMP:   meter = banks [BANK_AMP].meter_in;   break;
+    case BANK_EQPOST:meter = banks [BANK_EQPOST].meter_in; break;
     case BANK_CAB:   meter = banks [BANK_CAB].meter_in;   break;
     default:         meter = nullptr;         break;
   }
@@ -3023,7 +3027,9 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
 
   if (m_bypass.load (std::memory_order_relaxed)) {
     update_input_meter (BANK_PEDAL, process_in, nframes);
+    update_input_meter (BANK_EQPRE, process_in, nframes);
     update_input_meter (BANK_AMP, process_in, nframes);
+    update_input_meter (BANK_EQPOST, process_in, nframes);
     update_input_meter (BANK_CAB, process_in, nframes);
     if (process_in != out)
       memcpy (out, process_in, nframes * sizeof (float));
@@ -3052,6 +3058,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
       BANK_PEDAL, process_in, m_stage_buf_a.data (), nframes,
       pedal_mask, pedal_mask, 0, 1);
 
+    update_input_meter (BANK_EQPRE, m_stage_buf_a.data (), nframes);
     if (eq_pre.on)
       eq_pre.process_block (m_stage_buf_a.data (), nframes);
 
@@ -3059,6 +3066,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
       BANK_AMP, m_stage_buf_a.data (), m_stage_buf_b.data (), nframes,
       mask, mask, 0, 1);
 
+    update_input_meter (BANK_EQPOST, m_stage_buf_b.data (), nframes);
     if (eq_post.on)
       eq_post.process_block (m_stage_buf_b.data (), nframes);
 
@@ -3073,6 +3081,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
       BANK_PEDAL, process_in, m_stage_buf_a.data (), nframes,
       pedal_mask, pedal_mask, 0, 1);
 
+    update_input_meter (BANK_EQPRE, m_stage_buf_a.data (), nframes);
     if (eq_pre.on)
       eq_pre.process_block (m_stage_buf_a.data (), nframes);
 
@@ -3080,6 +3089,7 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
       BANK_AMP, m_stage_buf_a.data (), m_stage_buf_b.data (), nframes,
       xfade_old_mask, xfade_new_mask, xfade_pos, xfade_len);
 
+    update_input_meter (BANK_EQPOST, m_stage_buf_b.data (), nframes);
     if (eq_post.on)
       eq_post.process_block (m_stage_buf_b.data (), nframes);
 

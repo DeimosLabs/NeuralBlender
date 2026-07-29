@@ -164,7 +164,7 @@ bool read_file_to_mem (const char *fn, std::vector<unsigned char> &out);
 
 extern const char *g_build_timestamp;
 
-static inline float db_to_gain (float db) {
+/*static inline float db_to_gain (float db) {
   return powf (10.0f, db / 20.0f);
 }
 
@@ -173,7 +173,7 @@ static inline float gain_to_db (float gain) {
     return DB_SILENCE;
 
   return 20.0f * log10f(gain);
-}
+}*/
 
 struct c_neuralblender_lane_state {
   std::string filename;

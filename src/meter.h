@@ -10,6 +10,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <atomic>
 
 #ifdef min
@@ -39,6 +40,17 @@ enum class meterwarn {
   MAX
 };
 
+inline float db_to_gain (float db) {
+  return powf (10.0f, db / 20.0f);
+}
+
+inline float gain_to_db (float gain) {
+  if (gain <= 0.0f)
+    return -120;
+
+  return 20.0f * log10f(gain);
+}
+
 class c_vudata {
 public:
   bool sample (float l, float r);
@@ -56,6 +68,7 @@ public:
   float r () const;
   float peak_l () const;
   float peak_r () const;
+  float clip_threshold_gain () const;
   float display_l () const { return m_display_l.load (); }
   float display_r () const { return m_display_r.load (); }
   float display_peak_l () const { return db_scaled (m_peak_l.load ()); }
@@ -74,6 +87,7 @@ public:
   float redraw_interval = VU_REDRAW_EVERY;
   int samplerate = 48000;
   int bufsize = 128;
+  float clip_threshold_db = 6.0f;
 
 private:
   static float clamp01 (float f);
@@ -148,7 +162,8 @@ protected:
   void on_resize (int w, int h) override;
 
 private:
-  void draw_bar (cairo_t *cr, int at, int th, float level, float hold);
+  void draw_bar (cairo_t *cr, int at, int th, float level, float hold,
+                 bool clipped);
   void draw_warning_text (cairo_t *cr, const char *text, double x, double y,
                           double w, double h);
   void update_geometry ();
