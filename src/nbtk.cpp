@@ -506,7 +506,6 @@ void c_frame::draw (cairo_t *cr) {
   cairo_fill_preserve (cr);
 
   tk_set_gradient (cr, h, colors.fg);
-  //cairo_set_line_width (cr, line_width);
   cairo_set_line_width (cr, line_width);
   cairo_stroke (cr);
 }
@@ -978,7 +977,7 @@ void c_button::draw (cairo_t *cr) {
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, h, colors.fg);
   //cairo_set_line_width (cr, line_width);
-  cairo_set_line_width (cr, /*highlight ? line_width_highlight :*/ line_width);
+  cairo_set_line_width (cr, highlighted () ? line_width_highlight : line_width);
   cairo_stroke (cr);
 
   cairo_surface_t *img = image_for_state ();
@@ -1190,7 +1189,7 @@ void c_checkbox::draw (cairo_t *cr) {
   tk_set_gradient (cr, box, colors.bg);
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, box, colors.fg);
-  cairo_set_line_width (cr, highlight ? line_width_highlight : line_width);
+  cairo_set_line_width (cr, highlighted () ? line_width_highlight : line_width);
   cairo_stroke (cr);
 
   if (value) {
@@ -1404,7 +1403,7 @@ bool c_scrollbar::on_mouse_up (int x_, int y_, int button) {
   (void) y_;
   if (button == Button1) {
     dragging = false;
-    if (app)
+    if (app && !wants_keyboard_focus)
       app->clear_focus (this);
   }
   return true;
@@ -1436,6 +1435,14 @@ void c_scrollbar::on_mouse_leave () {
     return;
 
   c_widget::on_mouse_leave ();
+}
+
+c_slider::c_slider () {
+  wants_keyboard_focus = true;
+}
+
+bool c_slider::highlighted () const {
+  return c_scrollbar::highlighted () || widget_has_focus (*this);
 }
 
 void c_slider::draw (cairo_t *cr) {
@@ -1589,6 +1596,21 @@ bool c_slider::on_mouse_move (int x_, int y_) {
   return with_value_area_geometry (this, r, [&] {
     return c_scrollbar::on_mouse_move (x_ - r.x, y_ - r.y);
   });
+}
+
+bool c_slider::on_key_down (int key) {
+  switch (key) {
+    case KEY_UP:
+    case KEY_RIGHT:
+      return set_value (slider_value + slider_step, true) || true;
+
+    case KEY_DOWN:
+    case KEY_LEFT:
+      return set_value (slider_value - slider_step, true) || true;
+
+    default:
+      return c_scrollbar::on_key_down (key);
+  }
 }
 
 float c_slider::quantize (float value_) const {
@@ -1976,7 +1998,7 @@ void c_listbox::draw (cairo_t *cr) {
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, h, outline);
   //cairo_set_line_width (cr, focused ? 2.0 : 1.5);
-  cairo_set_line_width (cr, /*highlight ? line_width_highlight :*/ line_width);
+  cairo_set_line_width (cr, highlighted () ? line_width_highlight : line_width);
   cairo_stroke (cr);
 
   cairo_save (cr);
@@ -2185,7 +2207,7 @@ void c_combobox::draw (cairo_t *cr) {
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, h, colors.fg);
   //cairo_set_line_width (cr, 1.5);
-  cairo_set_line_width (cr, highlight ? line_width_highlight : line_width);
+  cairo_set_line_width (cr, highlighted () ? line_width_highlight : line_width);
   cairo_stroke (cr);
 
   const int arrow_w = std::min (24, std::max (16, h));
@@ -3038,7 +3060,7 @@ void c_textbox::draw (cairo_t *cr) {
 
   tk_set_gradient (cr, h, outline);
   //cairo_set_line_width (cr, focused ? 2.0 : 1.5);
-  cairo_set_line_width (cr, /*highlight ? line_width_highlight : */line_width);
+  cairo_set_line_width (cr, highlighted () ? line_width_highlight : line_width);
   cairo_stroke (cr);
 
   cairo_save (cr);

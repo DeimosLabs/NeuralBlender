@@ -448,10 +448,14 @@ private:
 
 class c_slider : public c_scrollbar {
 public:
+  c_slider ();
+
   void draw (cairo_t *cr) override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
   bool on_mouse_move (int x, int y) override;
+  bool on_key_down (int key) override;
+  bool highlighted () const override;
   bool set_value (float value, bool notify = false) override;
   void set_range (float min, float max) override;
   void set_min (float min) override;
