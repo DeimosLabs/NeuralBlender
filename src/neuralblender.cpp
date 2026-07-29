@@ -532,8 +532,7 @@ void c_eq::set_samplerate (int sr) {
     if (mode [i] == EQ_OFF || freq [i] <= 0.0f)
       bands [i].disable ();
     else
-      bands [i].set_peak (
-        sr, freq [i], gain_db [i] + master_gain_db, q [i], mode [i]);
+      bands [i].set_peak (sr, freq [i], gain_db [i], q [i], mode [i]);
   }
 }
 
@@ -589,16 +588,13 @@ void c_eq::set_band (int band_,
   bands [b].set_peak (
     samplerate,
     freq [b],
-    gain_db [b] + master_gain_db,
+    gain_db [b],
     q [b],
     this->mode [b]);
 }
 
 void c_eq::set_master_gain_db (float db) {
   master_gain_db = db;
-
-  for (int i = 0; i < EQ_NUM_BANDS; ++i)
-    set_band (i, freq [i], gain_db [i], q [i], mode [i]);
 }
 
 void c_eq::process_block (float *buf, uint32_t nframes) {
@@ -612,6 +608,12 @@ void c_eq::process_block (float *buf, uint32_t nframes) {
 
     for (uint32_t i = 0; i < nframes; ++i)
       buf [i] = band.process (buf [i]);
+  }
+
+  const float master_gain = db_to_gain (master_gain_db);
+  if (fabsf (master_gain - 1.0f) > 0.000001f) {
+    for (uint32_t i = 0; i < nframes; ++i)
+      buf [i] *= master_gain;
   }
 }
 
