@@ -218,6 +218,7 @@ struct c_eq_state {
   }
 
   bool on = false;
+  float master_gain_db = 0.0f;
   bool enabled [EQ_NUM_BANDS] = {};
   _eq_band_mode mode [EQ_NUM_BANDS] = {};
   float freq [EQ_NUM_BANDS] = {};
@@ -334,15 +335,17 @@ public:
   bool set_enabled (int band, bool enabled);
   void set_band (int band, float freq, float gain_db, float q, 
                  _eq_band_mode mode = EQ_KEEP);
+  void set_master_gain_db (float db);
   
-  bool on                           = false;
-  int samplerate                    = 0;
-  bool enabled       [EQ_NUM_BANDS] = { false };
-  _eq_band_mode mode [EQ_NUM_BANDS] = { EQ_OFF };
-  float freq         [EQ_NUM_BANDS] = { 0 };
-  float gain_db      [EQ_NUM_BANDS] = { 0 };
-  float q            [EQ_NUM_BANDS] = { 0 };
-  c_biquad bands [EQ_NUM_BANDS];
+  bool on                            = false;
+  int samplerate                     = 0;
+  float               master_gain_db = 0.0f;
+  bool enabled        [EQ_NUM_BANDS] = { false };
+  _eq_band_mode mode  [EQ_NUM_BANDS] = { EQ_OFF };
+  float freq          [EQ_NUM_BANDS] = { 0 };
+  float gain_db       [EQ_NUM_BANDS] = { 0 };
+  float q             [EQ_NUM_BANDS] = { 0 };
+  c_biquad bands      [EQ_NUM_BANDS];
 };
 
 // a simple but effective noise gate
@@ -594,6 +597,7 @@ public:
   void set_amp_bypass (bool bypass);
   void set_cab_bypass (bool bypass);
   bool set_eq_bypass (_lane_bank bank, bool bypass);
+  bool set_eq_master_gain_db (_lane_bank bank, float db);
   bool set_eq_band (
       _lane_bank bank,
       size_t band,

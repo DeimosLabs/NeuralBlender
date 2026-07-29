@@ -66,6 +66,7 @@ struct Plugin : public c_lv2_urids {
   const float *eq_freq      [BANK_COUNT] [EQ_NUM_BANDS] = {};
   const float *eq_gain      [BANK_COUNT] [EQ_NUM_BANDS] = {};
   const float *eq_q         [BANK_COUNT] [EQ_NUM_BANDS] = {};
+  const float *eq_master_gain [BANK_COUNT] = {};
   const float *bypass       = NULL;
   const float *vu_enable    = NULL;
   const float *mute_all     = NULL;
@@ -102,6 +103,7 @@ struct Plugin : public c_lv2_urids {
   float last_eq_freq        [BANK_COUNT] [EQ_NUM_BANDS] = {};
   float last_eq_gain        [BANK_COUNT] [EQ_NUM_BANDS] = {};
   float last_eq_q           [BANK_COUNT] [EQ_NUM_BANDS] = {};
+  float last_eq_master_gain [BANK_COUNT] = {};
   float last_bypass         = 1.0;
   float last_vu_enable      = 1.0;
   float last_mute_all       = 0.0;
@@ -153,6 +155,7 @@ struct Plugin : public c_lv2_urids {
   // to get notified back when model is loaded from session restore
   bool notify_path [BANK_COUNT] [NB_NUM_MODELS] = {};
   bool notify_bank_bypass [BANK_COUNT] = {};
+  bool notify_eq_master_gain [BANK_COUNT] = {};
   bool notify_eq_param [BANK_COUNT] [EQ_NUM_BANDS] [NB_LV2_EQ_PORT_COUNT] = {};
   std::string current_path [BANK_COUNT] [NB_NUM_MODELS];
   bool restored_from_state = false;
@@ -661,6 +664,17 @@ static void sync_last_eq_from_ports (
       self->eq_q [bank] [band], eq.q [band]);
 }
 
+static void sync_last_eq_master_from_port (
+    Plugin *self, _lane_bank bank_id, const c_eq &eq) {
+  if (!self)
+    return;
+
+  const size_t bank = (size_t) bank_id;
+  self->last_eq_master_gain [bank] =
+    current_port_value (
+      self->eq_master_gain [bank], eq.master_gain_db);
+}
+
 static void notify_eq_band (Plugin *self, _lane_bank bank_id, size_t band) {
   if (!self || band >= EQ_NUM_BANDS)
     return;
@@ -719,6 +733,25 @@ static void store_eq_band_state (
          LV2_STATE_IS_POD);
 }
 
+static void store_eq_master_state (
+    Plugin *self,
+    LV2_State_Store_Function store,
+    LV2_State_Handle handle,
+    _lane_bank bank_id,
+    const c_eq &eq) {
+  if (!self || !store)
+    return;
+
+  const size_t bank = (size_t) bank_id;
+  const float value = eq.master_gain_db;
+  store (handle,
+         self->urid_eq_master_gain [bank],
+         &value,
+         sizeof (value),
+         self->urid_atom_Float,
+         LV2_STATE_IS_POD);
+}
+
 static LV2_State_Status save (
   LV2_Handle instance,
   LV2_State_Store_Function store,
@@ -746,6 +779,7 @@ static LV2_State_Status save (
       if (!eq)
         continue;
 
+      store_eq_master_state (self, store, handle, b, *eq);
       for (size_t band = 0; band < EQ_NUM_BANDS; ++band)
         store_eq_band_state (self, store, handle, b, band, *eq);
     }
@@ -833,6 +867,31 @@ static bool retrieve_eq_float (
   return true;
 }
 
+static bool retrieve_eq_master_float (
+    Plugin *self,
+    LV2_State_Retrieve_Function retrieve,
+    LV2_State_Handle handle,
+    _lane_bank bank_id,
+    float &value) {
+  size_t size = 0;
+  uint32_t type = 0;
+  uint32_t valflags = 0;
+  const size_t bank = (size_t) bank_id;
+  const void *p =
+    retrieve (
+      handle,
+      self->urid_eq_master_gain [bank],
+      &size,
+      &type,
+      &valflags);
+
+  if (!p || type != self->urid_atom_Float || size < sizeof (float))
+    return false;
+
+  value = *(const float *) p;
+  return true;
+}
+
 static void restore_eq_state (
     Plugin *self,
     LV2_State_Retrieve_Function retrieve,
@@ -844,6 +903,13 @@ static void restore_eq_state (
     c_eq *eq = lv2_eq_for_bank (self, b);
     if (!eq)
       continue;
+
+    float master_gain = 0.0f;
+    if (retrieve_eq_master_float (self, retrieve, handle, b, master_gain)) {
+      self->blender.set_eq_master_gain_db (b, master_gain);
+      sync_last_eq_master_from_port (self, b, *eq);
+      self->notify_eq_master_gain [(size_t) b] = true;
+    }
 
     for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
       bool found = false;
@@ -1049,6 +1115,13 @@ static bool forge_next_eq_notify (Plugin *self) {
       continue;
 
     const size_t bank = (size_t) b;
+    if (self->notify_eq_master_gain [bank]) {
+      self->notify_eq_master_gain [bank] = false;
+      forge_float_notify (
+        self, self->urid_eq_master_gain [bank], eq->master_gain_db);
+      return true;
+    }
+
     for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
       for (uint32_t param = 0; param < NB_LV2_EQ_PORT_COUNT; ++param) {
         if (!self->notify_eq_param [bank] [band] [param])
@@ -1295,6 +1368,16 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
     return;
   }
 
+  if (port == PORT_EQPRE_MASTER_GAIN) {
+    self->eq_master_gain [BANK_EQPRE] = (const float *) data;
+    return;
+  }
+
+  if (port == PORT_EQPOST_MASTER_GAIN) {
+    self->eq_master_gain [BANK_EQPOST] = (const float *) data;
+    return;
+  }
+
   switch (port) {
     case PORT_AUDIO_IN:
       self->audio_in = (const float *) data;
@@ -1531,6 +1614,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	        for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
 	          self->notify_bank_bypass [bank] = true;
 	        for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
+            self->notify_eq_master_gain [(size_t) b] = true;
             for (size_t band = 0; band < EQ_NUM_BANDS; ++band)
               notify_eq_band (self, b, band);
           }
@@ -1732,6 +1816,14 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       continue;
 
     const size_t bank = (size_t) bnk;
+    if (read_changed (
+          self->eq_master_gain [bank],
+          self->last_eq_master_gain [bank],
+          v)) {
+      CP
+      self->blender.set_eq_master_gain_db (bnk, v);
+    }
+
     for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
       bool changed = false;
       float tmp = 0.0f;

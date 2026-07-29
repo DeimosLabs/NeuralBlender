@@ -82,6 +82,7 @@ static constexpr _lane_bank STANDALONE_MODEL_BANKS [] = {
 static void apply_eq_state (
     c_eq &eq, const c_eq_state &state, bool bypass) {
   eq.on = !bypass;
+  eq.set_master_gain_db (state.master_gain_db);
 
   for (int i = 0; i < EQ_NUM_BANDS; ++i) {
     eq.set_enabled (i, state.enabled [i]);
@@ -128,6 +129,7 @@ public:
   void on_master_gain (nbtk::c_widget *w, float f);
   void on_presence (nbtk::c_widget *w, float f);
   void on_eq_band (nbtk::c_widget *w, _lane_bank bank, size_t band);
+  void on_eq_master_gain (nbtk::c_widget *w, _lane_bank bank, float f);
   //void on_excl (nbtk::c_widget *w, int which);
   void on_bypass (nbtk::c_widget *w, bool b);
   void on_bank_bypass (nbtk::c_widget *w, _lane_bank bank, bool b);
@@ -351,6 +353,20 @@ void c_standalone_ui::on_eq_band (
     eq_state->freq [band],
     eq_state->gain_db [band],
     eq_state->q [band]);
+}
+
+void c_standalone_ui::on_eq_master_gain (
+    nbtk::c_widget *w, _lane_bank bank, float value) {
+  (void) w;
+  if (bank == BANK_EQPRE)
+    state.eqpre.master_gain_db = value;
+  else if (bank == BANK_EQPOST)
+    state.eqpost.master_gain_db = value;
+  else
+    return;
+
+  if (blender)
+    blender->set_eq_master_gain_db (bank, value);
 }
 
 void c_standalone_ui::on_linked_calib (nbtk::c_widget *w, bool b) {

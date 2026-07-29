@@ -259,6 +259,10 @@ void c_widget::draw (cairo_t *cr) {
   (void) cr;
 }
 
+bool c_widget::highlighted () const {
+  return false;
+}
+
 bool c_widget::on_mouse_down (int x_, int y_, int button) {
   (void) x_;
   (void) y_;
@@ -502,7 +506,8 @@ void c_frame::draw (cairo_t *cr) {
   cairo_fill_preserve (cr);
 
   tk_set_gradient (cr, h, colors.fg);
-  cairo_set_line_width (cr, 2.0);
+  //cairo_set_line_width (cr, line_width);
+  cairo_set_line_width (cr, line_width);
   cairo_stroke (cr);
 }
 
@@ -601,7 +606,7 @@ std::string c_valuewidget::get_value_string () const {
   return tk_format_value (value, step);
 }
 
-std::string c_valuewidget::get_label_text () const {
+std::string c_valuewidget::get_label_string () const {
   return label;
 }
 
@@ -653,13 +658,19 @@ void c_valuewidget::emit_action () {
 }
 
 int c_valuewidget::label_extent () const {
-  const std::string text = get_label_text ();
+  const std::string text = get_label_string ();
   if (label_position == LABEL_NONE || text.empty ())
     return 0;
 
+  const float font_size = label_fontsize * font_multiplier ();
+  if (label_position == LABEL_LEFT || label_position == LABEL_RIGHT) {
+    const int text_w = (int) std::ceil (text.size () * font_size * 0.62f + 8.0f);
+    return std::max (18, text_w) + label_gap;
+  }
+
   return std::max (
       14,
-      (int) std::ceil (label_fontsize * font_multiplier () + 4.0f)) +
+      (int) std::ceil (font_size + 4.0f)) +
     label_gap;
 }
 
@@ -715,7 +726,7 @@ void c_valuewidget::draw_value_label (cairo_t *cr) {
   if (!cr)
     return;
 
-  const std::string text = get_label_text ();
+  const std::string text = get_label_string ();
   const t_rect r = value_label_rect ();
   if (text.empty () || r.w <= 0 || r.h <= 0)
     return;
@@ -727,9 +738,26 @@ void c_valuewidget::draw_value_label (cairo_t *cr) {
   tk_set_text_fg (cr, enabled);
   cairo_text_extents_t ext {};
   cairo_text_extents (cr, text.c_str (), &ext);
+
+  double text_x = r.x + ((double) r.w - ext.width) * 0.5 - ext.x_bearing;
+  const double pad = 3.0;
+  switch (label_align) {
+    case TEXT_LEFT:
+      text_x = r.x + pad - ext.x_bearing;
+      break;
+
+    case TEXT_RIGHT:
+      text_x = r.x + (double) r.w - pad - ext.width - ext.x_bearing;
+      break;
+
+    case TEXT_CENTER:
+    default:
+      break;
+  }
+
   cairo_move_to (
       cr,
-      r.x + ((double) r.w - ext.width) * 0.5 - ext.x_bearing,
+      text_x,
       r.y + ((double) r.h - ext.height) * 0.5 - ext.y_bearing);
   cairo_show_text (cr, text.c_str ());
   cairo_restore (cr);
@@ -779,7 +807,7 @@ void c_label::draw (cairo_t *cr) {
     (h - ext.height) * 0.5 - ext.y_bearing);
   cairo_show_text (cr, label.c_str ());
 
-  if (link && (hovered || widget_has_focus (*this))) {
+  if (highlighted ()) {
     const double underline_y =
       (h + ext.height) * 0.5 + 2.0 * font_multiplier ();
     cairo_move_to (cr, text_x + ext.x_bearing, underline_y);
@@ -851,6 +879,10 @@ void c_label::clear_hover () {
   c_widget::clear_hover ();
 }
 
+bool c_label::highlighted () const {
+  return link && (hovered || widget_has_focus (*this));
+}
+
 _mouse_cursor c_label::mouse_cursor () const {
   return link ? MOUSE_CURSOR_HAND : MOUSE_CURSOR_DEFAULT;
 }
@@ -892,7 +924,7 @@ c_button::~c_button () {
 }
 
 cairo_surface_t *c_button::image_for_state () const {
-  const bool highlight = hovered || widget_has_focus (*this);
+  const bool highlight = highlighted ();
   if (pressed && highlight && img_down_hover) return img_down_hover;
   if (pressed && img_down)                  return img_down;
   if (!value && highlight && img_off_hover) return img_off_hover;
@@ -902,8 +934,12 @@ cairo_surface_t *c_button::image_for_state () const {
   return img_off;
 }
 
+bool c_button::highlighted () const {
+  return hovered || widget_has_focus (*this);
+}
+
 static nbtk::_widget_state tk_button_state (const c_button &button) {
-  const bool highlight = button.hovered || widget_has_focus (button);
+  const bool highlight = button.highlighted ();
   if (button.pressed && highlight) return WSTATE_DOWN_HOVER;
   if (button.pressed)              return WSTATE_DOWN;
   if (!button.value && highlight)  return WSTATE_OFF_HOVER;
@@ -941,7 +977,8 @@ void c_button::draw (cairo_t *cr) {
   tk_set_gradient (cr, h, colors.bg);
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, h, colors.fg);
-  cairo_set_line_width (cr, 2.0);
+  //cairo_set_line_width (cr, line_width);
+  cairo_set_line_width (cr, /*highlight ? line_width_highlight :*/ line_width);
   cairo_stroke (cr);
 
   cairo_surface_t *img = image_for_state ();
@@ -1133,13 +1170,15 @@ c_checkbox::c_checkbox () {
   is_toggle = true;
   align = TEXT_LEFT;
   corner_radius = NBTK_CHECKBOX_RADIUS;
+  line_width = 1.5f;
+  line_width_highlight = 2.0f;
 }
 
 void c_checkbox::draw (cairo_t *cr) {
   if (!cr)
     return;
 
-  const bool highlight = hovered || widget_has_focus (*this);
+  const bool highlight = highlighted ();
   const t_statecolors &colors = colors_for (
       WSTYLE_BUTTON,
       enabled ? tk_button_state (*this) : nbtk::WSTATE_DISABLED);
@@ -1151,7 +1190,7 @@ void c_checkbox::draw (cairo_t *cr) {
   tk_set_gradient (cr, box, colors.bg);
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, box, colors.fg);
-  cairo_set_line_width (cr, highlight ? 2.5 : 2.0);
+  cairo_set_line_width (cr, highlight ? line_width_highlight : line_width);
   cairo_stroke (cr);
 
   if (value) {
@@ -1258,6 +1297,10 @@ void c_scrollbar::emit_action () {
     on_action (event);
 }
 
+bool c_scrollbar::highlighted () const {
+  return hovered || pressed;
+}
+
 void c_scrollbar::draw (cairo_t *cr) {
   if (!cr)
     return;
@@ -1265,10 +1308,10 @@ void c_scrollbar::draw (cairo_t *cr) {
   const t_statecolors &frame = colors_for (WSTYLE_FRAME, nbtk::WSTATE_NORMAL);
   const t_statecolors &thumb = colors_for (
     WSTYLE_BUTTON,
-    pressed ? WSTATE_DOWN : hovered ? nbtk::WSTATE_HOVER : nbtk::WSTATE_NORMAL);
+    pressed ? WSTATE_DOWN : highlighted () ? nbtk::WSTATE_HOVER : nbtk::WSTATE_NORMAL);
   const t_statecolors &thumb_outline = colors_for (
     WSTYLE_FRAME,
-    (pressed || hovered) ? nbtk::WSTATE_SELECTED : nbtk::WSTATE_NORMAL);
+    highlighted () ? nbtk::WSTATE_SELECTED : nbtk::WSTATE_NORMAL);
   const nbtk::t_gradientcolors &bg = nbtk::get_colortheme ()->window_bg;
 
   tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
@@ -1295,7 +1338,7 @@ void c_scrollbar::draw (cairo_t *cr) {
       thumb_outline.fg.g1,
       thumb_outline.fg.b1,
       thumb_outline.fg.a1);
-  cairo_set_line_width (cr, hovered ? 1.8 : 1.2);
+  cairo_set_line_width (cr, highlighted () ? 1.8 : 1.2);
   cairo_stroke (cr);
 }
 
@@ -1902,6 +1945,10 @@ void c_listbox::on_activate (int index) {
   emit_action (true, index);
 }
 
+bool c_listbox::highlighted () const {
+  return widget_has_focus (*this);
+}
+
 void c_listbox::draw (cairo_t *cr) {
   if (!cr)
     return;
@@ -1911,7 +1958,7 @@ void c_listbox::draw (cairo_t *cr) {
   static cairo_surface_t *file_icon =
     cairo_image_surface_create_from_stream (data_icon_picker_file_png);
 
-  const bool focused = widget_has_focus (*this);
+  const bool focused = highlighted ();
   const t_statecolors &frame = colors_for (WSTYLE_FRAME, nbtk::WSTATE_NORMAL);
   const t_statecolors &focus_colors = colors_for (WSTYLE_FRAME, nbtk::WSTATE_SELECTED);
   const t_statecolors &sel = colors_for (WSTYLE_BUTTON, nbtk::WSTATE_ON);
@@ -1928,7 +1975,8 @@ void c_listbox::draw (cairo_t *cr) {
   cairo_set_source_rgba (cr, bg.r1, bg.g1, bg.b1, bg.a1);
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, h, outline);
-  cairo_set_line_width (cr, focused ? 2.0 : 1.5);
+  //cairo_set_line_width (cr, focused ? 2.0 : 1.5);
+  cairo_set_line_width (cr, /*highlight ? line_width_highlight :*/ line_width);
   cairo_stroke (cr);
 
   cairo_save (cr);
@@ -2119,11 +2167,15 @@ void c_combobox::create (
   sync_list_geometry ();
 }
 
+bool c_combobox::highlighted () const {
+  return hovered || widget_has_focus (*this);
+}
+
 void c_combobox::draw (cairo_t *cr) {
   if (!cr)
     return;
 
-  const bool highlight = hovered || widget_has_focus (*this);
+  const bool highlight = highlighted ();
   const t_statecolors &colors = colors_for (
       WSTYLE_BUTTON,
       pressed ? WSTATE_DOWN : highlight ? nbtk::WSTATE_HOVER : nbtk::WSTATE_NORMAL);
@@ -2132,7 +2184,8 @@ void c_combobox::draw (cairo_t *cr) {
   tk_set_gradient (cr, h, colors.bg);
   cairo_fill_preserve (cr);
   tk_set_gradient (cr, h, colors.fg);
-  cairo_set_line_width (cr, 1.5);
+  //cairo_set_line_width (cr, 1.5);
+  cairo_set_line_width (cr, highlight ? line_width_highlight : line_width);
   cairo_stroke (cr);
 
   const int arrow_w = std::min (24, std::max (16, h));
@@ -2611,6 +2664,7 @@ c_knob::c_knob () {
   wants_mouse = true;
   wants_hover = true;
   wants_keyboard_focus = true;
+  label_position = LABEL_BELOW;
 }
 
 bool c_knob::set_value (float value_, bool notify) {
@@ -2651,33 +2705,103 @@ std::string c_knob::get_value_string () const {
   return c_valuewidget::get_value_string ();
 }
 
-std::string c_knob::get_label_text () const {
+std::string c_knob::get_label_string () const {
   return label;
 }
 
 bool c_knob::hit_value_label (int x_, int y_) const {
-  const std::string text = get_label_text ();
-  if (text.empty ())
-    return false;
+  return value_label_rect ().contains (x_, y_);
+}
 
-  const int label_h =
-    std::max (14, (int) (fontsize * font_multiplier () + 4));
-  return t_rect { 0, std::max (0, h - label_h), w, label_h }
-    .contains (x_, y_);
+t_rect c_knob::value_area_rect () const {
+  if (label_position == LABEL_NONE || get_label_string ().empty ())
+    return { 0, 0, w, h };
+
+  switch (label_position) {
+    case LABEL_LEFT: {
+      const int size = std::min (w, h);
+      return { std::max (0, w - size), 0, size, h };
+    }
+
+    case LABEL_RIGHT: {
+      const int size = std::min (w, h);
+      return { 0, 0, size, h };
+    }
+
+    case LABEL_ABOVE:
+    case LABEL_BELOW:
+    case LABEL_NONE:
+    default:
+      return c_valuewidget::value_area_rect ();
+  }
+}
+
+t_rect c_knob::value_label_rect () const {
+  if (label_position == LABEL_NONE || get_label_string ().empty ())
+    return { 0, 0, 0, 0 };
+
+  switch (label_position) {
+    case LABEL_LEFT: {
+      const t_rect value_rect = value_area_rect ();
+      return {
+        0,
+        0,
+        std::max (0, value_rect.x - label_gap),
+        h
+      };
+    }
+
+    case LABEL_RIGHT: {
+      const t_rect value_rect = value_area_rect ();
+      const int label_x = value_rect.x + value_rect.w + label_gap;
+      return {
+        label_x,
+        0,
+        std::max (0, w - label_x),
+        h
+      };
+    }
+
+    case LABEL_ABOVE:
+    case LABEL_BELOW:
+    case LABEL_NONE:
+    default:
+      return c_valuewidget::value_label_rect ();
+  }
+}
+
+bool c_knob::highlighted () const {
+  return hovered || widget_has_focus (*this);
 }
 
 void c_knob::draw (cairo_t *cr, bool draw_label, bool draw_value) {
   if (!cr)
     return;
 
-  const bool highlight = hovered || widget_has_focus (*this);
+  const bool highlight = highlighted ();
   const t_statecolors &colors = colors_for (
     WSTYLE_BUTTON,
     pressed ? WSTATE_DOWN : highlight ? nbtk::WSTATE_HOVER : nbtk::WSTATE_NORMAL);
 
-  const std::string label_text = get_label_text ();
-  const int label_h = (!draw_label || label_text.empty ()) ? 0 :
-    std::max (14, (int) (fontsize * font_multiplier () + 4));
+  if (draw_label)
+    draw_value_label (cr);
+
+  const t_rect value_rect =
+    draw_label ? value_area_rect () : t_rect { 0, 0, w, h };
+  if (value_rect.w <= 0 || value_rect.h <= 0)
+    return;
+
+  cairo_save (cr);
+  cairo_translate (cr, value_rect.x, value_rect.y);
+  cairo_rectangle (cr, 0, 0, value_rect.w, value_rect.h);
+  cairo_clip (cr);
+
+  const int old_w = w;
+  const int old_h = h;
+  w = value_rect.w;
+  h = value_rect.h;
+
+  const int label_h = 0;
   const int knob_h = std::max (1, h - label_h);
   const double cx = w * 0.5;
   const double cy = knob_h * 0.5;
@@ -2688,7 +2812,6 @@ void c_knob::draw (cairo_t *cr, bool draw_label, bool draw_value) {
   const double indicator_radius = std::max (3.0, knob_size * 0.45);
   const double highlight_radius = indicator_radius * 0.8;
 
-  cairo_save (cr);
   if (!draw_nbtk_knob_image (cr, knob_x, knob_y, knob_size)) {
     cairo_arc (cr, cx, cy, radius, 0.0, 2.0 * M_PI);
     tk_set_gradient (cr, radius * 2.0, colors.bg);
@@ -2750,16 +2873,8 @@ void c_knob::draw (cairo_t *cr, bool draw_label, bool draw_value) {
     cairo_show_text (cr, text.c_str ());
   }
 
-  if (draw_label && !label_text.empty ()) {
-    cairo_text_extents_t ext {};
-    cairo_text_extents (cr, label_text.c_str (), &ext);
-    cairo_move_to (
-      cr,
-      cx - ext.width * 0.5 - ext.x_bearing,
-      h - label_h * 0.5 + ext.height * 0.5);
-    cairo_show_text (cr, label_text.c_str ());
-  }
-
+  w = old_w;
+  h = old_h;
   cairo_restore (cr);
 }
 
@@ -2771,7 +2886,7 @@ c_simpleknob::c_simpleknob () {
   show_value = false;
 }
 
-std::string c_simpleknob::get_label_text () const {
+std::string c_simpleknob::get_label_string () const {
   return get_value_string ();
 }
 
@@ -2898,11 +3013,15 @@ c_textbox::c_textbox () {
   corner_radius = NBTK_TEXTBOX_RADIUS;
 }
 
+bool c_textbox::highlighted () const {
+  return widget_has_focus (*this);
+}
+
 void c_textbox::draw (cairo_t *cr) {
   if (!cr)
     return;
 
-  const bool focused = widget_has_focus (*this);
+  const bool focused = highlighted ();
   const t_statecolors &frame = colors_for (WSTYLE_FRAME, nbtk::WSTATE_NORMAL);
   const t_statecolors &focus_colors = colors_for (WSTYLE_FRAME, nbtk::WSTATE_SELECTED);
   const nbtk::t_gradientcolors &bg = nbtk::get_colortheme ()->window_bg;
@@ -2918,7 +3037,8 @@ void c_textbox::draw (cairo_t *cr) {
   cairo_fill_preserve (cr);
 
   tk_set_gradient (cr, h, outline);
-  cairo_set_line_width (cr, focused ? 2.0 : 1.5);
+  //cairo_set_line_width (cr, focused ? 2.0 : 1.5);
+  cairo_set_line_width (cr, /*highlight ? line_width_highlight : */line_width);
   cairo_stroke (cr);
 
   cairo_save (cr);
@@ -4868,7 +4988,7 @@ static void fill_rounded_rect (
   nbtk::fill_rounded_rect (w, x, y, width, height, radius, colors);
 }
 
-static void draw_rounded_rect (
+/*static void draw_rounded_rect (
     nbtk::t_native_widget *w,
     int x,
     int y,
@@ -4908,7 +5028,7 @@ static void draw_rounded_rect (
     return;
 
   draw_rounded_rect (w, x, y, width, height, radius, colors, line_width);
-}
+}*/
 
 } // namespace nbtk
 

@@ -509,6 +509,11 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
   a2 = a2_ * inv_a0;
 }
 
+float g_defaultfreqs [] = { 50.0f,    100.0f,    250.0f,   500.0f,
+                            1000.0f,  2000.0f,  4000.0f,  8000.0f };
+_eq_band_mode g_defaultmodes [] = { EQ_HIPASS, EQ_LOWSHELF, EQ_CURVE, EQ_CURVE,
+                                  EQ_CURVE, EQ_CURVE, EQ_HISHELF, EQ_LOWPASS };
+
 void c_biquad::disable () { CP
   b0 = 1.0f;
   b1 = b2 = a1 = a2 = z1 = z2 = 0.0f;
@@ -527,21 +532,18 @@ void c_eq::set_samplerate (int sr) {
     if (mode [i] == EQ_OFF || freq [i] <= 0.0f)
       bands [i].disable ();
     else
-      bands [i].set_peak (sr, freq [i], gain_db [i], q [i], mode [i]);
+      bands [i].set_peak (
+        sr, freq [i], gain_db [i] + master_gain_db, q [i], mode [i]);
   }
 }
-
-float g_defaultfreqs [] = { 50.0f,    100.0f,    250.0f,   500.0f,
-                            1000.0f,  2000.0f,  4000.0f,  8000.0f };
-_eq_band_mode g_defaultmodes [] = { EQ_HIPASS, EQ_LOWSHELF, EQ_CURVE, EQ_CURVE,
-                                  EQ_CURVE, EQ_CURVE, EQ_HISHELF, EQ_LOWPASS };
 
 c_eq::c_eq () {
   reset ();
 }
 
 void c_eq::reset () {
-                             
+  
+  master_gain_db = 0.0f;
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     enabled [i] = false;
     freq [i] = g_defaultfreqs [i];
@@ -585,7 +587,18 @@ void c_eq::set_band (int band_,
   }
   
   bands [b].set_peak (
-    samplerate, freq [b], gain_db [b], q [b], this->mode [b]);
+    samplerate,
+    freq [b],
+    gain_db [b] + master_gain_db,
+    q [b],
+    this->mode [b]);
+}
+
+void c_eq::set_master_gain_db (float db) {
+  master_gain_db = db;
+
+  for (int i = 0; i < EQ_NUM_BANDS; ++i)
+    set_band (i, freq [i], gain_db [i], q [i], mode [i]);
 }
 
 void c_eq::process_block (float *buf, uint32_t nframes) {
@@ -613,6 +626,7 @@ bool c_eq::set_enabled (int band_, bool enabled_) {
 
 static void eq_to_state (const c_eq &eq, c_eq_state &state) {
   state.on = eq.on;
+  state.master_gain_db = eq.master_gain_db;
 
   for (int i = 0; i < EQ_NUM_BANDS; ++i) {
     state.enabled [i] = eq.enabled [i];
@@ -2404,6 +2418,16 @@ bool c_neuralblender::set_eq_bypass (_lane_bank bank, bool bypass) {
     return false;
 
   eq->on = !bypass;
+  request_mix_update ();
+  return true;
+}
+
+bool c_neuralblender::set_eq_master_gain_db (_lane_bank bank, float db) {
+  c_eq *eq = eq_for_bank (this, bank);
+  if (!eq)
+    return false;
+
+  eq->set_master_gain_db (std::clamp (db, -36.0f, 36.0f));
   return true;
 }
 

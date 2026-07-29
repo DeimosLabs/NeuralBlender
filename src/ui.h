@@ -88,6 +88,7 @@ enum _widget_role {
   ROLE_EQ_FREQ,
   ROLE_EQ_GAIN,
   ROLE_EQ_Q,
+  ROLE_EQ_MASTER_GAIN,
   ROLE_UNKNOWN
 };
 
@@ -278,7 +279,7 @@ public:
     return "";
   }
 
-  std::string get_label_text () const override {
+  std::string get_label_string () const override {
     return nbtk::c_knob::get_value_string () + "Hz";
   }
 };
@@ -289,14 +290,25 @@ public:
     return "";
   }
 
-  std::string get_label_text () const override {
+  std::string get_label_string () const override {
     return "Q=" + nbtk::c_knob::get_value_string ();
+  }
+};
+
+class c_gainknob : public nbtk::c_knob {
+public:
+  std::string get_value_string () const override {
+    return "";
+  }
+
+  std::string get_label_string () const override {
+    return "Gain: " + nbtk::c_knob::get_value_string () + "dB";
   }
 };
 
 class c_gainslider : public nbtk::c_slider {
 public:
-  std::string get_label_text () const override {
+  std::string get_label_string () const override {
     return nbtk::c_slider::get_value_string () + "dB";
   }
 };
@@ -328,7 +340,10 @@ public:
   nbtk::c_frame       frame;
   //nbtk::c_canvas      graph;
   nbtk::c_label       label;
-  nbtk::c_frame   cont_bands;
+  //c_gainknob          knob_dry_out;
+  //c_gainknob          knob_wet_out;
+  c_gainknob          knob_gain;
+  nbtk::c_frame       cont_bands;
   c_eqband_widgets    bands [EQ_NUM_BANDS];
   
   c_neuralblender_ui  *ui;
@@ -403,6 +418,7 @@ public:
   virtual void on_presence (nbtk::c_widget *w, float f)              = 0;
   virtual void on_threshgain (nbtk::c_widget *w, float f)            = 0;
   virtual void on_eq_band (nbtk::c_widget *w, _lane_bank bank, size_t band) = 0;
+  virtual void on_eq_master_gain (nbtk::c_widget *w, _lane_bank bank, float f) = 0;
   virtual void on_excl (nbtk::c_widget *w, int n)                       ; // UI only
           void on_excl_use (nbtk::c_widget *w, bool b)                  ;
           void on_action (nbtk::t_action_event &event)                  ;

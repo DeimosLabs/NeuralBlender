@@ -134,8 +134,10 @@ enum nb_lv2_port {
 
   PORT_EQPRE_FIRST,
   PORT_EQPRE_LAST = PORT_EQPRE_FIRST + EQ_NUM_BANDS * 5 - 1,
+  PORT_EQPRE_MASTER_GAIN,
   PORT_EQPOST_FIRST,
   PORT_EQPOST_LAST = PORT_EQPOST_FIRST + EQ_NUM_BANDS * 5 - 1,
+  PORT_EQPOST_MASTER_GAIN,
 
   PORT_CONTROL,
   PORT_NOTIFY,
@@ -206,6 +208,16 @@ static inline uint32_t nb_lv2_eq_port (
   const uint32_t first =
       (bank == BANK_EQPOST) ? PORT_EQPOST_FIRST : PORT_EQPRE_FIRST;
   return first + (uint32_t) band * NB_LV2_EQ_PORT_COUNT + param;
+}
+
+static inline uint32_t nb_lv2_eq_master_gain_port (_lane_bank bank) {
+  return bank == BANK_EQPOST ? PORT_EQPOST_MASTER_GAIN : PORT_EQPRE_MASTER_GAIN;
+}
+
+static inline const char *nb_lv2_eq_master_gain_uri (_lane_bank bank) {
+  return bank == BANK_EQPOST
+    ? NB_URI "#eqpost_master_gain"
+    : NB_URI "#eqpre_master_gain";
 }
 
 static inline bool nb_lv2_decode_eq_port (
@@ -355,6 +367,7 @@ public:
   LV2_URID urid_model [NB_NUM_MODELS] = { 0 };
   LV2_URID urid_bank_model [BANK_COUNT] [NB_NUM_MODELS] = {};
   LV2_URID urid_eq_param [BANK_COUNT] [EQ_NUM_BANDS] [NB_LV2_EQ_PORT_COUNT] = {};
+  LV2_URID urid_eq_master_gain [BANK_COUNT] = {};
   LV2_URID urid_meters = 0;
   LV2_URID urid_stats = 0;
   LV2_URID urid_calib_target_db = 0;
@@ -446,6 +459,8 @@ public:
 
     for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
       const size_t bank = (size_t) b;
+      urid_eq_master_gain [bank] =
+        map->map (map->handle, nb_lv2_eq_master_gain_uri (b));
       for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
         for (uint32_t param = 0; param < NB_LV2_EQ_PORT_COUNT; ++param) {
           char uri [128];
@@ -522,6 +537,7 @@ public:
   void on_master_gain (nbtk::c_widget *w, float f) override;
   void on_presence (nbtk::c_widget *w, float f) override;
   void on_eq_band (nbtk::c_widget *w, _lane_bank bank, size_t band) override;
+  void on_eq_master_gain (nbtk::c_widget *w, _lane_bank bank, float f) override;
   void on_bank_switch (nbtk::c_widget *w, int n) override;
   int idle () override;
   void apply_prefs (t_prefs &p) override;

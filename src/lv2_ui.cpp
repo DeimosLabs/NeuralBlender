@@ -448,6 +448,19 @@ void c_lv2_ui::on_eq_band (
   }
 }
 
+void c_lv2_ui::on_eq_master_gain (
+    nbtk::c_widget *w, _lane_bank bank, float value) {
+  (void) w;
+  if (bank == BANK_EQPRE)
+    state.eqpre.master_gain_db = value;
+  else if (bank == BANK_EQPOST)
+    state.eqpost.master_gain_db = value;
+  else
+    return;
+
+  write_control (nb_lv2_eq_master_gain_port (bank), value);
+}
+
 void c_lv2_ui::on_bank_switch (nbtk::c_widget *w, int n) {
   c_neuralblender_ui::on_bank_switch (w, n);
   write_control (PORT_ACTIVE_PAGE, (float) visible_page);
@@ -694,6 +707,22 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     else
       state.amp_bypass = bypassed;
     sync_widgets_from_state (state);
+    updating_from_state = old_updating_from_state;
+    updating_from_host = false;
+    return;
+  }
+
+  if (port == PORT_EQPRE_MASTER_GAIN ||
+      port == PORT_EQPOST_MASTER_GAIN) {
+    const _lane_bank eq_bank =
+      port == PORT_EQPOST_MASTER_GAIN ? BANK_EQPOST : BANK_EQPRE;
+    c_eq_state &eq_state =
+      eq_bank == BANK_EQPOST ? state.eqpost : state.eqpre;
+    eq_state.master_gain_db = value;
+    if (eq_bank == BANK_EQPOST)
+      eqpage_post.knob_gain.set_value (value);
+    else
+      eqpage_pre.knob_gain.set_value (value);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;
@@ -1033,6 +1062,17 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
   if (value->type == urid_atom_Float) {
     for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
       const size_t bank = (size_t) b;
+      if (prop != urid_eq_master_gain [bank])
+        continue;
+
+      set_port_value (
+        nb_lv2_eq_master_gain_port (b),
+        ((const LV2_Atom_Float *) value)->body);
+      return;
+    }
+
+    for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
+      const size_t bank = (size_t) b;
       for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
         for (uint32_t param = 0; param < NB_LV2_EQ_PORT_COUNT; ++param) {
           if (prop != urid_eq_param [bank] [band] [param])
@@ -1106,6 +1146,12 @@ void c_lv2_ui::subscribe_ports () {
   }
 
   for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
+    subscribe->subscribe (
+      subscribe->handle,
+      nb_lv2_eq_master_gain_port (b),
+      0,
+      NULL);
+
     for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
       for (uint32_t param = 0; param < NB_LV2_EQ_PORT_COUNT; ++param) {
         subscribe->subscribe (

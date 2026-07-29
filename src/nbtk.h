@@ -225,6 +225,7 @@ public:
   virtual void move (int x, int y);
   virtual void resize (int w, int h);
   virtual void move_resize (int x, int y, int w, int h);
+  virtual bool highlighted () const;
   void invalidate ();
   void invalidate_rect (int x, int y, int w, int h);
   void set_tooltip (const char *text);
@@ -251,6 +252,8 @@ public:
   int h = 0;
   float text_size = 1.0f;
   float corner_radius = 0.0f;
+  float line_width = 2.0f;
+  float line_width_highlight = 2.5f;
   _textalign align = TEXT_CENTER;
   bool visible = true;
   bool enabled = true;
@@ -286,7 +289,7 @@ public:
   virtual float normalized_value () const;
   virtual float value_from_normalized (float normalized) const;
   virtual std::string get_value_string () const;
-  virtual std::string get_label_text () const;
+  virtual std::string get_label_string () const;
   virtual bool parse_value_string (const std::string &text, float &out) const;
   virtual bool hit_value_label (int x, int y) const;
   virtual void show_value_editor ();
@@ -301,6 +304,7 @@ public:
   float default_value = 0.0f;
   float step = 0.01f;
   _label_position label_position = LABEL_NONE;
+  _textalign label_align = TEXT_CENTER;
   float label_fontsize = 12.0f;
   int label_gap = 4;
   bool reset_on_doubleclick = true;
@@ -324,6 +328,7 @@ public:
   void on_mouse_leave () override;
   void clear_hover () override;
   _mouse_cursor mouse_cursor () const override;
+  bool highlighted () const override;
 
   float fontsize = 13.0f;
   bool link = false;
@@ -342,6 +347,7 @@ public:
   void on_mouse_enter () override;
   void on_mouse_leave () override;
   void clear_hover () override;
+  bool highlighted () const override;
   bool set_value (bool value);
   void set_image (const unsigned char *png, _widget_state which = WSTATE_ALL);
 
@@ -419,6 +425,7 @@ public:
   bool on_mouse_up (int x, int y, int button) override;
   bool on_mouse_move (int x, int y) override;
   void on_mouse_leave () override;
+  bool highlighted () const override;
 
   bool set_value (float value, bool notify = false) override;
   void set_page_size (float value);
@@ -495,6 +502,7 @@ public:
 
   void draw (cairo_t *cr) override;
   void resize (int w, int h) override;
+  bool highlighted () const override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
   bool on_key_down (int key) override;
@@ -550,6 +558,7 @@ public:
       int h) override;
 
   void draw (cairo_t *cr) override;
+  bool highlighted () const override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
   bool on_key_down (int key) override;
@@ -610,14 +619,17 @@ public:
   bool on_mouse_move (int x, int y) override;
   bool on_key_down (int key) override;
   void on_mouse_leave () override;
+  bool highlighted () const override;
 
   bool set_value (float value, bool notify = false) override;
   float normalized_value () const override;
   float value_from_normalized (float normalized) const override;
   float angle_from_value () const;
   std::string get_value_string () const override;
-  std::string get_label_text () const override;
+  std::string get_label_string () const override;
   bool hit_value_label (int x, int y) const override;
+  t_rect value_area_rect () const override;
+  t_rect value_label_rect () const override;
 
   float drag_sensitivity = 0.005f;
   float log_taper = 1.0f;
@@ -636,7 +648,7 @@ private:
 class c_simpleknob : public c_knob {
 public:
   c_simpleknob ();
-  std::string get_label_text () const override;
+  std::string get_label_string () const override;
 };
 
 class c_textbox : public c_widget {
@@ -649,6 +661,7 @@ public:
   bool on_mouse_move (int x, int y) override;
   bool on_key_down (int key) override;
   bool on_text_input (const char *text) override;
+  bool highlighted () const override;
 
   bool set_text (const char *text);
   const std::string &text () const;

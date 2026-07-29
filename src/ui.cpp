@@ -295,8 +295,8 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   text_vuscale.set_tooltip ("Minimum dB value visible on VU meters");
   text_vuheadroom.set_tooltip ("Extra headroom given to VU meters above 0dB");
   btn_calib_default.set_tooltip ("Enable calibration by default for newly loaded lanes");
-  btn_bypass_doubleclick.set_tooltip ("Toggle bypassing banks when clicking the top button again");
-  btn_bypass_rightclick.set_tooltip ("Toggle bypassing banks when right-clicking the top button");
+  btn_bypass_doubleclick.set_tooltip ("Toggle bypassing banks when clicking its top button again");
+  btn_bypass_rightclick.set_tooltip ("Toggle bypassing banks when right-clicking its top button");
   btn_show_tooltips.set_tooltip ("No idea what this does");
   
   btn_cancel.create (&root_widget, "Cancel", 0, 0, 128, 40);
@@ -1042,7 +1042,18 @@ void c_eqpage_widgets::create (
   frame.create (parent, "", x, y, w, h);
   cont_bands.create (&frame, "", 0, 0, w, h);
   label.create (&frame, str.c_str (), 0, 0, 300, 30);
-  label.align = nbtk::TEXT_CENTER;
+  label.align = nbtk::TEXT_LEFT;
+  knob_gain.create (&frame, "", 0, 0, 40, 56);
+  knob_gain.text_size = 0.75;
+  knob_gain.label_position = nbtk::LABEL_LEFT;
+  knob_gain.label_align = nbtk::TEXT_LEFT;
+  knob_gain.role = ROLE_EQ_MASTER_GAIN;
+  knob_gain.bank = bank_id;
+  knob_gain.set_min (-36.0f);
+  knob_gain.set_max (36.0f);
+  knob_gain.set_default (0.0f);
+  knob_gain.set_value (0.0f);
+  knob_gain.set_step (0.1f);
   
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     bands [i].slider_gain.create (&cont_bands, "", 0, 0, 12, 200);
@@ -1077,7 +1088,7 @@ void c_eqpage_widgets::create (
     bands [i].menu_mode.set_selected ((int) g_defaultmodes [i] - 1);
     bands [i].menu_mode.text_size = 0.75;
 
-    bands [i].knob_freq.create (&cont_bands, "Freq", 0, 300, 40, 64);
+    bands [i].knob_freq.create (&cont_bands, "Freq", 0, 300, 36, 50);
     bands [i].knob_freq.role = ROLE_EQ_FREQ;
     bands [i].knob_freq.bank = bank_id;
     bands [i].knob_freq.lane = i;
@@ -1088,7 +1099,7 @@ void c_eqpage_widgets::create (
     bands [i].knob_freq.set_default (g_defaultfreqs [i]);
     bands [i].knob_freq.set_value (g_defaultfreqs [i]);
     bands [i].knob_freq.text_size = 0.75;
-    bands [i].knob_q.create (&cont_bands, "Q", 0, 380, 40, 64);
+    bands [i].knob_q.create (&cont_bands, "Q", 0, 380, 36, 50);
     bands [i].knob_q.role = ROLE_EQ_Q;
     bands [i].knob_q.bank = bank_id;
     bands [i].knob_q.lane = i;
@@ -1106,7 +1117,7 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   const int frame_h = std::max (1, h);
   frame.move_resize (x, y, frame_w, frame_h);
   const int padding = 16;
-  const int title_h = 32;
+  const int title_h = 48;
   const int inner_x = padding;
   const int inner_y = padding + title_h + 8;
   const int inner_w = std::max (1, frame_w - padding * 2);
@@ -1129,7 +1140,12 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   const int freq_y = menu_y + menu_h + 6;
   const int q_y = freq_y + knob_h;
   
-  label.move_resize (padding, padding, std::max (1, frame_w - padding * 2), title_h);
+  label.move_resize (padding, padding, std::max (1, frame_w / 2), title_h);
+  knob_gain.move_resize (
+    std::max (padding + 80, frame_w - padding - 138),
+    padding,
+    130,
+    title_h);
   cont_bands.move_resize (0, 0, frame_w, frame_h);
   
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
@@ -1150,6 +1166,8 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
 }
 
 void c_eqpage_widgets::sync_from_state (const c_eq_state &eq_state) {
+  knob_gain.set_value (eq_state.master_gain_db);
+
   for (int i = 0; i < EQ_NUM_BANDS; ++i) {
     bands [i].btn_on.set_value (eq_state.enabled [i]);
     bands [i].menu_mode.set_selected (std::clamp (
@@ -2257,6 +2275,21 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
 
   if (handle_eq_widget (event.source))
     return;
+
+  if (event.source &&
+      event.source->role == ROLE_EQ_MASTER_GAIN &&
+      (event.source->bank == BANK_EQPRE || event.source->bank == BANK_EQPOST)) {
+    const _lane_bank bank = (_lane_bank) event.source->bank;
+    c_eq_state &eq =
+      bank == BANK_EQPRE ? state.eqpre : state.eqpost;
+    eq.master_gain_db = std::clamp (
+      static_cast<nbtk::c_knob *> (event.source)->value,
+      -36.0f,
+      36.0f);
+    on_eq_master_gain (event.source, bank, eq.master_gain_db);
+    finish ();
+    return;
+  }
 
   auto handle_knob = [&] (nbtk::c_knob &knob, _widget_role role) {
     if (event.source_id != knob.id)
