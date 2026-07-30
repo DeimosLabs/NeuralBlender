@@ -523,11 +523,11 @@ static std::string tk_format_value (float value, float step) {
   return text;
 }
 
-static int tk_measure_text_width (const std::string &text, float fontsize) {
+static int tk_measure_text_width (const std::string &text, float font_size) {
   cairo_surface_t *surface =
     cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 1, 1);
   cairo_t *cr = cairo_create (surface);
-  cairo_set_font_size (cr, fontsize);
+  cairo_set_font_size (cr, font_size);
 
   cairo_text_extents_t ext;
   cairo_text_extents (cr, text.c_str (), &ext);
@@ -661,15 +661,16 @@ int c_valuewidget::label_extent () const {
   if (label_position == LABEL_NONE || text.empty ())
     return 0;
 
-  const float font_size = label_fontsize * font_multiplier ();
+  const float effective_font_size = font_size (label_text_size);
   if (label_position == LABEL_LEFT || label_position == LABEL_RIGHT) {
-    const int text_w = (int) std::ceil (text.size () * font_size * 0.62f + 8.0f);
+    const int text_w =
+      (int) std::ceil (text.size () * effective_font_size * 0.62f + 8.0f);
     return std::max (18, text_w) + label_gap;
   }
 
   return std::max (
       14,
-      (int) std::ceil (font_size + 4.0f)) +
+      (int) std::ceil (effective_font_size + 4.0f)) +
     label_gap;
 }
 
@@ -733,7 +734,7 @@ void c_valuewidget::draw_value_label (cairo_t *cr) {
   cairo_save (cr);
   cairo_rectangle (cr, r.x, r.y, r.w, r.h);
   cairo_clip (cr);
-  cairo_set_font_size (cr, label_fontsize * font_multiplier ());
+  cairo_set_font_size (cr, font_size (label_text_size));
   tk_set_text_fg (cr, enabled);
   cairo_text_extents_t ext {};
   cairo_text_extents (cr, text.c_str (), &ext);
@@ -787,8 +788,7 @@ void c_label::draw (cairo_t *cr) {
   
   //cairo_select_font_face (
   //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  const float font_size = fontsize * font_multiplier ();
-  cairo_set_font_size (cr, font_size);
+  cairo_set_font_size (cr, font_size ());
   if (!enabled)
     tk_set_text_fg (cr, false);
   else if (link)
@@ -998,7 +998,7 @@ void c_button::draw (cairo_t *cr) {
       }
 
       cairo_save (cr);
-      cairo_set_font_size (cr, 14.0 * font_multiplier ());
+      cairo_set_font_size (cr, font_size (TEXTSIZE_NORMAL));
       cairo_text_extents_t ext {};
       if (have_text)
         cairo_text_extents (cr, label.c_str (), &ext);
@@ -1040,7 +1040,7 @@ void c_button::draw (cairo_t *cr) {
 
   //cairo_select_font_face (
   //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-  cairo_set_font_size (cr, 14.0 * font_multiplier ());
+  cairo_set_font_size (cr, font_size (TEXTSIZE_NORMAL));
   tk_set_text_fg (cr, enabled);
   cairo_text_extents_t ext;
   cairo_text_extents (cr, label.c_str (), &ext);
@@ -1152,7 +1152,7 @@ void c_imagebutton::draw (cairo_t *cr) {
     return;
   }
 
-  cairo_set_font_size (cr, 14.0 * font_multiplier ());
+  cairo_set_font_size (cr, font_size (TEXTSIZE_NORMAL));
   tk_set_text_fg (cr, enabled);
   cairo_text_extents_t ext;
   cairo_text_extents (cr, label.c_str (), &ext);
@@ -1208,7 +1208,7 @@ void c_checkbox::draw (cairo_t *cr) {
 
   //cairo_select_font_face (
   //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (cr, 13.0 * font_multiplier ());
+  cairo_set_font_size (cr, font_size ());
   tk_set_text_fg (cr, enabled);
   cairo_text_extents_t ext {};
   cairo_text_extents (cr, label.c_str (), &ext);
@@ -2007,7 +2007,7 @@ void c_listbox::draw (cairo_t *cr) {
 
   //cairo_select_font_face (
   //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (cr, fontsize * font_multiplier ());
+  cairo_set_font_size (cr, font_size ());
   cairo_font_extents_t font_ext {};
   cairo_font_extents (cr, &font_ext);
   const double text_baseline =
@@ -2217,7 +2217,7 @@ void c_combobox::draw (cairo_t *cr) {
 
   //cairo_select_font_face (
   //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (cr, 13.0 * font_multiplier ());
+  cairo_set_font_size (cr, font_size ());
   cairo_text_extents_t ext {};
   cairo_text_extents (cr, text.c_str (), &ext);
   tk_set_text_fg (cr, enabled);
@@ -2441,8 +2441,7 @@ int c_combobox::measure_dropdown_width () {
 
   //cairo_select_font_face (
   //    cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  const float font_scale = app ? app->font_scale : 1.0f;
-  cairo_set_font_size (cr, listbox.fontsize * text_size * font_scale);
+  cairo_set_font_size (cr, listbox.font_size (text_size));
 
   double widest = 0.0;
   for (const std::string &item : items) {
@@ -2880,7 +2879,7 @@ void c_knob::draw (cairo_t *cr, bool draw_label, bool draw_value) {
 
   //cairo_select_font_face (
   //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (cr, fontsize * font_multiplier ());
+  cairo_set_font_size (cr, font_size ());
   tk_set_text_fg (cr, enabled);
 
   if (draw_value) {
@@ -3075,7 +3074,7 @@ void c_textbox::draw (cairo_t *cr) {
 
   //cairo_select_font_face (
   //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (cr, fontsize * font_multiplier ());
+  cairo_set_font_size (cr, font_size ());
 
   cairo_text_extents_t extents {};
   cairo_text_extents (cr, value.c_str (), &extents);
@@ -3132,7 +3131,7 @@ bool c_textbox::on_mouse_down (int x_, int y_, int button) {
   cairo_t *cr = cairo_create (surface);
   //cairo_select_font_face (
   //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (cr, fontsize * font_multiplier ());
+  cairo_set_font_size (cr, font_size ());
 
   const double pad = 8.0 * font_multiplier ();
   cursor = cursor_from_x (cr, (double) x_ - pad + scroll_x);
@@ -3209,7 +3208,7 @@ bool c_textbox::on_mouse_move (int x_, int y_) {
   cairo_t *cr = cairo_create (surface);
   //cairo_select_font_face (
   //  cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (cr, fontsize * font_multiplier ());
+  cairo_set_font_size (cr, font_size ());
 
   const double pad = 8.0 * font_multiplier ();
   const size_t next_cursor = cursor_from_x (cr, (double) x_ - pad + scroll_x);
@@ -3874,8 +3873,14 @@ bool c_widget::contains_local (int px, int py) const {
   return px >= x && py >= y && px < x + w && py < y + h;
 }
 
+// TODO: cleanup these font size shenanigans
 float c_widget::font_multiplier () const {
   return text_size * (app ? app->font_scale : 1.0f);
+}
+
+float c_widget::font_size (float multiplier) const {
+  const float base = app ? app->fontsize : 13.0f;
+  return base * font_multiplier () * multiplier;
 }
 
 void c_widget::show () {
@@ -4636,7 +4641,6 @@ void c_valueeditor_popup::create_for_value (
   root.corner_radius = NBTK_TEXTBOX_RADIUS;
 
   textbox.create (&root, "", 4, 4, 112, 22);
-  textbox.fontsize = 13.0f;
 }
 
 void c_valueeditor_popup::show_near_owner () {
@@ -4644,7 +4648,7 @@ void c_valueeditor_popup::show_near_owner () {
     return;
 
   const std::string text = value_widget->get_value_string ();
-  const int text_w = tk_measure_text_width (text, textbox.fontsize);
+  const int text_w = tk_measure_text_width (text, textbox.font_size ());
   const int editor_w = std::clamp (
       std::max ({ value_widget->w, text_w + 32, 120 }),
       84,
@@ -4737,7 +4741,7 @@ void c_tooltip::set_text (const char *text) {
     frame.corner_radius = NBTK_TOOLTIP_RADIUS;
     label.create (&frame, "", 6, 3, 1, 1);
     label.align = TEXT_LEFT;
-    label.fontsize = 11.0f;
+    label.text_size = TEXTSIZE_COMPACT;
   }
 
   label.label = str;
@@ -4761,7 +4765,7 @@ void c_tooltip::set_text (const char *text) {
   cairo_t *measure_cr = cairo_create (measure_surface);
   //cairo_select_font_face (
   //    measure_cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size (measure_cr, label.fontsize * label.font_multiplier ());
+  cairo_set_font_size (measure_cr, label.font_size ());
   cairo_text_extents_t ext {};
   cairo_text_extents (measure_cr, str, &ext);
   cairo_destroy (measure_cr);
@@ -5073,6 +5077,7 @@ bool c_native_toplevelwindow::create (
   app_context = app_;
   backend = app_context ? app_context->backend.get () : NULL;
   parent = parent_;
+  transient_owner = owner_;
 
   if (!app_context || !app_context->native_app)
     return false;
@@ -5104,7 +5109,7 @@ bool c_native_toplevelwindow::create (
 
   native_register_wm_delete_window (widget);
   auto_close (true);
-  nbtk::t_native_widget *owner = nbtk::as_native_widget (owner_);
+  nbtk::t_native_widget *owner = nbtk::as_native_widget (transient_owner);
   if (owner)
     native_set_transient_for_hint (owner, widget);
   set_title (title_);
@@ -5184,6 +5189,35 @@ void c_native_toplevelwindow::set_min_size (int w, int h) {
     return;
 
   native_set_window_min_size (widget, w, h, w, h);
+}
+
+void c_native_toplevelwindow::center_over (nbtk::t_native_handle owner_) {
+  nbtk::t_native_widget *owner = nbtk::as_native_widget (owner_);
+  if (!widget || !backend || !owner || !owner->app)
+    return;
+
+  Metrics_t owner_metrics;
+  native_get_window_metrics (owner, &owner_metrics);
+  if (owner_metrics.width <= 0 || owner_metrics.height <= 0)
+    return;
+
+  const float hdpi = owner->app->hdpi > 0.0f ? owner->app->hdpi : 1.0f;
+  const int owner_w = std::max (1, (int) (owner_metrics.width / hdpi));
+  const int owner_h = std::max (1, (int) (owner_metrics.height / hdpi));
+  const int self_w = std::max (1, w ());
+  const int self_h = std::max (1, h ());
+  const nbtk::t_point owner_screen = backend->root_to_screen (owner_, { 0, 0 });
+
+  backend->move_resize (
+      widget,
+      owner_screen.x + (owner_w - self_w) / 2,
+      owner_screen.y + (owner_h - self_h) / 2,
+      self_w,
+      self_h);
+}
+
+void c_native_toplevelwindow::center_over_transient_owner () {
+  center_over (transient_owner);
 }
 
 void c_native_toplevelwindow::show () {
@@ -6261,10 +6295,8 @@ void nbtk::c_filepicker::create (
   frame.create (&root_widget, "", 8, 8, 504, 360);
   //label_path.create (&frame, "", 12, 10, 480, 24);
   //label_path.align = TEXT_LEFT;
-  //label_path.fontsize = 12.0f;
   text_path.create (&frame, "", 12, 10, 480, 30);
   text_path.filepicker = this;
-  text_path.fontsize = 12.0f;
 
   listbox.create (&frame, "", 12, 50, 456, 300);
   listbox.activate_on_click_again = true;
@@ -6302,6 +6334,7 @@ void nbtk::c_filepicker::show () {
 
   activate ();
   scan_current_dir ();
+  center_over_transient_owner ();
   c_native_toplevelwindow::show ();
 }
 

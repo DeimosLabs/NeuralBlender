@@ -36,6 +36,13 @@
 
 namespace nbtk {
 
+static constexpr float TEXTSIZE_MINI    = 0.75f; // about  9pt on 13pt base
+static constexpr float TEXTSIZE_SMALL   = 0.80f; // about 10pt on 13pt base
+static constexpr float TEXTSIZE_COMPACT = 0.90f; // about 11pt on 13pt base
+static constexpr float TEXTSIZE_NORMAL  = 1.00f; // about 12pt on 13pt base
+static constexpr float TEXTSIZE_LARGE   = 1.10f; // about 14pt on 13pt base
+static constexpr float TEXTSIZE_HUGE    = 1.25f; // about 15pt on 13pt base
+
 struct t_gradient;
 struct t_gradientcolors;
 
@@ -220,6 +227,7 @@ public:
   t_rect rect () const;
   bool contains_local (int px, int py) const;
   float font_multiplier () const;
+  float font_size (float multiplier = 1.0f) const;
   void show ();
   void hide ();
   virtual void move (int x, int y);
@@ -305,7 +313,7 @@ public:
   float step = 0.01f;
   _label_position label_position = LABEL_NONE;
   _textalign label_align = TEXT_CENTER;
-  float label_fontsize = 12.0f;
+  float label_text_size = 1.0f;
   int label_gap = 4;
   bool reset_on_doubleclick = true;
   bool edit_on_label_doubleclick = true;
@@ -330,7 +338,6 @@ public:
   _mouse_cursor mouse_cursor () const override;
   bool highlighted () const override;
 
-  float fontsize = 13.0f;
   bool link = false;
 };
 
@@ -537,7 +544,6 @@ public:
   int selected = -1;
   int first_visible = 0;
   int row_height = 24;
-  float fontsize = 13.0f;
   bool activate_on_doubleclick = true;
   bool activate_on_click_again = false;
   bool activate_on_single_click = false;
@@ -638,7 +644,6 @@ public:
   float drag_sensitivity = 0.005f;
   float log_taper = 1.0f;
   bool show_value = true;
-  float fontsize = 12.0f;
   _knob_doubleclick_action doubleclick_action = _KNOB_DOUBLECLICK_SETDEFAULT;
 
 private:
@@ -673,7 +678,6 @@ public:
   std::string value;
   size_t cursor = 0;
   size_t selection_anchor = 0;
-  float fontsize = 13.0f;
 
 private:
   void emit_action ();
@@ -796,6 +800,7 @@ public:
   bool key_shift = false;
   bool key_ctrl = false;
   bool key_alt = false;
+  float fontsize = 13.0f;
   float font_scale = 1.0f;
 };
 
@@ -1077,6 +1082,8 @@ public:
 
   void set_min_size_to_current ();
   virtual void set_min_size (int w, int h);
+  void center_over (nbtk::t_native_handle owner);
+  void center_over_transient_owner ();
   void show ();
   void hide ();
   void auto_close (bool b = true);
@@ -1111,6 +1118,7 @@ public:
   c_app *app_context = NULL;
   c_native_backend *backend = NULL;
   nbtk::t_native_handle widget = nullptr;
+  nbtk::t_native_handle transient_owner = nullptr;
   nbtk::t_native_window window = 0;
   nbtk::t_native_window parent = 0;
 };

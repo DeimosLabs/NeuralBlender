@@ -348,6 +348,7 @@ void c_prefswindow::show () { CP
   if (!widget)
     create (ui);
   
+  center_over_transient_owner ();
   nbtk::c_toplevelwindow::show ();
 }
 
@@ -430,7 +431,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
       &ui->nbtk_app,
       native_root,
       "About NeuralBlender (tk)",
-      470, 0, 450, 500,
+      0, 0, 450, 500,
       ui->mainwindow.native_handle ()))
     return;
 
@@ -451,12 +452,10 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   for (int i = 0; g_about_text [i]; i++) {
     label_text [i].create (
       &frame_main, g_about_text [i], 0, 240 + i * 24, panel_w, 24);
-    label_text [i].fontsize = 13.0f;
   }
 
   /*label_link.create (
     &frame_main, "http://deimos.ca/neuralblender", 0, 336, panel_w, 24);
-  label_link.fontsize = 13.0f;
   label_link.link = true;*/
   label_text [4].link = true;
   label_text [5].link = true;
@@ -464,7 +463,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   char buf [64];
   snprintf (buf, sizeof (buf), "Build timestamp: %s", g_build_timestamp);
   label_build.create (&frame_main, buf, 0, 390, panel_w, 20);
-  label_build.fontsize = 10.0f;
+  label_build.text_size = nbtk::TEXTSIZE_MINI;
 
   btn_ok.create (root, "OK", 310, 424, 128, 40);
   btn_ok.set_image_default (data_icon_xputty_approved_png);
@@ -476,6 +475,7 @@ void c_aboutwindow::show () { CP
   if (!widget)
     return;
 
+  center_over_transient_owner ();
   nbtk::c_toplevelwindow::show ();
 }
 
@@ -804,13 +804,13 @@ void c_lane_widgets::create (
   //label_flip.create (ui, wp, "DC flip", 0, 0, 75, 32);
   //label_calib.create (ui, wp, "Calib.", 0, 0, 75, 32);
   label_frames.create (&lane_frame, "(not loaded)", 0, 0, 75, 24);
-  label_frames.fontsize = 10.5f;
+  label_frames.text_size = nbtk::TEXTSIZE_COMPACT;
   label_frames.align = nbtk::TEXT_CENTER;
   label_trim.create (&lane_frame, "1.0", 0, 0, 75, 24);
-  label_trim.fontsize = 10.5f;
+  label_trim.text_size = nbtk::TEXTSIZE_COMPACT;
   label_trim.align = nbtk::TEXT_CENTER;
   label_engine.create (&lane_frame, "(none)", 0, 0, 120, 24);
-  label_engine.fontsize = 10.5f;
+  label_engine.text_size = nbtk::TEXTSIZE_COMPACT;
   label_engine.align = nbtk::TEXT_CENTER;
   
   btn_excl.create   (&lane_frame, "Use", 0, 0, 100, 40);
@@ -1065,7 +1065,7 @@ void c_eqpage_widgets::create (
     bands [i].slider_gain.set_value (0.0f);
     bands [i].slider_gain.set_page_size (6.0f / 72.0f);
     bands [i].slider_gain.label_position = nbtk::LABEL_BELOW;
-    bands [i].slider_gain.label_fontsize = 11.0f;
+    bands [i].slider_gain.label_text_size = nbtk::TEXTSIZE_COMPACT;
     bands [i].slider_gain.label_gap = 4;
     bands [i].slider_gain.track_size = 16;
     bands [i].slider_gain.role = ROLE_EQ_GAIN;
@@ -1079,7 +1079,6 @@ void c_eqpage_widgets::create (
     bands [i].btn_on.lane = i;
     
     bands [i].menu_mode.create (&cont_bands, "", 0, 280, 92, 32);
-    //bands [i].menu_mode.fontsize = 8.0f;
     bands [i].menu_mode.set_items ({
       "HP", "Low", "Bell", "High", "LP"
     });
