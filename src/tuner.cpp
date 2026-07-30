@@ -38,7 +38,7 @@ c_pitchtracker::c_pitchtracker () { CP }
 c_pitchtracker::~c_pitchtracker () { CP }
 
 void c_pitchtracker::set_samplerate (int sr) { CP
-  if (sr < 800 || sr > 192000)
+  if (sr < 8000 || sr > 192000)
     return;
 
   samplerate = sr;

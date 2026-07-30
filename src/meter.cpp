@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 
@@ -50,6 +51,12 @@ static float linear_to_db_meter (float f) {
     return -200.0f;
 
   return 20.0f * log10f (f);
+}
+
+static uint64_t meter_now_ms () {
+  using clock = std::chrono::steady_clock;
+  return std::chrono::duration_cast<std::chrono::milliseconds> (
+    clock::now ().time_since_epoch ()).count ();
 }
 
 void c_vudata::set_headroom (float db) {
@@ -138,9 +145,16 @@ bool c_vudata::update () {
   bool changed = false;
   if (m_bufcount % (size_t) redraw_every == 0) {
     const size_t now = m_bufcount / (size_t) redraw_every;
-    const size_t peak_hold_frames = std::max (1, (int) (VU_PEAK_HOLD * bufs_sec / redraw_every));
-    const size_t clip_hold_frames = std::max (1, (int) (VU_CLIP_HOLD * bufs_sec / redraw_every));
-    const size_t xrun_hold_frames = std::max (1, (int) (VU_XRUN_HOLD * bufs_sec / redraw_every));
+    auto hold_frames = [&] (size_t ms) {
+      return std::max<size_t> (
+        1,
+        (size_t) std::ceil (
+          (double) ms * (double) bufs_sec /
+          ((double) redraw_every * 1000.0)));
+    };
+    const size_t peak_hold_frames = hold_frames (peak_hold_ms);
+    const size_t clip_hold_frames = hold_frames (clip_hold_ms);
+    const size_t xrun_hold_frames = hold_frames (xrun_hold_ms);
 
     const float plus_l = m_plus_l.exchange (0.0f);
     const float minus_l = m_minus_l.exchange (0.0f);
@@ -225,6 +239,21 @@ void c_vudata::set_db_scale (float db) {
   needs_redraw.store (true);
 }
 
+void c_vudata::set_peak_hold (size_t ms) {
+  peak_hold_ms = ms;
+  needs_redraw.store (true);
+}
+
+void c_vudata::set_clip_hold (size_t ms) {
+  clip_hold_ms = ms;
+  needs_redraw.store (true);
+}
+
+void c_vudata::set_xrun_hold (size_t ms) {
+  xrun_hold_ms = ms;
+  needs_redraw.store (true);
+}
+
 void c_vudata::set_l (float level, float hold, bool clip, bool xrun) {
   m_l.store (std::max (0.0f, level));
   m_display_l.store (db_scaled (level));
@@ -254,8 +283,17 @@ void c_vudata::set_l_smooth (float level, float hold, bool clip, bool xrun) {
   m_l.store (linear);
   m_display_l.store (next);
   m_peak_l.store (std::max (0.0f, hold));
-  clip_l.store (clip);
-  xrun_l.store (xrun);
+  const uint64_t now = meter_now_ms ();
+  if (clip)
+    m_wall_timestamp_clip_l = now;
+  if (xrun)
+    m_wall_timestamp_xrun_l = now;
+  clip_l.store (
+    m_wall_timestamp_clip_l &&
+    now - m_wall_timestamp_clip_l < clip_hold_ms);
+  xrun_l.store (
+    m_wall_timestamp_xrun_l &&
+    now - m_wall_timestamp_xrun_l < xrun_hold_ms);
   needs_redraw.store (true);
 }
 
@@ -270,8 +308,17 @@ void c_vudata::set_r_smooth (float level, float hold, bool clip, bool xrun) {
   m_r.store (linear);
   m_display_r.store (next);
   m_peak_r.store (std::max (0.0f, hold));
-  clip_r.store (clip);
-  xrun_r.store (xrun);
+  const uint64_t now = meter_now_ms ();
+  if (clip)
+    m_wall_timestamp_clip_r = now;
+  if (xrun)
+    m_wall_timestamp_xrun_r = now;
+  clip_r.store (
+    m_wall_timestamp_clip_r &&
+    now - m_wall_timestamp_clip_r < clip_hold_ms);
+  xrun_r.store (
+    m_wall_timestamp_xrun_r &&
+    now - m_wall_timestamp_xrun_r < xrun_hold_ms);
   needs_redraw.store (true);
 }
 
@@ -569,10 +616,31 @@ void c_meterwidget::set_headroom (float f) {
     data->set_headroom (headroom);
 }
 
+void c_meterwidget::set_peak_hold (size_t ms) {
+  peak_hold_ms = ms;
+  if (data)
+    data->set_peak_hold (ms);
+}
+
+void c_meterwidget::set_clip_hold (size_t ms) {
+  clip_hold_ms = ms;
+  if (data)
+    data->set_clip_hold (ms);
+}
+
+void c_meterwidget::set_xrun_hold (size_t ms) {
+  xrun_hold_ms = ms;
+  if (data)
+    data->set_xrun_hold (ms);
+}
+
 void c_meterwidget::set_vudata (c_vudata *v) {
   data = v;
   set_db_scale (db_scale);
   set_headroom (headroom);
+  set_peak_hold (peak_hold_ms);
+  set_clip_hold (clip_hold_ms);
+  set_xrun_hold (xrun_hold_ms);
 }
 
 c_vudata *c_meterwidget::get_vudata () {
@@ -839,13 +907,8 @@ void c_meterwidget::on_paint (cairo_t *cr) {
   if (!data)
     return;
 
-  const float clip_threshold = data->clip_threshold_gain ();
-  const bool clip_l = data->clip_l.load () ||
-                      data->linear_l () >= clip_threshold ||
-                      data->linear_peak_l () >= clip_threshold;
-  const bool clip_r = data->clip_r.load () ||
-                      data->linear_r () >= clip_threshold ||
-                      data->linear_peak_r () >= clip_threshold;
+  const bool clip_l = data->clip_l.load ();
+  const bool clip_r = data->clip_r.load ();
   if (stereo) {
     draw_bar (cr, t1, t2 - t1, data->l (), data->peak_l (), clip_l);
     draw_bar (cr, t3, t4 - t3, data->r (), data->peak_r (), clip_r);

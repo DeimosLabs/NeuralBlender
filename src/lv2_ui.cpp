@@ -903,10 +903,37 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
     case ATOM_METERS: {
       const uint32_t old_need = (1 + NB_NUM_MODELS) * 2;
       const uint32_t banked_need = BANK_COUNT * old_need;
+      const uint32_t clip_need = (1 + NB_NUM_MODELS) * 3;
+      const uint32_t banked_clip_need = BANK_COUNT * clip_need;
       if (count < old_need)
         return;
 
-      if (count >= banked_need) {
+      if (count >= banked_clip_need) {
+        auto read_meter = [&] (c_vudata &meter, size_t &n) {
+          meter.set_l_smooth (values [n], values [n + 1], values [n + 2] != 0.0f);
+          n += 3;
+        };
+
+        size_t n = 0;
+        for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
+          const _lane_bank bank_id = (_lane_bank) bank;
+          c_lane_widgets *bank_lanes =
+            lv2_ui_is_model_bank (bank_id) ? lanes_for_bank (bank_id) : NULL;
+
+          read_meter (vudata_in [bank], n);
+
+          for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
+            if (bank_lanes)
+              read_meter (bank_lanes [lane].vudata_out, n);
+            else
+              n += 3;
+          }
+        }
+        if (count >= banked_clip_need + 6) {
+          read_meter (vudata_masterin, n);
+          read_meter (vudata_masterout, n);
+        }
+      } else if (count >= banked_need) {
         size_t n = 0;
         for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
           const _lane_bank bank_id = (_lane_bank) bank;

@@ -24,9 +24,9 @@
 #define DEFAULT_VU_DB       -40.0f
 #define DEFAULT_VU_HEADROOM 3.0f
 #define VU_REDRAW_EVERY     0.033333333f
-#define VU_PEAK_HOLD        1.000000000f
-#define VU_CLIP_HOLD        1.000000000f
-#define VU_XRUN_HOLD        1.000000000f
+#define VU_PEAK_HOLD        1000
+#define VU_CLIP_HOLD        300
+#define VU_XRUN_HOLD        1000
 #define VU_FALL_SPEED       0.020000000f
 
 typedef struct _cairo cairo_t;
@@ -63,6 +63,9 @@ public:
   void set_display_l (float level, float hold, bool clip = false, bool xrun = false);
   void set_display_r (float level, float hold, bool clip = false, bool xrun = false);
   void set_headroom (float db);
+  void set_peak_hold (size_t ms);
+  void set_clip_hold (size_t ms);
+  void set_xrun_hold (size_t ms);
 
   float l () const;
   float r () const;
@@ -88,7 +91,10 @@ public:
   int samplerate = 48000;
   int bufsize = 128;
   float clip_threshold_db = 6.0f;
-
+  size_t clip_hold_ms = VU_CLIP_HOLD;
+  size_t peak_hold_ms = VU_PEAK_HOLD;
+  size_t xrun_hold_ms = VU_XRUN_HOLD;
+  
 private:
   static float clamp01 (float f);
   static void atomic_max (std::atomic<float> &dst, float value);
@@ -115,6 +121,10 @@ private:
   size_t m_timestamp_clip_r = 0;
   size_t m_timestamp_xrun_l = 0;
   size_t m_timestamp_xrun_r = 0;
+  uint64_t m_wall_timestamp_clip_l = 0;
+  uint64_t m_wall_timestamp_clip_r = 0;
+  uint64_t m_wall_timestamp_xrun_l = 0;
+  uint64_t m_wall_timestamp_xrun_r = 0;
 };
 
 #ifdef HAVE_GUI
@@ -134,11 +144,15 @@ public:
   void resize (int w, int h) override;
 
   void set_db_scale (float f);
-  void set_headroom (float f);
   void set_vudata (c_vudata *v);
   c_vudata *get_vudata ();
   bool needs_redraw ();
   void on_ui_timer ();
+  
+  void set_headroom (float f);
+  void set_peak_hold (size_t ms);
+  void set_clip_hold (size_t ms);
+  void set_xrun_hold (size_t ms);
 
   void set_stereo (bool b);
   void set_l (float level, float hold, bool clip = false, bool xrun = false);
@@ -155,6 +169,9 @@ public:
   bool rec_enabled = false;
   c_vudata *data = NULL;
   float db_scale = DEFAULT_VU_DB;
+  size_t peak_hold_ms = VU_PEAK_HOLD;
+  size_t clip_hold_ms = VU_CLIP_HOLD;
+  size_t xrun_hold_ms = VU_XRUN_HOLD;
 
 protected:
   void render_base (cairo_t *cr) override;

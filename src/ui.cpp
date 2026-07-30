@@ -2424,6 +2424,9 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
   char buf [128];
   const float scale_db = p.vu_scale_db <= 0.0f ? p.vu_scale_db : DEFAULT_VU_DB;
   const float headroom_db = std::clamp (p.vu_headroom_db, 0.0f, 12.0f);
+  const size_t peak_hold_ms = 1000;
+  const size_t clip_hold_ms = 200;
+  const size_t xrun_hold_ms = 1000;
 
   nbtk_app.show_tooltips = p.show_tooltips;
   if (!nbtk_app.show_tooltips)
@@ -2432,29 +2435,36 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     meter_in [bank].set_db_scale (scale_db);
     meter_in [bank].set_headroom (headroom_db);
-    vudata_in [bank].set_db_scale (scale_db);
-    vudata_in [bank].set_headroom (headroom_db);
+    meter_in [bank].set_peak_hold (peak_hold_ms);
+    meter_in [bank].set_clip_hold (clip_hold_ms);
+    meter_in [bank].set_xrun_hold (xrun_hold_ms);
   }
   for (size_t i = 0; i < 2; ++i) {
     meter_eqout [i].set_db_scale (scale_db);
     meter_eqout [i].set_headroom (headroom_db);
+    meter_eqout [i].set_peak_hold (peak_hold_ms);
+    meter_eqout [i].set_clip_hold (clip_hold_ms);
+    meter_eqout [i].set_xrun_hold (xrun_hold_ms);
   }
   meter_in [PAGE_OTHER].set_db_scale (scale_db);
   meter_in [PAGE_OTHER].set_headroom (headroom_db);
+  meter_in [PAGE_OTHER].set_peak_hold (peak_hold_ms);
+  meter_in [PAGE_OTHER].set_clip_hold (clip_hold_ms);
+  meter_in [PAGE_OTHER].set_xrun_hold (xrun_hold_ms);
   meter_masterout.set_db_scale (scale_db);
   meter_masterout.set_headroom (headroom_db);
-  vudata_masterin.set_db_scale (scale_db);
-  vudata_masterin.set_headroom (headroom_db);
-  vudata_masterout.set_db_scale (scale_db);
-  vudata_masterout.set_headroom (headroom_db);
+  meter_masterout.set_peak_hold (peak_hold_ms);
+  meter_masterout.set_clip_hold (clip_hold_ms);
+  meter_masterout.set_xrun_hold (xrun_hold_ms);
 
   for (_lane_bank bank_id : MODEL_BANKS) {
     c_lane_widgets *bank_lanes = lanes_for_bank (bank_id);
     for (size_t i = 0; i < NB_NUM_MODELS; i++) {
       bank_lanes [i].meter_out.set_db_scale (scale_db);
       bank_lanes [i].meter_out.set_headroom (headroom_db);
-      bank_lanes [i].vudata_out.set_db_scale (scale_db);
-      bank_lanes [i].vudata_out.set_headroom (headroom_db);
+      bank_lanes [i].meter_out.set_peak_hold (peak_hold_ms);
+      bank_lanes [i].meter_out.set_clip_hold (clip_hold_ms);
+      bank_lanes [i].meter_out.set_xrun_hold (xrun_hold_ms);
     }
   }
 

@@ -1161,22 +1161,24 @@ static bool forge_next_eq_notify (Plugin *self) {
 }
 
 static void forge_meter_notify (Plugin *self) {
-  float values [BANK_COUNT * (1 + NB_NUM_MODELS) * 2 + 4];
+  float values [BANK_COUNT * (1 + NB_NUM_MODELS) * 3 + 6];
   size_t n = 0;
+  auto write_meter = [&] (c_vudata &meter) {
+    values [n++] = meter.linear_l ();
+    values [n++] = meter.linear_peak_l ();
+    values [n++] =
+      meter.linear_l () >= meter.clip_threshold_gain () ? 1.0f : 0.0f;
+  };
 
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
-    values [n++] = self->meter_in [bank].linear_l ();
-    values [n++] = self->meter_in [bank].linear_peak_l ();
+    write_meter (self->meter_in [bank]);
 
     for (int i = 0; i < NB_NUM_MODELS; i++) {
-      values [n++] = self->meters_out [bank] [i].linear_l ();
-      values [n++] = self->meters_out [bank] [i].linear_peak_l ();
+      write_meter (self->meters_out [bank] [i]);
     }
   }
-  values [n++] = self->meter_masterin.linear_l ();
-  values [n++] = self->meter_masterin.linear_peak_l ();
-  values [n++] = self->meter_masterout.linear_l ();
-  values [n++] = self->meter_masterout.linear_peak_l ();
+  write_meter (self->meter_masterin);
+  write_meter (self->meter_masterout);
 
   LV2_Atom_Forge_Frame frame;
   lv2_atom_forge_frame_time (&self->forge, 0);
