@@ -804,7 +804,7 @@ void c_meterwidget::draw_bar (
     holdpos = std::clamp(holdpos, 1, met_len);
 
     cairo_set_source_rgba (cr, 1.0, 1.0, 1.0, 0.75);
-    cairo_set_line_width (cr, 1.0);
+    cairo_set_line_width (cr, 2.0);
     if (vertical) {
       const double py = height - rec_size - holdpos + 0.5;
       cairo_move_to (cr, at, py);

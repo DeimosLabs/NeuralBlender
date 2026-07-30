@@ -1031,18 +1031,19 @@ void c_eqpage_widgets::create (
     //size_t                   lane_id,
     int x, int y, int w, int h) { CP
   
+  char buf [128];
   ui = ui_;
-  std::string str;
+  std::string eqstr;
   if (bank_id == BANK_EQPRE)
-    str = "Pre-EQ";
+    eqstr = "Pre-EQ";
   else if (bank_id == BANK_EQPOST)
-    str = "Post-EQ";
+    eqstr = "Post-EQ";
   else
-    str = "EQ";
+    eqstr = "EQ";
   
   frame.create (parent, "", x, y, w, h);
   cont_bands.create (&frame, "", 0, 0, w, h);
-  label.create (&frame, str.c_str (), 0, 0, 300, 30);
+  label.create (&frame, eqstr.c_str (), 0, 0, 300, 30);
   label.align = nbtk::TEXT_LEFT;
   knob_gain.create (&frame, "", 0, 0, 40, 56);
   knob_gain.text_size = 0.75;
@@ -1055,6 +1056,8 @@ void c_eqpage_widgets::create (
   knob_gain.set_default (0.0f);
   knob_gain.set_value (0.0f);
   knob_gain.set_step (0.1f);
+  std::string tooltip_str ("Master gain for " + eqstr);
+  knob_gain.set_tooltip (tooltip_str.c_str ());
   
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     bands [i].slider_gain.create (&cont_bands, "", 0, 0, 12, 200);
@@ -1071,12 +1074,16 @@ void c_eqpage_widgets::create (
     bands [i].slider_gain.role = ROLE_EQ_GAIN;
     bands [i].slider_gain.bank = bank_id;
     bands [i].slider_gain.lane = i;
+    snprintf (buf, 127, "Gain for band %d", i + 1);
+    bands [i].slider_gain.set_tooltip (buf);
     
     bands [i].btn_on.create (&cont_bands, "", 0, 250, 32, 32);
     bands [i].btn_on.is_toggle = true;
     bands [i].btn_on.role = ROLE_EQ_ENABLED;
     bands [i].btn_on.bank = bank_id;
     bands [i].btn_on.lane = i;
+    snprintf (buf, 127, "Toggle band %d on/off", i + 1);
+    bands [i].btn_on.set_tooltip (buf);
     
     bands [i].menu_mode.create (&cont_bands, "", 0, 280, 92, 32);
     bands [i].menu_mode.set_items ({
@@ -1087,6 +1094,8 @@ void c_eqpage_widgets::create (
     bands [i].menu_mode.lane = i;
     bands [i].menu_mode.set_selected ((int) g_defaultmodes [i] - 1);
     bands [i].menu_mode.text_size = 0.75;
+    snprintf (buf, 127, "Band %d filtering mode", i + 1);
+    bands [i].menu_mode.set_tooltip (buf);
 
     bands [i].knob_freq.create (&cont_bands, "Freq", 0, 300, 36, 50);
     bands [i].knob_freq.role = ROLE_EQ_FREQ;
@@ -1099,6 +1108,9 @@ void c_eqpage_widgets::create (
     bands [i].knob_freq.set_default (g_defaultfreqs [i]);
     bands [i].knob_freq.set_value (g_defaultfreqs [i]);
     bands [i].knob_freq.text_size = 0.75;
+    snprintf (buf, 127, "Band %d center frequency", i + 1);
+    bands [i].knob_freq.set_tooltip (buf);
+    
     bands [i].knob_q.create (&cont_bands, "Q", 0, 380, 36, 50);
     bands [i].knob_q.role = ROLE_EQ_Q;
     bands [i].knob_q.bank = bank_id;
@@ -1109,6 +1121,9 @@ void c_eqpage_widgets::create (
     bands [i].knob_q.set_value (1.0f);
     bands [i].knob_q.log_taper = 3.0f;
     bands [i].knob_q.text_size = 0.75;
+    snprintf (buf, 127, "Q/width for band %d (higher Q = narrower band)", i + 1);
+    bands [i].knob_q.set_tooltip (buf);
+    
   }
 }
 
