@@ -532,8 +532,5 @@ public:
   bool config_file_read = false;
   bool config_file_written = false;
   bool ui_resize_lock = false;
-  bool ui_resize_pending = false;
-  int pending_resize_w = 0;
-  int pending_resize_h = 0;
   float stats [BANK_COUNT] [NB_NUM_MODELS * UI_STATS_PER_LANE];
 };

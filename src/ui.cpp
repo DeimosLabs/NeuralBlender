@@ -1625,11 +1625,10 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     int window_width = std::max (MIN_WINDOW_WIDTH, mainwindow.w ());
     int window_height = std::max (MIN_WINDOW_HEIGHT, mainwindow.h ());
 
-    debug ("move_resize: snap=%d visible=%d main=%d,%d metrics=%d,%d pending=%d,%d",
+    debug ("move_resize: snap=%d visible=%d main=%d,%d metrics=%d,%d",
            (int) snap_to_default, (int) metrics_visible,
            mainwindow.w (), mainwindow.h (),
-           metrics_w, metrics_h,
-           pending_resize_w, pending_resize_h);
+           metrics_w, metrics_h);
     if (!snap_to_default && metrics_visible) {
       window_width = std::max (MIN_WINDOW_WIDTH, metrics_w);
       window_height = std::max (MIN_WINDOW_HEIGHT, metrics_h);
@@ -2636,23 +2635,12 @@ void c_neuralblender_ui::on_window_resize (int w, int h) {
     return;
 
   debug ("on_window_resize: %d,%d", w, h);
-  pending_resize_w = w;
-  pending_resize_h = h;
-  ui_resize_pending = true;
-}
-
-void c_neuralblender_ui::on_window_configured () {
-  if (!ui_ready || ui_resize_lock || !ui_resize_pending)
-    return;
-
-  debug ("on_window_configured: consume pending resize %d,%d",
-         pending_resize_w, pending_resize_h);
-  ui_resize_pending = false;
   move_resize ();
   mainwindow.show_children ();
   sync_tuner_visibility ();
-  pending_resize_w = 0;
-  pending_resize_h = 0;
+}
+
+void c_neuralblender_ui::on_window_configured () {
 }
 
 bool c_neuralblender_ui::request_window_size (int w, int h) {
@@ -2706,14 +2694,6 @@ int c_neuralblender_ui::idle () {
   if (!ui_ready) {
     CP
     return 0;
-  }
-
-  if (ui_resize_pending && !ui_resize_lock) {
-    debug ("idle: consume pending resize %d,%d", pending_resize_w, pending_resize_h);
-    ui_resize_pending = false;
-    move_resize ();
-    pending_resize_w = 0;
-    pending_resize_h = 0;
   }
 
   if (nbtk_app.backend)

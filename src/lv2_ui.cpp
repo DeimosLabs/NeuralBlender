@@ -485,13 +485,6 @@ int c_lv2_ui::idle () {
   if (!ui_ready)
     return 0;
 
-  if (ui_resize_pending && !ui_resize_lock) {
-    ui_resize_pending = false;
-    move_resize ();
-    pending_resize_w = 0;
-    pending_resize_h = 0;
-  }
-
   if (nbtk_app.backend)
     nbtk_app.backend->run_events (&app);
 
