@@ -1744,7 +1744,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
 
       meter_in [PAGE_OTHER].move_resize (5, meter_top, METER_WIDTH, meter_h);
       meter_masterout.move_resize (
-        window_width - 4 - METER_WIDTH, meter_top, METER_WIDTH, meter_h);
+        window_width - 5 - METER_WIDTH, meter_top, METER_WIDTH, meter_h);
       const int panelsplit = panelwidth * 2 / 5;
       frame_other_volumepresence.move_resize (16, 0, panelsplit - 12, 120);
       frame_other_noisegate.move_resize (panelsplit + 16, 0, panelwidth - panelsplit, 120);
