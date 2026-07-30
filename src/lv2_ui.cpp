@@ -828,6 +828,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
       case NB_LV2_LANE_MUTE:
         lane_state.lane_mute = value >= 0.5f;
         bank_lanes [lane].btn_mute.set_value (lane_state.lane_mute);
+        sync_widgets_from_state (state);
       break;
 
       case NB_LV2_LANE_DCFLIP:

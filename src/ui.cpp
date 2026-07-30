@@ -660,6 +660,7 @@ void c_lane_widgets::on_action (nbtk::t_action_event &event) {
         ui->on_mute (&button, value);
         if (lane_state)
           lane_state->lane_mute = value;
+        ui->sync_widgets_from_state (ui->state);
       break;
 
       case ROLE_EXCL_USE:
