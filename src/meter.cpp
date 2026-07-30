@@ -64,6 +64,11 @@ void c_vudata::set_headroom (float db) {
   needs_redraw.store (true);
 }
 
+void c_vudata::set_clip_threshold (float db) {
+  clip_threshold_db = std::clamp (db, -120.0f, +40.0f);
+  needs_redraw.store (true);
+}
+
 /*float c_vudata::db_scaled (float f) const {
   const float scale = m_db_scale.load ();
   float ret = 0.0f;
@@ -614,6 +619,11 @@ void c_meterwidget::set_headroom (float f) {
   headroom = std::max (0.0f, f);
   if (data)
     data->set_headroom (headroom);
+}
+
+void c_meterwidget::set_clip_thresh (float f) {
+  if (data)
+    data->set_clip_threshold (f);
 }
 
 void c_meterwidget::set_peak_hold (size_t ms) {

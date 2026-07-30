@@ -66,6 +66,7 @@ public:
   void set_peak_hold (size_t ms);
   void set_clip_hold (size_t ms);
   void set_xrun_hold (size_t ms);
+  void set_clip_threshold (float db);
 
   float l () const;
   float r () const;
@@ -90,7 +91,7 @@ public:
   float redraw_interval = VU_REDRAW_EVERY;
   int samplerate = 48000;
   int bufsize = 128;
-  float clip_threshold_db = 6.0f;
+  float clip_threshold_db = 0.0f;
   size_t clip_hold_ms = VU_CLIP_HOLD;
   size_t peak_hold_ms = VU_PEAK_HOLD;
   size_t xrun_hold_ms = VU_XRUN_HOLD;
@@ -149,6 +150,7 @@ public:
   bool needs_redraw ();
   void on_ui_timer ();
   
+  void set_clip_thresh (float f);
   void set_headroom (float f);
   void set_peak_hold (size_t ms);
   void set_clip_hold (size_t ms);
