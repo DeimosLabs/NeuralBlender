@@ -337,11 +337,11 @@ public:
   void sync_from_state (const c_eq_state &state);
   void set_state (nbtk::_widget_state state);
   
+  nbtk::c_widget      cont_sliders;
+  nbtk::c_widget      cont_graph;
   nbtk::c_frame       frame;
-  //nbtk::c_canvas      graph;
+  nbtk::c_canvas      graph;
   nbtk::c_label       label;
-  //c_gainknob          knob_dry_out;
-  //c_gainknob          knob_wet_out;
   c_gainknob          knob_gain;
   nbtk::c_frame       cont_bands;
   c_eqband_widgets    bands [EQ_NUM_BANDS];

@@ -1181,7 +1181,7 @@ void c_checkbox::draw (cairo_t *cr) {
   const t_statecolors &colors = colors_for (
       WSTYLE_BUTTON,
       enabled ? tk_button_state (*this) : nbtk::WSTATE_DISABLED);
-  const int box = std::max (24, std::min (h - 4, 24));
+  const int box = std::max (16, std::min (h - 4, 24));
   const int bx = 2;
   const int by = (h - box) / 2;
 
@@ -1262,6 +1262,15 @@ void c_scrollbar::set_orientation (_scrollbar_orientation orientation_) {
   invalidate ();
 }
 
+t_rect c_scrollbar::track_rect () const {
+  return {
+    1,
+    1,
+    std::max (1, w - 2),
+    std::max (1, h - 2)
+  };
+}
+
 t_rect c_scrollbar::thumb_rect () const {
   if (orientation == SCROLLBAR_HORIZONTAL) {
     const int track_w = std::max (1, w - 4);
@@ -1313,7 +1322,14 @@ void c_scrollbar::draw (cairo_t *cr) {
     highlighted () ? nbtk::WSTATE_SELECTED : nbtk::WSTATE_NORMAL);
   const nbtk::t_gradientcolors &bg = nbtk::get_colortheme ()->window_bg;
 
-  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
+  const t_rect track = track_rect ();
+  tk_path_rounded_rect (
+      cr,
+      track.x,
+      track.y,
+      track.w,
+      track.h,
+      corner_radius);
   cairo_set_source_rgba (cr, bg.r1, bg.g1, bg.b1, bg.a1);
   cairo_fill_preserve (cr);
   cairo_set_source_rgba (
@@ -1329,7 +1345,10 @@ void c_scrollbar::draw (cairo_t *cr) {
       r.w,
       r.h,
       std::max (0.0f, corner_radius - (float) (r.x - 2)));
-  tk_set_gradient (cr, r.h, thumb.bg);
+  if (solid_thumb)
+    tk_set_gradient (cr, r.h, frame.bg);
+  else
+    tk_set_gradient (cr, r.h, thumb.bg);
   cairo_fill_preserve (cr);
   cairo_set_source_rgba (
       cr,
@@ -1439,6 +1458,7 @@ void c_scrollbar::on_mouse_leave () {
 
 c_slider::c_slider () {
   wants_keyboard_focus = true;
+  solid_thumb = true;
 }
 
 bool c_slider::highlighted () const {
@@ -1446,38 +1466,22 @@ bool c_slider::highlighted () const {
 }
 
 void c_slider::draw (cairo_t *cr) {
-  if (label_extent () <= 0) {
-    const t_rect track = slider_track_rect ();
-    if (track.x == 0 && track.y == 0 && track.w == w && track.h == h) {
-      c_scrollbar::draw (cr);
-      return;
-    }
+  const int thumb_pad = 7;
+  if (label_extent () > 0)
+    draw_value_label (cr);
 
-    cairo_save (cr);
-    cairo_translate (cr, track.x, track.y);
-    cairo_rectangle (cr, 0, 0, track.w, track.h);
-    cairo_clip (cr);
-
-    const int old_w = w;
-    const int old_h = h;
-    w = track.w;
-    h = track.h;
-    c_scrollbar::draw (cr);
-    w = old_w;
-    h = old_h;
-    cairo_restore (cr);
-    return;
-  }
-
-  draw_value_label (cr);
-
-  const t_rect r = slider_track_rect ();
+  const t_rect r = slider_control_rect ();
   if (r.w <= 0 || r.h <= 0)
     return;
 
   cairo_save (cr);
   cairo_translate (cr, r.x, r.y);
-  cairo_rectangle (cr, 0, 0, r.w, r.h);
+  cairo_rectangle (
+    cr,
+    -thumb_pad,
+    -thumb_pad,
+    r.w + thumb_pad * 2,
+    r.h + thumb_pad * 2);
   cairo_clip (cr);
 
   const int old_w = w;
@@ -1491,7 +1495,17 @@ void c_slider::draw (cairo_t *cr) {
   cairo_restore (cr);
 }
 
-t_rect c_slider::slider_track_rect () const {
+t_rect c_slider::thumb_rect () const {
+  t_rect r = c_scrollbar::thumb_rect ();
+  int diameter = std::max (1, std::min (r.w, r.h)) + 4;
+  int rad = diameter / 2;
+  int cx = r.x + r.w / 2;
+  int cy = r.y + r.h / 2;
+  
+  return { cx - rad, cy - rad, diameter, diameter };
+}
+
+t_rect c_slider::slider_control_rect () const {
   const t_rect r = value_area_rect ();
   if (track_size <= 0)
     return r;
@@ -1513,6 +1527,29 @@ t_rect c_slider::slider_track_rect () const {
     track_w,
     r.h
   };
+}
+
+t_rect c_slider::track_rect () const {
+  const int pad = 3;
+  t_rect r = c_scrollbar::track_rect ();
+
+  if (orientation == SCROLLBAR_HORIZONTAL) {
+    const int inset = std::min (pad, std::max (0, (r.h - 1) / 2));
+    r.y += inset;
+    r.h = std::max (1, r.h - inset * 2);
+    const int end_inset = std::min (pad, std::max (0, (r.w - 1) / 2));
+    r.x += end_inset;
+    r.w = std::max (1, r.w - end_inset * 2);
+  } else {
+    const int inset = std::min (pad, std::max (0, (r.w - 1) / 2));
+    r.x += inset;
+    r.w = std::max (1, r.w - inset * 2);
+    const int end_inset = std::min (pad, std::max (0, (r.h - 1) / 2));
+    r.y += end_inset;
+    r.h = std::max (1, r.h - end_inset * 2);
+  }
+
+  return r;
 }
 
 template <class Func>
@@ -1561,7 +1598,7 @@ bool c_slider::on_mouse_down (int x_, int y_, int button) {
     return c_widget::on_mouse_down (x_, y_, button);
   }
 
-  const t_rect r = slider_track_rect ();
+  const t_rect r = slider_control_rect ();
   if (r.w <= 0 || r.h <= 0)
     return true;
 
@@ -1585,14 +1622,14 @@ bool c_slider::on_mouse_down (int x_, int y_, int button) {
 }
 
 bool c_slider::on_mouse_up (int x_, int y_, int button) {
-  const t_rect r = slider_track_rect ();
+  const t_rect r = slider_control_rect ();
   return with_value_area_geometry (this, r, [&] {
     return c_scrollbar::on_mouse_up (x_ - r.x, y_ - r.y, button);
   });
 }
 
 bool c_slider::on_mouse_move (int x_, int y_) {
-  const t_rect r = slider_track_rect ();
+  const t_rect r = slider_control_rect ();
   return with_value_area_geometry (this, r, [&] {
     return c_scrollbar::on_mouse_move (x_ - r.x, y_ - r.y);
   });
@@ -2692,7 +2729,10 @@ bool c_knob::set_value (float value_, bool notify) {
   return c_valuewidget::set_value (value_, notify);
 }
 
-/*float c_knob::normalized_value () const {
+#ifdef USE_OLD_POWF_CURVE
+// old powf curve, keeping for reference
+
+float c_knob::normalized_value () const {
   if (max <= min)
     return 0.0f;
 
@@ -2715,6 +2755,11 @@ float c_knob::value_from_normalized (float normalized) const {
 
   return min + std::clamp (tapered, 0.0f, 1.0f) * (max - min);
 }*/
+
+#else
+// proper log taper
+// with 20Hz to 20KHz, a taper of 51.5011 will put 1KHz right in the middle,
+// while 60.0 is the logarithmic midpoint placing middle at 632Hz
 
 float c_knob::normalized_value () const {
   if (max <= min)
@@ -2747,6 +2792,9 @@ float c_knob::value_from_normalized (float normalized) const {
 
   return min + tapered * (max - min);
 }
+
+#endif
+
 float c_knob::angle_from_value () const {
   const float start = 3.0f * M_PI / 4.0f;
   const float sweep = 3.0f * M_PI / 2.0f;

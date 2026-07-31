@@ -1043,6 +1043,10 @@ void c_eqpage_widgets::create (
   
   frame.create (parent, "", x, y, w, h);
   cont_bands.create (&frame, "", 0, 0, w, h);
+  cont_graph.create (&cont_bands, "", 32, 0, w, h / 3);
+  graph.create (&cont_graph, "", 0, 0, w, h / 3);
+  cont_graph.hide ();
+  cont_sliders.create (&cont_bands, "", 32, 0, w, h / 3);
   label.create (&frame, eqstr.c_str (), 0, 0, 300, 30);
   label.align = nbtk::TEXT_LEFT;
   knob_gain.create (&frame, "", 0, 0, 40, 56);
@@ -1060,7 +1064,7 @@ void c_eqpage_widgets::create (
   knob_gain.set_tooltip (tooltip_str.c_str ());
   
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
-    bands [i].slider_gain.create (&cont_bands, "", 0, 0, 12, 200);
+    bands [i].slider_gain.create (&cont_sliders, "", 0, 0, 12, 200);
     bands [i].slider_gain.set_orientation (nbtk::SCROLLBAR_VERTICAL);
     bands [i].slider_gain.set_range (-36.0f, 36.0f);
     bands [i].slider_gain.set_step (0.1f);
@@ -1132,8 +1136,8 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   const int frame_w = std::max (1, w);
   const int frame_h = std::max (1, h);
   frame.move_resize (x, y, frame_w, frame_h);
-  const int padding = 16;
-  const int title_h = 48;
+  const int padding = 8;
+  const int title_h = 36;
   const int inner_x = padding;
   const int inner_y = padding + title_h + 8;
   const int inner_w = std::max (1, frame_w - padding * 2);
@@ -1142,11 +1146,11 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   const int slider_w = 16;
   const int slider_widget_w = std::max (slider_w, band_w - 4);
   const int label_h = 18;
-  const int checkbox = 28;
-  const int menu_h = 28;
+  const int checkbox = 24;
+  const int menu_h = 24;
   const int knob_w = std::min (64, std::max (42, band_w - 8));
   const int menu_w = std::min (80, std::max (44, band_w - 8));
-  const int knob_h = 68;
+  const int knob_h = 64;
   const int controls_h = label_h + checkbox + menu_h + knob_h * 2 + 12;
   const int slider_top = inner_y;
   const int slider_track_h = std::max (40, inner_h - controls_h - 8);
@@ -1158,18 +1162,26 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   
   label.move_resize (padding, padding, std::max (1, frame_w / 2), title_h);
   knob_gain.move_resize (
-    std::max (padding + 80, frame_w - padding - 138),
+    std::max (padding + 80, frame_w - padding - 128),
     padding,
-    130,
+    120,
     title_h);
   cont_bands.move_resize (0, 0, frame_w, frame_h);
+  const int toprect_x = padding;
+  const int toprect_y = slider_top;
+  const int toprect_w = frame_w - padding * 2;
+  const int toprect_h = slider_h;
+  
+  cont_graph.move_resize (toprect_x, toprect_y, toprect_w, toprect_h);
+  graph.move_resize (0, 0, toprect_w, toprect_h);
+  cont_sliders.move_resize (toprect_x, toprect_y, toprect_w, toprect_h);
   
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     const int band_x = inner_x + i * band_w;
     const int center_x = band_x + band_w / 2;
 
     bands [i].slider_gain.move_resize (
-      center_x - slider_widget_w / 2, slider_top, slider_widget_w, slider_h);
+      center_x - slider_widget_w / 2, 0, slider_widget_w, slider_h);
     bands [i].btn_on.move_resize (
       center_x - checkbox / 2, checkbox_y, checkbox, checkbox);
     bands [i].menu_mode.move_resize (

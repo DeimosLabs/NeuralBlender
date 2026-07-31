@@ -407,7 +407,7 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
     mode = mode_;
   
   freq = std::clamp (freq, 20.0f, samplerate * 0.45f);
-  q = std::clamp (q, 0.05f, 50.0f);
+  q = std::clamp (q, 0.05f, 100.0f);
   
   const float pi = 3.14159265358979323846f;
   const float a = powf (10.0f, gain_db / 40.0f);
@@ -462,7 +462,7 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
       float sqrtA = sqrtf (A);
 
       // shelf slope version
-      float S = std::clamp (q, 0.05f, 1.0f);
+      float S = std::clamp (q, 0.01f, 1.0f);
       float shelf_alpha = sw * 0.5f *
         sqrtf (std::max (0.0f, (A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f));
 
@@ -482,7 +482,7 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
       float A = powf (10.0f, gain_db / 40.0f);
       float sqrtA = sqrtf (A);
 
-      float S = std::clamp (q, 0.05f, 1.0f);
+      float S = std::clamp (q, 0.01f, 1.0f);
       float shelf_alpha = sw * 0.5f *
         sqrtf (std::max (0.0f, (A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f));
 
@@ -497,7 +497,7 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
     }
     break;
 
-    case EQ_KEEP:
+    case EQ_KEEP: // ...default to off?
       disable ();
       return;
   }

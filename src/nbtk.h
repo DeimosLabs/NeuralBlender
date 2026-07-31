@@ -439,12 +439,14 @@ public:
   void set_step (float value) override;
   void set_container (c_container *container);
   void set_orientation (_scrollbar_orientation orientation);
-  t_rect thumb_rect () const;
+  virtual t_rect track_rect () const;
+  virtual t_rect thumb_rect () const;
   void emit_action () override;
 
   float page_size = 0.1f;
   _scrollbar_orientation orientation = SCROLLBAR_VERTICAL;
   c_container *container = nullptr;
+  bool solid_thumb = false;
 
 private:
   bool dragging = false;
@@ -471,7 +473,9 @@ public:
   float real_value () const;
   std::string get_value_string () const override;
   void emit_action () override;
-  virtual t_rect slider_track_rect () const;
+  virtual t_rect slider_control_rect () const;
+  t_rect track_rect () const override;
+  virtual t_rect thumb_rect () const;
 
   float slider_value = 0.0f;
   float slider_step = 0.05f;
