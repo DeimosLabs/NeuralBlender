@@ -2692,7 +2692,7 @@ bool c_knob::set_value (float value_, bool notify) {
   return c_valuewidget::set_value (value_, notify);
 }
 
-float c_knob::normalized_value () const {
+/*float c_knob::normalized_value () const {
   if (max <= min)
     return 0.0f;
 
@@ -2714,8 +2714,39 @@ float c_knob::value_from_normalized (float normalized) const {
       powf (n, log_taper);
 
   return min + std::clamp (tapered, 0.0f, 1.0f) * (max - min);
+}*/
+
+float c_knob::normalized_value () const {
+  if (max <= min)
+    return 0.0f;
+
+  const float linear =
+    std::clamp ((value - min) / (max - min), 0.0f, 1.0f);
+
+  if (log_taper <= 0.000001f)
+    return linear;
+
+  const float ratio = powf (10.0f, log_taper / 20.0f);
+
+  return std::clamp (logf (1.0f + linear * (ratio - 1.0f)) / logf (ratio),
+                     0.0f, 1.0f);
 }
 
+float c_knob::value_from_normalized (float normalized) const {
+  const float n = std::clamp (normalized, 0.0f, 1.0f);
+
+  if (max <= min)
+    return min;
+
+  float tapered = n;
+
+  if (log_taper > 0.000001f) {
+    const float ratio = powf (10.0f, log_taper / 20.0f);
+    tapered = (powf (ratio, n) - 1.0f) / (ratio - 1.0f);
+  }
+
+  return min + tapered * (max - min);
+}
 float c_knob::angle_from_value () const {
   const float start = 3.0f * M_PI / 4.0f;
   const float sweep = 3.0f * M_PI / 2.0f;

@@ -1104,7 +1104,8 @@ void c_eqpage_widgets::create (
     bands [i].knob_freq.set_min (20.0f);
     bands [i].knob_freq.set_max (20000.0f);
     bands [i].knob_freq.set_step (1.0f);
-    bands [i].knob_freq.log_taper = 4.5f;
+    bands [i].knob_freq.log_taper = 51.5011f; // so that 1KHz == noon/middle
+    //bands [i].knob_freq.log_taper = 60.0f;  // logarithmic mid point at noon
     bands [i].knob_freq.set_default (g_defaultfreqs [i]);
     bands [i].knob_freq.set_value (g_defaultfreqs [i]);
     bands [i].knob_freq.text_size = 0.75;
