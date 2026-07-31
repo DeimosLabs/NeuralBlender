@@ -278,7 +278,7 @@ static inline void nb_lv2_eq_state_uri (
     bufsize,
     NB_URI "#%s_%c_%s",
     nb_lv2_eq_bank_symbol (bank),
-    (char) ('A' + band),
+    (char) ('1' + band),
     nb_lv2_eq_param_symbol (param));
 }
 

@@ -38,42 +38,42 @@ generate_one_eq_port() {
   local property=""
 
   case "$band" in
-    A)
+    1)
       mode="$mode_hipass"
       freq=50
     ;;
     
-    B)
+    2)
       mode="$mode_lowshelf"
       freq=100
     ;;
     
-    C)
+    3)
       mode="$mode_curve"
       freq=250
     ;;
     
-    D)
+    4)
       mode="$mode_curve"
       freq=500
     ;;
     
-    E)
+    5)
       mode="$mode_curve"
       freq=1000
     ;;
     
-    F)
+    6)
       mode="$mode_curve"
       freq=2000
     ;;
     
-    G)
+    7)
       mode="$mode_hishelf"
       freq=4000
     ;;
     
-    H)
+    8)
       mode="$mode_lowpass"
       freq=8000
     ;;
@@ -132,7 +132,8 @@ EOF
 
 generate_eq_ports() {
   for eq in eqpre eqpost; do
-    for band in A B C D E F G H; do
+    #for band in A B C D E F G H; do
+    for band in $(seq 1 8); do
       generate_one_eq_port "$eq" "$band" enabled
       generate_one_eq_port "$eq" "$band" mode
       generate_one_eq_port "$eq" "$band" freq
