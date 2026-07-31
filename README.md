@@ -31,7 +31,7 @@ On my Intel Core7 ultra, it loads 5 or 6 models in the middle of a busy live ses
 
 Features considered for future versions: VST plugin, series mode(s), optionally more than 4 lanes per model bank, lane groups, DSP load-splitting/balancing etc...
 
-Demo: https://soundcloud.com/delt01/snakeskin All the guitars and bass in this track are straight DI's processed through NeuralBlender with a bit of reverb, and flanger at one spot. NAM models used are available on https://tone3000.com
+Demo: https://soundcloud.com/delt01/snakeskin All the guitars and bass in this track are straight DI's processed through NeuralBlender with a bit of reverb, and flanger at one spot. The wah effect was achieved by automating one of the pre-EQ bands. NAM models used are available on https://tone3000.com
 
 ![NeuralBlender in Ardour](data/screenshot-session.png)
 
