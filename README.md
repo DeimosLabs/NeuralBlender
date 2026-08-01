@@ -6,9 +6,9 @@ Features:
   - Supports nam A1, nam A2, aidax, and json model files.
   - Full impulse response (convolution) for cab sim
   - Reads gzipped files
-  - Complete stompbox->amp->cab/IR signal flow with 3 "banks" of models
+  - Complete STOMPBOX -> preEQ -> AMP -> postEQ -> CAB/IR signal flow with 3 "banks" of models
   - 8-band parametric pre and post EQ
-  - Can load up to 4 models on each bank simultaneously 
+  - Can load up to 4 models on each bank simultaneously (each model either NAM/json/aidax or IR)
   - Can either blend them (normal) or switch between them like "channels" (exclusive mode)
   - Standalone app and LV2 plugin
   - Proper multithreading with UI and loader threads separate from DSP
@@ -19,13 +19,13 @@ Features:
   - Tuner, can be enabled/disabled to save a bit of CPU
   - Volume ramping/crossfade when loading, switching etc. to avoid clicks
   - Each model slot / lane has:
-    - input gain
+    - input gain if not an impulse response
+    - if IR, pitch shift +- 1 octave in 1/100 semitone increments
     - output gain
     - dry out gain
     - pre-delay for phasing correction/effects
     - optional DC flip for more phasing effects
-    - optional level calibration
-    - pitch shift for IR's
+    - optional level calibration to target dB
 
 On my Intel Core7 ultra, it loads 5 or 6 models in the middle of a busy live session, 64 sample buffers / 3 periods, and DSP load typically stays below 50%, no xruns. (with DSP threads pinned to p-cores)
 
