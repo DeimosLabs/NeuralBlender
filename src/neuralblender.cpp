@@ -935,8 +935,12 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
     std::cerr << "Error: no samples read from " << filename << "\n";
     return false;
   }
-
+  
+  size_t s1 = v.size ();
   convolver_trim_trailing_silence (v);
+  size_t s2 = v.size ();
+  std::cerr << filename << ": " << s1 << " samples, trimmed " << s1 - s2
+            << " smp. silence, remaining " << s2 << "\n";
   
   return true;
 }
@@ -976,7 +980,6 @@ static void convolver_trim_trailing_silence (
   while (n > 0 && fabsf (v [n - 1]) <= threshold)
     --n;
   
-  debug ("%ld samples of %ld remaining", (long int) n, (long int) v.size ());
   v.resize (n);
 }
 
