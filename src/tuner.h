@@ -16,6 +16,7 @@
 #define INTUNE_DELAY       5 // frames/redraws
 #define UNICODE_SHARPS_FLATS
 
+// DSP side object
 class c_pitchtracker {
 public:
   c_pitchtracker ();
@@ -62,6 +63,7 @@ private:
 
 #include "nbtk.h"
 
+// UI side widget
 class c_tunerwidget : public nbtk::c_canvas {
 public:
   void create (nbtk::c_widget *parent,

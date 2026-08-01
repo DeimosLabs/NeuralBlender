@@ -74,6 +74,7 @@
 #define NB_LANE_XFADE_MS         NB_XFADE_MS
 #define TUNER_THRESH_DB          -40.0f
 #define EQ_NUM_BANDS             8
+#define IR_SILENCE_THRESHOLD     -80.0f
 
 #ifndef NB_DEBUG_RATE_HELPERS
 #define NB_DEBUG_RATE_HELPERS

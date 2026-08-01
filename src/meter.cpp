@@ -589,7 +589,7 @@ void c_meterwidget::create (nbtk::c_widget *parent,
   update_geometry ();
 }
 
-void c_meterwidget::show () {
+/*void c_meterwidget::show () {
   nbtk::c_canvas::show ();
 }
 
@@ -607,7 +607,7 @@ void c_meterwidget::move (int x, int y) {
 
 void c_meterwidget::resize (int w, int h) {
   nbtk::c_canvas::resize (w, h);
-}
+}*/
 
 void c_meterwidget::set_db_scale (float f) {
   db_scale = f;

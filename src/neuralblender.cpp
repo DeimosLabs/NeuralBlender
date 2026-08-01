@@ -53,7 +53,7 @@
 
 static constexpr double MAX_IR_SECONDS = 3.0;
 static constexpr size_t WAV_READ_CHUNK_FRAMES = 8192;
-static constexpr uint32_t MAX_IR_PARTITIONS = 1024; // about 1.4sec at 64smp. buffer
+static constexpr uint32_t MAX_IR_PARTITIONS = 4096; // about 3sec at 64smp. buffer
 
 // a few helper functions
 
@@ -785,6 +785,10 @@ void c_delayline::process_block (float *in, float *out, uint32_t nframes) {
 
 #ifdef HAVE_FFTW
 
+static void convolver_trim_trailing_silence (
+    std::vector<float> &v,
+    float threshold = db_to_gain (IR_SILENCE_THRESHOLD));
+
 static bool read_wav (const char *filename, std::vector<float> &v, int channel, int *sr) {
   debug ("start");
   
@@ -931,6 +935,8 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
     std::cerr << "Error: no samples read from " << filename << "\n";
     return false;
   }
+
+  convolver_trim_trailing_silence (v);
   
   return true;
 }
@@ -960,12 +966,18 @@ static void convolver_remove_dc (std::vector<float> &v) {
     f -= dc;
 }
 
+// updated: don't pop each sample one by one
 static void convolver_trim_trailing_silence (
     std::vector<float> &v,
-    float threshold = 1.0e-7f) {
+    float threshold) {
+  
+  size_t n = v.size ();
 
-  while (!v.empty () && fabsf (v.back ()) <= threshold)
-    v.pop_back ();
+  while (n > 0 && fabsf (v [n - 1]) <= threshold)
+    --n;
+  
+  debug ("%ld samples of %ld remaining", (long int) n, (long int) v.size ());
+  v.resize (n);
 }
 
 static bool convolver_resample_ir (

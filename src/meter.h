@@ -51,6 +51,7 @@ inline float gain_to_db (float gain) {
   return 20.0f * log10f(gain);
 }
 
+// DSP side object
 class c_vudata {
 public:
   bool sample (float l, float r);
@@ -132,17 +133,18 @@ private:
 
 #include "nbtk.h"
 
+// UI side widget
 class c_meterwidget : public nbtk::c_canvas {
 public:
   void create (nbtk::c_widget *parent,
                const char *label,
                int x, int y, int w, int h);
 
-  void show ();
-  void hide ();
-  void move_resize (int x, int y, int w, int h) override;
-  void move (int x, int y) override;
-  void resize (int w, int h) override;
+  //void show ();
+  //void hide ();
+  //void move_resize (int x, int y, int w, int h) override;
+  //void move (int x, int y) override;
+  //void resize (int w, int h) override;
 
   void set_db_scale (float f);
   void set_vudata (c_vudata *v);

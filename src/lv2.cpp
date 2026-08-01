@@ -1822,7 +1822,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
           self->eq_master_gain [bank],
           self->last_eq_master_gain [bank],
           v)) {
-      CP
+      //CP
       self->blender.set_eq_master_gain_db (bnk, v);
     }
 
@@ -1834,7 +1834,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             self->eq_enabled [bank] [band],
             self->last_eq_enabled [bank] [band],
             eq->enabled [band])) {
-        CP
+        //CP
         changed = true;
       }
 
@@ -1842,7 +1842,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             self->eq_mode [bank] [band],
             self->last_eq_mode [bank] [band],
             tmp)) {
-        CP
+        //CP
         const int mode =
           std::clamp ((int) lrintf (tmp), (int) EQ_HIPASS, (int) EQ_LOWPASS);
         eq->mode [band] = (_eq_band_mode) mode;
@@ -1853,7 +1853,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             self->eq_freq [bank] [band],
             self->last_eq_freq [bank] [band],
             tmp)) {
-        CP
+        //CP
         eq->freq [band] = std::clamp (tmp, 20.0f, 20000.0f);
         changed = true;
       }
@@ -1862,7 +1862,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             self->eq_gain [bank] [band],
             self->last_eq_gain [bank] [band],
             tmp)) {
-        CP
+        //CP
         eq->gain_db [band] = std::clamp (tmp, -36.0f, 36.0f);
         changed = true;
       }
@@ -1871,7 +1871,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             self->eq_q [bank] [band],
             self->last_eq_q [bank] [band],
             tmp)) {
-        CP
+        //CP
         eq->q [band] = std::clamp (tmp, 0.01f, 100.0f);
         changed = true;
       }
@@ -1897,28 +1897,28 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       if (read_changed (
           self->gain_in_db [bank] [i],
           self->last_gain_in_db [bank] [i], v)) {
-        CP
+        //CP
         self->blender.set_gain_in (bnk, i, db_to_gain (v));
       }
 
       if (read_changed (
           self->ir_pitch [bank] [i],
           self->last_ir_pitch [bank] [i], v)) {
-        CP
+        //CP
         request_ir_pitch (self, bnk, i, v);
       }
 
       if (read_changed (
           self->gain_out_db [bank] [i],
           self->last_gain_out_db [bank] [i], v)) {
-        CP
+        //CP
         self->blender.set_gain_out (bnk, i, db_to_gain (v));
       }
 
       if (read_changed (
           self->dry_out_db [bank] [i],
           self->last_dry_out_db [bank] [i], v)) {
-        CP
+        //CP
         self->blender.set_dry_out (
           bnk, i, v <= DB_SILENCE ? 0.0f : db_to_gain (v));
       }
@@ -1926,7 +1926,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       if (read_changed (
           self->delay [bank] [i],
           self->last_delay [bank] [i], v)) {
-        CP
+        //CP
         self->blender.set_delay_ms (bnk, i, v);
         self->stats_dirty.store (true, std::memory_order_release);
       }
@@ -1934,7 +1934,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       if (read_changed_bool (
           self->lane_mute [bank] [i],
           self->last_lane_mute [bank] [i], b)) {
-        CP
+        //CP
         self->base_lane_mute [bank] [i] = b;
         apply_effective_controls (self);
       }
@@ -1942,7 +1942,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       if (read_changed_bool (
           self->dcflip [bank] [i],
           self->last_dcflip [bank] [i], b)) {
-        CP
+        //CP
         self->blender.dcflip (bnk, i, b);
       }
 
