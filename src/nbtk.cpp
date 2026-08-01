@@ -194,6 +194,8 @@ static t_colortheme g_default_colors = {
   sc (solid (0.10f,  0.10f,  0.10f,  0.55f), solid (0.20f, 0.20f, 0.20f, 0.75f))
 };
 
+static t_colortheme g_current_colors;
+
 t_hsl rgb_to_hsl (float r, float g, float b) {
   r = clamp01 (r);
   g = clamp01 (g);
@@ -291,15 +293,16 @@ static void swap_outline_gradients (t_colortheme &theme) {
   swap_outline_gradient (theme.frame_disabled);
 }
 
-void colortheme_transform (t_colortheme *theme,
-                           float r, float g, float b,
-                           float h, float s, float l,
-                           float contrast, float contrast_mid,
-                           bool flip) {
+void colortheme_apply (float r, float g, float b,
+                       float h, float s, float l,
+                       float contrast, float contrast_mid,
+                       bool flip) {
   //float *bigarray = (float *) &g_default_colors;
-  float *bigarray = (float *) theme;
-  const int num_floats = sizeof (*theme) / sizeof (float);
+  float *bigarray = (float *) &g_current_colors;
+  const int num_floats = sizeof (g_current_colors) / sizeof (float);
   
+  g_current_colors = g_default_colors;
+
   if (flip)
     h += 0.5f;
   if (h > 1.0f)
@@ -352,11 +355,11 @@ void colortheme_transform (t_colortheme *theme,
   
   if (flip) {
     // swap begin/end of each outline gradient
-    swap_outline_gradients (*theme);
+    swap_outline_gradients (g_current_colors);
   }
 }
 
-t_colortheme *g_colors = &g_default_colors;
+t_colortheme *g_colors = &g_current_colors;
 
 const t_colortheme *get_colortheme () {
   return g_colors;

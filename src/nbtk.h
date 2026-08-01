@@ -1044,11 +1044,10 @@ typedef struct {
 
 extern t_colortheme *g_colors;
 
-void colortheme_transform (t_colortheme *theme,
-                           float r, float g, float b,
-                           float h, float s, float l,
-                           float contrast, float contrast_mid = 0.3,
-                           bool flip = false);
+void colortheme_apply (float r, float g, float b,
+                       float h, float s, float l,
+                       float contrast, float contrast_mid = 0.3,
+                       bool flip = false);
 
 #ifndef NB_DEBUG_RATE_HELPERS
 #define NB_DEBUG_RATE_HELPERS

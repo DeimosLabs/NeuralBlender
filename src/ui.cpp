@@ -1224,9 +1224,9 @@ c_neuralblender_ui::c_neuralblender_ui () { CP
   display = NULL;
   window = 0;
   ui_ready = false;
-  nbtk::colortheme_transform (nbtk::g_colors,
-                              0.975, 0.975, 1.0, 0.0, 0.0, -0.02,
-                              0.95, 0.5, false);
+  
+  nbtk::colortheme_apply (0.975, 0.975, 1.0, 0.0, 0.0, -0.01,
+                          1.00, 0.5, false);
 }
 
 c_neuralblender_ui::~c_neuralblender_ui () { CP
