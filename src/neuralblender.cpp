@@ -939,8 +939,11 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   size_t s1 = v.size ();
   convolver_trim_trailing_silence (v);
   size_t s2 = v.size ();
-  std::cerr << filename << ": " << s1 << " samples, trimmed " << s1 - s2
-            << " smp. silence, remaining " << s2 << "\n";
+  
+  if (s1 != s2) {
+    std::cerr << filename << ": " << s1 << " samples, trimmed " << s1 - s2
+              << " smp. silence, remaining " << s2 << "\n";
+  }
   
   return true;
 }
