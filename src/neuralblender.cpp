@@ -805,14 +805,14 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
 
   if (file_is_gzipped (filename)) {
     if (!read_file_to_mem (filename, filedata)) {
-      std::cerr << "Error: failed to read gzipped WAV file: " << filename << "\n";
+      std::cerr << "NeuralBlender: Error: failed to read gzipped WAV file: " << filename << "\n";
       return false;
     }
 
     gzip_data = c_gzip::gunzip_memory_block (
         filedata.data (), filedata.size (), &actualsize);
     if (!gzip_data) {
-      std::cerr << "Error: failed to decompress WAV file: " << filename << "\n";
+      std::cerr << "NeuralBlender: Error: failed to decompress WAV file: " << filename << "\n";
       return false;
     }
 
@@ -822,7 +822,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
     memfile.pos = 0;
     f = sf_open_virtual (&g_sndfile_mem_vio, SFM_READ, &info, &memfile);
     if (!f) {
-      std::cerr << "Error: failed to open gzipped WAV file: " << filename << "\n";
+      std::cerr << "NeuralBlender: Error: failed to open gzipped WAV file: " << filename << "\n";
       free (gzip_data);
       return false;
     }
@@ -833,7 +833,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
     f = sf_open (filename, SFM_READ, &info);
 
   if (!f) {
-    std::cerr << "Error: failed to open WAV file: " << filename << "\n";
+    std::cerr << "NeuralBlender: Error: failed to open WAV file: " << filename << "\n";
     return false;
   }
   
@@ -842,7 +842,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   sf_count_t frames = info.frames;
 
   if (frames <= 0 || chans <= 0) {
-    std::cerr << "Error: invalid WAV format in " << filename << "\n";
+    std::cerr << "NeuralBlender: Error: invalid WAV format in " << filename << "\n";
     sf_close (f);
 #ifdef HAVE_GZIP
     if (gzip_data)
@@ -852,7 +852,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   }
 
   if (channel < 0 || channel >= chans) {
-    std::cerr << "Error: " << filename << " does not have channel " << channel << "\n";
+    std::cerr << "NeuralBlender: Error: " << filename << " does not have channel " << channel << "\n";
     sf_close (f);
 #ifdef HAVE_GZIP
     if (gzip_data)
@@ -864,7 +864,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   const double seconds =
       info.samplerate > 0 ? (double) frames / (double) info.samplerate : 0.0;
   if (seconds > MAX_IR_SECONDS) {
-    std::cerr << "Error: refusing to load oversized IR/WAV file: "
+    std::cerr << "NeuralBlender: Error: refusing to load oversized IR/WAV file: "
               << filename << " (" << seconds << " seconds, max "
               << MAX_IR_SECONDS << ")\n";
     sf_close (f);
@@ -878,7 +878,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   try {
     v.reserve ((size_t) frames);
   } catch (const std::bad_alloc &) {
-    std::cerr << "Error: out of memory loading WAV file: " << filename << "\n";
+    std::cerr << "NeuralBlender: Error: out of memory loading WAV file: " << filename << "\n";
     sf_close (f);
 #ifdef HAVE_GZIP
     if (gzip_data)
@@ -891,7 +891,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   try {
     buf.resize ((size_t) WAV_READ_CHUNK_FRAMES * (size_t) chans);
   } catch (const std::bad_alloc &) {
-    std::cerr << "Error: out of memory loading WAV file: " << filename << "\n";
+    std::cerr << "NeuralBlender: Error: out of memory loading WAV file: " << filename << "\n";
     sf_close (f);
 #ifdef HAVE_GZIP
     if (gzip_data)
@@ -912,7 +912,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
       for (sf_count_t i = 0; i < got; ++i)
         v.push_back (buf [(size_t) chans * (size_t) i + (size_t) channel]);
     } catch (const std::bad_alloc &) {
-      std::cerr << "Error: out of memory loading WAV file: " << filename << "\n";
+      std::cerr << "NeuralBlender: Error: out of memory loading WAV file: " << filename << "\n";
       sf_close (f);
 #ifdef HAVE_GZIP
       if (gzip_data)
@@ -932,7 +932,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
 #endif
 
   if (readframes <= 0) {
-    std::cerr << "Error: no samples read from " << filename << "\n";
+    std::cerr << "NeuralBlender: Error: no samples read from " << filename << "\n";
     return false;
   }
   
@@ -941,8 +941,8 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   size_t s2 = v.size ();
   
   if (s1 != s2) {
-    std::cerr << filename << ": " << s1 << " samples, trimmed " << s1 - s2
-              << " smp. silence, remaining " << s2 << "\n";
+    std::cerr << "NeuralBlender: " << filename << ": " << s1 << " samples, trimmed "
+              << s1 - s2 << " smp. silence, remaining " << s2 << "\n";
   }
   
   return true;
@@ -1267,7 +1267,7 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
     return false;
 
   if (m_num_partitions > MAX_IR_PARTITIONS) {
-    std::cerr << "Error: refusing to enable oversized IR realtime convolution: "
+    std::cerr << "NeuralBlender: Error: refusing to enable oversized IR realtime convolution: "
               << m_ir.size () << " samples at blocksize " << blocksize
               << " requires " << m_num_partitions << " partitions, max "
               << MAX_IR_PARTITIONS << "\n";
@@ -1555,7 +1555,7 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
     if (ends_with (fn, ".nam.gz")) {
       std::string temp_fn;
       if (!gunzip_file_to_temp (fn, ".nam", temp_fn)) {
-        fprintf (stderr, "Failed to decompress NAM model: %s\n", fn.c_str ());
+        fprintf (stderr, "NeuralBlender: Failed to decompress NAM model: %s\n", fn.c_str ());
         return false;
       }
 
@@ -1573,7 +1573,7 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
     if (!new_model)
     {
       fprintf (stderr,
-              "NAM loader returned null: %s\n",
+              "NeuralBlender: NAM loader returned null: %s\n",
               fn.c_str ());
       return false;
     }
@@ -1583,7 +1583,7 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
     m_nam_model = std::move (new_model);
 
     fprintf (stderr,
-            "Loaded NAM model: %s\n",
+            "NeuralBlender: Loaded NAM model: %s\n",
             fn.c_str ());
     if (a2)
       m_engine_mode = ENGINE_NAM_A2;
@@ -1594,7 +1594,7 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
   catch (const std::exception &e)
   {
     fprintf (stderr,
-            "NAM load failed for %s: %s\n",
+            "NeuralBlender: NAM load failed for %s: %s\n",
             fn.c_str (),
             e.what ());
 
@@ -1609,7 +1609,7 @@ bool c_neuralamp::load_json (const std::string &fn) { CP
     if (ends_with (fn, ".json.gz")) {
       nlohmann::json model_json;
       if (!read_gzipped_json_file (fn, model_json)) {
-        fprintf (stderr, "Failed to decompress model file: %s\n", fn.c_str ());
+        fprintf (stderr, "NeuralBlender: Failed to decompress model file: %s\n", fn.c_str ());
         return false;
       }
 
@@ -1619,7 +1619,7 @@ bool c_neuralamp::load_json (const std::string &fn) { CP
     {
       std::ifstream file (fn);
       if (!file.is_open ()) {
-        fprintf (stderr, "Could not open model file: %s\n", fn.c_str ());
+        fprintf (stderr, "NeuralBlender: Could not open model file: %s\n", fn.c_str ());
         return false;
       }
 
@@ -1627,7 +1627,7 @@ bool c_neuralamp::load_json (const std::string &fn) { CP
     }
 
     if (!new_model) {
-      fprintf (stderr, "RTNeural parser returned null: %s\n", fn.c_str ());
+      fprintf (stderr, "NeuralBlender: RTNeural parser returned null: %s\n", fn.c_str ());
       return false;
     }
 
@@ -1636,11 +1636,11 @@ bool c_neuralamp::load_json (const std::string &fn) { CP
     m_rtneural_model = std::move (new_model);
     m_engine_mode = ENGINE_JSON;
 
-    fprintf (stderr, "Loaded model: %s\n", fn.c_str ());
+    fprintf (stderr, "NeuralBlender: Loaded model: %s\n", fn.c_str ());
     return true;
   }
   catch (const std::exception &e) {
-    fprintf (stderr, "RTNeural load failed for %s: %s\n",
+    fprintf (stderr, "NeuralBlender: RTNeural load failed for %s: %s\n",
             fn.c_str (), e.what ());
     return false;
   }
@@ -1650,12 +1650,12 @@ bool c_neuralamp::request_load_model (const std::string &fn) { CP
   const std::string load_fn = fn.empty () ? model_filename () : fn;
 
   if (load_fn.empty ()) {
-    fprintf (stderr, "No model filename specified\n");
+    fprintf (stderr, "NeuralBlender: No model filename specified\n");
     return false;
   }
 
   if (!is_supported_model_path (load_fn)) {
-    fprintf (stderr, "Unsupported model file type: %s\n", load_fn.c_str ());
+    fprintf (stderr, "NeuralBlender: Unsupported model file type: %s\n", load_fn.c_str ());
     unload_model ();
     return false;
   }
@@ -1689,12 +1689,12 @@ bool c_neuralamp::load_model () { CP
 
 bool c_neuralamp::load_model_now (const std::string &load_fn) { CP
   if (load_fn.empty ()) {
-    fprintf (stderr, "No model filename specified\n");
+    fprintf (stderr, "NeuralBlender: No model filename specified\n");
     return false;
   }
 
   if (!is_supported_model_path (load_fn)) {
-    fprintf (stderr, "Unsupported model file type: %s\n", load_fn.c_str ());
+    fprintf (stderr, "NeuralBlender: Unsupported model file type: %s\n", load_fn.c_str ());
     unload_model ();
     return false;
   }

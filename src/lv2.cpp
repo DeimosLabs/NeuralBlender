@@ -389,7 +389,7 @@ static void loader_main (Plugin *self) { CP
     } // unlocks here
 
     if (do_load) {
-      fprintf (stderr, "loader: load_model(%d, %zu, \"%s\")\n",
+      fprintf (stderr, "NeuralBlender: loader: load_model(%d, %zu, \"%s\")\n",
                (int) bank, which, path.c_str ());
       self->load_requested = false;
 
