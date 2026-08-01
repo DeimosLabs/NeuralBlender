@@ -104,7 +104,25 @@ static constexpr nbtk::t_gradientcolors solid (
 static constexpr t_statecolors sc (
     nbtk::t_gradientcolors bg,
     nbtk::t_gradientcolors fg) {
-  return { bg, fg };
+  return { bg, fg, fg };
+}
+
+static constexpr t_statecolors sc (
+    nbtk::t_gradientcolors bg,
+    nbtk::t_gradientcolors fg,
+    nbtk::t_gradientcolors outline) {
+  return { bg, fg, outline };
+}
+
+static float clamp01 (float x) {
+  return std::max (0.0f, std::min (1.0f, x));
+}
+
+static float wrap01 (float x) {
+  x = fmodf (x, 1.0f);
+  if (x < 0.0f)
+    x += 1.0f;
+  return x;
 }
 
 static bool widget_has_focus (const c_widget &widget) {
@@ -176,7 +194,169 @@ static t_colortheme g_default_colors = {
   sc (solid (0.10f,  0.10f,  0.10f,  0.55f), solid (0.20f, 0.20f, 0.20f, 0.75f))
 };
 
-static t_colortheme *g_colors = &g_default_colors;
+t_hsl rgb_to_hsl (float r, float g, float b) {
+  r = clamp01 (r);
+  g = clamp01 (g);
+  b = clamp01 (b);
+
+  const float cmax = std::max (r, std::max (g, b));
+  const float cmin = std::min (r, std::min (g, b));
+  const float delta = cmax - cmin;
+
+  t_hsl hsl;
+  hsl.l = (cmax + cmin) * 0.5f;
+
+  if (delta <= 0.0f) {
+    hsl.h = 0.0f;
+    hsl.s = 0.0f;
+    return hsl;
+  }
+
+  hsl.s = delta / (1.0f - fabsf (2.0f * hsl.l - 1.0f));
+
+  if (cmax == r)
+    hsl.h = fmodf ((g - b) / delta, 6.0f) / 6.0f;
+  else if (cmax == g)
+    hsl.h = (((b - r) / delta) + 2.0f) / 6.0f;
+  else
+    hsl.h = (((r - g) / delta) + 4.0f) / 6.0f;
+
+  hsl.h = wrap01 (hsl.h);
+  return hsl;
+}
+
+t_rgb hsl_to_rgb (float h, float s, float l) {
+  h = wrap01 (h);
+  s = clamp01 (s);
+  l = clamp01 (l);
+
+  const float c = (1.0f - fabsf (2.0f * l - 1.0f)) * s;
+  const float hp = h * 6.0f;
+  const float x = c * (1.0f - fabsf (fmodf (hp, 2.0f) - 1.0f));
+  const float m = l - c * 0.5f;
+
+  float rp = 0.0f;
+  float gp = 0.0f;
+  float bp = 0.0f;
+
+  if (hp < 1.0f) {
+    rp = c;
+    gp = x;
+  } else if (hp < 2.0f) {
+    rp = x;
+    gp = c;
+  } else if (hp < 3.0f) {
+    gp = c;
+    bp = x;
+  } else if (hp < 4.0f) {
+    gp = x;
+    bp = c;
+  } else if (hp < 5.0f) {
+    rp = x;
+    bp = c;
+  } else {
+    rp = c;
+    bp = x;
+  }
+
+  return { clamp01 (rp + m), clamp01 (gp + m), clamp01 (bp + m) };
+}
+
+void t_gradientcolors::swap () {
+  std::swap (r1, r2);
+  std::swap (g1, g2);
+  std::swap (b1, b2);
+  std::swap (a1, a2);
+}
+
+static void swap_outline_gradient (t_statecolors &colors) {
+  colors.outline.swap ();
+}
+
+static void swap_outline_gradients (t_controlcolors &colors) {
+  swap_outline_gradient (colors.normal);
+  swap_outline_gradient (colors.hover);
+  swap_outline_gradient (colors.on);
+  swap_outline_gradient (colors.on_hover);
+  swap_outline_gradient (colors.down);
+  swap_outline_gradient (colors.disabled);
+}
+
+static void swap_outline_gradients (t_colortheme &theme) {
+  swap_outline_gradients (theme.button);
+  swap_outline_gradients (theme.radio);
+
+  swap_outline_gradient (theme.frame_normal);
+  swap_outline_gradient (theme.frame_selected);
+  swap_outline_gradient (theme.frame_disabled);
+}
+
+void colortheme_transform (t_colortheme *theme,
+                           float r, float g, float b,
+                           float h, float s, float l,
+                           float contrast, float contrast_mid,
+                           bool flip) {
+  //float *bigarray = (float *) &g_default_colors;
+  float *bigarray = (float *) theme;
+  const int num_floats = sizeof (*theme) / sizeof (float);
+  
+  if (flip)
+    h += 0.5f;
+  if (h > 1.0f)
+    h -= 1.0f;
+    
+  for (int i = 0; i < num_floats; i += 4) {
+    if (r != 1.0f) {
+      bigarray [i]     *= r;
+    }
+    if (g != 1.0f) {
+      bigarray [i + 1] *= g;
+    }
+    if (b != 1.0f) {
+      bigarray [i + 2] *= b;
+    }
+
+    bigarray [i] = clamp01 (bigarray [i]);
+    bigarray [i + 1] = clamp01 (bigarray [i + 1]);
+    bigarray [i + 2] = clamp01 (bigarray [i + 2]);
+
+    if (h != 0.0f || s != 0.0f || l != 0.0f) {
+      t_hsl hsl = rgb_to_hsl (bigarray [i], bigarray [i + 1], bigarray [i + 2]);
+      hsl.h = wrap01 (hsl.h + h);
+      hsl.s = clamp01 (hsl.s + s);
+      hsl.l = clamp01 (hsl.l + l);
+
+      t_rgb rgb = hsl_to_rgb (hsl.h, hsl.s, hsl.l);
+      bigarray [i] = rgb.r;
+      bigarray [i + 1] = rgb.g;
+      bigarray [i + 2] = rgb.b;
+    }
+    
+    if (flip) {
+      bigarray [i]     = 1.0f - bigarray [i];
+      bigarray [i + 1] = 1.0f - bigarray [i + 1];
+      bigarray [i + 2] = 1.0f - bigarray [i + 2];
+    }
+    
+  }
+  contrast_mid = std::clamp (contrast_mid, 0.0f, 1.0f);
+  
+  for (int i = 0; i < num_floats; i++) {
+    if (contrast != 1.0f && i % 4 != 3) {
+      bigarray [i] -= contrast_mid;
+      bigarray [i] *= contrast;
+      bigarray [i] += contrast_mid;
+      bigarray [i] = std::clamp (bigarray [i], 0.0f, 1.0f);
+    }
+  }
+  
+  if (flip) {
+    // swap begin/end of each outline gradient
+    swap_outline_gradients (*theme);
+  }
+}
+
+t_colortheme *g_colors = &g_default_colors;
 
 const t_colortheme *get_colortheme () {
   return g_colors;
@@ -505,7 +685,7 @@ void c_frame::draw (cairo_t *cr) {
   tk_set_gradient (cr, h, colors.bg);
   cairo_fill_preserve (cr);
 
-  tk_set_gradient (cr, h, colors.fg);
+  tk_set_gradient (cr, h, colors.outline);
   cairo_set_line_width (cr, line_width);
   cairo_stroke (cr);
 }
@@ -975,7 +1155,7 @@ void c_button::draw (cairo_t *cr) {
   tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   tk_set_gradient (cr, h, colors.bg);
   cairo_fill_preserve (cr);
-  tk_set_gradient (cr, h, colors.fg);
+  tk_set_gradient (cr, h, colors.outline);
   //cairo_set_line_width (cr, line_width);
   cairo_set_line_width (cr, highlighted () ? line_width_highlight : line_width);
   cairo_stroke (cr);
@@ -1188,7 +1368,7 @@ void c_checkbox::draw (cairo_t *cr) {
   tk_path_rounded_rect (cr, bx, by, box, box, corner_radius);
   tk_set_gradient (cr, box, colors.bg);
   cairo_fill_preserve (cr);
-  tk_set_gradient (cr, box, colors.fg);
+  tk_set_gradient (cr, box, colors.outline);
   cairo_set_line_width (cr, highlighted () ? line_width_highlight : line_width);
   cairo_stroke (cr);
 
@@ -1333,7 +1513,11 @@ void c_scrollbar::draw (cairo_t *cr) {
   cairo_set_source_rgba (cr, bg.r1, bg.g1, bg.b1, bg.a1);
   cairo_fill_preserve (cr);
   cairo_set_source_rgba (
-      cr, frame.fg.r1, frame.fg.g1, frame.fg.b1, frame.fg.a1);
+      cr,
+      frame.outline.r1,
+      frame.outline.g1,
+      frame.outline.b1,
+      frame.outline.a1);
   cairo_set_line_width (cr, 1.0);
   cairo_stroke (cr);
 
@@ -1352,10 +1536,10 @@ void c_scrollbar::draw (cairo_t *cr) {
   cairo_fill_preserve (cr);
   cairo_set_source_rgba (
       cr,
-      thumb_outline.fg.r1,
-      thumb_outline.fg.g1,
-      thumb_outline.fg.b1,
-      thumb_outline.fg.a1);
+      thumb_outline.outline.r1,
+      thumb_outline.outline.g1,
+      thumb_outline.outline.b1,
+      thumb_outline.outline.a1);
   cairo_set_line_width (cr, highlighted () ? 1.8 : 1.2);
   cairo_stroke (cr);
 }
@@ -2024,10 +2208,10 @@ void c_listbox::draw (cairo_t *cr) {
   const t_statecolors &hover = colors_for (WSTYLE_BUTTON, nbtk::WSTATE_HOVER);
   const nbtk::t_gradientcolors &bg = nbtk::get_colortheme ()->window_bg;
   const nbtk::t_gradientcolors outline = focused ?
-    focus_colors.fg :
+    focus_colors.outline :
     nbtk::t_gradientcolors {
-      frame.fg.r2, frame.fg.g2, frame.fg.b2, frame.fg.a2,
-      frame.fg.r1, frame.fg.g1, frame.fg.b1, frame.fg.a1
+      frame.outline.r2, frame.outline.g2, frame.outline.b2, frame.outline.a2,
+      frame.outline.r1, frame.outline.g1, frame.outline.b1, frame.outline.a1
     };
 
   tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
@@ -2242,7 +2426,7 @@ void c_combobox::draw (cairo_t *cr) {
   tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
   tk_set_gradient (cr, h, colors.bg);
   cairo_fill_preserve (cr);
-  tk_set_gradient (cr, h, colors.fg);
+  tk_set_gradient (cr, h, colors.outline);
   //cairo_set_line_width (cr, 1.5);
   cairo_set_line_width (cr, highlighted () ? line_width_highlight : line_width);
   cairo_stroke (cr);
@@ -2917,7 +3101,7 @@ void c_knob::draw (cairo_t *cr, bool draw_label, bool draw_value) {
     tk_set_gradient (cr, radius * 2.0, colors.bg);
     cairo_fill_preserve (cr);
 
-    tk_set_gradient (cr, radius * 2.0, colors.fg);
+    tk_set_gradient (cr, radius * 2.0, colors.outline);
     cairo_set_line_width (cr, highlight ? 2.4 : 1.8);
     cairo_stroke (cr);
   }
@@ -3126,10 +3310,10 @@ void c_textbox::draw (cairo_t *cr) {
   const t_statecolors &focus_colors = colors_for (WSTYLE_FRAME, nbtk::WSTATE_SELECTED);
   const nbtk::t_gradientcolors &bg = nbtk::get_colortheme ()->window_bg;
   const nbtk::t_gradientcolors outline = focused ?
-    focus_colors.fg :
+    focus_colors.outline :
     nbtk::t_gradientcolors {
-      frame.fg.r2, frame.fg.g2, frame.fg.b2, frame.fg.a2,
-      frame.fg.r1, frame.fg.g1, frame.fg.b1, frame.fg.a1
+      frame.outline.r2, frame.outline.g2, frame.outline.b2, frame.outline.a2,
+      frame.outline.r1, frame.outline.g1, frame.outline.b1, frame.outline.a1
     };
 
   tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);

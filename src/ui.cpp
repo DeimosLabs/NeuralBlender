@@ -1046,10 +1046,10 @@ void c_eqpage_widgets::create (
   cont_graph.create (&cont_bands, "", 32, 0, w, h / 3);
   graph.create (&cont_graph, "", 0, 0, w, h / 3);
   cont_graph.hide ();
+  knob_gain.create (&cont_bands, "", 0, 0, 40, 56);
   cont_sliders.create (&cont_bands, "", 32, 0, w, h / 3);
   label.create (&frame, eqstr.c_str (), 0, 0, 300, 30);
   label.align = nbtk::TEXT_LEFT;
-  knob_gain.create (&frame, "", 0, 0, 40, 56);
   knob_gain.text_size = 0.75;
   knob_gain.label_position = nbtk::LABEL_LEFT;
   knob_gain.label_align = nbtk::TEXT_LEFT;
@@ -1224,6 +1224,9 @@ c_neuralblender_ui::c_neuralblender_ui () { CP
   display = NULL;
   window = 0;
   ui_ready = false;
+  nbtk::colortheme_transform (nbtk::g_colors,
+                              0.975, 0.975, 1.0, 0.0, 0.0, -0.02,
+                              0.95, 0.5, false);
 }
 
 c_neuralblender_ui::~c_neuralblender_ui () { CP

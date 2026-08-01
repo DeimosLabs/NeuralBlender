@@ -998,11 +998,25 @@ protected:
 typedef struct t_gradientcolors {
   float r1 = 0.00, g1 = 0.00, b1 = 0.00, a1 = 1.00,
         r2 = 0.00, g2 = 0.00, b2 = 0.00, a2 = 1.00;
+  void swap ();
 } t_gradientcolors;
+
+typedef struct {
+  float r = 0.0f;
+  float g = 0.0f;
+  float b = 0.0f;
+} t_rgb;
+
+typedef struct {
+  float h = 0.0f;
+  float s = 0.0f;
+  float l = 0.0f;
+} t_hsl;
 
 typedef struct {
   t_gradientcolors bg;
   t_gradientcolors fg;
+  t_gradientcolors outline;
 } t_statecolors;
 
 typedef struct {
@@ -1027,6 +1041,14 @@ typedef struct {
   t_statecolors frame_selected;
   t_statecolors frame_disabled;
 } t_colortheme;
+
+extern t_colortheme *g_colors;
+
+void colortheme_transform (t_colortheme *theme,
+                           float r, float g, float b,
+                           float h, float s, float l,
+                           float contrast, float contrast_mid = 0.3,
+                           bool flip = false);
 
 #ifndef NB_DEBUG_RATE_HELPERS
 #define NB_DEBUG_RATE_HELPERS
@@ -1066,6 +1088,8 @@ struct c_printfps {
 #endif
 
 const t_colortheme *get_colortheme ();
+t_hsl rgb_to_hsl (float r, float g, float b);
+t_rgb hsl_to_rgb (float h, float s, float l);
 std::string path_dirname (const std::string &path);
 std::string path_basename (const std::string &path);
 void tk_path_rounded_rect (cairo_t *cr,
