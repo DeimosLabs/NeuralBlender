@@ -971,15 +971,11 @@ void c_lane_widgets::move_resize (
   btn_mute.move_resize (mute_x,
                          button_top, mute_width, button_width);
   if (btn_mute.w > 80) {
-    btn_mute.label = "Mute";
-    btn_mute.invalidate ();
-    btn_excl.label = "Use";
-    btn_excl.invalidate ();
+    btn_mute.set_label ("Mute");
+    btn_excl.set_label ("Use");
   } else {
-    btn_mute.label.clear ();
-    btn_mute.invalidate ();
-    btn_excl.label.clear ();
-    btn_excl.invalidate ();
+    btn_mute.set_label ("");
+    btn_excl.set_label ("");
   }
   btn_excl.move_resize (btn_mute.x, btn_mute.y, btn_mute.w, btn_mute.h);
   btn_mute.padding = btn_mute.h / 4;
@@ -1043,11 +1039,10 @@ void c_eqpage_widgets::create (
   
   frame.create (parent, "", x, y, w, h);
   cont_bands.create (&frame, "", 0, 0, w, h);
-  cont_graph.create (&cont_bands, "", 32, 0, w, h / 3);
-  graph.create (&cont_graph, "", 0, 0, w, h / 3);
-  cont_graph.hide ();
   knob_gain.create (&cont_bands, "", 0, 0, 40, 56);
   cont_sliders.create (&cont_bands, "", 32, 0, w, h / 3);
+  cont_graph.create (&frame, "", 32, 0, w, h / 3);
+  graph.create (&cont_graph, "", 0, 0, w, h / 3);
   label.create (&frame, eqstr.c_str (), 0, 0, 300, 30);
   label.align = nbtk::TEXT_LEFT;
   knob_gain.text_size = 0.75;
@@ -1151,10 +1146,16 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   const int knob_w = std::min (64, std::max (42, band_w - 8));
   const int menu_w = std::min (80, std::max (44, band_w - 8));
   const int knob_h = 64;
-  const int controls_h = label_h + checkbox + menu_h + knob_h * 2 + 12;
-  const int slider_top = inner_y;
-  const int slider_track_h = std::max (40, inner_h - controls_h - 8);
-  const int slider_h = slider_track_h + label_h + 4;
+  const int controls_h = checkbox + menu_h + knob_h * 2 + 18;
+  const int graph_top = inner_y;
+  const int graph_gap = 4;
+  const int top_area_h = std::max (1, inner_h - controls_h);
+  const int slider_min_h = label_h + 44;
+  int slider_h = std::max (1, top_area_h * 3 / 8);
+  if (top_area_h >= slider_min_h + graph_gap + 32)
+    slider_h = std::max (slider_min_h, slider_h);
+  const int graph_h = std::max (1, top_area_h - slider_h - graph_gap);
+  const int slider_top = graph_top + graph_h + graph_gap;
   const int checkbox_y = slider_top + slider_h + 6;
   const int menu_y = checkbox_y + checkbox + 6;
   const int freq_y = menu_y + menu_h + 6;
@@ -1167,21 +1168,21 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
     120,
     title_h);
   cont_bands.move_resize (0, 0, frame_w, frame_h);
-  const int toprect_x = padding;
-  const int toprect_y = slider_top;
-  const int toprect_w = frame_w - padding * 2;
-  const int toprect_h = slider_h;
+  const int toprect_x = inner_x;
+  const int toprect_w = inner_w;
   
-  cont_graph.move_resize (toprect_x, toprect_y, toprect_w, toprect_h);
-  graph.move_resize (0, 0, toprect_w, toprect_h);
-  cont_sliders.move_resize (toprect_x, toprect_y, toprect_w, toprect_h);
+  cont_graph.move_resize (toprect_x, graph_top, toprect_w, graph_h);
+  graph.move_resize (0, 0, toprect_w, graph_h);
+  cont_sliders.move_resize (toprect_x, slider_top, toprect_w, slider_h);
   
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
-    const int band_x = inner_x + i * band_w;
+    const int local_band_x = i * band_w;
+    const int local_center_x = local_band_x + band_w / 2;
+    const int band_x = inner_x + local_band_x;
     const int center_x = band_x + band_w / 2;
 
     bands [i].slider_gain.move_resize (
-      center_x - slider_widget_w / 2, 0, slider_widget_w, slider_h);
+      local_center_x - slider_widget_w / 2, 0, slider_widget_w, slider_h);
     bands [i].btn_on.move_resize (
       center_x - checkbox / 2, checkbox_y, checkbox, checkbox);
     bands [i].menu_mode.move_resize (
@@ -1743,6 +1744,20 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     eqpage_pre.move_resize (16, lane_top, lane_width, lane_stack_h);
     eqpage_post.move_resize (16, lane_top, lane_width, lane_stack_h);
 
+    auto layout_bank_lanes = [&] (_lane_bank bank_id) {
+      c_lane_widgets *bank_lanes = lanes_for_bank (bank_id);
+      for (int i = 0; i < NB_NUM_MODELS; i++) {
+        bank_lanes [i].move_resize (
+          16,
+          lane_top + i * (lane_height + lane_gap),
+          lane_width,
+          lane_height);
+      }
+    };
+
+    for (_lane_bank bank_id : MODEL_BANKS)
+      layout_bank_lanes (bank_id);
+
     if (visible_page == PAGE_EQPRE || visible_page == PAGE_EQPOST) {
       const int eq_meter = visible_page == PAGE_EQPRE ? 0 : 1;
       const _lane_bank eq_bank = bank_for_page (visible_page);
@@ -1754,21 +1769,12 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
         16 + lane_width + 5, meter_top, METER_WIDTH, meter_h);
     } else if (page_has_bank (visible_page)) {
       c_lane_widgets *meter_ref_lanes = lanes_for_bank (visible_bank);
-      size_t i;
-      for (i = 0; i < NB_NUM_MODELS; i++) {
-        meter_ref_lanes [i].move_resize (
-          16, lane_top + i * (lane_height + lane_gap), lane_width, lane_height);
-      }
       lane_meter_span (meter_ref_lanes, NB_NUM_MODELS, &meter_top, &meter_h);
       
       meter_in [visible_bank].move_resize (
         5, meter_top, METER_WIDTH, meter_h);
     } else {
       c_lane_widgets *meter_ref_lanes = lanes_for_bank (visible_bank);
-      for (int i = 0; i < NB_NUM_MODELS; i++) {
-        meter_ref_lanes [i].move_resize (
-          16, lane_top + i * (lane_height + lane_gap), lane_width, lane_height);
-      }
       lane_meter_span (meter_ref_lanes, NB_NUM_MODELS, &meter_top, &meter_h);
 
       meter_in [PAGE_OTHER].move_resize (5, meter_top, METER_WIDTH, meter_h);
@@ -2540,8 +2546,7 @@ void c_neuralblender_ui::update_stats () {
       if (eng < ENGINE_NONE || eng > ENGINE_UNKNOWN)
         eng = ENGINE_UNKNOWN;
       
-      bank_lanes [i].label_engine.label = engine_names [eng];
-      bank_lanes [i].label_engine.invalidate ();
+      bank_lanes [i].label_engine.set_label (engine_names [eng]);
       const bool lane_loaded =
         state.banks [bank].lanes [i].loaded;
       const bool show_ir_pitch =
@@ -2556,16 +2561,13 @@ void c_neuralblender_ui::update_stats () {
       }
 
       snprintf (buf, 127, "%d frames", nframes);
-      bank_lanes [i].label_frames.label = buf;
-      bank_lanes [i].label_frames.invalidate ();
+      bank_lanes [i].label_frames.set_label (buf);
       if (trim == 1.00) {
-        bank_lanes [i].label_trim.label.clear ();
-        bank_lanes [i].label_trim.invalidate ();
+        bank_lanes [i].label_trim.set_label ("");
       } else {
         float db = gain_to_db (trim);
         snprintf (buf, 127, "Trim: %s%.02fdB", db > 0.0 ? "+" : "", db);
-        bank_lanes [i].label_trim.label = buf;
-        bank_lanes [i].label_trim.invalidate ();
+        bank_lanes [i].label_trim.set_label (buf);
       }
     }
   }

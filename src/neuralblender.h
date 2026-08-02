@@ -204,7 +204,7 @@ struct c_eq_state {
       EQ_HIPASS, EQ_LOWSHELF, EQ_CURVE, EQ_CURVE,
       EQ_CURVE, EQ_CURVE, EQ_HISHELF, EQ_LOWPASS
     };
-
+    
     for (int i = 0; i < EQ_NUM_BANDS; ++i) {
       enabled [i] = false;
       mode [i] = g_defaultmodes [i];
@@ -213,7 +213,7 @@ struct c_eq_state {
       q [i] = 1.0f;
     }
   }
-
+  
   bool on = false;
   float master_gain_db = 0.0f;
   bool enabled [EQ_NUM_BANDS] = {};

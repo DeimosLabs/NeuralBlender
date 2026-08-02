@@ -28,6 +28,7 @@
 #include "configfile.h"
 #include "nbtk.h"
 #include "tuner.h"
+#include "eqgraph.h"
 
 #define UI_STATS_PER_LANE    NB_STATS_PER_LANE
 
@@ -338,9 +339,9 @@ public:
   void set_state (nbtk::_widget_state state);
   
   nbtk::c_widget      cont_sliders;
-  nbtk::c_widget      cont_graph;
+  nbtk::c_container   cont_graph;
   nbtk::c_frame       frame;
-  nbtk::c_canvas      graph;
+  c_eqgraph           graph;
   nbtk::c_label       label;
   c_gainknob          knob_gain;
   nbtk::c_frame       cont_bands;

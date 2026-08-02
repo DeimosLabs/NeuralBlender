@@ -236,6 +236,8 @@ public:
   virtual bool highlighted () const;
   void invalidate ();
   void invalidate_rect (int x, int y, int w, int h);
+  bool set_label (const char *text);
+  bool set_label (const std::string &text);
   void set_tooltip (const char *text);
   void set_font (cairo_t *cr) {}
   
@@ -268,6 +270,8 @@ public:
   bool wants_mouse = false;
   bool wants_hover = false;
   bool wants_keyboard_focus = false;
+  bool clears_background = false;
+  bool redraw_on_show = false;
   bool doublebuffer = false;
   bool mouse_inside = false;
   bool hovered = false;
@@ -491,6 +495,8 @@ private:
 
 class c_container : public c_widget {
 public:
+  c_container ();
+
   void draw (cairo_t *cr) override;
   void set_scrollbar (c_scrollbar *scrollbar);
   void set_vscrollbar (c_scrollbar *scrollbar);
@@ -950,20 +956,20 @@ public:
   void on_mouse_leave () override;
   bool on_key_down (int key) override;
   bool on_key_up (int key) override;
-
+  
   void move_resize (int x, int y, int w, int h) override;
   void resize (int w, int h) override;
-
+  
   void invalidate_base ();
   void invalidate_overlay ();
   void invalidate_overlay_rect (int x, int y, int w, int h);
   void expose ();
-
+  
   bool button_left_down () const;
   bool button_middle_down () const;
   bool button_right_down () const;
   bool check_click_distance (int which_button) const;
-
+  
 protected:
   virtual void render_base (cairo_t *cr);
   virtual void render_overlay (cairo_t *cr);
@@ -984,7 +990,14 @@ protected:
   virtual void on_keydown (int keycode, bool is_repeat);
   virtual void on_keyup (int keycode);
   virtual void on_visible ();
-
+  
+  inline void cairo_move_to (cairo_t *cr, float x, float y) {
+    ::cairo_move_to (cr, x + 0.5, y + 0.5);
+  }
+  inline void cairo_line_to (cairo_t *cr, float x, float y) {
+    ::cairo_line_to (cr, x + 0.5, y + 0.5);
+  }
+  
   int opacity = 255;
   int mouse_x = -1;
   int mouse_y = -1;
@@ -1168,6 +1181,13 @@ public:
   virtual bool on_key_down (int key);
   void set_min_size (int w, int h) override;
   void redraw_child (nbtk::c_widget &child, int pad = 1);
+  void redraw_child_rect (
+      nbtk::c_widget &child,
+      int x,
+      int y,
+      int w,
+      int h,
+      int pad = 1);
   void activate ();
   void save_state ();
   void auto_hide_on_close (bool b = true);

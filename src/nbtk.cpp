@@ -413,6 +413,54 @@ static void tk_update_widget_context (
     tk_update_widget_context (child, app, toplevel);
 }
 
+static bool tk_widget_visible_in_tree (const c_widget *widget) {
+  for (const c_widget *node = widget; node; node = node->parent) {
+    if (!node->visible)
+      return false;
+  }
+
+  return true;
+}
+
+static void tk_mark_redraw_on_show (c_widget *widget) {
+  for (c_widget *node = widget; node; node = node->parent) {
+    if (!node->visible)
+      node->redraw_on_show = true;
+  }
+}
+
+static bool tk_redraw_parent_rect (
+    c_widget *widget,
+    int x,
+    int y,
+    int w,
+    int h) {
+  if (!widget || !widget->parent || !widget->toplevel ||
+      !widget->toplevel->widget)
+    return false;
+
+  c_widget *redraw_root = widget->parent;
+  while (redraw_root->parent && !redraw_root->clears_background)
+    redraw_root = redraw_root->parent;
+
+  if (!tk_widget_visible_in_tree (redraw_root))
+    return true;
+
+  const t_point root_p = widget->local_to_root ({ x, y });
+  const t_point redraw_p = redraw_root->root_to_local (root_p);
+  widget->toplevel->redraw_child_rect (
+      *redraw_root,
+      redraw_p.x,
+      redraw_p.y,
+      w,
+      h);
+  return true;
+}
+
+static bool tk_redraw_parent_rect (c_widget *widget) {
+  return tk_redraw_parent_rect (widget, 0, 0, widget->w, widget->h);
+}
+
 void c_widget::create (
     c_widget *parent_,
     const char *label_,
@@ -677,6 +725,7 @@ void c_widget::clear_hover_tree () {
 
 c_frame::c_frame () {
   corner_radius = NBTK_FRAME_RADIUS;
+  clears_background = true;
 }
 
 void c_frame::draw (cairo_t *cr) {
@@ -1757,6 +1806,8 @@ static bool with_value_area_geometry (c_slider *slider, const t_rect &r, Func fu
   slider->y = old_y;
   slider->w = old_w;
   slider->h = old_h;
+  if (result)
+    slider->invalidate ();
   return result;
 }
 
@@ -1914,6 +1965,10 @@ void c_slider::emit_action () {
   event.source_id = id;
   event.mouse_button = last_mouse_button;
   on_action (event);
+}
+
+c_container::c_container () {
+  clears_background = true;
 }
 
 void c_container::draw (cairo_t *cr) {
@@ -4154,7 +4209,12 @@ void c_widget::show () {
     return;
 
   visible = true;
-  invalidate ();
+  const bool force_redraw = redraw_on_show;
+  redraw_on_show = false;
+  if (force_redraw)
+    invalidate ();
+  else if (!tk_redraw_parent_rect (this))
+    invalidate ();
 }
 
 void c_widget::hide () {
@@ -4165,17 +4225,24 @@ void c_widget::hide () {
     app->clear_focus (this);
 
   visible = false;
-  invalidate ();
+  if (!tk_redraw_parent_rect (this))
+    invalidate ();
 }
 
 void c_widget::move (int x_, int y_) {
   if (x == x_ && y == y_)
     return;
 
-  invalidate ();
+  if (!tk_widget_visible_in_tree (this))
+    tk_mark_redraw_on_show (this);
+  else
+    invalidate ();
   x = x_;
   y = y_;
-  invalidate ();
+  if (!tk_widget_visible_in_tree (this))
+    tk_mark_redraw_on_show (this);
+  else
+    invalidate ();
 }
 
 void c_widget::resize (int w_, int h_) {
@@ -4184,10 +4251,16 @@ void c_widget::resize (int w_, int h_) {
   if (w == w_ && h == h_)
     return;
 
-  invalidate ();
+  if (!tk_widget_visible_in_tree (this))
+    tk_mark_redraw_on_show (this);
+  else
+    invalidate ();
   w = w_;
   h = h_;
-  invalidate ();
+  if (!tk_widget_visible_in_tree (this))
+    tk_mark_redraw_on_show (this);
+  else
+    invalidate ();
 }
 
 void c_widget::move_resize (int x_, int y_, int w_, int h_) {
@@ -4196,12 +4269,18 @@ void c_widget::move_resize (int x_, int y_, int w_, int h_) {
   if (x == x_ && y == y_ && w == w_ && h == h_)
     return;
 
-  invalidate ();
+  if (!tk_widget_visible_in_tree (this))
+    tk_mark_redraw_on_show (this);
+  else
+    invalidate ();
   x = x_;
   y = y_;
   w = w_;
   h = h_;
-  invalidate ();
+  if (!tk_widget_visible_in_tree (this))
+    tk_mark_redraw_on_show (this);
+  else
+    invalidate ();
 }
 
 void c_widget::invalidate () {
@@ -4209,11 +4288,36 @@ void c_widget::invalidate () {
 }
 
 void c_widget::invalidate_rect (int x_, int y_, int w_, int h_) {
+  if (!tk_widget_visible_in_tree (this))
+    return;
+
+  if (tk_redraw_parent_rect (this, x_, y_, w_, h_))
+    return;
+
   if (!app)
     return;
 
   t_point p = local_to_root ({ x_, y_ });
   app->invalidate_rect (p.x, p.y, w_, h_);
+}
+
+bool c_widget::set_label (const char *text) {
+  const char *str = text ? text : "";
+  if (label == str)
+    return false;
+
+  label = str;
+  invalidate ();
+  return true;
+}
+
+bool c_widget::set_label (const std::string &text) {
+  if (label == text)
+    return false;
+
+  label = text;
+  invalidate ();
+  return true;
 }
 
 c_app::~c_app () = default;
@@ -5955,8 +6059,24 @@ void c_toplevelwindow::set_min_size (int w, int h) {
 }
 
 void c_toplevelwindow::redraw_child (nbtk::c_widget &child, int pad) {
-  if (!widget || !widget->crb || !widget->cr || !child.visible)
+  redraw_child_rect (child, 0, 0, child.w, child.h, pad);
+}
+
+void c_toplevelwindow::redraw_child_rect (
+    nbtk::c_widget &child,
+    int x,
+    int y,
+    int w,
+    int h,
+    int pad) {
+  if (!widget || !child.visible)
     return;
+
+  if (!widget->crb || !widget->cr) {
+    if (app && app->backend)
+      app->backend->invalidate (widget);
+    return;
+  }
 
   Metrics_t metrics;
   native_get_window_metrics (widget, &metrics);
@@ -5965,13 +6085,16 @@ void c_toplevelwindow::redraw_child (nbtk::c_widget &child, int pad) {
 
   activate ();
 
-  const nbtk::t_point p = child.local_to_root ({ 0, 0 });
+  if (w <= 0 || h <= 0)
+    return;
+
+  const nbtk::t_point p = child.local_to_root ({ x, y });
   const int root_w = std::max (1, root_widget.w);
   const int root_h = std::max (1, root_widget.h);
   const int rx = std::max (0, p.x - pad);
   const int ry = std::max (0, p.y - pad);
-  const int rw = std::min (root_w - rx, child.w + pad * 2);
-  const int rh = std::min (root_h - ry, child.h + pad * 2);
+  const int rw = std::min (root_w - rx, w + pad * 2);
+  const int rh = std::min (root_h - ry, h + pad * 2);
   if (rw <= 0 || rh <= 0)
     return;
 
@@ -5979,7 +6102,7 @@ void c_toplevelwindow::redraw_child (nbtk::c_widget &child, int pad) {
   cairo_save (widget->crb);
   cairo_rectangle (widget->crb, rx, ry, rw, rh);
   cairo_clip (widget->crb);
-  cairo_translate (widget->crb, p.x - child.x, p.y - child.y);
+  cairo_translate (widget->crb, p.x - child.x - x, p.y - child.y - y);
   child.draw_tree (widget->crb);
   cairo_restore (widget->crb);
   app->cr = nullptr;

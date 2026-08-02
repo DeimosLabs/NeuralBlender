@@ -7,13 +7,14 @@
  */
 
 
-#include "meter.h"
 
 #include <algorithm>
 #include <cmath>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+
+#include "meter.h"
 
 #ifndef METER_DATA_ONLY
 #include "nbtk.h"
@@ -724,6 +725,8 @@ void c_meterwidget::update_geometry () {
 void c_meterwidget::render_base (cairo_t *cr) {
   update_geometry ();
 
+  cairo_set_line_cap (cr, CAIRO_LINE_CAP_SQUARE);
+  
   cairo_set_source_rgb (cr, 0.05, 0.05, 0.05);
   cairo_paint (cr);
 
@@ -760,19 +763,19 @@ void c_meterwidget::render_base (cairo_t *cr) {
     if (vertical) {
       int ppos = (int) (met_len * line.pos);
       int y = height - ppos - rec_size;
-      cairo_move_to (cr, t1, y + 0.5);
-      cairo_line_to (cr, t2, y + 0.5);
+      cairo_move_to (cr, t1, y);
+      cairo_line_to (cr, t2, y);
       if (stereo) {
-        cairo_move_to (cr, t3, y + 0.5);
-        cairo_line_to (cr, t4, y + 0.5);
+        cairo_move_to (cr, t3, y);
+        cairo_line_to (cr, t4, y);
       }
     } else {
       int x = rec_size + (int) (met_len * line.pos);
-      cairo_move_to (cr, x + 0.5, t1);
-      cairo_line_to (cr, x + 0.5, t2 - 1);
+      cairo_move_to (cr, x, t1);
+      cairo_line_to (cr, x, t2 - 1);
       if (stereo) {
-        cairo_move_to (cr, x + 0.5, t3);
-        cairo_line_to (cr, x + 0.5, t4 - 1);
+        cairo_move_to (cr, x, t3);
+        cairo_line_to (cr, x, t4 - 1);
       }
     }
     cairo_stroke (cr);
@@ -798,7 +801,7 @@ void c_meterwidget::draw_bar (
     bool clipped) {
   level = std::clamp (level, 0.0f, 1.0f);
   hold = std::clamp (hold, 0.0f, 1.0f);
-
+  
   int x = 0;
   int y = 0;
   int w = 0;
@@ -884,11 +887,11 @@ void c_meterwidget::draw_bar (
     cairo_set_source_rgba (cr, 1.0, 1.0, 1.0, 0.75);
     cairo_set_line_width (cr, 2.0);
     if (vertical) {
-      const double py = height - rec_size - holdpos + 0.5;
+      const double py = height - rec_size - holdpos;// + 0.5;
       cairo_move_to (cr, at, py);
       cairo_line_to (cr, at + bar_th, py);
     } else {
-      const double px = rec_size + holdpos + 0.5;
+      const double px = rec_size + holdpos;// + 0.5;
       cairo_move_to (cr, px, at);
       cairo_line_to (cr, px, at + bar_th);
     }

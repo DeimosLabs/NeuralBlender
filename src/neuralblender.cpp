@@ -981,7 +981,7 @@ static void convolver_trim_trailing_silence (
   size_t n = v.size ();
 
   while (n > 0 && fabsf (v [n - 1]) <= threshold)
-    --n;
+    n--;
   
   v.resize (n);
 }
