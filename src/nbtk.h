@@ -129,7 +129,7 @@ class c_tooltip;
 class c_filepicker;
 class c_valueeditor_popup;
 
-enum class e_event_type {
+enum class _event_type {
   unknown,
   action,
   command,
@@ -139,7 +139,7 @@ enum class e_event_type {
 };
 
 struct t_event {
-  e_event_type type = e_event_type::unknown;
+  _event_type type = _event_type::unknown;
   c_widget *source = nullptr;
   uint64_t source_id = 0;
   int source_index = -1;

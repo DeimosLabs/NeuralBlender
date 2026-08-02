@@ -1680,7 +1680,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     debug ("window w/h %d,%d", window_width, window_height);
     
     const int btnl = 16;
-          int btnh = std::max (50, toparea / 2 - 12);
+          int btnh = std::max (48, toparea / 2 - 14);
           int btnw = std::min (76, btnh * 2);
               btnw = std::max (btnw, window_width / 8);
     if (btnh > window_width / 12)

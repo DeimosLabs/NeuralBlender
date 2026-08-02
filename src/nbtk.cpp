@@ -391,11 +391,11 @@ bool t_rect::contains (int px, int py) const {
 }
 
 t_action_event::t_action_event () {
-  type = e_event_type::action;
+  type = _event_type::action;
 }
 
 t_command_event::t_command_event () {
-  type = e_event_type::command;
+  type = _event_type::command;
 }
 
 static void tk_update_widget_context (
