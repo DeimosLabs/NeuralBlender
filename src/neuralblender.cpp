@@ -2588,8 +2588,12 @@ void c_neuralblender::update_mutes () {
     for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
       const bool loaded = banks [bank].lanes [i].loaded ();
       banks [bank].lanes [i].mute = !loaded;
-      if (loaded)
+      if (loaded) {
         loaded_mask |= 1u << i;
+      } else {
+        c_vudata *v = banks [bank].meters_out [i];
+        if (v) v->set_l (0.0f, 0.0f);
+      }
     }
 
     if (!loaded_mask)
@@ -2598,10 +2602,6 @@ void c_neuralblender::update_mutes () {
     banks [bank].active_mask = loaded_mask;
   }
 
-  // Compatibility for current amp-only process_block().
-  // loaded_lane_mask == 0: no models loaded, passthrough
-  // loaded_lane_mask != 0 but active mask is 0: models exist but are
-  // muted/excluded, silence/mix logic
   loaded_lane_mask.store (
     banks [BANK_AMP].active_mask, std::memory_order_release);
 
