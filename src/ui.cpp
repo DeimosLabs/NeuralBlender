@@ -1043,6 +1043,7 @@ void c_eqpage_widgets::create (
   cont_sliders.create (&cont_bands, "", 32, 0, w, h / 3);
   cont_graph.create (&frame, "", 32, 0, w, h / 3);
   graph.create (&cont_graph, "", 0, 0, w, h / 3);
+  cont_graph.hide ();
   label.create (&frame, eqstr.c_str (), 0, 0, 300, 30);
   label.align = nbtk::TEXT_LEFT;
   knob_gain.text_size = 0.75;
@@ -1148,14 +1149,15 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   const int knob_h = 64;
   const int controls_h = checkbox + menu_h + knob_h * 2 + 18;
   const int graph_top = inner_y;
-  const int graph_gap = 4;
   const int top_area_h = std::max (1, inner_h - controls_h);
-  const int slider_min_h = label_h + 44;
-  int slider_h = std::max (1, top_area_h * 3 / 8);
-  if (top_area_h >= slider_min_h + graph_gap + 32)
-    slider_h = std::max (slider_min_h, slider_h);
-  const int graph_h = std::max (1, top_area_h - slider_h - graph_gap);
+  const int graph_h = cont_graph.visible ?
+    std::min (150, std::max (1, top_area_h - 1)) :
+    0;
+  const int graph_gap = graph_h > 0 ? 4 : 0;
   const int slider_top = graph_top + graph_h + graph_gap;
+  const int slider_h = std::max (
+    1,
+    top_area_h - graph_h - graph_gap);
   const int checkbox_y = slider_top + slider_h + 6;
   const int menu_y = checkbox_y + checkbox + 6;
   const int freq_y = menu_y + menu_h + 6;
