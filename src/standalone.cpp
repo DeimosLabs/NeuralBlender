@@ -336,33 +336,24 @@ void c_standalone_ui::on_eq_band (
   if (!blender || band >= EQ_NUM_BANDS)
     return;
 
-  c_eq_state *eq_state = nullptr;
-  if (bank == BANK_EQPRE) {
-    eq_state = &state.eqpre;
-  } else if (bank == BANK_EQPOST) {
-    eq_state = &state.eqpost;
-  } else {
+  if (bank != BANK_EQPRE && bank != BANK_EQPOST)
     return;
-  }
 
+  const c_eq_state &eq_state = ui_eq_state_for_bank (bank);
   blender->set_eq_band (
     bank,
     band,
-    eq_state->enabled [band],
-    eq_state->mode [band],
-    eq_state->freq [band],
-    eq_state->gain_db [band],
-    eq_state->q [band]);
+    eq_state.enabled [band],
+    eq_state.mode [band],
+    eq_state.freq [band],
+    eq_state.gain_db [band],
+    eq_state.q [band]);
 }
 
 void c_standalone_ui::on_eq_master_gain (
     nbtk::c_widget *w, _lane_bank bank, float value) {
   (void) w;
-  if (bank == BANK_EQPRE)
-    state.eqpre.master_gain_db = value;
-  else if (bank == BANK_EQPOST)
-    state.eqpost.master_gain_db = value;
-  else
+  if (bank != BANK_EQPRE && bank != BANK_EQPOST)
     return;
 
   if (blender)

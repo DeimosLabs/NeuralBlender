@@ -424,6 +424,8 @@ public:
           void on_excl_use (nbtk::c_widget *w, bool b)                  ;
           void on_action (nbtk::t_action_event &event)                  ;
   virtual void on_bank_switch (nbtk::c_widget *w, int n)                ;
+          c_eq_state &ui_eq_state_for_bank (_lane_bank bank)            ;
+    const c_eq_state &ui_eq_state_for_bank (_lane_bank bank) const      ;
           void sync_page_visibility ()                                  ;
           void ensure_tuner_created ()                                  ;
           void sync_tuner_visibility ()                                 ;
@@ -523,6 +525,8 @@ public:
   c_vudata vudata_masterout;
   c_configfile configfile;
   c_neuralblender_state state;
+  c_eq_state ui_eqpre;
+  c_eq_state ui_eqpost;
   _lane_bank visible_bank = BANK_AMP;
   _ui_page visible_page = PAGE_AMP;
   size_t last_exclusive_lane [BANK_COUNT] = {0, 0, 0}; // 1-based lane remembered when exclusive mode is off

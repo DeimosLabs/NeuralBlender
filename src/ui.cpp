@@ -1043,7 +1043,7 @@ void c_eqpage_widgets::create (
   cont_sliders.create (&cont_bands, "", 32, 0, w, h / 3);
   cont_graph.create (&frame, "", 32, 0, w, h / 3);
   graph.create (&cont_graph, "", 0, 0, w, h / 3);
-  cont_graph.hide ();
+  //cont_graph.hide ();
   label.create (&frame, eqstr.c_str (), 0, 0, 300, 30);
   label.align = nbtk::TEXT_LEFT;
   knob_gain.text_size = 0.75;
@@ -1126,6 +1126,13 @@ void c_eqpage_widgets::create (
     bands [i].knob_q.set_tooltip (buf);
     
   }
+  if (ui) {
+    if (bank_id == BANK_EQPRE) {
+      graph.set_state (&ui->ui_eqpre);
+    } else if (bank_id == BANK_EQPOST) {
+      graph.set_state (&ui->ui_eqpost);
+    }
+  }
 }
 
 void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
@@ -1151,7 +1158,7 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   const int graph_top = inner_y;
   const int top_area_h = std::max (1, inner_h - controls_h);
   const int graph_h = cont_graph.visible ?
-    std::min (150, std::max (1, top_area_h - 1)) :
+    std::max (1, top_area_h / 2 - 1) :
     0;
   const int graph_gap = graph_h > 0 ? 4 : 0;
   const int slider_top = graph_top + graph_h + graph_gap;
@@ -1209,6 +1216,7 @@ void c_eqpage_widgets::sync_from_state (const c_eq_state &eq_state) {
     bands [i].knob_freq.set_value (eq_state.freq [i]);
     bands [i].knob_q.set_value (eq_state.q [i]);
   }
+  graph.invalidate ();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1921,6 +1929,15 @@ void c_neuralblender_ui::on_bank_switch (nbtk::c_widget *w, int n) { CP
   move_resize ();
 }
 
+c_eq_state &c_neuralblender_ui::ui_eq_state_for_bank (_lane_bank bank) {
+  return bank == BANK_EQPOST ? ui_eqpost : ui_eqpre;
+}
+
+const c_eq_state &c_neuralblender_ui::ui_eq_state_for_bank (
+    _lane_bank bank) const {
+  return bank == BANK_EQPOST ? ui_eqpost : ui_eqpre;
+}
+
 void c_neuralblender_ui::sync_page_visibility () {
   if (visible_page == PAGE_PEDAL)
     cont_pedals.show ();
@@ -2280,8 +2297,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
     if (bank != BANK_EQPRE && bank != BANK_EQPOST)
       return false;
 
-    c_eq_state &eq =
-      bank == BANK_EQPRE ? state.eqpre : state.eqpost;
+    c_eq_state &eq = ui_eq_state_for_bank (bank);
     const size_t band = widget->lane;
     bool changed_parameter = false;
 
@@ -2326,8 +2342,21 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
         return false;
     }
 
-    if (eq_auto_enable && changed_parameter)
+    if (eq_auto_enable && changed_parameter) {
       eq.enabled [band] = true;
+      c_eqpage_widgets &eqpage =
+        bank == BANK_EQPOST ? eqpage_post : eqpage_pre;
+      eqpage.bands [band].btn_on.set_value (true);
+    }
+
+    if (bank == BANK_EQPOST)
+      state.eqpost = eq;
+    else
+      state.eqpre = eq;
+
+    c_eqpage_widgets &eqpage =
+      bank == BANK_EQPOST ? eqpage_post : eqpage_pre;
+    eqpage.graph.invalidate ();
 
     on_eq_band (widget, bank, band);
     finish ();
@@ -2341,12 +2370,15 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       event.source->role == ROLE_EQ_MASTER_GAIN &&
       (event.source->bank == BANK_EQPRE || event.source->bank == BANK_EQPOST)) {
     const _lane_bank bank = (_lane_bank) event.source->bank;
-    c_eq_state &eq =
-      bank == BANK_EQPRE ? state.eqpre : state.eqpost;
+    c_eq_state &eq = ui_eq_state_for_bank (bank);
     eq.master_gain_db = std::clamp (
       static_cast<nbtk::c_knob *> (event.source)->value,
       -36.0f,
       36.0f);
+    if (bank == BANK_EQPOST)
+      state.eqpost = eq;
+    else
+      state.eqpre = eq;
     on_eq_master_gain (event.source, bank, eq.master_gain_db);
     finish ();
     return;
@@ -2907,8 +2939,10 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   btn_other_link_amp.set_value (linked_calib_for_bank (BANK_AMP));
   btn_other_link_cab.set_value (linked_calib_for_bank (BANK_CAB));
   btn_other_vu.set_value (state.do_vu);
-  eqpage_pre.sync_from_state (state.eqpre);
-  eqpage_post.sync_from_state (state.eqpost);
+  ui_eqpre = state.eqpre;
+  ui_eqpost = state.eqpost;
+  eqpage_pre.sync_from_state (ui_eqpre);
+  eqpage_post.sync_from_state (ui_eqpost);
   if (state.do_vu) {
     for (_lane_bank bank_id : MODEL_BANKS) {
       const size_t bank = (size_t) bank_id;

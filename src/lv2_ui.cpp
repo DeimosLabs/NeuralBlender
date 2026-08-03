@@ -403,8 +403,7 @@ void c_lv2_ui::on_eq_band (
   if (!w || band >= EQ_NUM_BANDS)
     return;
 
-  const c_eq_state &eq_state =
-    bank == BANK_EQPOST ? state.eqpost : state.eqpre;
+  const c_eq_state &eq_state = ui_eq_state_for_bank (bank);
 
   if (w->role != ROLE_EQ_ENABLED && eq_state.enabled [band]) {
     write_control (
@@ -451,11 +450,7 @@ void c_lv2_ui::on_eq_band (
 void c_lv2_ui::on_eq_master_gain (
     nbtk::c_widget *w, _lane_bank bank, float value) {
   (void) w;
-  if (bank == BANK_EQPRE)
-    state.eqpre.master_gain_db = value;
-  else if (bank == BANK_EQPOST)
-    state.eqpost.master_gain_db = value;
-  else
+  if (bank != BANK_EQPRE && bank != BANK_EQPOST)
     return;
 
   write_control (nb_lv2_eq_master_gain_port (bank), value);
@@ -712,6 +707,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     c_eq_state &eq_state =
       eq_bank == BANK_EQPOST ? state.eqpost : state.eqpre;
     eq_state.master_gain_db = value;
+    ui_eq_state_for_bank (eq_bank).master_gain_db = value;
     if (eq_bank == BANK_EQPOST)
       eqpage_post.knob_gain.set_value (value);
     else

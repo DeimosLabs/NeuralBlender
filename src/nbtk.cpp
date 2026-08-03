@@ -1788,27 +1788,21 @@ t_rect c_slider::track_rect () const {
   return r;
 }
 
-template <class Func>
-static bool with_value_area_geometry (c_slider *slider, const t_rect &r, Func func) {
+static t_rect slider_thumb_rect_for_control (
+    const c_slider *slider,
+    const t_rect &control) {
   if (!slider)
-    return false;
+    return {0, 0, 0, 0};
 
-  const int old_x = slider->x;
-  const int old_y = slider->y;
-  const int old_w = slider->w;
-  const int old_h = slider->h;
-  slider->x += r.x;
-  slider->y += r.y;
-  slider->w = r.w;
-  slider->h = r.h;
-  const bool result = func ();
-  slider->x = old_x;
-  slider->y = old_y;
-  slider->w = old_w;
-  slider->h = old_h;
-  if (result)
-    slider->invalidate ();
-  return result;
+  c_slider *mutable_slider = const_cast<c_slider *> (slider);
+  const int old_w = mutable_slider->w;
+  const int old_h = mutable_slider->h;
+  mutable_slider->w = control.w;
+  mutable_slider->h = control.h;
+  const t_rect thumb = mutable_slider->thumb_rect ();
+  mutable_slider->w = old_w;
+  mutable_slider->h = old_h;
+  return thumb;
 }
 
 bool c_slider::on_mouse_down (int x_, int y_, int button) {
@@ -1854,23 +1848,100 @@ bool c_slider::on_mouse_down (int x_, int y_, int button) {
   if (!r.contains (x_, y_) && button != Button4 && button != Button5)
     return c_widget::on_mouse_down (x_, y_, button);
 
-  return with_value_area_geometry (this, r, [&] {
-    return c_scrollbar::on_mouse_down (x_ - r.x, y_ - r.y, button);
-  });
+  c_widget::on_mouse_down (x_, y_, button);
+  last_mouse_button = button;
+
+  if (button == Button2) {
+    if (app)
+      app->set_focus (this);
+
+    const t_rect thumb = slider_thumb_rect_for_control (this, r);
+    if (orientation == SCROLLBAR_HORIZONTAL) {
+      const int travel = std::max (1, r.w - thumb.w);
+      return c_scrollbar::set_value (
+        (float) (x_ - r.x - thumb.w / 2) / (float) travel,
+        true) || true;
+    }
+
+    const int travel = std::max (1, r.h - thumb.h);
+    return c_scrollbar::set_value (
+      (float) (y_ - r.y - thumb.h / 2) / (float) travel,
+      true) || true;
+  }
+
+  if (button != Button1)
+    return true;
+
+  if (app)
+    app->set_focus (this);
+
+  const t_rect thumb = slider_thumb_rect_for_control (this, r);
+  const t_rect local_thumb = {
+    thumb.x + r.x,
+    thumb.y + r.y,
+    thumb.w,
+    thumb.h
+  };
+  if (local_thumb.contains (x_, y_)) {
+    dragging = true;
+    drag_start_x = x_;
+    drag_start_y = y_;
+    drag_start_value = value;
+  } else {
+    float new_value;
+    if (orientation == SCROLLBAR_HORIZONTAL) {
+      const int travel = std::max (1, r.w - thumb.w);
+      new_value =
+        (float) (x_ - r.x - thumb.w / 2) / (float) travel;
+    } else {
+      const int travel = std::max (1, r.h - thumb.h);
+      new_value =
+        (float) (y_ - r.y - thumb.h / 2) / (float) travel;
+    }
+
+    c_scrollbar::set_value (new_value, true);
+    dragging = true;
+    drag_start_x = x_;
+    drag_start_y = y_;
+    drag_start_value = value;
+  }
+
+  return true;
 }
 
 bool c_slider::on_mouse_up (int x_, int y_, int button) {
-  const t_rect r = slider_control_rect ();
-  return with_value_area_geometry (this, r, [&] {
-    return c_scrollbar::on_mouse_up (x_ - r.x, y_ - r.y, button);
-  });
+  if (button == Button4)
+    return set_value (slider_value + slider_step, true) || true;
+  if (button == Button5)
+    return set_value (slider_value - slider_step, true) || true;
+
+  c_widget::on_mouse_up (x_, y_, button);
+  if (button == Button1) {
+    dragging = false;
+    if (app && !wants_keyboard_focus)
+      app->clear_focus (this);
+  }
+  return true;
 }
 
 bool c_slider::on_mouse_move (int x_, int y_) {
   const t_rect r = slider_control_rect ();
-  return with_value_area_geometry (this, r, [&] {
-    return c_scrollbar::on_mouse_move (x_ - r.x, y_ - r.y);
-  });
+  if (!dragging || r.w <= 0 || r.h <= 0)
+    return true;
+
+  const t_rect thumb = slider_thumb_rect_for_control (this, r);
+  if (orientation == SCROLLBAR_HORIZONTAL) {
+    const int travel = std::max (1, r.w - thumb.w);
+    c_scrollbar::set_value (
+      drag_start_value + (float) (x_ - drag_start_x) / (float) travel,
+      true);
+  } else {
+    const int travel = std::max (1, r.h - thumb.h);
+    c_scrollbar::set_value (
+      drag_start_value + (float) (y_ - drag_start_y) / (float) travel,
+      true);
+  }
+  return true;
 }
 
 bool c_slider::on_key_down (int key) {

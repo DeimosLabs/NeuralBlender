@@ -452,7 +452,7 @@ public:
   c_container *container = nullptr;
   bool solid_thumb = false;
 
-private:
+protected:
   bool dragging = false;
   int drag_start_x = 0;
   int drag_start_y = 0;

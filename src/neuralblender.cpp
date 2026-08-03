@@ -536,6 +536,31 @@ void c_eq::set_samplerate (int sr) {
   }
 }
 
+// this is primarily used by the UI side for graph
+float c_biquad::response_db (float freq, float samplerate) const {
+  if (mode == EQ_OFF || samplerate <= 0.0f)
+    return 0.0f;
+
+  const float pi = 3.14159265358979323846f;
+  const float w0 = 2.0f * pi * freq / samplerate;
+
+  const float c1 = cosf (w0);
+  const float s1 = sinf (w0);
+  const float c2 = cosf (2.0f * w0);
+  const float s2 = sinf (2.0f * w0);
+
+  const float nr = b0 + b1 * c1 + b2 * c2;
+  const float ni =      - b1 * s1 - b2 * s2;
+  const float dr = 1.0f + a1 * c1 + a2 * c2;
+  const float di =        - a1 * s1 - a2 * s2;
+
+  const float n2 = nr * nr + ni * ni;
+  const float d2 = std::max (dr * dr + di * di, 1.0e-20f);
+  const float mag = sqrtf (n2 / d2);
+
+  return 20.0f * log10f (std::max (mag, 1.0e-20f));
+}
+
 c_eq::c_eq () {
   reset ();
 }
