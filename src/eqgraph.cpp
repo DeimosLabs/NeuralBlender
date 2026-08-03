@@ -99,6 +99,16 @@ void c_eqgraph::on_paint (cairo_t *cr) {
 
   cairo_set_source_surface (cr, curve_surface, 0, 0);
   cairo_paint (cr);
+
+  if (mouse_handle_x >= 0 && mouse_handle_y >= 0) {
+    cairo_set_line_width (cr, 2.0f);
+    cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 0.25);
+    cairo_rectangle (cr,
+                     mouse_handle_x - handle_size / 2,
+                     mouse_handle_y - handle_size / 2,
+                     handle_size, handle_size);
+    cairo_fill (cr);
+  }
 }
 
 void c_eqgraph::render_curve_surface () {
@@ -115,13 +125,12 @@ void c_eqgraph::render_curve_surface () {
     return;
   }
 
-  cairo_set_source_rgba (curve_cr, 1, 1, 1, 1);
   cairo_set_line_width (curve_cr, 2.0f);
+  cairo_set_source_rgba (curve_cr, 1, 1, 1, 1);
   path_curve (curve_cr, curve);
   cairo_stroke (curve_cr);
-  
-  cairo_set_source_rgba (curve_cr, 0.7, 1.0, 0.7, 1);
   cairo_set_line_width (curve_cr, 1.0f);
+
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     if (state->enabled [i]) {
       int x = freq_to_x (state->freq [i]);
@@ -131,9 +140,16 @@ void c_eqgraph::render_curve_surface () {
                        0.5 + x - handle_size / 2,
                        0.5 + y - handle_size / 2,
                        handle_size, handle_size);
+      
+      if (i == drag_handle)
+        cairo_set_source_rgba (curve_cr, 1, 1, 0, 1);
+      else
+        cairo_set_source_rgba (curve_cr, 0.7, 1.0, 0.7, 1);
+
       cairo_stroke (curve_cr);
     }
   }
+  
 
   cairo_surface_flush (curve_surface);
 }
@@ -321,6 +337,53 @@ int c_eqgraph::find_handle (int x, int y) const {
   return -1;
 }
 
+void c_eqgraph::set_mouse_handle (int handle) {
+  handle = std::clamp (handle, -1, EQ_NUM_BANDS - 1);
+
+  int next_x = -1;
+  int next_y = -1;
+  if (handle >= 0 && state) {
+    next_x = (int) std::round (freq_to_x (state->freq [handle]));
+    next_y = (int) std::round (db_to_y (state->gain_db [handle]));
+  }
+
+  if (handle == mouse_handle &&
+      next_x == mouse_handle_x &&
+      next_y == mouse_handle_y)
+    return;
+
+  mouse_handle = handle;
+  mouse_handle_x = next_x;
+  mouse_handle_y = next_y;
+
+  invalidate ();
+}
+
+void c_eqgraph::update_mouse_handle (int x, int y) {
+  const int handle = find_handle (x, y);
+
+  if (handle >= 0 && state) {
+    const int handle_x = (int) std::round (freq_to_x (state->freq [handle]));
+    const int handle_y = (int) std::round (db_to_y (state->gain_db [handle]));
+    const float rad = handle_size * 0.5f;
+
+    if (fabsf ((float) x - (float) handle_x) <= rad &&
+        fabsf ((float) y - (float) handle_y) <= rad) {
+      set_mouse_handle (handle);
+      return;
+    }
+  } else {
+    set_mouse_handle (-1);
+    return;
+  }
+
+  set_mouse_handle (-1);
+}
+
+void c_eqgraph::clear_mouse_handle () {
+  set_mouse_handle (-1);
+}
+
 void c_eqgraph::emit_band_action (int band) {
   if (band < 0 || band >= EQ_NUM_BANDS)
     return;
@@ -344,6 +407,7 @@ void c_eqgraph::update_dragged_handle (int x, int y) {
     freq_max);
   state->gain_db [drag_handle] = y_to_db ((float) y);
   state_changed ();
+  set_mouse_handle (drag_handle);
   emit_band_action (drag_handle);
 }
 
@@ -352,7 +416,8 @@ bool c_eqgraph::on_mouse_down (int mouse_x, int mouse_y, int button) {
     return nbtk::c_canvas::on_mouse_down (mouse_x, mouse_y, button);
 
   last_mouse_button = button;
-
+  invalidate ();
+  
   if (button == Button4 || button == Button5) {
     const int found = find_handle (mouse_x, mouse_y);
     if (found >= 0) {
@@ -370,6 +435,7 @@ bool c_eqgraph::on_mouse_down (int mouse_x, int mouse_y, int button) {
     return true;
 
   drag_handle = find_handle (mouse_x, mouse_y);
+  set_mouse_handle (drag_handle);
   drag_orig_x = mouse_x;
   drag_orig_y = mouse_y;
   return true;
@@ -378,12 +444,15 @@ bool c_eqgraph::on_mouse_down (int mouse_x, int mouse_y, int button) {
 bool c_eqgraph::on_mouse_up (int mouse_x, int mouse_y, int button) {
   if (button == Button1 && drag_handle >= 0)
     update_dragged_handle (mouse_x, mouse_y);
-
+  
+  invalidate ();
+  
   nbtk::c_canvas::on_mouse_up (mouse_x, mouse_y, button);
 
   if (button == Button1)
     drag_handle = -1;
-
+  
+  update_mouse_handle (mouse_x, mouse_y);
   return true;
 }
 
@@ -392,6 +461,13 @@ bool c_eqgraph::on_mouse_move (int mouse_x, int mouse_y) {
 
   if (drag_handle >= 0)
     update_dragged_handle (mouse_x, mouse_y);
+  else
+    update_mouse_handle (mouse_x, mouse_y);
 
   return true;
+}
+
+void c_eqgraph::on_mouse_leave () {
+  clear_mouse_handle ();
+  nbtk::c_canvas::on_mouse_leave ();
 }

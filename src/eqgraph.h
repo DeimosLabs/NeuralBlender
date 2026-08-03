@@ -27,6 +27,7 @@ public:
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
   bool on_mouse_move (int x, int y) override;
+  void on_mouse_leave () override;
   
   float freq_min = 20.0f;
   float freq_max = 20000.0f;
@@ -39,6 +40,9 @@ private:
   float y_to_db (float y) const;
   
   int find_handle (int x, int y) const;
+  void set_mouse_handle (int handle);
+  void update_mouse_handle (int x, int y);
+  void clear_mouse_handle ();
   void emit_band_action (int band);
   void update_dragged_handle (int x, int y);
   
@@ -62,6 +66,9 @@ private:
   int curve_surface_w = 0;
   int curve_surface_h = 0;
   
+  int mouse_handle = -1;
+  int mouse_handle_x = -1;
+  int mouse_handle_y = -1;
   int drag_handle = -1;
   int drag_orig_x = -1;
   int drag_orig_y = -1;
