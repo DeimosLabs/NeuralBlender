@@ -224,7 +224,6 @@ public:
       int x, int y, int w, int h);
 	      
   void move_resize (int x, int y, int w, int h);
-  void sync_from_state (const c_eq_state &state);
   void set_state (nbtk::_widget_state state);
   
   //bool user_mute = false;
@@ -337,6 +336,7 @@ public:
   
   void move_resize (int x, int y, int w, int h);
   void sync_from_state (const c_eq_state &state);
+  void sync_band_from_state (const c_eq_state &state, size_t band);
   void set_state (nbtk::_widget_state state);
   
   nbtk::c_widget      cont_sliders;

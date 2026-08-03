@@ -13,6 +13,9 @@
 #include "neuralblender.h"
 #include "nbtk.h"
 
+#define CURVE_RECALC_MS 20
+#define CURVE_POINTS    640
+
 class c_eqgraph : public nbtk::c_canvas {
 public:
   c_eqgraph ();
@@ -36,22 +39,24 @@ public:
 private:
   float freq_to_x (float freq) const;
   float x_to_freq (float x) const;
+  float curve_x_to_freq (float x) const;
   float db_to_y (float gain_db) const;
   float y_to_db (float y) const;
   
   int find_handle (int x, int y) const;
-  void set_mouse_handle (int handle);
+  void mark_curves_dirty (bool force_redraw);
+  void set_mouse_handle (int handle, bool redraw = true);
   void update_mouse_handle (int x, int y);
   void clear_mouse_handle ();
   void emit_band_action (int band);
-  void update_dragged_handle (int x, int y);
+  void update_dragged_handle (int x, int y, bool force_redraw);
   
   void generate_curves ();
   void clear_curve_surface ();
   bool ensure_curve_surface ();
   void render_curve_surface ();
   void path_curve (cairo_t *cr, const std::vector<float> &v);
-  int samplerate = 48000; // TODO: DON'T FORGET TO GRAB THIS FROM UI!!!
+  int samplerate = 0;
   
   c_eq_state *state = NULL;
   std::vector<float> curves [EQ_NUM_BANDS];
@@ -59,7 +64,7 @@ private:
   
   bool curves_dirty = true;
   uint64_t curves_last_ms = 0;
-  static constexpr uint64_t CURVE_RECALC_MS = 50;
+  //static constexpr uint64_t CURVE_RECALC_MS = 50;
   
   cairo_surface_t *curve_surface = NULL;
   cairo_t *curve_cr = NULL;

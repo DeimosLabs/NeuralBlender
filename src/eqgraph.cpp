@@ -72,8 +72,7 @@ void c_eqgraph::set_state (c_eq_state *state_) {
 }
 
 void c_eqgraph::state_changed () {
-  curves_dirty = true;
-  invalidate ();
+  mark_curves_dirty (true);
 }
 
 void c_eqgraph::set_samplerate (int sr) {
@@ -84,6 +83,9 @@ void c_eqgraph::set_samplerate (int sr) {
 void c_eqgraph::on_paint (cairo_t *cr) {
   if (!state)
     return;
+  
+  static nbtk::c_printfps p ("on_paint: ");
+  p.tick ();
   
   const uint64_t now = nbtk::now_ms ();
   if (!curve_surface ||
@@ -115,6 +117,9 @@ void c_eqgraph::render_curve_surface () {
   if (!ensure_curve_surface () || !curve_cr)
     return;
 
+  static nbtk::c_printfps p ("render_curve_surface: ");
+  p.tick ();
+  
   cairo_save (curve_cr);
   cairo_set_operator (curve_cr, CAIRO_OPERATOR_CLEAR);
   cairo_paint (curve_cr);
@@ -204,10 +209,17 @@ bool c_eqgraph::ensure_curve_surface () {
 void c_eqgraph::path_curve (cairo_t *cr, const std::vector<float> &v) {
   if (!v.size () || !cr)
     return;
+
+  static nbtk::c_printfps p ("path curve: ");
+  p.tick ();
   
-  cairo_move_to (cr, 0, db_to_y (v [0]));
-  for (int i = 1; i < v.size () && i < w; i++)
-    cairo_line_to (cr, i, db_to_y (v [i]));
+  const size_t n = v.size ();
+  const float denom = (n > 1) ? (float) (n - 1) : 1.0f;
+  const float xscale = (w > 1) ? (float) (w - 1) / denom : 0.0f;
+
+  cairo_move_to (cr, 0.0f, db_to_y (v [0]));
+  for (size_t i = 1; i < n; i++)
+    cairo_line_to (cr, (float) i * xscale, db_to_y (v [i]));
 }
 
 void c_eqgraph::on_resize (int w, int h) {
@@ -232,17 +244,17 @@ void c_eqgraph::generate_curves () { CP
   if (!state || w <= 0)
     return;
   
-  //static nbtk::c_printfps p ("eqgraph curve: ");
-  //p.tick ();
+  static nbtk::c_printfps p ("generate_curves: ");
+  p.tick ();
   
-  curve.assign (w, 0.0f);
+  curve.assign (CURVE_POINTS, 0.0f);
   for (int band = 0; band < EQ_NUM_BANDS; ++band)
-    curves [band].assign (w, 0.0f);
+    curves [band].assign (CURVE_POINTS, 0.0f);
 
   if (!state || samplerate <= 0)
     return;
 
-  curve.assign (w, state->master_gain_db);
+  curve.assign (CURVE_POINTS, state->master_gain_db);
 
   for (int band = 0; band < EQ_NUM_BANDS; ++band) {
     if (!state->enabled [band] || state->mode [band] == EQ_OFF)
@@ -256,7 +268,7 @@ void c_eqgraph::generate_curves () { CP
       state->q [band],
       state->mode [band]);
 
-    for (int x = 0; x < w; ++x) {
+    for (int x = 0; x < CURVE_POINTS; ++x) {
       float db = 0.0f;
 
       int oversampling = 1;
@@ -266,7 +278,7 @@ void c_eqgraph::generate_curves () { CP
         const float q = std::max (state->q [band], 0.01f);
         const float range_hz = center / q * 4.0f;
 
-        if (fabsf (x_to_freq ((float) x) - center) <= range_hz)
+        if (fabsf (curve_x_to_freq ((float) x) - center) <= range_hz)
           oversampling = eqgraph_oversampling_for_q (q);
       }
 
@@ -277,7 +289,7 @@ void c_eqgraph::generate_curves () { CP
           (float) x - 0.5f + ((float) i + 0.5f) * oversamp_jump;
 
         const float db1 =
-          biquad.response_db (x_to_freq (sub_x), samplerate);
+          biquad.response_db (curve_x_to_freq (sub_x), samplerate);
 
         if (fabsf (db1) > fabsf (db))
           db = db1;
@@ -301,6 +313,12 @@ float c_eqgraph::freq_to_x (float freq) const {
 
 float c_eqgraph::x_to_freq (float x) const {
   float t = std::max (0.0f, std::min ((float) x / (float) w, 1.0f));
+  return freq_min * std::pow (freq_max / freq_min, t);
+}
+
+float c_eqgraph::curve_x_to_freq (float x) const {
+  const float max_x = (float) (CURVE_POINTS - 1);
+  const float t = std::max (0.0f, std::min (x / max_x, 1.0f));
   return freq_min * std::pow (freq_max / freq_min, t);
 }
 
@@ -337,7 +355,18 @@ int c_eqgraph::find_handle (int x, int y) const {
   return -1;
 }
 
-void c_eqgraph::set_mouse_handle (int handle) {
+void c_eqgraph::mark_curves_dirty (bool force_redraw) {
+  curves_dirty = true;
+
+  const uint64_t now = nbtk::now_ms ();
+  if (force_redraw ||
+      !curve_surface ||
+      now - curves_last_ms >= CURVE_RECALC_MS) {
+    invalidate ();
+  }
+}
+
+void c_eqgraph::set_mouse_handle (int handle, bool redraw) {
   handle = std::clamp (handle, -1, EQ_NUM_BANDS - 1);
 
   int next_x = -1;
@@ -356,7 +385,8 @@ void c_eqgraph::set_mouse_handle (int handle) {
   mouse_handle_x = next_x;
   mouse_handle_y = next_y;
 
-  invalidate ();
+  if (redraw)
+    invalidate ();
 }
 
 void c_eqgraph::update_mouse_handle (int x, int y) {
@@ -397,7 +427,7 @@ void c_eqgraph::emit_band_action (int band) {
   on_action (event);
 }
 
-void c_eqgraph::update_dragged_handle (int x, int y) {
+void c_eqgraph::update_dragged_handle (int x, int y, bool force_redraw) {
   if (!state || drag_handle < 0 || drag_handle >= EQ_NUM_BANDS)
     return;
 
@@ -406,8 +436,8 @@ void c_eqgraph::update_dragged_handle (int x, int y) {
     freq_min,
     freq_max);
   state->gain_db [drag_handle] = y_to_db ((float) y);
-  state_changed ();
-  set_mouse_handle (drag_handle);
+  mark_curves_dirty (force_redraw);
+  set_mouse_handle (drag_handle, force_redraw);
   emit_band_action (drag_handle);
 }
 
@@ -443,7 +473,7 @@ bool c_eqgraph::on_mouse_down (int mouse_x, int mouse_y, int button) {
 
 bool c_eqgraph::on_mouse_up (int mouse_x, int mouse_y, int button) {
   if (button == Button1 && drag_handle >= 0)
-    update_dragged_handle (mouse_x, mouse_y);
+    update_dragged_handle (mouse_x, mouse_y, true);
   
   invalidate ();
   
@@ -460,7 +490,7 @@ bool c_eqgraph::on_mouse_move (int mouse_x, int mouse_y) {
   nbtk::c_canvas::on_mouse_move (mouse_x, mouse_y);
 
   if (drag_handle >= 0)
-    update_dragged_handle (mouse_x, mouse_y);
+    update_dragged_handle (mouse_x, mouse_y, false);
   else
     update_mouse_handle (mouse_x, mouse_y);
 

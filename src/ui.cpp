@@ -1160,7 +1160,7 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   const int graph_top = inner_y;
   const int top_area_h = std::max (1, inner_h - controls_h);
   const int graph_h = cont_graph.visible ?
-    std::max (1, top_area_h / 2 - 1) :
+    std::max (1, top_area_h * 2 / 3 - 32) :
     0;
   const int graph_gap = graph_h > 0 ? 4 : 0;
   const int slider_top = graph_top + graph_h + graph_gap;
@@ -1208,17 +1208,26 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
 void c_eqpage_widgets::sync_from_state (const c_eq_state &eq_state) {
   knob_gain.set_value (eq_state.master_gain_db);
 
-  for (int i = 0; i < EQ_NUM_BANDS; ++i) {
-    bands [i].btn_on.set_value (eq_state.enabled [i]);
-    bands [i].menu_mode.set_selected (std::clamp (
-      (int) eq_state.mode [i] - 1,
-      0,
-      (int) EQ_LOWPASS - 1));
-    bands [i].slider_gain.set_value (eq_state.gain_db [i]);
-    bands [i].knob_freq.set_value (eq_state.freq [i]);
-    bands [i].knob_q.set_value (eq_state.q [i]);
-  }
+  for (int i = 0; i < EQ_NUM_BANDS; ++i)
+    sync_band_from_state (eq_state, (size_t) i);
   graph.state_changed ();
+}
+
+void c_eqpage_widgets::sync_band_from_state (
+    const c_eq_state &eq_state,
+    size_t band) {
+
+  if (band >= EQ_NUM_BANDS)
+    return;
+
+  bands [band].btn_on.set_value (eq_state.enabled [band]);
+  bands [band].menu_mode.set_selected (std::clamp (
+    (int) eq_state.mode [band] - 1,
+    0,
+    (int) EQ_LOWPASS - 1));
+  bands [band].slider_gain.set_value (eq_state.gain_db [band]);
+  bands [band].knob_freq.set_value (eq_state.freq [band]);
+  bands [band].knob_q.set_value (eq_state.q [band]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2379,7 +2388,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
     c_eqpage_widgets &eqpage =
       bank == BANK_EQPOST ? eqpage_post : eqpage_pre;
     if ((_widget_role) widget->role == ROLE_EQ_GRAPH)
-      eqpage.sync_from_state (eq);
+      eqpage.sync_band_from_state (eq, band);
     else
       eqpage.graph.state_changed ();
 

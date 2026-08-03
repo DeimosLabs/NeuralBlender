@@ -606,6 +606,17 @@ void c_widget::draw_tree (cairo_t *cr) {
   if (!visible || !cr || w <= 0 || h <= 0)
     return;
 
+  double clip_x1 = 0.0;
+  double clip_y1 = 0.0;
+  double clip_x2 = 0.0;
+  double clip_y2 = 0.0;
+  cairo_clip_extents (cr, &clip_x1, &clip_y1, &clip_x2, &clip_y2);
+  if ((double) x >= clip_x2 ||
+      (double) y >= clip_y2 ||
+      (double) (x + w) <= clip_x1 ||
+      (double) (y + h) <= clip_y1)
+    return;
+
   cairo_save (cr);
   cairo_translate (cr, x, y);
   cairo_rectangle (cr, 0, 0, w, h);
