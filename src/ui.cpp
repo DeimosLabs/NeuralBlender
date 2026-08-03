@@ -1687,9 +1687,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     cont_eqpost.move_resize (0, page_y, window_width, page_h);
     cont_cabs.move_resize   (0, page_y, window_width, page_h);
     cont_other.move_resize  (0, page_y, window_width, page_h);
-    
-    sync_page_visibility ();
-    
+
     int lane_width = window_width - 32;
     const int lane_top = 0;
     const int lane_gap = 12;
@@ -1813,6 +1811,8 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
       btn_other_prefs.move (frame_other_misc.w - 280, about_y);
       btn_other_about.move (frame_other_misc.w - 140, about_y);
     }
+
+    sync_page_visibility ();
     
     ui_resize_lock = false;
   }
@@ -1936,8 +1936,8 @@ void c_neuralblender_ui::on_bank_switch (nbtk::c_widget *w, int n) { CP
       visible_bank = bank_for_page (visible_page);
   }
 
-  sync_widgets_from_state (state);
   move_resize ();
+  sync_widgets_from_state (state);
 }
 
 c_eq_state &c_neuralblender_ui::ui_eq_state_for_bank (_lane_bank bank) {
