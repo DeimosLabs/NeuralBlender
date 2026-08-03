@@ -4433,7 +4433,7 @@ void c_app::draw () {
 void c_app::dispatch_mouse_down (int x, int y, int button) {
   hide_tooltip ();
 
-  for (auto it = popups.rbegin (); it != popups.rend (); ++it) {
+  for (auto it = popups.rbegin (); it != popups.rend (); it++) {
     c_popupwindow *popup = it->get ();
     if (!popup || !popup->visible)
       continue;

@@ -50,13 +50,7 @@ void c_eqgraph::render_base (cairo_t *cr) {
     cairo_line_to (cr, w, y);
   }
   cairo_set_line_width (cr, 0.5f);
-  cairo_set_source_rgba (cr, 0, 0, 0.5, 1);
-  cairo_stroke (cr);
-
-  int x = freq_to_x (1000);
-  cairo_move_to (cr, x, 0);
-  cairo_line_to (cr, x, h);
-  cairo_set_source_rgba (cr, 0, 0, 0.9, 1);
+  cairo_set_source_rgba (cr, 0, 0, 0.5, 0.5);
   cairo_stroke (cr);
 
   int y = db_to_y (0);
@@ -64,6 +58,34 @@ void c_eqgraph::render_base (cairo_t *cr) {
   cairo_line_to (cr, w, y);
   cairo_set_source_rgba (cr, 1, 1, 0, 1);
   cairo_set_line_width (cr, 1);
+  cairo_stroke (cr);
+  
+  cairo_set_source_rgba, (cr, 0, 0, 1, 1);
+  cairo_set_font_size (cr, 11);
+  
+  cairo_text_extents_t ext;
+  cairo_text_extents (cr, "Ay", &ext);
+  int label_y = h + 6 - ext.height;
+  
+  cairo_set_source_rgba (cr, 0.3, 0.3, 1.0, 0.3);
+  char buf [32];
+  for (int i : { 50, 200, 1000, 4000, 8000 }) {
+    if (i < 1000)
+      snprintf (buf, 31, "%d", i);
+    else
+      snprintf (buf, 31, "%dK", i / 1000);
+    float fx = freq_to_x (i);
+    cairo_move_to (cr, fx, 0);
+    cairo_line_to (cr, fx, h);
+    cairo_move_to (cr, fx + 2, label_y);
+    cairo_show_text (cr, buf);
+  }
+  cairo_stroke (cr);
+  
+  int x = freq_to_x (1000);
+  cairo_move_to (cr, x, 0);
+  cairo_line_to (cr, x, h);
+  cairo_set_source_rgba (cr, 0, 0, 0.9, 1);
   cairo_stroke (cr);
 }
 
@@ -167,7 +189,7 @@ void c_eqgraph::print_label (cairo_t *cr, int x, int y, int band) {
   cairo_set_font_size (cr, 11);
   cairo_select_font_face (cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
   cairo_text_extents_t ext;
-  cairo_text_extents (cr, "ABCxyz", &ext);
+  cairo_text_extents (cr, "Ay", &ext);
   
   snprintf (buf, 63, hz_format.c_str (), freq);
   cairo_move_to (cr, x, y + ext.height);
