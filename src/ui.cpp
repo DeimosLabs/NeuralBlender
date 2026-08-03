@@ -2130,6 +2130,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       return false;
 
     const bool right_click = event.mouse_button == Button3;
+    bool switched_page = false;
     if (page == PAGE_OTHER) {
       if (visible_page != PAGE_OTHER && right_click && page_has_bank (visible_page)) {
         const int exclusive_lane =
@@ -2137,6 +2138,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
         on_excl (nullptr, exclusive_lane);
       } else if (visible_page != PAGE_OTHER) {
         on_bank_switch (&button, page);
+        switched_page = true;
       }
     } else if (page_has_bypass (page) &&
         ((right_click && prefs.bypass_rightclick) ||
@@ -2148,8 +2150,13 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       // Right-click bank buttons are reserved for bank bypass when enabled.
     } else {
       on_bank_switch (&button, page);
+      switched_page = true;
     }
-    finish ();
+
+    if (switched_page)
+      event.handled = true;
+    else
+      finish ();
     return true;
   };
 
@@ -3006,6 +3013,9 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   const bool exclusive_on = visible_exclusive_lane > 0;
   const bool visible_bank_bypassed =
     bank_bypass_for_state (state, visible_bank);
+  const bool exclusive_active =
+    exclusive_on && !state.mute_all && enabled && !visible_bank_bypassed;
+
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     const c_neuralblender_lane_state &lane = visible_bank_state.lanes [i];
     const bool selected =
@@ -3014,24 +3024,23 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     visible_lanes [i].btn_mute.set_value (lane.lane_mute);
     visible_lanes [i].btn_excl.set_value (selected);
 
-    if (lane.lane_mute || state.mute_all || !enabled ||
-        visible_bank_bypassed) { CP
-      visible_lanes [i].set_state (nbtk::WSTATE_DISABLED);
-    } else {
-      visible_lanes [i].set_state (nbtk::WSTATE_NORMAL);
-    }
-
-    if (exclusive_on) { CP
-      visible_lanes [i].set_state (nbtk::WSTATE_DISABLED);
+    if (exclusive_on) {
       visible_lanes [i].btn_mute.hide ();
       visible_lanes [i].btn_excl.show ();
+
+      visible_lanes [i].set_state (
+        selected && exclusive_active ?
+          nbtk::WSTATE_SELECTED :
+          nbtk::WSTATE_DISABLED);
     } else { CP
       visible_lanes [i].btn_mute.show ();
       visible_lanes [i].btn_excl.hide ();
+
+      visible_lanes [i].set_state (
+        lane.lane_mute || state.mute_all || !enabled || visible_bank_bypassed ?
+          nbtk::WSTATE_DISABLED :
+          nbtk::WSTATE_NORMAL);
     }
-  }
-  if (exclusive_on && !state.mute_all && enabled && !visible_bank_bypassed) {
-    visible_lanes [visible_exclusive_lane - 1].set_state (nbtk::WSTATE_SELECTED);
   }
 
   updating_from_state = false;
