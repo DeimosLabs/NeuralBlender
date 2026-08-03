@@ -216,8 +216,8 @@ void c_eqgraph::generate_curves () { CP
   if (!state || w <= 0)
     return;
   
-  static nbtk::c_printfps p ("eqgraph curve: ");
-  p.tick ();
+  //static nbtk::c_printfps p ("eqgraph curve: ");
+  //p.tick ();
   
   curve.assign (w, 0.0f);
   for (int band = 0; band < EQ_NUM_BANDS; ++band)
