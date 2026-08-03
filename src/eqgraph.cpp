@@ -56,7 +56,7 @@ void c_eqgraph::render_base (cairo_t *cr) {
   int x = freq_to_x (1000);
   cairo_move_to (cr, x, 0);
   cairo_line_to (cr, x, h);
-  cairo_set_source_rgba (cr, 0, 0, 0.75, 1);
+  cairo_set_source_rgba (cr, 0, 0, 0.9, 1);
   cairo_stroke (cr);
 
   int y = db_to_y (0);
@@ -82,7 +82,7 @@ void c_eqgraph::on_paint (cairo_t *cr) {
     curves_last_ms = now;
     curves_dirty = false;
   }
-
+  
   if (!curve_surface)
     return;
 
@@ -106,6 +106,59 @@ void c_eqgraph::on_paint (cairo_t *cr) {
                      handle_size, handle_size);
     cairo_fill (cr);
   }
+  
+  if (mouse_x >= 0 && mouse_y >= 0 &&
+      band >= 0 && band < EQ_NUM_BANDS) {
+    int label_x = mouse_x + 24;
+    int label_y = std::clamp (mouse_y - 16, 0, h - 32);
+    if (w - mouse_x < 80)
+      label_x = mouse_x - 80;
+      
+    print_label (cr, label_x, label_y, band);
+  }
+
+}
+
+void c_eqgraph::print_label (cairo_t *cr, int x, int y, int band) {
+  char buf [64];
+  
+  if (!state || band < 0 || band >= EQ_NUM_BANDS)
+    return;
+  
+  cairo_save (cr);
+  
+  float freq = state->freq [band];
+  float gain = state->gain_db [band];
+  float q = state->q [band];
+  std::string hz_unit = "Hz";
+  std::string hz_format = "%.3fHz";
+  if (freq >= 1000) {
+    freq /= 1000;
+    hz_unit = "KHz";
+  } else {
+    hz_format = freq < 100 ? "%.2fHz" : "%.1fHz";
+  }
+  
+  cairo_set_source_rgba (cr, 0.5, 0.5, 1.0, 1.0);
+  cairo_set_font_size (cr, 11);
+  cairo_select_font_face (cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+  cairo_text_extents_t ext;
+  cairo_text_extents (cr, "ABCxyz", &ext);
+  
+  snprintf (buf, 63, hz_format.c_str (), freq);
+  cairo_move_to (cr, x, y + ext.height);
+  cairo_show_text (cr, buf);
+  
+  snprintf (buf, 63, "%s%.1fdB", gain < 0.0f ? "-" : "+", 
+            fabs (gain));
+  cairo_move_to (cr, x, y + ext.height * 2);
+  cairo_show_text (cr, buf);
+  
+  snprintf (buf, 63, "Q=%.2f", q);
+  cairo_move_to (cr, x, y + ext.height * 3);
+  cairo_show_text (cr, buf);
+  
+  cairo_restore (cr);
 }
 
 void c_eqgraph::set_state (c_eq_state *state_) {
@@ -314,10 +367,12 @@ void c_eqgraph::on_resize (int w, int h) {
 }
 
 // avoid "jigsaw" up/down effect when moving band with high Q
+// yeah yeah, could just use a log function for this
 static int eqgraph_oversampling_for_q (float q) {
-  if (q >= 60.0f) return 16;
-  if (q >= 20.0f) return 8;
-  if (q >= 10.0f) return 4;
+  if (q >= 64.0f) return 16;
+  if (q >= 32.0f) return 12;
+  if (q >= 16.0f) return 8;
+  if (q >= 8.0f)  return 4;
   if (q >= 4.0f)  return 2;
   return 1;
 }
