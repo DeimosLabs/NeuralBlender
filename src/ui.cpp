@@ -149,9 +149,8 @@ void c_neuralblendermainwindow::on_action (nbtk::t_action_event &event) {
 }
 
 void c_neuralblendermainwindow::on_hover_changed (nbtk::c_widget *hovered) {
-  (void) hovered;
   if (ui)
-    ui->sync_eq_graph_highlight ();
+    ui->sync_eq_graph_highlight (hovered);
 }
 
 bool is_supported_model_filename (const std::string &path) {
@@ -1237,6 +1236,23 @@ void c_eqpage_widgets::sync_band_from_state (
 }
 
 void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
+  auto is_eq_band_role = [] (int64_t role) {
+    return role == ROLE_EQ_ENABLED ||
+           role == ROLE_EQ_MODE ||
+           role == ROLE_EQ_FREQ ||
+           role == ROLE_EQ_GAIN ||
+           role == ROLE_EQ_Q;
+  };
+
+  for (nbtk::c_widget *w = hovered; w; w = w->parent) {
+    if (w->bank == graph.bank &&
+        w->lane < EQ_NUM_BANDS &&
+        is_eq_band_role (w->role)) {
+      graph.set_highlighted_band ((int) w->lane);
+      return;
+    }
+  }
+
   auto is_descendant_of = [] (
       nbtk::c_widget *root,
       nbtk::c_widget *widget) {
@@ -1259,7 +1275,21 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
     }
   }
 
+  if (highlighted < 0) {
+    for (int i = 0; i < EQ_NUM_BANDS; ++i) {
+      if (bands [i].slider_gain.mouse_inside ||
+          bands [i].btn_on.mouse_inside ||
+          bands [i].menu_mode.mouse_inside ||
+          bands [i].knob_freq.mouse_inside ||
+          bands [i].knob_q.mouse_inside) {
+        highlighted = i;
+        break;
+      }
+    }
+  }
+
   graph.set_highlighted_band (highlighted);
+  graph.invalidate ();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2065,6 +2095,11 @@ void c_neuralblender_ui::sync_eq_graph_highlight () {
   nbtk::c_widget *hovered = mainwindow.hovered_widget;
   if (nbtk_app.active_toplevel == &mainwindow)
     hovered = nbtk_app.hovered_widget;
+
+  sync_eq_graph_highlight (hovered);
+}
+
+void c_neuralblender_ui::sync_eq_graph_highlight (nbtk::c_widget *hovered) {
 
   if (visible_page == PAGE_EQPRE) {
     eqpage_pre.sync_highlight_from_hover (hovered);

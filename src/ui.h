@@ -433,7 +433,8 @@ public:
           void sync_page_visibility ()                                  ;
           void ensure_tuner_created ()                                  ;
           void sync_tuner_visibility ()                                 ;
-          void sync_eq_graph_highlight ()                               ;
+	          void sync_eq_graph_highlight ()                               ;
+	          void sync_eq_graph_highlight (nbtk::c_widget *hovered)        ;
   virtual void on_window_resize (int w, int h)                          ;
           void on_window_configured ()                                  ;
   virtual bool request_window_size (int w, int h)                       ;

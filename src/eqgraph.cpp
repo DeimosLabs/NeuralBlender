@@ -69,7 +69,7 @@ void c_eqgraph::render_base (cairo_t *cr) {
   
   cairo_set_source_rgba (cr, 0.3, 0.3, 1.0, 0.3);
   char buf [32];
-  for (int i : { 50, 200, 1000, 4000, 8000 }) {
+  for (int i : { 20, 200, 1000, 4000, 8000 }) {
     if (i < 1000)
       snprintf (buf, 31, "%d", i);
     else
@@ -82,11 +82,12 @@ void c_eqgraph::render_base (cairo_t *cr) {
   }
   cairo_stroke (cr);
   
-  int x = freq_to_x (1000);
-  cairo_move_to (cr, x, 0);
-  cairo_line_to (cr, x, h);
-  cairo_set_source_rgba (cr, 0, 0, 0.9, 1);
-  cairo_stroke (cr);
+  // 1KHz line?
+  //int x = freq_to_x (1000);
+  //cairo_move_to (cr, x, 0);
+  //cairo_line_to (cr, x, h);
+  //cairo_set_source_rgba (cr, 0, 0, 0.9, 1);
+  //cairo_stroke (cr);
 }
 
 void c_eqgraph::on_paint (cairo_t *cr) {
@@ -119,7 +120,11 @@ void c_eqgraph::on_paint (cairo_t *cr) {
     cairo_paint (cr);
   }
 
-  const bool draw_handles = always_show_handles || mouse_in () || drag_handle >= 0;
+  const bool draw_handles =
+    always_show_handles ||
+    mouse_in () ||
+    drag_handle >= 0 ||
+    highlighted_band >= 0;
   if (draw_handles) {
     for (int i = 0; i < EQ_NUM_BANDS; i++) {
       if (!state->enabled [i])
@@ -133,12 +138,12 @@ void c_eqgraph::on_paint (cairo_t *cr) {
                        0.5 + y - handle_size / 2,
                        handle_size, handle_size);
 
-      if (i == drag_handle)
+      if (i == drag_handle || i == band)
         cairo_set_source_rgba (cr, 1, 1, 0, 1);
       else
         cairo_set_source_rgba (cr, 0.7, 1.0, 0.7, 1);
 
-      cairo_set_line_width (cr, 1.0f);
+      cairo_set_line_width (cr, i == band ? 2.0f : 1.0f);
       cairo_stroke (cr);
     }
   }
