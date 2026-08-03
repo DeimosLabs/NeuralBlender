@@ -1043,6 +1043,8 @@ void c_eqpage_widgets::create (
   cont_sliders.create (&cont_bands, "", 32, 0, w, h / 3);
   cont_graph.create (&frame, "", 32, 0, w, h / 3);
   graph.create (&cont_graph, "", 0, 0, w, h / 3);
+  graph.role = ROLE_EQ_GRAPH;
+  graph.bank = bank_id;
   //cont_graph.hide ();
   label.create (&frame, eqstr.c_str (), 0, 0, 300, 30);
   label.align = nbtk::TEXT_LEFT;
@@ -1216,7 +1218,7 @@ void c_eqpage_widgets::sync_from_state (const c_eq_state &eq_state) {
     bands [i].knob_freq.set_value (eq_state.freq [i]);
     bands [i].knob_q.set_value (eq_state.q [i]);
   }
-  graph.invalidate ();
+  graph.state_changed ();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1242,6 +1244,15 @@ c_neuralblender_ui::c_neuralblender_ui () { CP
 
 c_neuralblender_ui::~c_neuralblender_ui () { CP
   destroy ();
+}
+
+void c_neuralblender_ui::set_samplerate (int samplerate_) {
+  if (samplerate_ <= 0)
+    return;
+
+  samplerate = samplerate_;
+  eqpage_pre.graph.set_samplerate (samplerate);
+  eqpage_post.graph.set_samplerate (samplerate);
 }
 
 void c_neuralblender_ui::update_model_cwd (std::string path) {
@@ -2338,6 +2349,10 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
         changed_parameter = true;
       break;
 
+      case ROLE_EQ_GRAPH:
+        changed_parameter = true;
+      break;
+
       default:
         return false;
     }
@@ -2356,7 +2371,10 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
 
     c_eqpage_widgets &eqpage =
       bank == BANK_EQPOST ? eqpage_post : eqpage_pre;
-    eqpage.graph.invalidate ();
+    if ((_widget_role) widget->role == ROLE_EQ_GRAPH)
+      eqpage.sync_from_state (eq);
+    else
+      eqpage.graph.state_changed ();
 
     on_eq_band (widget, bank, band);
     finish ();

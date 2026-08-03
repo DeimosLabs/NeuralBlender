@@ -664,7 +664,12 @@ int main (int argc, char **argv) {
     return 1;
   }
   
-  g_blender->set_samplerate (jack_get_sample_rate (jack_client));
+  const int samplerate = jack_get_sample_rate (jack_client);
+  g_blender->set_samplerate (samplerate);
+#ifdef HAVE_GUI
+  if (g_ui)
+    g_ui->set_samplerate (samplerate);
+#endif
   g_blender->set_blocksize (jack_get_buffer_size (jack_client));
   
 #ifdef HAVE_GUI

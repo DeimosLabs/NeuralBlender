@@ -228,6 +228,7 @@ public:
   bool contains_local (int px, int py) const;
   float font_multiplier () const;
   float font_size (float multiplier = 1.0f) const;
+  bool is_visible () const;
   void show ();
   void hide ();
   virtual void move (int x, int y);

@@ -370,6 +370,7 @@ public:
   LV2_URID urid_eq_master_gain [BANK_COUNT] = {};
   LV2_URID urid_meters = 0;
   LV2_URID urid_stats = 0;
+  LV2_URID urid_samplerate = 0;
   LV2_URID urid_calib_target_db = 0;
   LV2_URID urid_calib_bass = 0;
   LV2_URID urid_bank_bypass [BANK_COUNT] = {};
@@ -442,6 +443,8 @@ public:
       map->map (map->handle, NB_URI "#Meters");
     urid_stats =
       map->map (map->handle, NB_URI "#Stats");
+    urid_samplerate =
+      map->map (map->handle, NB_URI "#Samplerate");
     urid_calib_target_db =
       map->map (map->handle, NB_URI "#CalibTargetDb");
     urid_calib_bass =

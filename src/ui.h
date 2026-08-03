@@ -90,6 +90,7 @@ enum _widget_role {
   ROLE_EQ_GAIN,
   ROLE_EQ_Q,
   ROLE_EQ_MASTER_GAIN,
+  ROLE_EQ_GRAPH,
   ROLE_UNKNOWN
 };
 
@@ -357,6 +358,7 @@ public:
   bool create (nbtk::t_native_window parent = 0);
   void destroy ();
   virtual int idle ();
+  void set_samplerate (int samplerate);
   void draw ();
   void clear_lane_model_ui (_lane_bank bank, size_t which);
   void clear_lane_model_ui (size_t which);
@@ -438,7 +440,8 @@ public:
   virtual void apply_prefs (t_prefs &p)                                 ;
   virtual void write_prefs_to (t_prefs &p)                              ;
           void apply_ui_prefs (t_prefs &p)                              ;
-	  
+	
+  int samplerate = 0;
   nbtk::t_native_display display = NULL;
   nbtk::t_native_window window;
   c_neuralblender *blender = NULL;

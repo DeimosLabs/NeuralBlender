@@ -414,12 +414,7 @@ static void tk_update_widget_context (
 }
 
 static bool tk_widget_visible_in_tree (const c_widget *widget) {
-  for (const c_widget *node = widget; node; node = node->parent) {
-    if (!node->visible)
-      return false;
-  }
-
-  return true;
+  return widget && widget->is_visible ();
 }
 
 static void tk_mark_redraw_on_show (c_widget *widget) {
@@ -4273,6 +4268,15 @@ float c_widget::font_multiplier () const {
 float c_widget::font_size (float multiplier) const {
   const float base = app ? app->fontsize : 13.0f;
   return base * font_multiplier () * multiplier;
+}
+
+bool c_widget::is_visible () const {
+  for (const c_widget *node = this; node; node = node->parent) {
+    if (!node->visible)
+      return false;
+  }
+
+  return true;
 }
 
 void c_widget::show () {

@@ -1077,6 +1077,11 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
   }
 
   if (value->type == urid_atom_Float) {
+    if (prop == urid_samplerate) {
+      set_samplerate ((int) lrintf (((const LV2_Atom_Float *) value)->body));
+      return;
+    }
+
     for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
       const size_t bank = (size_t) b;
       if (prop != urid_eq_master_gain [bank])

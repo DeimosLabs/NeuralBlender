@@ -157,6 +157,7 @@ struct Plugin : public c_lv2_urids {
   bool notify_bank_bypass [BANK_COUNT] = {};
   bool notify_eq_master_gain [BANK_COUNT] = {};
   bool notify_eq_param [BANK_COUNT] [EQ_NUM_BANDS] [NB_LV2_EQ_PORT_COUNT] = {};
+  bool notify_samplerate = true;
   std::string current_path [BANK_COUNT] [NB_NUM_MODELS];
   bool restored_from_state = false;
   
@@ -1583,9 +1584,21 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       !sent_bank_bypass_notify &&
       forge_next_eq_notify (self);
 
+    const bool sent_samplerate_notify =
+      !sent_path_notify &&
+      !sent_bank_bypass_notify &&
+      !sent_eq_notify &&
+      self->notify_samplerate;
+    if (sent_samplerate_notify) {
+      forge_float_notify (
+        self, self->urid_samplerate, (float) self->samplerate);
+      self->notify_samplerate = false;
+    }
+
 	    const bool sent_stats_notify =
 	      !sent_bank_bypass_notify &&
 	      !sent_eq_notify &&
+	      !sent_samplerate_notify &&
 	      self->stats_dirty.exchange (false, std::memory_order_acq_rel);
 	    if (sent_stats_notify)
 	      forge_stats_notify (self);
@@ -1593,6 +1606,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	    const uint32_t meter_interval =
 	      (uint32_t) (self->samplerate > 0.0 ? self->samplerate / LV2_METER_FPS : 1600.0);
 	    if (!sent_path_notify && !sent_bank_bypass_notify && !sent_eq_notify &&
+	        !sent_samplerate_notify &&
 	        !sent_stats_notify &&
 	        self->meter_notify_samples >= meter_interval) {
       forge_meter_notify (self);
@@ -1620,6 +1634,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             for (size_t band = 0; band < EQ_NUM_BANDS; ++band)
               notify_eq_band (self, b, band);
           }
+          self->notify_samplerate = true;
 	        self->restored_from_state = false;
 	        self->stats_dirty.store (true, std::memory_order_release);
 	

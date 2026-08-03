@@ -12,7 +12,10 @@
 #include "cmdline_debug.h"
 
 c_eqgraph::c_eqgraph () { CP }
-c_eqgraph::~c_eqgraph () { CP }
+c_eqgraph::~c_eqgraph () {
+  CP
+  clear_curve_surface ();
+}
 
 void c_eqgraph::render_base (cairo_t *cr) {
   int i;
@@ -65,46 +68,142 @@ void c_eqgraph::render_base (cairo_t *cr) {
 
 void c_eqgraph::set_state (c_eq_state *state_) {
   state = state_;
+  state_changed ();
+}
+
+void c_eqgraph::state_changed () {
+  curves_dirty = true;
+  invalidate ();
+}
+
+void c_eqgraph::set_samplerate (int sr) {
+  samplerate = sr;
+  state_changed ();
 }
 
 void c_eqgraph::on_paint (cairo_t *cr) {
   if (!state)
     return;
   
-  generate_curves ();
-  cairo_set_source_rgba (cr, 1, 1, 1, 1);
-  cairo_set_line_width (cr, 2.0f);
-  path_curve (cr, curve);
-  cairo_stroke (cr);
+  const uint64_t now = nbtk::now_ms ();
+  if (!curve_surface ||
+      (curves_dirty && now - curves_last_ms >= CURVE_RECALC_MS)) {
+    generate_curves ();
+    render_curve_surface ();
+    curves_last_ms = now;
+    curves_dirty = false;
+  }
+
+  if (!curve_surface)
+    return;
+
+  cairo_set_source_surface (cr, curve_surface, 0, 0);
+  cairo_paint (cr);
+}
+
+void c_eqgraph::render_curve_surface () {
+  if (!ensure_curve_surface () || !curve_cr)
+    return;
+
+  cairo_save (curve_cr);
+  cairo_set_operator (curve_cr, CAIRO_OPERATOR_CLEAR);
+  cairo_paint (curve_cr);
+  cairo_restore (curve_cr);
+
+  if (!state || curve.empty ()) {
+    cairo_surface_flush (curve_surface);
+    return;
+  }
+
+  cairo_set_source_rgba (curve_cr, 1, 1, 1, 1);
+  cairo_set_line_width (curve_cr, 2.0f);
+  path_curve (curve_cr, curve);
+  cairo_stroke (curve_cr);
   
-  cairo_set_source_rgba (cr, 0.7, 1.0, 0.7, 1);
-  cairo_set_line_width (cr, 1.0f);
+  cairo_set_source_rgba (curve_cr, 0.7, 1.0, 0.7, 1);
+  cairo_set_line_width (curve_cr, 1.0f);
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     if (state->enabled [i]) {
       int x = freq_to_x (state->freq [i]);
       int y = db_to_y (state->gain_db [i]);
       
-      cairo_rectangle (cr, 0.5 + x - anchor_size / 2, 0.5 + y - anchor_size / 2, 
-                       anchor_size, anchor_size);
-      cairo_stroke (cr);
+      cairo_rectangle (curve_cr,
+                       0.5 + x - handle_size / 2,
+                       0.5 + y - handle_size / 2,
+                       handle_size, handle_size);
+      cairo_stroke (curve_cr);
     }
   }
+
+  cairo_surface_flush (curve_surface);
 }
 
-void c_eqgraph::path_curve (cairo_t *cr, std::vector<float> v) {
+void c_eqgraph::clear_curve_surface () {
+  if (curve_cr) {
+    cairo_destroy (curve_cr);
+    curve_cr = NULL;
+  }
+
+  if (curve_surface) {
+    cairo_surface_destroy (curve_surface);
+    curve_surface = NULL;
+  }
+
+  curve_surface_w = 0;
+  curve_surface_h = 0;
+}
+
+bool c_eqgraph::ensure_curve_surface () {
+  if (w <= 0 || h <= 0)
+    return false;
+
+  if (curve_surface &&
+      curve_cr &&
+      curve_surface_w == w &&
+      curve_surface_h == h &&
+      cairo_surface_status (curve_surface) == CAIRO_STATUS_SUCCESS &&
+      cairo_status (curve_cr) == CAIRO_STATUS_SUCCESS)
+    return true;
+
+  clear_curve_surface ();
+
+  curve_surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, w, h);
+  if (!curve_surface ||
+      cairo_surface_status (curve_surface) != CAIRO_STATUS_SUCCESS) {
+    clear_curve_surface ();
+    return false;
+  }
+
+  curve_cr = cairo_create (curve_surface);
+  if (!curve_cr || cairo_status (curve_cr) != CAIRO_STATUS_SUCCESS) {
+    clear_curve_surface ();
+    return false;
+  }
+
+  curve_surface_w = w;
+  curve_surface_h = h;
+  return true;
+}
+
+void c_eqgraph::path_curve (cairo_t *cr, const std::vector<float> &v) {
   if (!v.size () || !cr)
     return;
   
   cairo_move_to (cr, 0, db_to_y (v [0]));
-  for (int i = 1; i < v.size () && i < w; i++) {
+  for (int i = 1; i < v.size () && i < w; i++)
     cairo_line_to (cr, i, db_to_y (v [i]));
-  }
 }
 
 void c_eqgraph::on_resize (int w, int h) {
+  (void) w;
+  (void) h;
   generate_curves ();
+  render_curve_surface ();
+  curves_last_ms = nbtk::now_ms ();
+  curves_dirty = false;
 }
 
+// avoid "jigsaw" up/down effect when moving band with high Q
 static int eqgraph_oversampling_for_q (float q) {
   if (q >= 60.0f) return 16;
   if (q >= 20.0f) return 8;
@@ -113,11 +212,13 @@ static int eqgraph_oversampling_for_q (float q) {
   return 1;
 }
 
-// c_biquad already does the heavy math for us
 void c_eqgraph::generate_curves () { CP
-  if (w <= 0)
+  if (!state || w <= 0)
     return;
-
+  
+  static nbtk::c_printfps p ("eqgraph curve: ");
+  p.tick ();
+  
   curve.assign (w, 0.0f);
   for (int band = 0; band < EQ_NUM_BANDS; ++band)
     curves [band].assign (w, 0.0f);
@@ -175,28 +276,122 @@ void c_eqgraph::generate_curves () { CP
     db = std::clamp (db, -36.0f, 36.0f);
 }
 
-float c_eqgraph::freq_to_x (float freq) {
+float c_eqgraph::freq_to_x (float freq) const {
   freq = std::max (freq_min, std::min (freq, freq_max));
   float t = std::log (freq / freq_min) / std::log (freq_max / freq_min);
   return t * w;
 
 }
 
-float c_eqgraph::x_to_freq (float x) {
+float c_eqgraph::x_to_freq (float x) const {
   float t = std::max (0.0f, std::min ((float) x / (float) w, 1.0f));
   return freq_min * std::pow (freq_max / freq_min, t);
 }
 
-float c_eqgraph::db_to_y (float db) {
+float c_eqgraph::db_to_y (float db) const {
   float half = h / 2;
   return half - ((float) (db * h) / 72.0f);
 }
 
-float c_eqgraph::y_to_db (float y) {
+float c_eqgraph::y_to_db (float y) const {
   if (h <= 0)
     return 0.0f;
 
   const float half = h / 2.0f;
   const float db = (half - (float) y) * 72.0f / (float) h;
   return std::clamp (db, -36.0f, 36.0f);
+}
+
+int c_eqgraph::find_handle (int x, int y) const {
+  if (!state)
+    return -1;
+
+  const float rad = handle_size * 0.5f;
+  for (int i = EQ_NUM_BANDS - 1; i >= 0; --i) {
+    if (!state->enabled [i])
+      continue;
+
+    const float handle_x = freq_to_x (state->freq [i]);
+    const float handle_y = db_to_y (state->gain_db [i]);
+    if (fabsf ((float) x - handle_x) <= rad &&
+        fabsf ((float) y - handle_y) <= rad)
+      return i;
+  }
+
+  return -1;
+}
+
+void c_eqgraph::emit_band_action (int band) {
+  if (band < 0 || band >= EQ_NUM_BANDS)
+    return;
+
+  lane = (uint64_t) band;
+
+  nbtk::t_action_event event;
+  event.source = this;
+  event.source_id = id;
+  event.mouse_button = last_mouse_button;
+  on_action (event);
+}
+
+void c_eqgraph::update_dragged_handle (int x, int y) {
+  if (!state || drag_handle < 0 || drag_handle >= EQ_NUM_BANDS)
+    return;
+
+  state->freq [drag_handle] = std::clamp (
+    x_to_freq ((float) x),
+    freq_min,
+    freq_max);
+  state->gain_db [drag_handle] = y_to_db ((float) y);
+  state_changed ();
+  emit_band_action (drag_handle);
+}
+
+bool c_eqgraph::on_mouse_down (int mouse_x, int mouse_y, int button) {
+  if (!state || samplerate <= 0)
+    return nbtk::c_canvas::on_mouse_down (mouse_x, mouse_y, button);
+
+  last_mouse_button = button;
+
+  if (button == Button4 || button == Button5) {
+    const int found = find_handle (mouse_x, mouse_y);
+    if (found >= 0) {
+      const float qmult = button == Button4 ? 1.05f : 1.0f / 1.05f;
+      state->q [found] = std::clamp (state->q [found] * qmult, 0.01f, 100.0f);
+      state_changed ();
+      emit_band_action (found);
+    }
+    return true;
+  }
+
+  nbtk::c_canvas::on_mouse_down (mouse_x, mouse_y, button);
+
+  if (button != Button1)
+    return true;
+
+  drag_handle = find_handle (mouse_x, mouse_y);
+  drag_orig_x = mouse_x;
+  drag_orig_y = mouse_y;
+  return true;
+}
+
+bool c_eqgraph::on_mouse_up (int mouse_x, int mouse_y, int button) {
+  if (button == Button1 && drag_handle >= 0)
+    update_dragged_handle (mouse_x, mouse_y);
+
+  nbtk::c_canvas::on_mouse_up (mouse_x, mouse_y, button);
+
+  if (button == Button1)
+    drag_handle = -1;
+
+  return true;
+}
+
+bool c_eqgraph::on_mouse_move (int mouse_x, int mouse_y) {
+  nbtk::c_canvas::on_mouse_move (mouse_x, mouse_y);
+
+  if (drag_handle >= 0)
+    update_dragged_handle (mouse_x, mouse_y);
+
+  return true;
 }
