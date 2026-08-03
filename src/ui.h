@@ -181,6 +181,7 @@ public:
   void on_resize () override;
   void on_configure_notify () override;
   void on_action (nbtk::t_action_event &event) override;
+  void on_hover_changed (nbtk::c_widget *hovered) override;
 
 private:
   c_neuralblender_ui *ui = NULL;

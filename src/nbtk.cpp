@@ -6223,6 +6223,10 @@ bool c_toplevelwindow::on_key_down (int key) {
   return false;
 }
 
+void c_toplevelwindow::on_hover_changed (nbtk::c_widget *hovered) {
+  (void) hovered;
+}
+
 void c_toplevelwindow::auto_hide_on_close (bool b) {
   hide_on_close = b;
   if (b)
@@ -6320,6 +6324,7 @@ void c_toplevelwindow::cb_motion (
 
   c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->app) {
+    nbtk::c_widget *old_hovered = self->hovered_widget;
     self->activate ();
     const int rx = native_event_x (event) / w->app->hdpi;
     const int ry = native_event_y (event) / w->app->hdpi;
@@ -6328,6 +6333,7 @@ void c_toplevelwindow::cb_motion (
         self->app->mouse_capture_widget->root_to_local ({ rx, ry });
       self->app->mouse_capture_widget->on_mouse_move (local.x, local.y);
     } else {
+      self->app->hovered_widget = nullptr;
       self->root_widget.update_hover_tree (rx, ry);
       self->app->update_tooltip (self->app->hovered_widget, rx, ry);
       nbtk::_mouse_cursor cursor = nbtk::MOUSE_CURSOR_DEFAULT;
@@ -6336,6 +6342,8 @@ void c_toplevelwindow::cb_motion (
       self->set_mouse_cursor (cursor);
     }
     self->save_state ();
+    if (self->hovered_widget != old_hovered)
+      self->on_hover_changed (self->hovered_widget);
   }
 }
 
@@ -6347,12 +6355,14 @@ void c_toplevelwindow::cb_enter (void *w_, void *user_data) {
 
   c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->app) {
+    nbtk::c_widget *old_hovered = self->hovered_widget;
     nbtk::t_point local;
     if (!self->app->backend ||
         !self->app->backend->query_pointer (w, &local))
       return;
 
     self->activate ();
+    self->app->hovered_widget = nullptr;
     self->root_widget.update_hover_tree (local.x, local.y);
     self->app->update_tooltip (
         self->app->hovered_widget, local.x, local.y);
@@ -6361,6 +6371,8 @@ void c_toplevelwindow::cb_enter (void *w_, void *user_data) {
       cursor = self->app->hovered_widget->mouse_cursor ();
     self->set_mouse_cursor (cursor);
     self->save_state ();
+    if (self->hovered_widget != old_hovered)
+      self->on_hover_changed (self->hovered_widget);
   }
 }
 
@@ -6372,11 +6384,16 @@ void c_toplevelwindow::cb_leave (void *w_, void *user_data) {
 
   c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->app) {
+    nbtk::c_widget *old_hovered = self->hovered_widget;
     self->activate ();
     self->app->hide_tooltip ();
     self->root_widget.clear_hover_tree ();
+    self->app->hovered_widget = nullptr;
+    self->hovered_widget = nullptr;
     self->set_mouse_cursor (nbtk::MOUSE_CURSOR_DEFAULT);
     self->save_state ();
+    if (self->hovered_widget != old_hovered)
+      self->on_hover_changed (self->hovered_widget);
   }
 }
 

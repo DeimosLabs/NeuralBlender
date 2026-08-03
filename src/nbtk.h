@@ -1175,12 +1175,13 @@ public:
       int x, int y, int w, int h,
       nbtk::t_native_handle owner = nullptr);
 
-  void on_resize () override;
-  void on_configure_notify () override;
-  void on_expose () override;
-  void on_close () override;
-  virtual bool on_key_down (int key);
-  void set_min_size (int w, int h) override;
+	  void on_resize () override;
+	  void on_configure_notify () override;
+	  void on_expose () override;
+	  void on_close () override;
+	  virtual bool on_key_down (int key);
+	  virtual void on_hover_changed (nbtk::c_widget *hovered);
+	  void set_min_size (int w, int h) override;
   void redraw_child (nbtk::c_widget &child, int pad = 1);
   void redraw_child_rect (
       nbtk::c_widget &child,

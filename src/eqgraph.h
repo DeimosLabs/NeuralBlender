@@ -13,7 +13,7 @@
 #include "neuralblender.h"
 #include "nbtk.h"
 
-#define CURVE_RECALC_MS 20
+#define CURVE_RECALC_MS 30
 #define CURVE_POINTS    640
 
 class c_eqgraph : public nbtk::c_canvas {
@@ -31,10 +31,12 @@ public:
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
   bool on_mouse_move (int x, int y) override;
+  void on_mouse_enter () override;
   void on_mouse_leave () override;
   
-  float freq_min = 20.0f;
-  float freq_max = 20000.0f;
+  bool always_show_handles = false;
+  float freq_min = 20.0f;     // NOTE TO SELF: check for hard coded <---
+  float freq_max = 20000.0f; 
   float handle_size = 12.0f;
   
 private:
@@ -43,6 +45,8 @@ private:
   float curve_x_to_freq (float x) const;
   float db_to_y (float gain_db) const;
   float y_to_db (float y) const;
+  
+  inline bool mouse_in () { return mouse_x >= 0 && mouse_y >= 0; }
   
   int find_handle (int x, int y) const;
   void mark_curves_dirty (bool force_redraw);

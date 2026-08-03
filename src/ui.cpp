@@ -148,6 +148,12 @@ void c_neuralblendermainwindow::on_action (nbtk::t_action_event &event) {
     ui->on_action (event);
 }
 
+void c_neuralblendermainwindow::on_hover_changed (nbtk::c_widget *hovered) {
+  (void) hovered;
+  if (ui)
+    ui->sync_eq_graph_highlight ();
+}
+
 bool is_supported_model_filename (const std::string &path) {
   std::string lower = path;
   std::transform (lower.begin (), lower.end (), lower.begin (),
@@ -1231,13 +1237,23 @@ void c_eqpage_widgets::sync_band_from_state (
 }
 
 void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
+  auto is_descendant_of = [] (
+      nbtk::c_widget *root,
+      nbtk::c_widget *widget) {
+    for (nbtk::c_widget *w = widget; w; w = w->parent) {
+      if (w == root)
+        return true;
+    }
+    return false;
+  };
+
   int highlighted = -1;
   for (int i = 0; i < EQ_NUM_BANDS; ++i) {
-    if (hovered == &bands [i].slider_gain ||
-        hovered == &bands [i].btn_on ||
-        hovered == &bands [i].menu_mode ||
-        hovered == &bands [i].knob_freq ||
-        hovered == &bands [i].knob_q) {
+    if (is_descendant_of (&bands [i].slider_gain, hovered) ||
+        is_descendant_of (&bands [i].btn_on, hovered) ||
+        is_descendant_of (&bands [i].menu_mode, hovered) ||
+        is_descendant_of (&bands [i].knob_freq, hovered) ||
+        is_descendant_of (&bands [i].knob_q, hovered)) {
       highlighted = i;
       break;
     }

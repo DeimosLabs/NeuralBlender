@@ -26,7 +26,7 @@ void c_eqgraph::render_base (cairo_t *cr) {
   cairo_rectangle (cr, 0, 0, w, h);
   cairo_set_source_rgba (cr, 0, 0, 0.05, 1);
   cairo_fill (cr);
-  for (i = 20; i <= 20000;) {
+  for (i = freq_min; i <= freq_max;) {
     int x = freq_to_x ((float) i);
     if (x == w) x--;
     cairo_move_to (cr, x, 0);
@@ -97,7 +97,31 @@ void c_eqgraph::on_paint (cairo_t *cr) {
     cairo_paint (cr);
   }
 
-  if (mouse_handle_x >= 0 && mouse_handle_y >= 0) {
+  const bool draw_handles = always_show_handles || mouse_in () || drag_handle >= 0;
+  if (draw_handles) {
+    for (int i = 0; i < EQ_NUM_BANDS; i++) {
+      if (!state->enabled [i])
+        continue;
+
+      int x = freq_to_x (state->freq [i]);
+      int y = db_to_y (state->gain_db [i]);
+
+      cairo_rectangle (cr,
+                       0.5 + x - handle_size / 2,
+                       0.5 + y - handle_size / 2,
+                       handle_size, handle_size);
+
+      if (i == drag_handle)
+        cairo_set_source_rgba (cr, 1, 1, 0, 1);
+      else
+        cairo_set_source_rgba (cr, 0.7, 1.0, 0.7, 1);
+
+      cairo_set_line_width (cr, 1.0f);
+      cairo_stroke (cr);
+    }
+  }
+
+  if (draw_handles && mouse_handle_x >= 0 && mouse_handle_y >= 0) {
     cairo_set_line_width (cr, 2.0f);
     cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 0.25);
     cairo_rectangle (cr,
@@ -208,26 +232,6 @@ void c_eqgraph::render_curve_surface () {
   cairo_set_line_width (curve_cr, 1.0f);
 
   mark_band_curve_surfaces_dirty ();
-
-  for (int i = 0; i < EQ_NUM_BANDS; i++) {
-    if (state->enabled [i]) {
-      int x = freq_to_x (state->freq [i]);
-      int y = db_to_y (state->gain_db [i]);
-      
-      cairo_rectangle (curve_cr,
-                       0.5 + x - handle_size / 2,
-                       0.5 + y - handle_size / 2,
-                       handle_size, handle_size);
-      
-      if (i == drag_handle)
-        cairo_set_source_rgba (curve_cr, 1, 1, 0, 1);
-      else
-        cairo_set_source_rgba (curve_cr, 0.7, 1.0, 0.7, 1);
-
-      cairo_stroke (curve_cr);
-    }
-  }
-  
 
   cairo_surface_flush (curve_surface);
 }
@@ -682,6 +686,8 @@ bool c_eqgraph::on_mouse_up (int mouse_x, int mouse_y, int button) {
 }
 
 bool c_eqgraph::on_mouse_move (int mouse_x, int mouse_y) {
+  const bool was_mouse_in = mouse_in ();
+
   nbtk::c_canvas::on_mouse_move (mouse_x, mouse_y);
 
   if (drag_handle >= 0)
@@ -689,7 +695,15 @@ bool c_eqgraph::on_mouse_move (int mouse_x, int mouse_y) {
   else
     update_mouse_handle (mouse_x, mouse_y);
 
+  if (!was_mouse_in && mouse_in ())
+    invalidate ();
+
   return true;
+}
+
+void c_eqgraph::on_mouse_enter () {
+  nbtk::c_canvas::on_mouse_enter ();
+  invalidate ();
 }
 
 void c_eqgraph::on_mouse_leave () {
@@ -703,4 +717,5 @@ void c_eqgraph::on_mouse_leave () {
 
   clear_mouse_handle ();
   nbtk::c_canvas::on_mouse_leave ();
+  invalidate ();
 }
