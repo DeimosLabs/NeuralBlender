@@ -26,6 +26,7 @@ public:
   void on_paint (cairo_t *cr);
   void set_state (c_eq_state *state);
   void state_changed ();
+  void set_highlighted_band (int band);
   void on_resize (int w, int h);
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
@@ -49,12 +50,18 @@ private:
   void update_mouse_handle (int x, int y);
   void clear_mouse_handle ();
   void emit_band_action (int band);
+  bool point_inside_graph (int x, int y) const;
+  void render_curves_now ();
+  void restore_dragged_handle ();
+  void release_pointer_grab ();
   void update_dragged_handle (int x, int y, bool force_redraw);
   
   void generate_curves ();
   void clear_curve_surface ();
   bool ensure_curve_surface ();
+  void mark_band_curve_surfaces_dirty ();
   void render_curve_surface ();
+  void render_band_curve_surface (int band);
   void path_curve (cairo_t *cr, const std::vector<float> &v);
   int samplerate = 0;
   
@@ -67,9 +74,12 @@ private:
   //static constexpr uint64_t CURVE_RECALC_MS = 50;
   
   cairo_surface_t *curve_surface = NULL;
+  cairo_surface_t *curve_surfaces [EQ_NUM_BANDS] = { NULL };
   cairo_t *curve_cr = NULL;
   int curve_surface_w = 0;
   int curve_surface_h = 0;
+  int highlighted_band = -1;
+  bool band_curve_surfaces_dirty [EQ_NUM_BANDS] = {};
   
   int mouse_handle = -1;
   int mouse_handle_x = -1;
@@ -77,4 +87,8 @@ private:
   int drag_handle = -1;
   int drag_orig_x = -1;
   int drag_orig_y = -1;
+  float drag_orig_freq = 0.0f;
+  float drag_orig_gain_db = 0.0f;
+  bool drag_outside = false;
+  bool pointer_grabbed = false;
 }; 

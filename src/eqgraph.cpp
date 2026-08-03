@@ -14,6 +14,7 @@
 c_eqgraph::c_eqgraph () { CP }
 c_eqgraph::~c_eqgraph () {
   CP
+  release_pointer_grab ();
   clear_curve_surface ();
 }
 
@@ -66,20 +67,6 @@ void c_eqgraph::render_base (cairo_t *cr) {
   cairo_stroke (cr);
 }
 
-void c_eqgraph::set_state (c_eq_state *state_) {
-  state = state_;
-  state_changed ();
-}
-
-void c_eqgraph::state_changed () {
-  mark_curves_dirty (true);
-}
-
-void c_eqgraph::set_samplerate (int sr) {
-  samplerate = sr;
-  state_changed ();
-}
-
 void c_eqgraph::on_paint (cairo_t *cr) {
   if (!state)
     return;
@@ -102,6 +89,14 @@ void c_eqgraph::on_paint (cairo_t *cr) {
   cairo_set_source_surface (cr, curve_surface, 0, 0);
   cairo_paint (cr);
 
+  const int band = mouse_handle >= 0 ? mouse_handle : highlighted_band;
+  if (band >= 0 && band < EQ_NUM_BANDS && curve_surfaces [band]) {
+    if (band_curve_surfaces_dirty [band])
+      render_band_curve_surface (band);
+    cairo_set_source_surface (cr, curve_surfaces [band], 0, 0);
+    cairo_paint (cr);
+  }
+
   if (mouse_handle_x >= 0 && mouse_handle_y >= 0) {
     cairo_set_line_width (cr, 2.0f);
     cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 0.25);
@@ -111,6 +106,29 @@ void c_eqgraph::on_paint (cairo_t *cr) {
                      handle_size, handle_size);
     cairo_fill (cr);
   }
+}
+
+void c_eqgraph::set_state (c_eq_state *state_) {
+  state = state_;
+  state_changed ();
+}
+
+void c_eqgraph::state_changed () {
+  mark_curves_dirty (true);
+}
+
+void c_eqgraph::set_highlighted_band (int band) {
+  band = std::clamp (band, -1, EQ_NUM_BANDS - 1);
+  if (highlighted_band == band)
+    return;
+
+  highlighted_band = band;
+  invalidate ();
+}
+
+void c_eqgraph::set_samplerate (int sr) {
+  samplerate = sr;
+  state_changed ();
 }
 
 void c_eqgraph::render_curve_surface () {
@@ -136,6 +154,8 @@ void c_eqgraph::render_curve_surface () {
   cairo_stroke (curve_cr);
   cairo_set_line_width (curve_cr, 1.0f);
 
+  mark_band_curve_surfaces_dirty ();
+
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     if (state->enabled [i]) {
       int x = freq_to_x (state->freq [i]);
@@ -159,6 +179,41 @@ void c_eqgraph::render_curve_surface () {
   cairo_surface_flush (curve_surface);
 }
 
+void c_eqgraph::mark_band_curve_surfaces_dirty () {
+  for (int i = 0; i < EQ_NUM_BANDS; ++i)
+    band_curve_surfaces_dirty [i] = true;
+}
+
+void c_eqgraph::render_band_curve_surface (int band) {
+  if (band < 0 || band >= EQ_NUM_BANDS || !curve_surfaces [band])
+    return;
+
+  cairo_t *cr = cairo_create (curve_surfaces [band]);
+  if (!cr || cairo_status (cr) != CAIRO_STATUS_SUCCESS) {
+    if (cr)
+      cairo_destroy (cr);
+    return;
+  }
+
+  cairo_save (cr);
+  cairo_set_operator (cr, CAIRO_OPERATOR_CLEAR);
+  cairo_paint (cr);
+  cairo_restore (cr);
+
+  if (state &&
+      state->enabled [band] &&
+      !curves [band].empty ()) {
+    cairo_set_line_width (cr, 1.0f);
+    cairo_set_source_rgba (cr, 0.35, 0.95, 0.95, 0.95);
+    path_curve (cr, curves [band]);
+    cairo_stroke (cr);
+  }
+
+  cairo_destroy (cr);
+  cairo_surface_flush (curve_surfaces [band]);
+  band_curve_surfaces_dirty [band] = false;
+}
+
 void c_eqgraph::clear_curve_surface () {
   if (curve_cr) {
     cairo_destroy (curve_cr);
@@ -168,6 +223,14 @@ void c_eqgraph::clear_curve_surface () {
   if (curve_surface) {
     cairo_surface_destroy (curve_surface);
     curve_surface = NULL;
+  }
+
+  for (int i = 0; i < EQ_NUM_BANDS; ++i) {
+    if (curve_surfaces [i]) {
+      cairo_surface_destroy (curve_surfaces [i]);
+      curve_surfaces [i] = NULL;
+    }
+    band_curve_surfaces_dirty [i] = true;
   }
 
   curve_surface_w = 0;
@@ -183,8 +246,17 @@ bool c_eqgraph::ensure_curve_surface () {
       curve_surface_w == w &&
       curve_surface_h == h &&
       cairo_surface_status (curve_surface) == CAIRO_STATUS_SUCCESS &&
-      cairo_status (curve_cr) == CAIRO_STATUS_SUCCESS)
-    return true;
+      cairo_status (curve_cr) == CAIRO_STATUS_SUCCESS) {
+    bool band_surfaces_ok = true;
+    for (int i = 0; i < EQ_NUM_BANDS; ++i) {
+      band_surfaces_ok =
+        band_surfaces_ok &&
+        curve_surfaces [i] &&
+        cairo_surface_status (curve_surfaces [i]) == CAIRO_STATUS_SUCCESS;
+    }
+    if (band_surfaces_ok)
+      return true;
+  }
 
   clear_curve_surface ();
 
@@ -199,6 +271,16 @@ bool c_eqgraph::ensure_curve_surface () {
   if (!curve_cr || cairo_status (curve_cr) != CAIRO_STATUS_SUCCESS) {
     clear_curve_surface ();
     return false;
+  }
+
+  for (int i = 0; i < EQ_NUM_BANDS; ++i) {
+    curve_surfaces [i] = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, w, h);
+    if (!curve_surfaces [i] ||
+        cairo_surface_status (curve_surfaces [i]) != CAIRO_STATUS_SUCCESS) {
+      clear_curve_surface ();
+      return false;
+    }
+    band_curve_surfaces_dirty [i] = true;
   }
 
   curve_surface_w = w;
@@ -427,9 +509,51 @@ void c_eqgraph::emit_band_action (int band) {
   on_action (event);
 }
 
+bool c_eqgraph::point_inside_graph (int x, int y) const {
+  return x >= 0 && y >= 0 && x < w && y < h;
+}
+
+void c_eqgraph::render_curves_now () {
+  generate_curves ();
+  render_curve_surface ();
+  curves_last_ms = nbtk::now_ms ();
+  curves_dirty = false;
+  invalidate ();
+}
+
+void c_eqgraph::restore_dragged_handle () {
+  if (!state || drag_handle < 0 || drag_handle >= EQ_NUM_BANDS)
+    return;
+
+  state->freq [drag_handle] = drag_orig_freq;
+  state->gain_db [drag_handle] = drag_orig_gain_db;
+  set_mouse_handle (drag_handle);
+  render_curves_now ();
+  emit_band_action (drag_handle);
+}
+
+void c_eqgraph::release_pointer_grab () {
+  if (!pointer_grabbed)
+    return;
+
+  if (app && app->backend && toplevel)
+    app->backend->ungrab_pointer (toplevel->widget);
+  pointer_grabbed = false;
+}
+
 void c_eqgraph::update_dragged_handle (int x, int y, bool force_redraw) {
   if (!state || drag_handle < 0 || drag_handle >= EQ_NUM_BANDS)
     return;
+
+  if (!point_inside_graph (x, y)) {
+    if (!drag_outside) {
+      drag_outside = true;
+      restore_dragged_handle ();
+    }
+    return;
+  }
+
+  drag_outside = false;
 
   state->freq [drag_handle] = std::clamp (
     x_to_freq ((float) x),
@@ -468,19 +592,35 @@ bool c_eqgraph::on_mouse_down (int mouse_x, int mouse_y, int button) {
   set_mouse_handle (drag_handle);
   drag_orig_x = mouse_x;
   drag_orig_y = mouse_y;
+  drag_outside = false;
+  if (drag_handle >= 0 && state) {
+    drag_orig_freq = state->freq [drag_handle];
+    drag_orig_gain_db = state->gain_db [drag_handle];
+    if (app)
+      app->set_focus (this);
+    if (app && app->backend && toplevel)
+      pointer_grabbed = app->backend->grab_pointer (toplevel->widget);
+  }
   return true;
 }
 
 bool c_eqgraph::on_mouse_up (int mouse_x, int mouse_y, int button) {
-  if (button == Button1 && drag_handle >= 0)
-    update_dragged_handle (mouse_x, mouse_y, true);
+  if (button == Button1 && drag_handle >= 0) {
+    if (point_inside_graph (mouse_x, mouse_y))
+      update_dragged_handle (mouse_x, mouse_y, true);
+    else
+      restore_dragged_handle ();
+  }
   
   invalidate ();
   
   nbtk::c_canvas::on_mouse_up (mouse_x, mouse_y, button);
 
-  if (button == Button1)
+  if (button == Button1) {
     drag_handle = -1;
+    drag_outside = false;
+    release_pointer_grab ();
+  }
   
   update_mouse_handle (mouse_x, mouse_y);
   return true;
@@ -498,6 +638,14 @@ bool c_eqgraph::on_mouse_move (int mouse_x, int mouse_y) {
 }
 
 void c_eqgraph::on_mouse_leave () {
+  if (drag_handle >= 0) {
+    if (!drag_outside) {
+      drag_outside = true;
+      restore_dragged_handle ();
+    }
+    return;
+  }
+
   clear_mouse_handle ();
   nbtk::c_canvas::on_mouse_leave ();
 }

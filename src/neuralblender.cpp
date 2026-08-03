@@ -510,7 +510,7 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
 }
 
 float g_defaultfreqs [] = { 50.0f,    100.0f,    250.0f,   500.0f,
-                            1000.0f,  2000.0f,  4000.0f,  8000.0f };
+                            1000.0f,  4000.0f,  8000.0f,  11000.0f };
 _eq_band_mode g_defaultmodes [] = { EQ_HIPASS, EQ_LOWSHELF, EQ_CURVE, EQ_CURVE,
                                   EQ_CURVE, EQ_CURVE, EQ_HISHELF, EQ_LOWPASS };
 

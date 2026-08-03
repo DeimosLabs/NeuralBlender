@@ -337,6 +337,7 @@ public:
   void move_resize (int x, int y, int w, int h);
   void sync_from_state (const c_eq_state &state);
   void sync_band_from_state (const c_eq_state &state, size_t band);
+  void sync_highlight_from_hover (nbtk::c_widget *hovered);
   void set_state (nbtk::_widget_state state);
   
   nbtk::c_widget      cont_sliders;
@@ -431,6 +432,7 @@ public:
           void sync_page_visibility ()                                  ;
           void ensure_tuner_created ()                                  ;
           void sync_tuner_visibility ()                                 ;
+          void sync_eq_graph_highlight ()                               ;
   virtual void on_window_resize (int w, int h)                          ;
           void on_window_configured ()                                  ;
   virtual bool request_window_size (int w, int h)                       ;

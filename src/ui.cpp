@@ -1230,6 +1230,22 @@ void c_eqpage_widgets::sync_band_from_state (
   bands [band].knob_q.set_value (eq_state.q [band]);
 }
 
+void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
+  int highlighted = -1;
+  for (int i = 0; i < EQ_NUM_BANDS; ++i) {
+    if (hovered == &bands [i].slider_gain ||
+        hovered == &bands [i].btn_on ||
+        hovered == &bands [i].menu_mode ||
+        hovered == &bands [i].knob_freq ||
+        hovered == &bands [i].knob_q) {
+      highlighted = i;
+      break;
+    }
+  }
+
+  graph.set_highlighted_band (highlighted);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // c_neuralblender_ui
 
@@ -2029,6 +2045,23 @@ void c_neuralblender_ui::sync_tuner_visibility () {
   }
 }
 
+void c_neuralblender_ui::sync_eq_graph_highlight () {
+  nbtk::c_widget *hovered = mainwindow.hovered_widget;
+  if (nbtk_app.active_toplevel == &mainwindow)
+    hovered = nbtk_app.hovered_widget;
+
+  if (visible_page == PAGE_EQPRE) {
+    eqpage_pre.sync_highlight_from_hover (hovered);
+    eqpage_post.graph.set_highlighted_band (-1);
+  } else if (visible_page == PAGE_EQPOST) {
+    eqpage_post.sync_highlight_from_hover (hovered);
+    eqpage_pre.graph.set_highlighted_band (-1);
+  } else {
+    eqpage_pre.graph.set_highlighted_band (-1);
+    eqpage_post.graph.set_highlighted_band (-1);
+  }
+}
+
 static bool page_has_bank (_ui_page page) {
   return page == PAGE_PEDAL || page == PAGE_AMP || page == PAGE_CAB;
 }
@@ -2794,6 +2827,8 @@ int c_neuralblender_ui::idle () {
 
   if (nbtk_app.backend)
     nbtk_app.backend->run_events (&app);
+
+  sync_eq_graph_highlight ();
 
   nbtk_app.tick ();
 
