@@ -128,7 +128,7 @@ struct Plugin : public c_lv2_urids {
   // dsp
   c_neuralblender blender;
   double samplerate            = 48000;
-  uint32_t blocksize           = 64;
+  uint32_t blocksize           = 0;
   
   const LV2_Atom_Sequence *control = NULL;
   LV2_Atom_Sequence *notify    = NULL;
@@ -1533,9 +1533,9 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   Plugin *self = (Plugin *) instance;
   if (!self) return;
 
-  if (self->blocksize != nframes) {
+  if (self->blocksize == 0 || nframes > self->blocksize) {
     self->blocksize = nframes;
-    self->blender.set_blocksize(nframes);
+    self->blender.set_blocksize (nframes);
   }
   
   if (self->notify) {
