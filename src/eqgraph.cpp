@@ -449,6 +449,7 @@ void c_eqgraph::generate_curves () { CP
       continue;
 
     c_biquad biquad;
+    biquad.slope = state->slope [band];
     biquad.set_peak (
       samplerate,
       state->freq [band],
@@ -461,7 +462,7 @@ void c_eqgraph::generate_curves () { CP
 
       int oversampling = 1;
 
-      if (state->mode [band] == EQ_CURVE) {
+      if (state->mode [band] == EQ_BELL) {
         const float center = state->freq [band];
         const float q = std::max (state->q [band], 0.01f);
         const float range_hz = center / q * 4.0f;
@@ -480,7 +481,8 @@ void c_eqgraph::generate_curves () { CP
           db = db1;
       }
 
-      curves [band] [x] = std::clamp (db, -1.0f * db_range, db_range);
+      //curves [band] [x] = std::clamp (db, -1.0f * db_range, db_range);
+      curves [band] [x] = db;
       curve [x] += db;
     }
   }

@@ -52,6 +52,26 @@ static constexpr _lane_bank MODEL_BANKS [] = {
   BANK_PEDAL, BANK_AMP, BANK_CAB
 };
 
+struct t_eq_mode_choice {
+  const char *name;
+  _eq_band_mode mode = EQ_OFF;
+  int slope = 1;
+};
+
+static const t_eq_mode_choice g_eq_mode_choices [] = {
+  { "HPx1",  EQ_HIPASS,     1 },
+  { "HPx2",  EQ_HIPASS,     2 },
+  { "HPx3",  EQ_HIPASS,     3 },
+  { "HPx4",  EQ_HIPASS,     4 },
+  { "Low",   EQ_LOWSHELF,   1 },
+  { "Bell",  EQ_BELL,       1 },
+  { "High",  EQ_HISHELF,    1 },
+  { "LPx1",  EQ_LOWPASS,    1 },
+  { "LPx2",  EQ_LOWPASS,    2 },
+  { "LPx3",  EQ_LOWPASS,    3 },
+  { "LPx4",  EQ_LOWPASS,    4 },
+};
+
 static bool filename_ends_with (const std::string &path, const char *suffix) {
   const size_t suffix_len = strlen (suffix);
   return path.size () >= suffix_len &&
@@ -1022,7 +1042,16 @@ void c_lane_widgets::set_state (nbtk::_widget_state state) {
 // c_eqband_widgets, c_eqpage_widgets
 
 extern float g_defaultfreqs [];
-extern _eq_band_mode g_defaultmodes [];
+_ui_eq_band_mode g_eq_defaultmodes [] = {
+  UI_EQ_HIPASS1,
+  UI_EQ_LOWSHELF,
+  UI_EQ_BELL,
+  UI_EQ_BELL,
+  UI_EQ_BELL,
+  UI_EQ_BELL,
+  UI_EQ_HISHELF,
+  UI_EQ_LOWPASS1,
+};
 
 void c_eqpage_widgets::create (
     c_neuralblender_ui       *ui_,
@@ -1093,13 +1122,18 @@ void c_eqpage_widgets::create (
     bands [i].btn_on.set_tooltip (buf);
     
     bands [i].menu_mode.create (&cont_bands, "", 0, 280, 92, 32);
-    bands [i].menu_mode.set_items ({
-      "HP", "Low", "Bell", "High", "LP"
-    });
+    //bands [i].menu_mode.set_items ({
+    //  "HP", "Low", "Bell", "High", "LP"
+    //});
+    
+    std::vector<std::string> modeitems;
+    for (int mode = UI_EQ_HIPASS1; mode <= UI_EQ_LOWPASS4; mode++)
+      modeitems.push_back (std::string (g_eq_mode_choices [mode].name));
+    bands [i].menu_mode.set_items (modeitems);
     bands [i].menu_mode.role = ROLE_EQ_MODE;
     bands [i].menu_mode.bank = bank_id;
     bands [i].menu_mode.lane = i;
-    bands [i].menu_mode.set_selected ((int) g_defaultmodes [i] - 1);
+    bands [i].menu_mode.set_selected ((int) g_eq_defaultmodes [i]);
     bands [i].menu_mode.text_size = 0.75;
     snprintf (buf, 127, "Band %d filtering mode", i + 1);
     bands [i].menu_mode.set_tooltip (buf);
@@ -1226,10 +1260,15 @@ void c_eqpage_widgets::sync_band_from_state (
     return;
 
   bands [band].btn_on.set_value (eq_state.enabled [band]);
-  bands [band].menu_mode.set_selected (std::clamp (
-    (int) eq_state.mode [band] - 1,
-    0,
-    (int) EQ_LOWPASS - 1));
+  int mode_index = UI_EQ_BELL;
+  for (int i = UI_EQ_HIPASS1; i <= UI_EQ_LOWPASS4; ++i) {
+    if (g_eq_mode_choices [i].mode == eq_state.mode [band] &&
+        g_eq_mode_choices [i].slope == eq_state.slope [band]) {
+      mode_index = i;
+      break;
+    }
+  }
+  bands [band].menu_mode.set_selected (mode_index);
   bands [band].slider_gain.set_value (eq_state.gain_db [band]);
   bands [band].knob_freq.set_value (eq_state.freq [band]);
   bands [band].knob_q.set_value (eq_state.q [band]);
@@ -2417,12 +2456,16 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
         eq.enabled [band] = static_cast<nbtk::c_button *> (widget)->value;
       break;
 
-      case ROLE_EQ_MODE:
-        eq.mode [band] = (_eq_band_mode) std::clamp (
-          static_cast<nbtk::c_combobox *> (widget)->selected + 1,
-          (int) EQ_HIPASS,
-          (int) EQ_LOWPASS);
+      case ROLE_EQ_MODE: {
+        _ui_eq_band_mode ui_mode = (_ui_eq_band_mode) std::clamp (
+          static_cast<nbtk::c_combobox *> (widget)->selected,
+          (int) UI_EQ_HIPASS1,
+          (int) UI_EQ_LOWPASS4);
+          
+        eq.mode [band] = g_eq_mode_choices [ui_mode].mode;
+        eq.slope [band] = g_eq_mode_choices [ui_mode].slope;
         changed_parameter = true;
+      }
       break;
 
       case ROLE_EQ_FREQ:

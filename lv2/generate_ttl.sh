@@ -20,11 +20,11 @@ cd "$srcdir/lv2" || {
 }
 
 startport=99
-mode_hipass=1
-mode_lowshelf=2
-mode_curve=3
-mode_hishelf=4
-mode_lowpass=5
+mode_hipass=0
+mode_lowshelf=4
+mode_curve=5
+mode_hishelf=6
+mode_lowpass=7
 
 generate_one_eq_port() {
   local eq="$1"
@@ -90,8 +90,8 @@ generate_one_eq_port() {
     "mode")
       property="        lv2:portProperty lv2:integer ;"
       default="$mode"
-      minimum=1
-      maximum=5
+      minimum=0
+      maximum=10
     ;;
     
     "freq")

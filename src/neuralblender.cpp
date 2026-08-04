@@ -405,7 +405,7 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
     return;
   
   if (mode_ != EQ_KEEP)
-    mode = mode_;
+    mode = std::clamp (mode_, EQ_OFF, EQ_LOWPASS);
   
   freq = std::clamp (freq, 20.0f, samplerate * 0.45f);
   q = std::clamp (q, 0.05f, 100.0f);
@@ -423,7 +423,7 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
       disable ();
       return;
     
-    case EQ_CURVE:
+    case EQ_BELL:
       b0_ = 1.0f + alpha * a;
       b1_ = -2.0f * cw;
       b2_ = 1.0f - alpha * a;
@@ -509,14 +509,19 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
   a2 = a2_ * inv_a0;
 }
 
-float g_defaultfreqs [] = { 50.0f,    100.0f,    250.0f,   500.0f,
-                            1000.0f,  4000.0f,  8000.0f,  11000.0f };
-_eq_band_mode g_defaultmodes [] = { EQ_HIPASS, EQ_LOWSHELF, EQ_CURVE, EQ_CURVE,
-                                  EQ_CURVE, EQ_CURVE, EQ_HISHELF, EQ_LOWPASS };
+_eq_band_mode g_defaultmodes [] = { EQ_HIPASS, EQ_LOWSHELF, EQ_BELL, EQ_BELL,
+                                    EQ_BELL, EQ_BELL, EQ_HISHELF, EQ_LOWPASS };
+
+float g_defaultfreqs [] = {   50.0f,   100.0f,   250.0f,   500.0f,
+                            1000.0f,  2000.0f,  4000.0f,  8000.0f };
 
 void c_biquad::disable () { CP
   b0 = 1.0f;
-  b1 = b2 = a1 = a2 = z1 = z2 = 0.0f;
+  b1 = b2 = a1 = a2 = 0.0f;
+  for (int i = 0; i < EQ_SLOPE_MAX; i++) {
+    z1 [i] = 0.0f;
+    z2 [i] = 0.0f;
+  }
   mode = EQ_OFF;
 }
 
@@ -531,8 +536,10 @@ void c_eq::set_samplerate (int sr) {
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     if (mode [i] == EQ_OFF || freq [i] <= 0.0f)
       bands [i].disable ();
-    else
+    else {
+      bands [i].slope = slope [i];
       bands [i].set_peak (sr, freq [i], gain_db [i], q [i], mode [i]);
+    }
   }
 }
 
@@ -557,8 +564,12 @@ float c_biquad::response_db (float freq, float samplerate) const {
   const float n2 = nr * nr + ni * ni;
   const float d2 = std::max (dr * dr + di * di, 1.0e-20f);
   const float mag = sqrtf (n2 / d2);
-
-  return 20.0f * log10f (std::max (mag, 1.0e-20f));
+  
+  float slope_factor = 1.0f;
+  if (mode == EQ_HIPASS || mode == EQ_LOWPASS)
+    slope_factor = (float) std::clamp (slope, 1, 4);
+    
+  return 20.0f * log10f (std::max (mag, 1.0e-20f)) * slope_factor;
 }
 
 c_eq::c_eq () {
@@ -572,12 +583,15 @@ void c_eq::reset () {
     enabled [i] = false;
     freq [i] = g_defaultfreqs [i];
     mode [i] = g_defaultmodes [i];
+    slope [i] = 1;
     gain_db [i] = 0.0f;
     q [i] = 1.0f;
-    if (samplerate > 0)
+    if (samplerate > 0) {
+      bands [i].slope = slope [i];
       bands [i].set_peak (samplerate, freq [i], gain_db [i], q [i], mode [i]);
-    else
+    } else {
       bands [i].disable ();
+    }
   }
 }
 
@@ -585,7 +599,8 @@ void c_eq::set_band (int band_,
                      float freq_,
                      float gain_db_,
                      float q_,
-                     _eq_band_mode mode_) {
+                     _eq_band_mode mode_,
+                     int slope_) {
   const int b = band_;
 
   if (b < 0 || b >= EQ_NUM_BANDS)
@@ -594,15 +609,17 @@ void c_eq::set_band (int band_,
   const float next_freq = std::clamp (freq_, 20.0f, 20000.0f);
   const float next_gain_db = std::clamp (gain_db_, -36.0f, +36.0f);
   const float next_q = std::clamp (q_, 0.01f, 100.0f);
+  const int next_slope = std::clamp (slope_, 1, EQ_SLOPE_MAX);
 
   freq [b] = next_freq;
   gain_db [b] = next_gain_db;
   q [b] = next_q;
+  slope [b] = next_slope;
   if (mode_ != EQ_KEEP) {
     mode [b] = mode_;
   } else {
     if (mode [b] == EQ_OFF)
-      mode [b] = EQ_CURVE;
+      mode [b] = EQ_BELL;
   }
 
   if (samplerate <= 0) {
@@ -610,6 +627,7 @@ void c_eq::set_band (int band_,
     return;
   }
   
+  bands [b].slope = slope [b];
   bands [b].set_peak (
     samplerate,
     freq [b],
@@ -658,6 +676,7 @@ static void eq_to_state (const c_eq &eq, c_eq_state &state) {
   for (int i = 0; i < EQ_NUM_BANDS; ++i) {
     state.enabled [i] = eq.enabled [i];
     state.mode [i] = eq.mode [i];
+    state.slope [i] = eq.slope [i];
     state.freq [i] = eq.freq [i];
     state.gain_db [i] = eq.gain_db [i];
     state.q [i] = eq.q [i];
@@ -2497,6 +2516,7 @@ bool c_neuralblender::set_eq_band (
     size_t band,
     bool enabled,
     _eq_band_mode mode,
+    int slope,
     float freq,
     float gain_db,
     float q) {
@@ -2506,7 +2526,7 @@ bool c_neuralblender::set_eq_band (
     return false;
 
   eq->set_enabled ((int) band, enabled);
-  eq->set_band ((int) band, freq, gain_db, q, mode);
+  eq->set_band ((int) band, freq, gain_db, q, mode, slope);
   return true;
 }
 

@@ -91,7 +91,8 @@ static void apply_eq_state (
       state.freq [i],
       state.gain_db [i],
       state.q [i],
-      state.mode [i]);
+      state.mode [i],
+      state.slope [i]);
   }
 }
 
@@ -345,6 +346,7 @@ void c_standalone_ui::on_eq_band (
     band,
     eq_state.enabled [band],
     eq_state.mode [band],
+    eq_state.slope [band],
     eq_state.freq [band],
     eq_state.gain_db [band],
     eq_state.q [band]);

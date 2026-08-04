@@ -421,7 +421,8 @@ void c_lv2_ui::on_eq_band (
     case ROLE_EQ_MODE:
       write_control (
         widget_eq_port (w, NB_LV2_EQ_MODE),
-        (float) eq_state.mode [band]);
+        (float) nb_lv2_encode_eq_mode (
+          eq_state.mode [band], eq_state.slope [band]));
     break;
 
     case ROLE_EQ_FREQ:
@@ -437,6 +438,18 @@ void c_lv2_ui::on_eq_band (
     break;
 
     case ROLE_EQ_Q:
+      write_control (
+        widget_eq_port (w, NB_LV2_EQ_Q),
+        eq_state.q [band]);
+    break;
+
+    case ROLE_EQ_GRAPH:
+      write_control (
+        widget_eq_port (w, NB_LV2_EQ_FREQ),
+        eq_state.freq [band]);
+      write_control (
+        widget_eq_port (w, NB_LV2_EQ_GAIN),
+        eq_state.gain_db [band]);
       write_control (
         widget_eq_port (w, NB_LV2_EQ_Q),
         eq_state.q [band]);
@@ -756,12 +769,10 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
       break;
 
       case NB_LV2_EQ_MODE: {
-        int mode = (int) lrintf (value);
-        if (mode < (int) EQ_HIPASS)
-          mode = (int) EQ_HIPASS;
-        if (mode > (int) EQ_LOWPASS)
-          mode = (int) EQ_LOWPASS;
-        eq_state.mode [eq_band] = (_eq_band_mode) mode;
+        nb_lv2_decode_eq_mode (
+          (int) lrintf (value),
+          &eq_state.mode [eq_band],
+          &eq_state.slope [eq_band]);
       } break;
 
       case NB_LV2_EQ_FREQ:

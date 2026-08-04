@@ -42,6 +42,21 @@ enum _ui_page {
   PAGE_COUNT
 };
 
+enum _ui_eq_band_mode {
+  UI_EQ_HIPASS1 = 0,
+  UI_EQ_HIPASS2,
+  UI_EQ_HIPASS3,
+  UI_EQ_HIPASS4,
+  UI_EQ_LOWSHELF,
+  UI_EQ_BELL,
+  UI_EQ_HISHELF,
+  UI_EQ_LOWPASS1,
+  UI_EQ_LOWPASS2,
+  UI_EQ_LOWPASS3,
+  UI_EQ_LOWPASS4,
+  UI_EQ_KEEP
+};
+
 enum _widget_role {
   ROLE_NONE = 0,
   ROLE_PAGESWITCH,

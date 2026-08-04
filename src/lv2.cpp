@@ -653,7 +653,8 @@ static void sync_last_eq_from_ports (
       self->eq_enabled [bank] [band], eq.enabled [band] ? 1.0f : 0.0f);
   self->last_eq_mode [bank] [band] =
     current_port_value (
-      self->eq_mode [bank] [band], (float) eq.mode [band]);
+      self->eq_mode [bank] [band],
+      (float) nb_lv2_encode_eq_mode (eq.mode [band], eq.slope [band]));
   self->last_eq_freq [bank] [band] =
     current_port_value (
       self->eq_freq [bank] [band], eq.freq [band]);
@@ -697,7 +698,8 @@ static void store_eq_band_state (
 
   const size_t bank = (size_t) bank_id;
   const int32_t enabled = eq.enabled [band] ? 1 : 0;
-  const int32_t mode = (int32_t) eq.mode [band];
+  const int32_t mode =
+    (int32_t) nb_lv2_encode_eq_mode (eq.mode [band], eq.slope [band]);
   const float freq = eq.freq [band];
   const float gain = eq.gain_db [band];
   const float q = eq.q [band];
@@ -919,6 +921,7 @@ static void restore_eq_state (
 
       bool enabled = eq->enabled [band];
       _eq_band_mode mode = eq->mode [band];
+      int slope = eq->slope [band];
       float freq = eq->freq [band];
       float gain = eq->gain_db [band];
       float q = eq->q [band];
@@ -931,8 +934,7 @@ static void restore_eq_state (
 
       if (retrieve_eq_int (
             self, retrieve, handle, b, band, NB_LV2_EQ_MODE, i)) {
-        i = std::clamp (i, (int32_t) EQ_HIPASS, (int32_t) EQ_LOWPASS);
-        mode = (_eq_band_mode) i;
+        nb_lv2_decode_eq_mode ((int) i, &mode, &slope);
         found = true;
       }
 
@@ -957,7 +959,7 @@ static void restore_eq_state (
       if (!found)
         continue;
 
-      self->blender.set_eq_band (b, band, enabled, mode, freq, gain, q);
+      self->blender.set_eq_band (b, band, enabled, mode, slope, freq, gain, q);
       sync_last_eq_from_ports (self, b, band, *eq);
       notify_eq_band (self, b, band);
     }
@@ -1139,7 +1141,10 @@ static bool forge_next_eq_notify (Plugin *self) {
 
           case NB_LV2_EQ_MODE:
             forge_int_notify (
-              self, property, (int32_t) eq->mode [band]);
+              self,
+              property,
+              (int32_t) nb_lv2_encode_eq_mode (
+                eq->mode [band], eq->slope [band]));
             return true;
 
           case NB_LV2_EQ_FREQ:
@@ -1858,9 +1863,8 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             self->last_eq_mode [bank] [band],
             tmp)) {
         //CP
-        const int mode =
-          std::clamp ((int) lrintf (tmp), (int) EQ_HIPASS, (int) EQ_LOWPASS);
-        eq->mode [band] = (_eq_band_mode) mode;
+        nb_lv2_decode_eq_mode (
+          (int) lrintf (tmp), &eq->mode [band], &eq->slope [band]);
         changed = true;
       }
 
@@ -1897,6 +1901,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
           band,
           eq->enabled [band],
           eq->mode [band],
+          eq->slope [band],
           eq->freq [band],
           eq->gain_db [band],
           eq->q [band]);

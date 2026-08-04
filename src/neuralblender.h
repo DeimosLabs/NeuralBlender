@@ -74,6 +74,7 @@
 #define NB_LANE_XFADE_MS         NB_XFADE_MS
 #define TUNER_THRESH_DB          -40.0f
 #define EQ_NUM_BANDS             8
+#define EQ_SLOPE_MAX             4
 #define IR_SILENCE_THRESHOLD     -80.0f
 
 #ifndef NB_DEBUG_RATE_HELPERS
@@ -118,7 +119,7 @@ enum _eq_band_mode {
   EQ_OFF,
   EQ_HIPASS,
   EQ_LOWSHELF,
-  EQ_CURVE,
+  EQ_BELL,
   EQ_HISHELF,
   EQ_LOWPASS,
   EQ_KEEP // means don't change current setting
@@ -200,14 +201,10 @@ extern _eq_band_mode g_defaultmodes [];
 
 struct c_eq_state {
   c_eq_state () {
-    const _eq_band_mode defaultmodes [EQ_NUM_BANDS] = {
-      EQ_HIPASS, EQ_LOWSHELF, EQ_CURVE, EQ_CURVE,
-      EQ_CURVE, EQ_CURVE, EQ_HISHELF, EQ_LOWPASS
-    };
-
     for (int i = 0; i < EQ_NUM_BANDS; ++i) {
       enabled [i] = false;
       mode [i] = g_defaultmodes [i];
+      slope [i] = 1;
       freq [i] = g_defaultfreqs [i];
       gain_db [i] = 0.0f;
       q [i] = 1.0f;
@@ -218,6 +215,7 @@ struct c_eq_state {
   float master_gain_db = 0.0f;
   bool enabled [EQ_NUM_BANDS] = {};
   _eq_band_mode mode [EQ_NUM_BANDS] = {};
+  int slope [EQ_NUM_BANDS] = {};
   float freq [EQ_NUM_BANDS] = {};
   float gain_db [EQ_NUM_BANDS] = {};
   float q [EQ_NUM_BANDS] = {};
@@ -299,28 +297,50 @@ public:
   void set_peak (float sr, float freq, float gain_db, float q,
                  _eq_band_mode = EQ_KEEP);
   void disable ();
+
   inline float process (float x) {
+    const int n =
+      (mode == EQ_HIPASS || mode == EQ_LOWPASS)
+        ? std::clamp (slope, 1, 4)
+        : 1;
+
+    for (int i = 0; i < n; i++) {
+      const float y = b0 * x + z1 [i];
+      z1 [i] = b1 * x - a1 * y + z2 [i];
+      z2 [i] = b2 * x - a2 * y;
+      x = y;
+    }
+
+    return x;
+  }
+
+
+  /*inline float process (float x) {
     const float y = b0 * x + z1;
     z1 = b1 * x - a1 * y + z2;
     z2 = b2 * x - a2 * y;
     return y;
-  }
+  }*/
+  
   inline void reset () {
-    z1 = 0.0f;
-    z2 = 0.0f;
+    for (int i = 0; i < EQ_SLOPE_MAX; i++) {
+      z1 [i] = 0.0f;
+      z2 [i] = 0.0f;
+    }
   }
   float response_db (float freq, float samplerate) const;
   
   _eq_band_mode mode = EQ_OFF;
-
+  
+  int slope = 1;
   float b0 = 1.0f;
   float b1 = 0.0f;
   float b2 = 0.0f;
   float a1 = 0.0f;
   float a2 = 0.0f;
-
-  float z1 = 0.0f;
-  float z2 = 0.0f;
+  
+  float z1 [EQ_SLOPE_MAX] = { 0.0f };
+  float z2 [EQ_SLOPE_MAX] = { 0.0f };
 };
 
 class c_eq {
@@ -331,7 +351,7 @@ public:
   void process_block (float *buf, uint32_t nframes);
   bool set_enabled (int band, bool enabled);
   void set_band (int band, float freq, float gain_db, float q, 
-                 _eq_band_mode mode = EQ_KEEP);
+                 _eq_band_mode mode = EQ_KEEP, int slope = 1);
   void set_master_gain_db (float db);
   
   bool on                            = false;
@@ -339,6 +359,7 @@ public:
   float               master_gain_db = 0.0f;
   bool enabled        [EQ_NUM_BANDS] = { false };
   _eq_band_mode mode  [EQ_NUM_BANDS] = { EQ_OFF };
+  int slope           [EQ_NUM_BANDS] = {};
   float freq          [EQ_NUM_BANDS] = { 0 };
   float gain_db       [EQ_NUM_BANDS] = { 0 };
   float q             [EQ_NUM_BANDS] = { 0 };
@@ -600,6 +621,7 @@ public:
       size_t band,
       bool enabled,
       _eq_band_mode mode,
+      int slope,
       float freq,
       float gain_db,
       float q);
