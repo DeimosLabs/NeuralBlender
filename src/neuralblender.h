@@ -438,8 +438,8 @@ private:
   bool               m_ready            = false;
   float              m_pitch_semitones  = 0.0f;
   uint32_t           m_ir_samplerate    = 0;
-  uint32_t           m_samplerate       = 48000;
-  uint32_t           m_blocksize        = 0;
+  uint32_t           m_samplerate       = 0;
+  uint32_t           m_blocksize        = 0; // DUUUH
   uint32_t           m_partition_size   = 0;
   uint32_t           m_num_partitions   = 0;
   uint32_t           m_fft_size         = 0;
@@ -517,7 +517,7 @@ public:
   float       dry_out         = 0.0f;
   c_delayline delay;
   float       calib_target_db = DB_CALIB_TARGET_DEFAULT;
-  uint32_t    samplerate      = 48000;
+  uint32_t    samplerate      = 0;
   uint32_t    blocksize       = 0;
   std::atomic<bool> mute      { false };
   std::atomic<_ramp_state> ramp = RAMP_PLAYING;
@@ -688,6 +688,6 @@ private:
   uint32_t xfade_len = 0;
 
   bool       m_ready = false;
-  uint32_t   m_samplerate = 48000;
+  uint32_t   m_samplerate = 0;
   uint32_t   m_blocksize = 0;
 };
