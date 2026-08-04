@@ -550,6 +550,8 @@ int c_eqgraph::find_handle (int x, int y) const {
 
 void c_eqgraph::mark_curves_dirty (bool force_redraw) {
   curves_dirty = true;
+  if (force_redraw)
+    curves_last_ms = 0;
 
   const uint64_t now = nbtk::now_ms ();
   if (force_redraw ||
