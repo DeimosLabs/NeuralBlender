@@ -228,8 +228,8 @@ void c_eqgraph::draw_label (cairo_t *cr, int x, int y, int band) {
   cairo_fill (cr);
   cairo_set_source_rgba (cr, 0.5, 0.5, 1.0, 1.0);
   
-  x = std::clamp (x, 4, (int) this->w - w - 8);
-  y = std::clamp (y, 4, (int) this->h - h - 8);
+  x = std::clamp (x, 4, (int) this->w - w - 32);
+  y = std::clamp (y, 4, (int) this->h - (h * 4) - 8);
   
   for (int i = 0; i < 4; i++) {
     cairo_move_to (cr, x, y + (h * (i + 1)));
