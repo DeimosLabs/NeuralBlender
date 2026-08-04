@@ -160,20 +160,26 @@ void c_eqgraph::on_paint (cairo_t *cr) {
     cairo_fill (cr);
   }
   
-  if (mouse_x >= 0 && mouse_y >= 0 &&
-      band >= 0 && band < EQ_NUM_BANDS) {
+  if (band >= 0 && band < EQ_NUM_BANDS) {
     int label_x = mouse_x + 24;
     int label_y = std::clamp (mouse_y - 16, 0, h - 32);
     if (w - mouse_x < 80)
       label_x = mouse_x - 80;
-      
-    print_label (cr, label_x, label_y, band);
+    
+    if (state->enabled [band]) {
+      if (mouse_x > -1 && mouse_x < this->w && mouse_y > -1 && mouse_y < this->h)
+        draw_label (cr, label_x, label_y, band);
+      else
+        draw_label (cr, 5, 5, band);
+    }
   }
 
 }
 
-void c_eqgraph::print_label (cairo_t *cr, int x, int y, int band) {
-  char buf [64];
+void c_eqgraph::draw_label (cairo_t *cr, int x, int y, int band) {
+  char buf1 [64];
+  char buf2 [64];
+  char buf3 [64];
   
   if (!state || band < 0 || band >= EQ_NUM_BANDS)
     return;
@@ -192,24 +198,37 @@ void c_eqgraph::print_label (cairo_t *cr, int x, int y, int band) {
     hz_format = freq < 100 ? "%.2f%s" : "%.1f%s";
   }
   
-  cairo_set_source_rgba (cr, 0.5, 0.5, 1.0, 1.0);
   cairo_set_font_size (cr, 11);
   cairo_select_font_face (cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
   cairo_text_extents_t ext;
   cairo_text_extents (cr, "Ay", &ext);
+  int h = ext.height * 1.1f;
+  int w = 0;
   
-  snprintf (buf, 63, hz_format.c_str (), freq, hz_unit.c_str ());
-  cairo_move_to (cr, x, y + ext.height);
-  cairo_show_text (cr, buf);
+  snprintf (buf1, 63, hz_format.c_str (), freq, hz_unit.c_str ());
+  snprintf (buf2, 63, "%s%.1fdB", gain < 0.0f ? "-" : "+", fabs (gain));
+  snprintf (buf3, 63, "Q=%.2f", q);
+  cairo_text_extents (cr, buf1, &ext);
+  w = std::max (w, (int) ext.width);
+  cairo_text_extents (cr, buf2, &ext);
+  w = std::max (w, (int) ext.width);
+  cairo_text_extents (cr, buf3, &ext);
+  w = std::max (w, (int) ext.width);
   
-  snprintf (buf, 63, "%s%.1fdB", gain < 0.0f ? "-" : "+", 
-            fabs (gain));
-  cairo_move_to (cr, x, y + ext.height * 2);
-  cairo_show_text (cr, buf);
+  cairo_rectangle (cr, x - 2, y - 2, w + 6, h * 3 + 6);
+  cairo_set_source_rgba (cr, 0, 0, 0, 0.5);
+  cairo_fill (cr);
+  cairo_set_source_rgba (cr, 0.5, 0.5, 1.0, 1.0);
   
-  snprintf (buf, 63, "Q=%.2f", q);
-  cairo_move_to (cr, x, y + ext.height * 3);
-  cairo_show_text (cr, buf);
+  x = std::clamp (x, 4, (int) this->w - w - 8);
+  y = std::clamp (y, 4, (int) (this->h * 3) - h - 8);
+  
+  cairo_move_to (cr, x, y + h);
+  cairo_show_text (cr, buf1);
+  cairo_move_to (cr, x, y + h * 2);
+  cairo_show_text (cr, buf2);
+  cairo_move_to (cr, x, y + h * 3);
+  cairo_show_text (cr, buf3);
   
   cairo_restore (cr);
 }

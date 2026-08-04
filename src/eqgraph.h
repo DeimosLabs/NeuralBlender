@@ -69,7 +69,7 @@ private:
   void render_curve_surface ();
   void render_band_curve_surface (int band);
   void path_curve (cairo_t *cr, const std::vector<float> &v);
-  void print_label (cairo_t *cr, int x, int y, int band);
+  void draw_label (cairo_t *cr, int x, int y, int band);
   
   int samplerate = 0;
   
