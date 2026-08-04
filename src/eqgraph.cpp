@@ -177,9 +177,16 @@ void c_eqgraph::on_paint (cairo_t *cr) {
 }
 
 void c_eqgraph::draw_label (cairo_t *cr, int x, int y, int band) {
-  char buf1 [64];
-  char buf2 [64];
-  char buf3 [64];
+  char buf [4] [64];
+  static const char *modenames [] = {
+    "Off",
+    "HP",
+    "Low",
+    "Bell",
+    "Hi",
+    "LP",
+    NULL
+  };
   
   if (!state || band < 0 || band >= EQ_NUM_BANDS)
     return;
@@ -205,30 +212,29 @@ void c_eqgraph::draw_label (cairo_t *cr, int x, int y, int band) {
   int h = ext.height * 1.1f;
   int w = 0;
   
-  snprintf (buf1, 63, hz_format.c_str (), freq, hz_unit.c_str ());
-  snprintf (buf2, 63, "%s%.1fdB", gain < 0.0f ? "-" : "+", fabs (gain));
-  snprintf (buf3, 63, "Q=%.2f", q);
-  cairo_text_extents (cr, buf1, &ext);
+  snprintf (buf [0], 63, "%d: %s", band + 1, modenames [state->mode [band]]);
+  snprintf (buf [1], 63, hz_format.c_str (), freq, hz_unit.c_str ());
+  snprintf (buf [2], 63, "%s%.1fdB", gain < 0.0f ? "-" : "+", fabs (gain));
+  snprintf (buf [3], 63, "Q=%.2f", q);
+  cairo_text_extents (cr, buf [0], &ext);
   w = std::max (w, (int) ext.width);
-  cairo_text_extents (cr, buf2, &ext);
+  cairo_text_extents (cr, buf [1], &ext);
   w = std::max (w, (int) ext.width);
-  cairo_text_extents (cr, buf3, &ext);
+  cairo_text_extents (cr, buf [2], &ext);
   w = std::max (w, (int) ext.width);
   
-  cairo_rectangle (cr, x - 2, y - 2, w + 6, h * 3 + 6);
+  cairo_rectangle (cr, x - 2, y - 2, w + 6, h * 4 + 6);
   cairo_set_source_rgba (cr, 0, 0, 0, 0.5);
   cairo_fill (cr);
   cairo_set_source_rgba (cr, 0.5, 0.5, 1.0, 1.0);
   
   x = std::clamp (x, 4, (int) this->w - w - 8);
-  y = std::clamp (y, 4, (int) (this->h * 3) - h - 8);
+  y = std::clamp (y, 4, (int) this->h - h - 8);
   
-  cairo_move_to (cr, x, y + h);
-  cairo_show_text (cr, buf1);
-  cairo_move_to (cr, x, y + h * 2);
-  cairo_show_text (cr, buf2);
-  cairo_move_to (cr, x, y + h * 3);
-  cairo_show_text (cr, buf3);
+  for (int i = 0; i < 4; i++) {
+    cairo_move_to (cr, x, y + (h * (i + 1)));
+    cairo_show_text (cr, buf [i]);
+  }
   
   cairo_restore (cr);
 }
@@ -740,7 +746,7 @@ bool c_eqgraph::on_mouse_move (int mouse_x, int mouse_y) {
     update_dragged_handle (mouse_x, mouse_y, false);
   else
     update_mouse_handle (mouse_x, mouse_y);
-
+  
   if (!was_mouse_in && mouse_in ())
     invalidate ();
 

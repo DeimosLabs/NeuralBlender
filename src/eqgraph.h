@@ -16,6 +16,14 @@
 #define CURVE_RECALC_MS 30
 #define CURVE_POINTS    640
 
+struct t_eq_mode_choice {
+  const char *name;
+  _eq_band_mode mode = EQ_OFF;
+  int slope = 1;
+};
+
+extern const t_eq_mode_choice g_eq_mode_choices [];
+
 class c_eqgraph : public nbtk::c_canvas {
 public:
   c_eqgraph ();
@@ -33,14 +41,14 @@ public:
   bool on_mouse_move (int x, int y) override;
   void on_mouse_enter () override;
   void on_mouse_leave () override;
+  inline int get_mouse_handle () const { return mouse_handle; }
   
   bool always_show_handles = false;
   float freq_min = 20.0f;     // NOTE TO SELF: check for hard coded <---
   float freq_max = 20000.0f; 
   float db_range = 36.0f;
   float handle_size = 12.0f;
-  
-  
+    
 private:
   float freq_to_x (float freq) const;
   float x_to_freq (float x) const;

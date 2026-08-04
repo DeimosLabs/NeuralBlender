@@ -52,13 +52,7 @@ static constexpr _lane_bank MODEL_BANKS [] = {
   BANK_PEDAL, BANK_AMP, BANK_CAB
 };
 
-struct t_eq_mode_choice {
-  const char *name;
-  _eq_band_mode mode = EQ_OFF;
-  int slope = 1;
-};
-
-static const t_eq_mode_choice g_eq_mode_choices [] = {
+const t_eq_mode_choice g_eq_mode_choices [] = {
   { "HPx1",  EQ_HIPASS,     1 },
   { "HPx2",  EQ_HIPASS,     2 },
   { "HPx3",  EQ_HIPASS,     3 },
@@ -1274,6 +1268,7 @@ void c_eqpage_widgets::sync_band_from_state (
   bands [band].knob_q.set_value (eq_state.q [band]);
 }
 
+// thanks to codex for help with these lambdas
 void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
   auto is_eq_band_role = [] (int64_t role) {
     return role == ROLE_EQ_ENABLED ||
@@ -1282,15 +1277,6 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
            role == ROLE_EQ_GAIN ||
            role == ROLE_EQ_Q;
   };
-
-  for (nbtk::c_widget *w = hovered; w; w = w->parent) {
-    if (w->bank == graph.bank &&
-        w->lane < EQ_NUM_BANDS &&
-        is_eq_band_role (w->role)) {
-      graph.set_highlighted_band ((int) w->lane);
-      return;
-    }
-  }
 
   auto is_descendant_of = [] (
       nbtk::c_widget *root,
@@ -1301,16 +1287,41 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
     }
     return false;
   };
+  
+  auto set_band_external_highlight = [&] (int band, bool highlighted) {
+    bands [band].slider_gain.set_external_highlight (highlighted);
+    bands [band].btn_on.set_external_highlight (highlighted);
+    bands [band].menu_mode.set_external_highlight (highlighted);
+    bands [band].knob_freq.set_external_highlight (highlighted);
+    bands [band].knob_q.set_external_highlight (highlighted);
+  };
+  
+  auto apply_external_highlight = [&] (int highlighted) {
+    for (int i = 0; i < EQ_NUM_BANDS; ++i)
+      set_band_external_highlight (i, i == highlighted);
+  };
 
   int highlighted = -1;
-  for (int i = 0; i < EQ_NUM_BANDS; ++i) {
-    if (is_descendant_of (&bands [i].slider_gain, hovered) ||
-        is_descendant_of (&bands [i].btn_on, hovered) ||
-        is_descendant_of (&bands [i].menu_mode, hovered) ||
-        is_descendant_of (&bands [i].knob_freq, hovered) ||
-        is_descendant_of (&bands [i].knob_q, hovered)) {
-      highlighted = i;
+
+  for (nbtk::c_widget *w = hovered; w; w = w->parent) {
+    if (w->bank == graph.bank &&
+        w->lane < EQ_NUM_BANDS &&
+        is_eq_band_role (w->role)) {
+      highlighted = (int) w->lane;
       break;
+    }
+  }
+
+  if (highlighted < 0) {
+    for (int i = 0; i < EQ_NUM_BANDS; ++i) {
+      if (is_descendant_of (&bands [i].slider_gain, hovered) ||
+          is_descendant_of (&bands [i].btn_on, hovered) ||
+          is_descendant_of (&bands [i].menu_mode, hovered) ||
+          is_descendant_of (&bands [i].knob_freq, hovered) ||
+          is_descendant_of (&bands [i].knob_q, hovered)) {
+        highlighted = i;
+        break;
+      }
     }
   }
 
@@ -1327,7 +1338,13 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
     }
   }
 
+  if (highlighted < 0 &&
+      (hovered == &graph || is_descendant_of (&graph, hovered))) {
+    highlighted = graph.get_mouse_handle ();
+  }
+
   graph.set_highlighted_band (highlighted);
+  apply_external_highlight (highlighted);
   graph.invalidate ();
 }
 
