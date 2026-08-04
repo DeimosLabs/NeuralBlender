@@ -466,8 +466,8 @@ void c_eqgraph::generate_curves () { CP
     }
   }
 
-  for (float &db : curve)
-    db = std::clamp (db, -1.0f * db_range, db_range);
+  //for (float &db : curve)
+  //  db = std::clamp (db, -1.0f * db_range, db_range);
 }
 
 float c_eqgraph::freq_to_x (float freq) const {
