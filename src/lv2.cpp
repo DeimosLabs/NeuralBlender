@@ -1849,11 +1849,17 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
       bool changed = false;
       float tmp = 0.0f;
+      bool enabled = eq->enabled [band];
+      _eq_band_mode mode = eq->mode [band];
+      int slope = eq->slope [band];
+      float freq = eq->freq [band];
+      float gain_db = eq->gain_db [band];
+      float q = eq->q [band];
 
       if (read_changed_bool (
             self->eq_enabled [bank] [band],
             self->last_eq_enabled [bank] [band],
-            eq->enabled [band])) {
+            enabled)) {
         //CP
         changed = true;
       }
@@ -1864,7 +1870,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             tmp)) {
         //CP
         nb_lv2_decode_eq_mode (
-          (int) lrintf (tmp), &eq->mode [band], &eq->slope [band]);
+          (int) lrintf (tmp), &mode, &slope);
         changed = true;
       }
 
@@ -1873,7 +1879,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             self->last_eq_freq [bank] [band],
             tmp)) {
         //CP
-        eq->freq [band] = std::clamp (tmp, 20.0f, 20000.0f);
+        freq = std::clamp (tmp, 20.0f, 20000.0f);
         changed = true;
       }
 
@@ -1882,7 +1888,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             self->last_eq_gain [bank] [band],
             tmp)) {
         //CP
-        eq->gain_db [band] = std::clamp (tmp, -36.0f, 36.0f);
+        gain_db = std::clamp (tmp, -36.0f, 36.0f);
         changed = true;
       }
 
@@ -1891,7 +1897,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             self->last_eq_q [bank] [band],
             tmp)) {
         //CP
-        eq->q [band] = std::clamp (tmp, 0.01f, 100.0f);
+        q = std::clamp (tmp, 0.01f, 100.0f);
         changed = true;
       }
 
@@ -1899,12 +1905,12 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         self->blender.set_eq_band (
           bnk,
           band,
-          eq->enabled [band],
-          eq->mode [band],
-          eq->slope [band],
-          eq->freq [band],
-          eq->gain_db [band],
-          eq->q [band]);
+          enabled,
+          mode,
+          slope,
+          freq,
+          gain_db,
+          q);
       }
     }
   }

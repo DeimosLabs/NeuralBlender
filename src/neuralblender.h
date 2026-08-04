@@ -75,6 +75,7 @@
 #define TUNER_THRESH_DB          -40.0f
 #define EQ_NUM_BANDS             8
 #define EQ_SLOPE_MAX             4
+#define EQ_PARAM_XFADE_MS        2.0f
 #define IR_SILENCE_THRESHOLD     -80.0f
 
 #ifndef NB_DEBUG_RATE_HELPERS
@@ -364,6 +365,9 @@ public:
   float gain_db       [EQ_NUM_BANDS] = { 0 };
   float q             [EQ_NUM_BANDS] = { 0 };
   c_biquad bands      [EQ_NUM_BANDS];
+  c_biquad old_bands  [EQ_NUM_BANDS];
+  uint32_t coeff_xfade_pos [EQ_NUM_BANDS] = { 0 };
+  uint32_t coeff_xfade_len [EQ_NUM_BANDS] = { 0 };
 };
 
 // a simple but effective noise gate
@@ -446,10 +450,16 @@ public:
 private:
   bool rebuild_for_blocksize (uint32_t nframes);
   bool rebuild_resampled_ir ();
+  void process_fft_block (const float *in, float *out);
+  void process_direct_block (const float *in, float *out, uint32_t nframes);
+  void update_direct_history (const float *in, uint32_t nframes);
   
   std::vector<float> m_ir_source;       // cleaned source IR
   std::vector<float> m_ir;              // current pitch-resampled IR
   std::vector<float> m_overlap;
+  std::vector<float> m_direct_history;
+  std::vector<float> m_variable_input;
+  std::vector<float> m_fft_sync_out;
 
   std::vector<cpx> m_fft_out;
   std::vector<std::vector<cpx>> m_ir_fft;
@@ -466,6 +476,7 @@ private:
   uint32_t           m_fft_size         = 0;
   uint32_t           m_freq_bins        = 0;
   uint32_t           m_accum_pos        = 0;
+  uint32_t           m_direct_pos       = 0;
   
   fftwf_plan m_forward_plan = NULL;
   fftwf_plan m_inverse_plan = NULL;

@@ -466,12 +466,12 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
       float shelf_alpha = sw * 0.5f *
         sqrtf (std::max (0.0f, (A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f));
 
-      b0_ =    A * ((A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha);
-      b1_ =  2.0f * A * ((A - 1.0f) - (A + 1.0f) * cw);
-      b2_ =    A * ((A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha);
-      a0_ =        (A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha;
-      a1_ = -2.0f * ((A - 1.0f) + (A + 1.0f) * cw);
-      a2_ =        (A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha;
+      b0_ =        A * ((A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha);
+      b1_ = 2.0f * A * ((A - 1.0f) - (A + 1.0f) * cw);
+      b2_ =        A * ((A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha);
+      a0_ =             (A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha;
+      a1_ = -2.0f *    ((A - 1.0f) + (A + 1.0f) * cw);
+      a2_ =             (A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha;
 
       inv_a0 = 1.0f / a0_;
     }
@@ -486,12 +486,12 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
       float shelf_alpha = sw * 0.5f *
         sqrtf (std::max (0.0f, (A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f));
 
-      b0_ =    A * ((A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha);
+      b0_ =         A * ((A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha);
       b1_ = -2.0f * A * ((A - 1.0f) + (A + 1.0f) * cw);
-      b2_ =    A * ((A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha);
-      a0_ =        (A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha;
-      a1_ =  2.0f * ((A - 1.0f) - (A + 1.0f) * cw);
-      a2_ =        (A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha;
+      b2_ =         A * ((A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha);
+      a0_ =              (A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha;
+      a1_ =      2.0f * ((A - 1.0f) - (A + 1.0f) * cw);
+      a2_ =              (A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha;
 
       inv_a0 = 1.0f / a0_;
     }
@@ -515,6 +515,15 @@ _eq_band_mode g_defaultmodes [] = { EQ_HIPASS, EQ_LOWSHELF, EQ_BELL, EQ_BELL,
 float g_defaultfreqs [] = {   50.0f,   100.0f,   250.0f,   500.0f,
                             1000.0f,  2000.0f,  4000.0f,  8000.0f };
 
+static uint32_t eq_param_xfade_samples_for_rate (int samplerate) {
+  if (samplerate <= 0)
+    return 1;
+
+  return std::max (
+    1u,
+    (uint32_t) lrintf ((float) samplerate * EQ_PARAM_XFADE_MS * 0.001f));
+}
+
 void c_biquad::disable () { CP
   b0 = 1.0f;
   b1 = b2 = a1 = a2 = 0.0f;
@@ -534,6 +543,9 @@ void c_eq::set_samplerate (int sr) {
   }
 
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
+    old_bands [i].mode = EQ_OFF;
+    coeff_xfade_pos [i] = 0;
+    coeff_xfade_len [i] = 0;
     if (mode [i] == EQ_OFF || freq [i] <= 0.0f)
       bands [i].disable ();
     else {
@@ -586,6 +598,9 @@ void c_eq::reset () {
     slope [i] = 1;
     gain_db [i] = 0.0f;
     q [i] = 1.0f;
+    old_bands [i].mode = EQ_OFF;
+    coeff_xfade_pos [i] = 0;
+    coeff_xfade_len [i] = 0;
     if (samplerate > 0) {
       bands [i].slope = slope [i];
       bands [i].set_peak (samplerate, freq [i], gain_db [i], q [i], mode [i]);
@@ -610,17 +625,43 @@ void c_eq::set_band (int band_,
   const float next_gain_db = std::clamp (gain_db_, -36.0f, +36.0f);
   const float next_q = std::clamp (q_, 0.01f, 100.0f);
   const int next_slope = std::clamp (slope_, 1, EQ_SLOPE_MAX);
+  _eq_band_mode next_mode = mode [b];
+  if (mode_ != EQ_KEEP) {
+    next_mode = std::clamp (mode_, EQ_OFF, EQ_LOWPASS);
+  } else if (next_mode == EQ_OFF) {
+    next_mode = EQ_BELL;
+  }
+
+  const bool changed =
+    freq [b] != next_freq ||
+    gain_db [b] != next_gain_db ||
+    q [b] != next_q ||
+    slope [b] != next_slope ||
+    mode [b] != next_mode;
+
+  const bool start_xfade =
+    changed &&
+    on &&
+    enabled [b] &&
+    samplerate > 0 &&
+    bands [b].mode != EQ_OFF &&
+    next_mode != EQ_OFF;
+
+  if (start_xfade) {
+    old_bands [b] = bands [b];
+    coeff_xfade_pos [b] = 0;
+    coeff_xfade_len [b] = eq_param_xfade_samples_for_rate (samplerate);
+  } else if (changed) {
+    old_bands [b].mode = EQ_OFF;
+    coeff_xfade_pos [b] = 0;
+    coeff_xfade_len [b] = 0;
+  }
 
   freq [b] = next_freq;
   gain_db [b] = next_gain_db;
   q [b] = next_q;
   slope [b] = next_slope;
-  if (mode_ != EQ_KEEP) {
-    mode [b] = mode_;
-  } else {
-    if (mode [b] == EQ_OFF)
-      mode [b] = EQ_BELL;
-  }
+  mode [b] = next_mode;
 
   if (samplerate <= 0) {
     bands [band_].disable ();
@@ -649,8 +690,33 @@ void c_eq::process_block (float *buf, uint32_t nframes) {
     if (!enabled [b] || band.mode == EQ_OFF)
       continue;
 
-    for (uint32_t i = 0; i < nframes; ++i)
-      buf [i] = band.process (buf [i]);
+    if (coeff_xfade_len [b] > 0 &&
+        coeff_xfade_pos [b] < coeff_xfade_len [b]) {
+      c_biquad &old_band = old_bands [b];
+      for (uint32_t i = 0; i < nframes; ++i) {
+        if (coeff_xfade_pos [b] >= coeff_xfade_len [b]) {
+          buf [i] = band.process (buf [i]);
+          continue;
+        }
+
+        const float x = buf [i];
+        const float y_old = old_band.process (x);
+        const float y_new = band.process (x);
+        const float t =
+          (float) (coeff_xfade_pos [b] + 1) / (float) coeff_xfade_len [b];
+        buf [i] = y_old + (y_new - y_old) * t;
+        coeff_xfade_pos [b]++;
+      }
+
+      if (coeff_xfade_pos [b] >= coeff_xfade_len [b]) {
+        old_bands [b].mode = EQ_OFF;
+        coeff_xfade_pos [b] = 0;
+        coeff_xfade_len [b] = 0;
+      }
+    } else {
+      for (uint32_t i = 0; i < nframes; ++i)
+        buf [i] = band.process (buf [i]);
+    }
   }
 
   const float master_gain = db_to_gain (master_gain_db);
@@ -666,6 +732,11 @@ bool c_eq::set_enabled (int band_, bool enabled_) {
     return false;
 
   enabled [b] = enabled_;
+  if (!enabled_) {
+    old_bands [b].mode = EQ_OFF;
+    coeff_xfade_pos [b] = 0;
+    coeff_xfade_len [b] = 0;
+  }
   return true;
 }
 
@@ -1183,6 +1254,10 @@ void c_convolver::clear () {
 }
 
 void c_convolver::reset () {
+  std::fill (m_direct_history.begin (), m_direct_history.end (), 0.0f);
+  m_direct_pos = 0;
+  m_variable_input.clear ();
+
   for (std::vector<cpx> &slot : m_accum_fft)
     clear_cpx_vector (slot);
 
@@ -1282,12 +1357,16 @@ void c_convolver::clear_fft_state () { CP
   m_ir_fft.clear ();
   m_accum_fft.clear ();
   m_overlap.clear ();
+  m_direct_history.clear ();
+  m_variable_input.clear ();
+  m_fft_sync_out.clear ();
   
   m_ready = false;
   m_fft_size = 0;
   m_freq_bins = 0;
   m_num_partitions = 0;
   m_accum_pos = 0;
+  m_direct_pos = 0;
 }
 
 bool c_convolver::rebuild_resampled_ir () {
@@ -1326,6 +1405,12 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
 
   m_overlap.resize (m_partition_size);
   std::fill (m_overlap.begin (), m_overlap.end (), 0.0f);
+  m_direct_history.resize (m_ir.size ());
+  std::fill (m_direct_history.begin (), m_direct_history.end (), 0.0f);
+  m_variable_input.clear ();
+  m_variable_input.reserve ((size_t) m_partition_size * 2);
+  m_fft_sync_out.resize (m_partition_size);
+  m_direct_pos = 0;
 
   // frequency-domain sizes for real FFT
   m_freq_bins = (m_fft_size / 2) + 1;
@@ -1410,23 +1495,11 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
   return true;
 }
 
-void c_convolver::process_block (
-    const float *in,
-    float *out,
-    uint32_t nframes) {
-
-  if (!in || !out || !nframes)
+void c_convolver::process_fft_block (const float *in, float *out) {
+  if (!in || !out || !m_ready || m_blocksize == 0)
     return;
 
-  if (!m_ready || nframes != m_blocksize) {
-    if (in != out) {
-      for (uint32_t i = 0; i < nframes; ++i)
-        out [i] = in [i];
-    }
-    return;
-  }
-
-  // 1. FFT input block, zero-padded to fft_size
+  // FFT input block, zero-padded to fft_size
   std::fill (m_fftw_time_in, m_fftw_time_in + m_fft_size, 0.0f);
   for (uint32_t i = 0; i < m_blocksize; ++i)
     m_fftw_time_in [i] = in [i];
@@ -1437,8 +1510,8 @@ void c_convolver::process_block (
     m_fft_out [bin].i = m_fftw_freq_out [bin] [1];
   }
 
-  // 2. Multiply current input FFT by every IR partition.
-  //    Add each result into a future accumulation slot.
+  // multiply current input FFT by every IR partition.
+  //    add each result into a future accumulation slot.
   for (uint32_t p = 0; p < m_num_partitions; ++p) {
     const uint32_t slot = (m_accum_pos + p) % m_num_partitions;
 
@@ -1448,14 +1521,14 @@ void c_convolver::process_block (
         cpx_mul (m_fft_out [bin], m_ir_fft [p] [bin]));
   }
 
-  // 3. Inverse FFT the current accumulation slot
+  // inverse FFT the current accumulation slot
   for (uint32_t bin = 0; bin < m_freq_bins; ++bin) {
     m_fftw_freq_in [bin] [0] = m_accum_fft [m_accum_pos] [bin].r;
     m_fftw_freq_in [bin] [1] = m_accum_fft [m_accum_pos] [bin].i;
   }
   fftwf_execute (m_inverse_plan);
 
-  // 4. Normalize IFFT. FFTW inverse is unnormalized.
+  // normalize IFFT. FFTW inverse is unnormalized.
   const float scale = 1.0f / (float) m_fft_size;
 
   for (uint32_t i = 0; i < m_blocksize; ++i)
@@ -1464,11 +1537,101 @@ void c_convolver::process_block (
   for (uint32_t i = 0; i < m_blocksize; ++i)
     m_overlap [i] = m_fftw_time_out [i + m_blocksize] * scale;
 
-  // 5. Clear current accumulation slot for reuse
+  // clear current accumulation slot for reuse
   clear_cpx_vector (m_accum_fft [m_accum_pos]);
 
-  // 6. Advance ring
+  // advance ring
   m_accum_pos = (m_accum_pos + 1) % m_num_partitions;
+}
+
+void c_convolver::update_direct_history (const float *in, uint32_t nframes) {
+  if (!in || nframes == 0 || m_direct_history.empty ())
+    return;
+
+  const uint32_t hist_size = (uint32_t) m_direct_history.size ();
+  uint32_t pos = m_direct_pos;
+  for (uint32_t i = 0; i < nframes; ++i) {
+    m_direct_history [pos] = in [i];
+    pos++;
+    if (pos >= hist_size)
+      pos = 0;
+  }
+  m_direct_pos = pos;
+}
+
+// this is to avoid clicks when host changes block sizes on us
+// see process_block () just below
+void c_convolver::process_direct_block (
+    const float *in,
+    float *out,
+    uint32_t nframes) {
+
+  if (!in || !out || nframes == 0)
+    return;
+
+  const uint32_t hist_size = (uint32_t) m_direct_history.size ();
+  if (hist_size == 0) {
+    if (in != out) {
+      for (uint32_t i = 0; i < nframes; ++i)
+        out [i] = in [i];
+    }
+    return;
+  }
+
+  const float *ir = m_ir.data ();
+  float *history = m_direct_history.data ();
+  uint32_t pos = m_direct_pos;
+
+  for (uint32_t i = 0; i < nframes; ++i) {
+    history [pos] = in [i];
+
+    float y = 0.0f;
+    uint32_t h = pos;
+    for (uint32_t k = 0; k < hist_size; ++k) {
+      y += ir [k] * history [h];
+      h = h == 0 ? hist_size - 1 : h - 1;
+    }
+
+    out [i] = y;
+    pos++;
+    if (pos >= hist_size)
+      pos = 0;
+  }
+
+  m_direct_pos = pos;
+}
+
+void c_convolver::process_block (
+    const float *in,
+    float *out,
+    uint32_t nframes) {
+
+  if (!in || !out || !nframes)
+    return;
+
+  if (!m_ready || m_blocksize == 0) {
+    if (in != out) {
+      for (uint32_t i = 0; i < nframes; ++i)
+        out [i] = in [i];
+    }
+    return;
+  }
+
+  if (nframes == m_blocksize && m_variable_input.empty ()) {
+    update_direct_history (in, nframes);
+    process_fft_block (in, out);
+    return;
+  }
+
+  m_variable_input.insert (m_variable_input.end (), in, in + nframes);
+  process_direct_block (in, out, nframes);
+
+  while (m_variable_input.size () >= m_blocksize) {
+    process_fft_block (m_variable_input.data (), m_fft_sync_out.data ());
+    m_variable_input.erase (
+      m_variable_input.begin (),
+      m_variable_input.begin () + m_blocksize);
+  }
 }
 
 #endif
