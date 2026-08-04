@@ -1236,6 +1236,7 @@ static LV2UI_Handle instantiate (
     return NULL;
   }
 
+  ui->visible_page = PAGE_NONE;
   if (!ui->create (parent)) {
     delete ui;
     return NULL;

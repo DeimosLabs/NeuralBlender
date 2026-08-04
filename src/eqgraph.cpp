@@ -578,6 +578,9 @@ void c_eqgraph::set_mouse_handle (int handle, bool redraw) {
   mouse_handle_x = next_x;
   mouse_handle_y = next_y;
 
+  if (toplevel)
+    toplevel->on_hover_changed (this);
+
   if (redraw)
     invalidate ();
 }

@@ -1455,6 +1455,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
     return false;
   }
   
+  //mainwindow.hide ();
   mainwindow.set_icon_from_png (data_neuralblender_logo_512_png);
 
   cont_toparea.create (&mainwindow.root_widget, "", 0, 0, 640, 50);
@@ -1919,7 +1920,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
       
       meter_in [visible_bank].move_resize (
         5, meter_top, METER_WIDTH, meter_h);
-    } else {
+    } else if (visible_page == PAGE_OTHER) {
       c_lane_widgets *meter_ref_lanes = lanes_for_bank (visible_bank);
       lane_meter_span (meter_ref_lanes, NB_NUM_MODELS, &meter_top, &meter_h);
 
@@ -2018,7 +2019,7 @@ void c_neuralblender_ui::redraw_visible_meters () {
     const _lane_bank eq_bank = bank_for_page (visible_page);
     redraw_meter (meter_in [eq_bank]);
     redraw_meter (meter_eqout [eq_meter]);
-  } else {
+  } else if (page_has_bank (visible_page)) {
     redraw_meter (meter_in [visible_bank]);
     c_lane_widgets *bank_lanes = lanes_for_bank (visible_bank);
     for (int i = 0; i < NB_NUM_MODELS; i++)

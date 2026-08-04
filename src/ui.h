@@ -33,6 +33,7 @@
 #define UI_STATS_PER_LANE    NB_STATS_PER_LANE
 
 enum _ui_page {
+  PAGE_NONE = -1,
   PAGE_PEDAL = 0,
   PAGE_EQPRE,
   PAGE_AMP,
