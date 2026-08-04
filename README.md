@@ -43,6 +43,7 @@ No pre-built binaries yet. If anyone would like them, please let me know.
 
 Compiles and installs with cmake. Required libs / utilities to build:
   - eigen3 (for core, required)
+  - fftw-float
   - lv2 (for LV2 plugin)
   - jack (for standalone app)
   - cairo/x11 (for GUI)
@@ -51,7 +52,7 @@ Compiles and installs with cmake. Required libs / utilities to build:
   
 On debian/ubuntu/mint, just run:
 ```bash
-sudo apt install git cmake libeigen3-dev lv2-dev libjack-dev libcairo2-dev libsndfile1-dev libsamplerate0-dev xxd
+sudo apt install git cmake libeigen3-dev libfftw3-dev lv2-dev libjack-dev libcairo2-dev libsndfile1-dev libsamplerate0-dev xxd
 ```
 On other distributions, the package names (and package system) are probably different, but still available.
 
