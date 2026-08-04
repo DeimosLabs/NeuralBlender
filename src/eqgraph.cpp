@@ -40,8 +40,8 @@ void c_eqgraph::render_base (cairo_t *cr) {
     else
       i += 10000;
   }
-  for (i = 0; i < 36; i += 12) {
-    int y = db_to_y (i);
+  for (i = 0; i <= db_range; i += 12) {
+    int y = std::clamp (db_to_y (i), 0.0f, (float) (h - 1));
     cairo_move_to (cr, 0, y);
     cairo_line_to (cr, w, y);
     y = db_to_y (-1 * i);
@@ -52,7 +52,7 @@ void c_eqgraph::render_base (cairo_t *cr) {
   cairo_set_line_width (cr, 0.5f);
   cairo_set_source_rgba (cr, 0, 0, 0.5, 0.5);
   cairo_stroke (cr);
-
+  
   int y = db_to_y (0);
   cairo_move_to (cr, 0, y);
   cairo_line_to (cr, w, y);
@@ -69,25 +69,27 @@ void c_eqgraph::render_base (cairo_t *cr) {
   
   cairo_set_source_rgba (cr, 0.3, 0.3, 1.0, 0.3);
   char buf [32];
-  for (int i : { 20, 200, 1000, 4000, 8000 }) {
-    if (i < 1000)
-      snprintf (buf, 31, "%d", i);
-    else
-      snprintf (buf, 31, "%dK", i / 1000);
-    float fx = freq_to_x (i);
-    cairo_move_to (cr, fx, 0);
-    cairo_line_to (cr, fx, h);
-    cairo_move_to (cr, fx + 2, label_y);
-    cairo_show_text (cr, buf);
+  for (int i : { 20, 200, 1000, 4000, 8000, 20000 }) {
+    int fx = std::clamp (freq_to_x (i), 0.0f, (float) (w - 1));
+    cairo_move_to (cr, fx + 0.5f, 0);
+    cairo_line_to (cr, fx + 0.5f, h);
+    if (i < 19999) {
+      if (i < 1000)
+        snprintf (buf, 31, "%d", i);
+      else
+        snprintf (buf, 31, "%dK", i / 1000);
+      cairo_move_to (cr, fx + 2, label_y);
+      cairo_show_text (cr, buf);
+    }
   }
   cairo_stroke (cr);
   
   // 1KHz line?
-  //int x = freq_to_x (1000);
-  //cairo_move_to (cr, x, 0);
-  //cairo_line_to (cr, x, h);
-  //cairo_set_source_rgba (cr, 0, 0, 0.9, 1);
-  //cairo_stroke (cr);
+  int x = freq_to_x (1000);
+  cairo_move_to (cr, x, 0);
+  cairo_line_to (cr, x, h);
+  cairo_set_source_rgba (cr, 0, 0, 0.9, 1);
+  cairo_stroke (cr);
 }
 
 void c_eqgraph::on_paint (cairo_t *cr) {
@@ -182,12 +184,12 @@ void c_eqgraph::print_label (cairo_t *cr, int x, int y, int band) {
   float gain = state->gain_db [band];
   float q = state->q [band];
   std::string hz_unit = "Hz";
-  std::string hz_format = "%.3fHz";
+  std::string hz_format = "%.3f%s";
   if (freq >= 1000) {
     freq /= 1000;
     hz_unit = "KHz";
   } else {
-    hz_format = freq < 100 ? "%.2fHz" : "%.1fHz";
+    hz_format = freq < 100 ? "%.2f%s" : "%.1f%s";
   }
   
   cairo_set_source_rgba (cr, 0.5, 0.5, 1.0, 1.0);
@@ -196,7 +198,7 @@ void c_eqgraph::print_label (cairo_t *cr, int x, int y, int band) {
   cairo_text_extents_t ext;
   cairo_text_extents (cr, "Ay", &ext);
   
-  snprintf (buf, 63, hz_format.c_str (), freq);
+  snprintf (buf, 63, hz_format.c_str (), freq, hz_unit.c_str ());
   cairo_move_to (cr, x, y + ext.height);
   cairo_show_text (cr, buf);
   
@@ -398,7 +400,6 @@ void c_eqgraph::on_resize (int w, int h) {
 }
 
 // avoid "jigsaw" up/down effect when moving band with high Q
-// yeah yeah, could just use a log function for this
 static int eqgraph_oversampling_for_q (float q) {
   if (q >= 64.0f) return 16;
   if (q >= 32.0f) return 12;
@@ -453,23 +454,20 @@ void c_eqgraph::generate_curves () { CP
       const float oversamp_jump = 1.0f / (float) oversampling;
 
       for (int i = 0; i < oversampling; ++i) {
-        const float sub_x =
-          (float) x - 0.5f + ((float) i + 0.5f) * oversamp_jump;
-
-        const float db1 =
-          biquad.response_db (curve_x_to_freq (sub_x), samplerate);
+        const float sub_x = (float) x - 0.5f + ((float) i + 0.5f) * oversamp_jump;
+        const float db1 = biquad.response_db (curve_x_to_freq (sub_x), samplerate);
 
         if (fabsf (db1) > fabsf (db))
           db = db1;
       }
 
-      curves [band] [x] = std::clamp (db, -36.0f, 36.0f);
+      //curves [band] [x] = std::clamp (db, -1.0f * db_range - 10, db_range + 10);
       curve [x] += db;
     }
   }
 
   for (float &db : curve)
-    db = std::clamp (db, -36.0f, 36.0f);
+    db = std::clamp (db, -1.0f * db_range, db_range);
 }
 
 float c_eqgraph::freq_to_x (float freq) const {
@@ -492,7 +490,7 @@ float c_eqgraph::curve_x_to_freq (float x) const {
 
 float c_eqgraph::db_to_y (float db) const {
   float half = h / 2;
-  return half - ((float) (db * h) / 72.0f);
+  return half - ((float) (db * h) / (db_range * 2));
 }
 
 float c_eqgraph::y_to_db (float y) const {
@@ -500,8 +498,8 @@ float c_eqgraph::y_to_db (float y) const {
     return 0.0f;
 
   const float half = h / 2.0f;
-  const float db = (half - (float) y) * 72.0f / (float) h;
-  return std::clamp (db, -36.0f, 36.0f);
+  const float db = (half - (float) y) * (db_range * 2) / (float) h;
+  return std::clamp (db, -1.0f * db_range, db_range);
 }
 
 int c_eqgraph::find_handle (int x, int y) const {

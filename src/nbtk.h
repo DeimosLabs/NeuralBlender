@@ -235,6 +235,7 @@ public:
   virtual void resize (int w, int h);
   virtual void move_resize (int x, int y, int w, int h);
   virtual bool highlighted () const;
+  bool set_external_highlight (bool b);
   void invalidate ();
   void invalidate_rect (int x, int y, int w, int h);
   bool set_label (const char *text);
@@ -277,6 +278,7 @@ public:
   bool mouse_inside = false;
   bool hovered = false;
   bool pressed = false;
+  bool external_highlight = false;
   int last_mouse_button = Button1;
 };
 

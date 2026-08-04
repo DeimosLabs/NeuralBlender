@@ -37,7 +37,9 @@ public:
   bool always_show_handles = false;
   float freq_min = 20.0f;     // NOTE TO SELF: check for hard coded <---
   float freq_max = 20000.0f; 
+  float db_range = 36.0f;
   float handle_size = 12.0f;
+  
   
 private:
   float freq_to_x (float freq) const;

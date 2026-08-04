@@ -486,7 +486,16 @@ void c_widget::draw (cairo_t *cr) {
 }
 
 bool c_widget::highlighted () const {
-  return false;
+  return external_highlight;
+}
+
+bool c_widget::set_external_highlight (bool b) {
+  if (external_highlight == b)
+    return false;
+
+  external_highlight = b;
+  invalidate ();
+  return true;
 }
 
 bool c_widget::on_mouse_down (int x_, int y_, int button) {
@@ -1117,7 +1126,7 @@ void c_label::clear_hover () {
 }
 
 bool c_label::highlighted () const {
-  return link && (hovered || widget_has_focus (*this));
+  return c_widget::highlighted () || (link && (hovered || widget_has_focus (*this)));
 }
 
 _mouse_cursor c_label::mouse_cursor () const {
@@ -1172,7 +1181,7 @@ cairo_surface_t *c_button::image_for_state () const {
 }
 
 bool c_button::highlighted () const {
-  return hovered || widget_has_focus (*this);
+  return c_widget::highlighted () || hovered || widget_has_focus (*this);
 }
 
 static nbtk::_widget_state tk_button_state (const c_button &button) {
@@ -1544,7 +1553,7 @@ void c_scrollbar::emit_action () {
 }
 
 bool c_scrollbar::highlighted () const {
-  return hovered || pressed;
+  return c_widget::highlighted () || hovered || pressed;
 }
 
 void c_scrollbar::draw (cairo_t *cr) {
@@ -2324,7 +2333,7 @@ void c_listbox::on_activate (int index) {
 }
 
 bool c_listbox::highlighted () const {
-  return widget_has_focus (*this);
+  return c_widget::highlighted () || widget_has_focus (*this);
 }
 
 void c_listbox::draw (cairo_t *cr) {
@@ -2546,7 +2555,7 @@ void c_combobox::create (
 }
 
 bool c_combobox::highlighted () const {
-  return hovered || widget_has_focus (*this);
+  return c_widget::highlighted () || hovered || widget_has_focus (*this);
 }
 
 void c_combobox::draw (cairo_t *cr) {
@@ -3190,7 +3199,7 @@ t_rect c_knob::value_label_rect () const {
 }
 
 bool c_knob::highlighted () const {
-  return hovered || widget_has_focus (*this);
+  return c_widget::highlighted () || hovered || widget_has_focus (*this);
 }
 
 void c_knob::draw (cairo_t *cr, bool draw_label, bool draw_value) {
@@ -3433,7 +3442,7 @@ c_textbox::c_textbox () {
 }
 
 bool c_textbox::highlighted () const {
-  return widget_has_focus (*this);
+  return c_widget::highlighted () || widget_has_focus (*this);
 }
 
 void c_textbox::draw (cairo_t *cr) {
