@@ -709,8 +709,17 @@ bool c_widget::update_hover_tree (int px, int py) {
        mouse_cursor () != MOUSE_CURSOR_DEFAULT))
     app->hovered_widget = this;
 
-  for (c_widget *child : children) {
-    if (child && child->update_hover_tree (lx, ly))
+  for (auto it = children.rbegin (); it != children.rend (); ++it) {
+    c_widget *child = *it;
+    if (!child)
+      continue;
+
+    if (handled) {
+      child->clear_hover_tree ();
+      continue;
+    }
+
+    if (child->update_hover_tree (lx, ly))
       handled = true;
   }
 
@@ -6197,6 +6206,13 @@ void c_toplevelwindow::redraw_child_rect (
   cairo_save (widget->crb);
   cairo_rectangle (widget->crb, rx, ry, rw, rh);
   cairo_clip (widget->crb);
+
+  const nbtk::t_gradientcolors &bg = nbtk::get_colortheme ()->window_bg;
+  cairo_set_operator (widget->crb, CAIRO_OPERATOR_SOURCE);
+  cairo_set_source_rgba (widget->crb, bg.r1, bg.g1, bg.b1, bg.a1);
+  cairo_paint (widget->crb);
+  cairo_set_operator (widget->crb, CAIRO_OPERATOR_OVER);
+
   cairo_translate (widget->crb, p.x - child.x - x, p.y - child.y - y);
   child.draw_tree (widget->crb);
   cairo_restore (widget->crb);
