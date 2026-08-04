@@ -313,7 +313,6 @@ public:
   
   _eq_band_mode mode = EQ_OFF;
 
-//private:
   float b0 = 1.0f;
   float b1 = 0.0f;
   float b2 = 0.0f;

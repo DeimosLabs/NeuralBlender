@@ -461,7 +461,7 @@ void c_eqgraph::generate_curves () { CP
           db = db1;
       }
 
-      //curves [band] [x] = std::clamp (db, -1.0f * db_range - 10, db_range + 10);
+      curves [band] [x] = std::clamp (db, -1.0f * db_range, db_range);
       curve [x] += db;
     }
   }

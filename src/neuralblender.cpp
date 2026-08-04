@@ -398,6 +398,7 @@ static SF_VIRTUAL_IO g_sndfile_mem_vio {
 ////////////////////////////////////////////////////////////////////////////////
 // c_biquad, c_eq
 
+// the bulk of our math processing. piece of cake :D
 void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
                          _eq_band_mode mode_) {
   if (samplerate <= 0.0f)
@@ -421,7 +422,6 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
     case EQ_OFF:
       disable ();
       return;
-    break;
     
     case EQ_CURVE:
       b0_ = 1.0f + alpha * a;
