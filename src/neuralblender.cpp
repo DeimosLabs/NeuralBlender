@@ -965,10 +965,10 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   convolver_trim_trailing_silence (v);
   size_t s2 = v.size ();
   
-  if (s1 != s2) {
+  //if (s1 != s2) {
     std::cerr << "NeuralBlender: " << filename << ": " << s1 << " samples, trimmed "
               << s1 - s2 << " smp. silence, remaining " << s2 << "\n";
-  }
+  //}
   
   return true;
 }
