@@ -1532,6 +1532,11 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   int i;
   Plugin *self = (Plugin *) instance;
   if (!self) return;
+
+  if (self->blocksize != nframes) {
+    self->blocksize = nframes;
+    self->blender.set_blocksize(nframes);
+  }
   
   if (self->notify) {
     LV2_Atom_Forge_Frame frame;
@@ -1690,11 +1695,6 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     }
   }
   
-  if (self->blocksize == 0 || nframes > self->blocksize) {
-    self->blocksize = nframes;
-    self->blender.set_blocksize(nframes);
-  }
-
   {
     for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
       self->meter_in [bank].bufsize = (int) nframes;

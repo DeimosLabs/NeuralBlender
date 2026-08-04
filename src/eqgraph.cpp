@@ -53,13 +53,6 @@ void c_eqgraph::render_base (cairo_t *cr) {
   cairo_set_source_rgba (cr, 0, 0, 0.5, 0.5);
   cairo_stroke (cr);
   
-  int y = db_to_y (0);
-  cairo_move_to (cr, 0, y);
-  cairo_line_to (cr, w, y);
-  cairo_set_source_rgba (cr, 1, 1, 0, 1);
-  cairo_set_line_width (cr, 1);
-  cairo_stroke (cr);
-  
   cairo_set_source_rgba, (cr, 0, 0, 1, 1);
   cairo_set_font_size (cr, 11);
   
@@ -89,6 +82,13 @@ void c_eqgraph::render_base (cairo_t *cr) {
   cairo_move_to (cr, x, 0);
   cairo_line_to (cr, x, h);
   cairo_set_source_rgba (cr, 0, 0, 0.9, 1);
+  cairo_stroke (cr);
+
+  int y = db_to_y (0);
+  cairo_move_to (cr, 0, y);
+  cairo_line_to (cr, w, y);
+  cairo_set_source_rgba (cr, 1, 1, 0, 1);
+  cairo_set_line_width (cr, 1);
   cairo_stroke (cr);
 }
 

@@ -810,6 +810,8 @@ void c_delayline::process_block (float *in, float *out, uint32_t nframes) {
 
 #ifdef HAVE_FFTW
 
+static std::mutex g_fftw_planner_mutex;
+
 static void convolver_trim_trailing_silence (
     std::vector<float> &v,
     float threshold = db_to_gain (IR_SILENCE_THRESHOLD));
@@ -1195,7 +1197,7 @@ void c_convolver::set_samplerate (uint32_t samplerate) {
 }
 
 void c_convolver::set_blocksize (uint32_t nframes) {
-  if (nframes == m_blocksize)
+  if (nframes == m_blocksize && (!m_loaded || m_ready))
     return;
 
   m_blocksize = nframes;
@@ -1224,14 +1226,17 @@ bool c_convolver::set_pitch_semitones (float semitones) {
 }
 
 void c_convolver::clear_fft_state () { CP
-  if (m_forward_plan) {
-    fftwf_destroy_plan (m_forward_plan);
-    m_forward_plan = nullptr;
-  }
-  
-  if (m_inverse_plan) {
-    fftwf_destroy_plan (m_inverse_plan);
-    m_inverse_plan = nullptr;
+  {
+    std::lock_guard<std::mutex> lock (g_fftw_planner_mutex);
+    if (m_forward_plan) {
+      fftwf_destroy_plan (m_forward_plan);
+      m_forward_plan = nullptr;
+    }
+    
+    if (m_inverse_plan) {
+      fftwf_destroy_plan (m_inverse_plan);
+      m_inverse_plan = nullptr;
+    }
   }
   
   if (m_fftw_time_in) {
@@ -1337,19 +1342,22 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
     return false;
   }
 
-  m_forward_plan =
-    fftwf_plan_dft_r2c_1d (
-      (int) m_fft_size,
-      m_fftw_time_in,
-      m_fftw_freq_out,
-      FFTW_MEASURE);
+  {
+    std::lock_guard<std::mutex> lock (g_fftw_planner_mutex);
+    m_forward_plan =
+      fftwf_plan_dft_r2c_1d (
+        (int) m_fft_size,
+        m_fftw_time_in,
+        m_fftw_freq_out,
+        FFTW_ESTIMATE);
 
-  m_inverse_plan =
-    fftwf_plan_dft_c2r_1d (
-      (int) m_fft_size,
-      m_fftw_freq_in,
-      m_fftw_time_out,
-      FFTW_MEASURE);
+    m_inverse_plan =
+      fftwf_plan_dft_c2r_1d (
+        (int) m_fft_size,
+        m_fftw_freq_in,
+        m_fftw_time_out,
+        FFTW_ESTIMATE);
+  }
 
   if (!m_forward_plan || !m_inverse_plan) {
     clear_fft_state ();
@@ -1523,7 +1531,13 @@ void c_neuralamp::set_samplerate (uint32_t sr) { CP
 }
 
 void c_neuralamp::set_blocksize (uint32_t bs) { CP
-  if (blocksize == bs)
+  if (blocksize == bs &&
+      !(m_engine_mode == ENGINE_IR && m_convolver.loaded () && !m_convolver.ready ()))
+    return;
+
+  std::lock_guard<std::mutex> lock (model_mutex);
+  if (blocksize == bs &&
+      !(m_engine_mode == ENGINE_IR && m_convolver.loaded () && !m_convolver.ready ()))
     return;
 
   blocksize = bs;
