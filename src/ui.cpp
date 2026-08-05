@@ -1515,10 +1515,12 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_tab_cabs.set_image_default (data_icon_power_on_png);
   btn_tab_cabs.padding = tabbutton_padding;
   btn_tab_cabs.align = nbtk::TEXT_LEFT;
-  btn_tab_other.create (&cont_toparea, "...", 0, 0, 84, 50);
+  btn_tab_other.create (&cont_toparea, "Misc", 0, 0, 84, 50);
   btn_tab_other.role = ROLE_PAGESWITCH;
   btn_tab_other.bank = BANK_AMP;
   btn_tab_other.page = PAGE_OTHER;
+  btn_tab_other.align = nbtk::TEXT_LEFT;
+  btn_tab_other.set_image_default (data_icon_gears_png);
   
   //btn_noisegate.create (&cont_toparea, "", 0, 0, 40, 40);
   //btn_noisegate.role = ROLE_NOISEGATE;
@@ -1714,7 +1716,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   
   btn_other_prefs.create (&frame_other_misc, "Settings", 0, 130, 120, 40);
   btn_other_prefs.role = ROLE_PREFS;
-  btn_other_prefs.set_image_default (data_icon_xputty_gear_png);
+  btn_other_prefs.set_image_default (data_icon_gears_png);
   btn_other_about.create (&frame_other_misc, "About...", 0, 130, 120, 40);
   btn_other_about.role = ROLE_ABOUT;
   btn_other_about.set_image_default (data_icon_xputty_info_png);
