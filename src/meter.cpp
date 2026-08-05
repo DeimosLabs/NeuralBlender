@@ -769,6 +769,7 @@ void c_meterwidget::render_base (cairo_t *cr) {
   };*/
 
   const meter_line lines [] = {
+    { -96.0f,  0.0, 1.0, 0.0, 0.25 },
     { -48.0f,   0.0, 1.0, 0.0, 0.25 },
     { -24.0f,   0.0, 1.0, 0.0, 0.25 },
     { -12.0f,   0.0, 1.0, 0.0, 0.25 },
@@ -777,6 +778,8 @@ void c_meterwidget::render_base (cairo_t *cr) {
     { data ? (float) data->get_headroom () : 3.0f,     
                 1.0, 0.0, 0.0, 0.25 }
   };
+  
+  int ppos_last = -1;
 
   cairo_set_line_width (cr, 1.0);
   for (const auto &line : lines) {
@@ -785,7 +788,10 @@ void c_meterwidget::render_base (cairo_t *cr) {
       ? std::clamp ((line.pos - db_scale) / range_db, 0.0f, 1.0f)
       : 0.0f;
     const int ppos = (int) std::lround ((met_len - 1) * pos);
-
+    if (ppos == ppos_last)
+      continue;
+    
+    ppos_last = ppos;
     cairo_set_source_rgba (cr, line.r, line.g, line.b, line.a);
     if (vertical) {
       const int y = clip_size + met_len - 1 - ppos;
