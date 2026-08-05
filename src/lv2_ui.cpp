@@ -799,6 +799,8 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
       bank == BANK_EQPOST ? eqpage_post : eqpage_pre;
     eqpage.sync_band_from_state (ui_eq_state, eq_band);
     eqpage.graph.state_changed (false);
+    if (eq_param == NB_LV2_EQ_ENABLED)
+      sync_eq_graph_highlight ();
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;

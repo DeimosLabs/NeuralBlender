@@ -1343,6 +1343,9 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
     highlighted = graph.get_mouse_handle ();
   }
 
+  if (highlighted >= 0 && !bands [highlighted].btn_on.value)
+    highlighted = -1;
+
   graph.set_highlighted_band (highlighted);
   apply_external_highlight (highlighted);
 }
@@ -2467,6 +2470,8 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
     c_eq_state &eq = ui_eq_state_for_bank (bank);
     const size_t band = widget->lane;
     bool changed_parameter = false;
+    const bool changed_enabled =
+      (_widget_role) widget->role == ROLE_EQ_ENABLED;
 
     switch ((_widget_role) widget->role) {
       case ROLE_EQ_ENABLED:
@@ -2541,6 +2546,8 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       event.handled = true;
     else
       finish ();
+    if (changed_enabled)
+      sync_eq_graph_highlight (event.source);
     return true;
   };
 
