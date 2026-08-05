@@ -62,6 +62,8 @@ static uint64_t meter_now_ms () {
 
 void c_vudata::set_headroom (float db) {
   m_headroom_db.store (std::max (0.0f, db));
+  m_display_l.store (db_scaled (m_l.load ()), std::memory_order_relaxed);
+  m_display_r.store (db_scaled (m_r.load ()), std::memory_order_relaxed);
   needs_redraw.store (true);
 }
 
@@ -242,6 +244,8 @@ bool c_vudata::update () {
 
 void c_vudata::set_db_scale (float db) {
   m_db_scale.store (db);
+  m_display_l.store (db_scaled (m_l.load ()), std::memory_order_relaxed);
+  m_display_r.store (db_scaled (m_r.load ()), std::memory_order_relaxed);
   needs_redraw.store (true);
 }
 
@@ -765,11 +769,13 @@ void c_meterwidget::render_base (cairo_t *cr) {
   };*/
 
   const meter_line lines [] = {
+    { -48.0f,   0.0, 1.0, 0.0, 0.25 },
     { -24.0f,   0.0, 1.0, 0.0, 0.25 },
-    //{ -12.0f,   0.0, 1.0, 0.0, 0.25 },
-    { -6.0f,    0.0, 1.0, 0.0, 0.25 },
+    { -12.0f,   0.0, 1.0, 0.0, 0.25 },
+    { -6.0f,    1.0, 1.0, 0.0, 0.25 },
     { 0.0f,     1.0, 0.5, 0.0, 0.25 },
-    { data ? (float) data->get_headroom () : 3.0f,     1.0, 0.0, 0.0, 0.25 },
+    { data ? (float) data->get_headroom () : 3.0f,     
+                1.0, 0.0, 0.0, 0.25 }
   };
 
   cairo_set_line_width (cr, 1.0);
@@ -854,9 +860,21 @@ void c_meterwidget::draw_bar (
         else
           gradient = cairo_pattern_create_linear (rec_size, 0, width - clip_size, 0);
 
-        cairo_pattern_add_color_stop_rgb (gradient, 0.00, 0.0, 0.9, 0.0);
-        cairo_pattern_add_color_stop_rgb (gradient, 0.66, 1.0, 1.0, 0.0);
-        cairo_pattern_add_color_stop_rgb (gradient, 1.00, 1.0, 0.0, 0.0);
+        //constexpr float gradient_yellow_db = -12.0f;
+        //constexpr float gradient_red_db = 3.0f;
+        const float range_db = headroom - db_scale;
+        const auto gradient_pos = [&] (float db) {
+          return range_db > 0.0f
+            ? std::clamp ((db - db_scale) / range_db, 0.0f, 1.0f)
+            : 0.0f;
+        };
+        const float yellow_pos = gradient_pos (VU_YELLOW_DB);
+        const float red_pos = gradient_pos (VU_RED_DB);
+
+        cairo_pattern_add_color_stop_rgb (gradient, 0.0,        0.0, 0.9, 0.0);
+        cairo_pattern_add_color_stop_rgb (gradient, yellow_pos, 1.0, 1.0, 0.0);
+        cairo_pattern_add_color_stop_rgb (gradient, red_pos,    1.0, 0.0, 0.0);
+        cairo_pattern_add_color_stop_rgb (gradient, 1.0,        1.0, 0.0, 0.0);
         cairo_set_source (cr, gradient);
         cairo_fill (cr);
         cairo_pattern_destroy (gradient);

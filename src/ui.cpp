@@ -376,7 +376,7 @@ void c_prefswindow::hide () { CP
 }
 
 void c_prefswindow::load_defaults () {
-  text_vuscale.set_text ("-48.0");
+  text_vuscale.set_text ("-6.0");
   text_vuheadroom.set_text ("6.0");
   btn_calib_default.set_value (false);
   btn_bypass_doubleclick.set_value (false);
