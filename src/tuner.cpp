@@ -175,6 +175,23 @@ bool c_pitchtracker::analyze () {
   return true;
 }
 
+int freq_to_midi_note (float freq, float *r_cents, float basefreq = 440) {
+  const float midi_f =
+    69.0f + 12.0f * log2f (freq / (float) basefreq);
+  const int midinote = (int) lroundf (midi_f);
+
+  const float note_freq =
+    (float) basefreq * powf (2.0f, ((float) midinote - 69.0f) / 12.0f);
+
+  const float cents =
+    1200.0f * log2f (freq / note_freq);
+  
+  if (r_cents)
+    *r_cents = cents;
+    
+  return midinote;
+}
+
 void c_pitchtracker::update_note_from_freq (float freq) {
   if (freq <= 0.0f || !std::isfinite (freq)) {
     const float old_freq = detected_freq.exchange (0.0f, std::memory_order_release);
@@ -184,17 +201,9 @@ void c_pitchtracker::update_note_from_freq (float freq) {
       needs_redraw.store (true, std::memory_order_release);
     return;
   }
-
-  const float midi_f =
-    69.0f + 12.0f * log2f (freq / (float) basefreq);
-  const int midi = (int) lroundf (midi_f);
-
-  const float note_freq =
-    (float) basefreq * powf (2.0f, ((float) midi - 69.0f) / 12.0f);
-
-  const float cents =
-    1200.0f * log2f (freq / note_freq);
-
+  
+  float cents;
+  int midi = freq_to_midi_note (freq, &cents, (float) basefreq);
   //debug ("freq=%f, midi=%d, cents=%f", freq, midi, cents);
 
   const float old_freq = detected_freq.exchange (freq, std::memory_order_release);
@@ -392,7 +401,7 @@ void c_tunerwidget::render_base (cairo_t *cr) {
 
 #ifdef UNICODE_SHARPS_FLATS
 
-static const char *note_names_sharps [12] = {
+const char *g_note_names_sharps [12] = {
   "C-",
   "C♯",
   "D-",
@@ -407,7 +416,7 @@ static const char *note_names_sharps [12] = {
   "B-",
 };
 
-static const char *note_names_flats [12] = {
+const char *g_note_names_flats [12] = {
   "C-",
   "D♭",
   "D-",
@@ -424,7 +433,7 @@ static const char *note_names_flats [12] = {
 
 #else
 
-static const char *note_names_sharps [12] = {
+const char *g_note_names_sharps [12] = {
   "C-",
   "C#",
   "D-",
@@ -439,7 +448,7 @@ static const char *note_names_sharps [12] = {
   "B-",
 };
 
-static const char *note_names_flats [12] = {
+const char *g_note_names_flats [12] = {
   "C-",
   "Db",
   "D-",
@@ -488,9 +497,9 @@ void c_tunerwidget::on_paint (cairo_t *cr) { //DEBUG_SHOW_RATE ("tuner redraw: "
       stable_tuning = false;
   
   if (valid) {
-    const char **note_names = note_names_sharps;
+    const char **note_names = g_note_names_sharps;
     if (show_flats)
-      note_names = note_names_flats;
+      note_names = g_note_names_flats;
     snprintf (buf, 31, "%s%d", note_names [((int) current_note) % 12],
               (int) (-1 + current_note / 12));
     float x = (float) width / 2.0 + (current_cents / 50.0 * (float) width / 2.0);

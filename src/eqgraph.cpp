@@ -163,30 +163,30 @@ void c_eqgraph::on_paint (cairo_t *cr) {
   if (band >= 0 && band < EQ_NUM_BANDS) {
     int label_x = mouse_x + 24;
     int label_y = std::clamp (mouse_y - 16, 0, h - 32);
-    if (w - mouse_x < 80)
-      label_x = mouse_x - 80;
+    //if (w - mouse_x < 80)
+    //  label_x = mouse_x - 80;
     
     if (state->enabled [band]) {
-      if (mouse_x > -1 && mouse_x < this->w && mouse_y > -1 && mouse_y < this->h)
-        draw_label (cr, label_x, label_y, band);
-      else
-        draw_label (cr, 5, 5, band);
+      draw_label (cr, band);
     }
   }
 
 }
 
-void c_eqgraph::draw_label (cairo_t *cr, int x, int y, int band) {
-  char buf [4] [64];
+void c_eqgraph::draw_label (cairo_t *cr, int band) {
+  char buf [5] [64];
   static const char *modenames [] = {
     "Off",
-    "HP",
-    "Low",
+    "Hipass",
+    "Low shelf",
     "Bell",
-    "Hi",
-    "LP",
+    "Hi shelf",
+    "Lowpass",
     NULL
   };
+  
+  int x = 5;
+  int y = 5;
   
   if (!state || band < 0 || band >= EQ_NUM_BANDS)
     return;
@@ -198,11 +198,12 @@ void c_eqgraph::draw_label (cairo_t *cr, int x, int y, int band) {
   float q = state->q [band];
   std::string hz_unit = "Hz";
   std::string hz_format = "%.3f%s";
-  if (freq >= 1000) {
-    freq /= 1000;
+  float showfreq = freq;
+  if (showfreq >= 1000) {
+    showfreq /= 1000;
     hz_unit = "KHz";
   } else {
-    hz_format = freq < 100 ? "%.2f%s" : "%.1f%s";
+    hz_format = showfreq < 100 ? "%.2f%s" : "%.1f%s";
   }
   
   cairo_set_font_size (cr, 11);
@@ -212,26 +213,43 @@ void c_eqgraph::draw_label (cairo_t *cr, int x, int y, int band) {
   int h = ext.height * 1.1f;
   int w = 0;
   
+  float cents;
+  int note = freq_to_midi_note (freq, &cents, 440); // borrowed from tuner
+  
   snprintf (buf [0], 63, "%d: %s", band + 1, modenames [state->mode [band]]);
-  snprintf (buf [1], 63, hz_format.c_str (), freq, hz_unit.c_str ());
+  snprintf (buf [1], 63, hz_format.c_str (), showfreq, hz_unit.c_str ());
   snprintf (buf [2], 63, "%s%.1fdB", gain < 0.0f ? "-" : "+", fabs (gain));
   snprintf (buf [3], 63, "Q=%.2f", q);
-  cairo_text_extents (cr, buf [0], &ext);
-  w = std::max (w, (int) ext.width);
-  cairo_text_extents (cr, buf [1], &ext);
-  w = std::max (w, (int) ext.width);
-  cairo_text_extents (cr, buf [2], &ext);
-  w = std::max (w, (int) ext.width);
+  if (note >= 8 && note <= 184) {
+    snprintf (buf [4], 63, "%s%d (%s%.3f)", 
+              g_note_names_sharps [note % 12],
+              (int) (note / 12 - 1),
+              cents < 0 ? "-" : "+", fabs (cents));
+  } else {
+    snprintf (buf [4], 63, "");
+  }
   
-  cairo_rectangle (cr, x - 2, y - 2, w + 6, h * 4 + 6);
+  cairo_text_extents (cr, "(A-0 (9999.9Hz)", &ext);
+  w = ext.width;
+  for (int i = 0; i < 5; i++) {
+    cairo_text_extents (cr, buf [i], &ext);
+    w = std::max (w, (int) ext.width);
+  }
+  
+  //if (x > mouse_x && x < mouse_x + w)
+  //  x -= w;
+  if (mouse_x >= 0 && mouse_x < w + 16 && mouse_y < this->h / 2)
+    x = this->w - w - 5;
+  
+  x = std::clamp (x, 4, (int) this->w - w - 8);
+  y = std::clamp (y, 4, (int) this->h - (h * 5) - 8);
+
+  cairo_rectangle (cr, x - 2, y - 2, w + 6, h * 5 + 6);
   cairo_set_source_rgba (cr, 0, 0, 0, 0.5);
   cairo_fill (cr);
   cairo_set_source_rgba (cr, 0.5, 0.5, 1.0, 1.0);
   
-  x = std::clamp (x, 4, (int) this->w - w - 32);
-  y = std::clamp (y, 4, (int) this->h - (h * 4) - 8);
-  
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 5; i++) {
     cairo_move_to (cr, x, y + (h * (i + 1)));
     cairo_show_text (cr, buf [i]);
   }

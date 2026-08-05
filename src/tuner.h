@@ -51,7 +51,7 @@ private:
   
   size_t count       = 0;
   int write_snapshot = 0;
-  int samplerate     = 48000;
+  int samplerate     = 0;
   int basefreq       = 440;
   int lastfreq       = -1;
   
@@ -62,6 +62,11 @@ private:
 #if defined (HAVE_GUI)
 
 #include "nbtk.h"
+
+extern const char *g_note_names_sharps [12];
+extern const char *g_note_names_flats [12];
+
+int freq_to_midi_note (float freq, float *r_cents, float basefreq = 440.0f);
 
 // UI side widget
 class c_tunerwidget : public nbtk::c_canvas {
