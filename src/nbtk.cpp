@@ -719,8 +719,13 @@ bool c_widget::update_hover_tree (int px, int py) {
       continue;
     }
 
-    if (child->update_hover_tree (lx, ly))
+    if (child->visible &&
+        child->enabled &&
+        child->contains_local (lx, ly)) {
+      child->update_hover_tree (lx, ly);
       handled = true;
+    } else
+      child->clear_hover_tree ();
   }
 
   if (!handled)
