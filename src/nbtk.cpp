@@ -5252,7 +5252,7 @@ void c_tooltip::set_text (const char *text) {
 
   const int text_w =
       std::max (24, (int) std::ceil (ext.x_advance + 16) + pad_x * 2 + 2);
-  const int tooltip_w = std::min (420, text_w);
+  const int tooltip_w = std::min (640, text_w);
   const int tooltip_h = std::max (30, (int) ext.y_advance);
   
   move_resize (x, y, tooltip_w, tooltip_h);

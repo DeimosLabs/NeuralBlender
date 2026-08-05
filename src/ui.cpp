@@ -1479,7 +1479,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   img_logo.set_tooltip ("Click for tuner");
   img_logo.role = ROLE_TUNER;
   
-  const int tabbutton_padding = 0;
+  const int tabbutton_padding = 16;
   btn_tab_pedals.create (&cont_toparea, "PDL", 0, 0, 84, 50);
   btn_tab_pedals.role = ROLE_PAGESWITCH;
   btn_tab_pedals.bank = BANK_PEDAL;
@@ -1753,7 +1753,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_tab_eqpre.set_tooltip ("Pre EQ");
   btn_tab_eqpost.set_tooltip ("Post EQ");
   btn_tab_cabs.set_tooltip ("Cab/IR bank");
-  btn_tab_other.set_tooltip ("More settings, right-click to toggle current bank's exclusive mode");
+  btn_tab_other.set_tooltip ("More settings. Right-click to toggle current bank's exclusive mode");
   btn_enable.set_tooltip ("Master BYPASS");
   btn_muteall.set_tooltip ("Master MUTE");
   btn_tuner.set_tooltip ("Enable tuner");
