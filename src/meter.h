@@ -64,6 +64,7 @@ public:
   void set_display_l (float level, float hold, bool clip = false, bool xrun = false);
   void set_display_r (float level, float hold, bool clip = false, bool xrun = false);
   void set_headroom (float db);
+  inline float get_headroom () { return m_headroom_db; }
   void set_peak_hold (size_t ms);
   void set_clip_hold (size_t ms);
   void set_xrun_hold (size_t ms);

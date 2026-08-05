@@ -611,15 +611,22 @@ void c_meterwidget::resize (int w, int h) {
 }*/
 
 void c_meterwidget::set_db_scale (float f) {
+  const bool changed = db_scale != f;
   db_scale = f;
   if (data)
     data->set_db_scale (f);
+  if (changed)
+    invalidate_base ();
 }
 
 void c_meterwidget::set_headroom (float f) {
-  headroom = std::max (0.0f, f);
+  f = std::max (0.0f, f);
+  const bool changed = headroom != f;
+  headroom = f;
   if (data)
     data->set_headroom (headroom);
+  if (changed)
+    invalidate_base ();
 }
 
 void c_meterwidget::set_clip_thresh (float f) {
@@ -750,19 +757,32 @@ void c_meterwidget::render_base (cairo_t *cr) {
     double a;
   };
 
-  const meter_line lines [] = {
+  /*const meter_line lines [] = {
     { 0.5f,   0.0, 1.0, 0.0, 0.25 },
     { 0.75f,  1.0, 1.0, 0.0, 0.25 },
     { 0.875f, 1.0, 0.5, 0.0, 0.25 },
     { 1.0f,   1.0, 0.0, 0.0, 0.25 },
+  };*/
+
+  const meter_line lines [] = {
+    { -24.0f,   0.0, 1.0, 0.0, 0.25 },
+    //{ -12.0f,   0.0, 1.0, 0.0, 0.25 },
+    { -6.0f,    0.0, 1.0, 0.0, 0.25 },
+    { 0.0f,     1.0, 0.5, 0.0, 0.25 },
+    { data ? (float) data->get_headroom () : 3.0f,     1.0, 0.0, 0.0, 0.25 },
   };
 
   cairo_set_line_width (cr, 1.0);
   for (const auto &line : lines) {
+    const float range_db = headroom - db_scale;
+    const float pos = range_db > 0.0f
+      ? std::clamp ((line.pos - db_scale) / range_db, 0.0f, 1.0f)
+      : 0.0f;
+    const int ppos = (int) std::lround ((met_len - 1) * pos);
+
     cairo_set_source_rgba (cr, line.r, line.g, line.b, line.a);
     if (vertical) {
-      int ppos = (int) (met_len * line.pos);
-      int y = height - ppos - rec_size;
+      const int y = clip_size + met_len - 1 - ppos;
       cairo_move_to (cr, t1, y);
       cairo_line_to (cr, t2, y);
       if (stereo) {
@@ -770,7 +790,7 @@ void c_meterwidget::render_base (cairo_t *cr) {
         cairo_line_to (cr, t4, y);
       }
     } else {
-      int x = rec_size + (int) (met_len * line.pos);
+      const int x = rec_size + ppos;
       cairo_move_to (cr, x, t1);
       cairo_line_to (cr, x, t2 - 1);
       if (stereo) {
