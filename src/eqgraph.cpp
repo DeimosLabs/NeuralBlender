@@ -96,8 +96,8 @@ void c_eqgraph::on_paint (cairo_t *cr) {
   if (!state)
     return;
   
-  //static nbtk::c_printfps p ("on_paint: ");
-  //p.tick ();
+  static nbtk::c_printfps p ("on_paint: ");
+  p.tick ();
   
   const uint64_t now = nbtk::now_ms ();
   if (!curve_surface ||
@@ -238,7 +238,7 @@ void c_eqgraph::draw_label (cairo_t *cr, int band) {
   
   //if (x > mouse_x && x < mouse_x + w)
   //  x -= w;
-  if (mouse_x >= 0 && mouse_x < w + 16 && mouse_y < this->h / 2)
+  if (mouse_x >= 0 && mouse_x < w + 16 && mouse_y < h * 5 + 12)
     x = this->w - w - 5;
   
   x = std::clamp (x, 4, (int) this->w - w - 8);
@@ -262,8 +262,35 @@ void c_eqgraph::set_state (c_eq_state *state_) {
   state_changed ();
 }
 
-void c_eqgraph::state_changed () {
-  mark_curves_dirty (true);
+static bool eqgraph_states_equal (
+    const c_eq_state &a,
+    const c_eq_state &b) {
+
+  if (a.on != b.on || a.master_gain_db != b.master_gain_db)
+    return false;
+
+  for (int i = 0; i < EQ_NUM_BANDS; ++i) {
+    if (a.enabled [i] != b.enabled [i] ||
+        a.mode [i] != b.mode [i] ||
+        a.slope [i] != b.slope [i] ||
+        a.freq [i] != b.freq [i] ||
+        a.gain_db [i] != b.gain_db [i] ||
+        a.q [i] != b.q [i]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void c_eqgraph::state_changed (bool force_redraw) {
+  if (state &&
+      rendered_state_valid &&
+      eqgraph_states_equal (*state, rendered_state)) {
+    return;
+  }
+
+  mark_curves_dirty (force_redraw);
 }
 
 void c_eqgraph::set_highlighted_band (int band) {
@@ -276,7 +303,11 @@ void c_eqgraph::set_highlighted_band (int band) {
 }
 
 void c_eqgraph::set_samplerate (int sr) {
+  if (samplerate == sr)
+    return;
+
   samplerate = sr;
+  rendered_state_valid = false;
   state_changed ();
 }
 
@@ -284,8 +315,8 @@ void c_eqgraph::render_curve_surface () {
   if (!ensure_curve_surface () || !curve_cr)
     return;
 
-  //static nbtk::c_printfps p ("render_curve_surface: ");
-  //p.tick ();
+  static nbtk::c_printfps p ("render_curve_surface: ");
+  p.tick ();
   
   cairo_save (curve_cr);
   cairo_set_operator (curve_cr, CAIRO_OPERATOR_CLEAR);
@@ -421,8 +452,8 @@ void c_eqgraph::path_curve (cairo_t *cr, const std::vector<float> &v) {
   if (!v.size () || !cr)
     return;
 
-  //static nbtk::c_printfps p ("path curve: ");
-  //p.tick ();
+  static nbtk::c_printfps p ("path curve: ");
+  p.tick ();
   
   const size_t n = v.size ();
   const float denom = (n > 1) ? (float) (n - 1) : 1.0f;
@@ -456,8 +487,8 @@ void c_eqgraph::generate_curves () { CP
   if (!state || w <= 0)
     return;
   
-  //static nbtk::c_printfps p ("generate_curves: ");
-  //p.tick ();
+  static nbtk::c_printfps p ("generate_curves: ");
+  p.tick ();
   
   curve.assign (CURVE_POINTS, 0.0f);
   for (int band = 0; band < EQ_NUM_BANDS; ++band)
@@ -513,6 +544,9 @@ void c_eqgraph::generate_curves () { CP
 
   //for (float &db : curve)
   //  db = std::clamp (db, -1.0f * db_range, db_range);
+
+  rendered_state = *state;
+  rendered_state_valid = true;
 }
 
 float c_eqgraph::freq_to_x (float freq) const {

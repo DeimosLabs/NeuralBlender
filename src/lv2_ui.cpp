@@ -762,10 +762,12 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
   if (nb_lv2_decode_eq_port (port, &bank, &eq_band, &eq_param)) {
     c_eq_state &eq_state =
       bank == BANK_EQPOST ? state.eqpost : state.eqpre;
+    c_eq_state &ui_eq_state = ui_eq_state_for_bank (bank);
 
     switch (eq_param) {
       case NB_LV2_EQ_ENABLED:
         eq_state.enabled [eq_band] = value >= 0.5f;
+        ui_eq_state.enabled [eq_band] = eq_state.enabled [eq_band];
       break;
 
       case NB_LV2_EQ_MODE: {
@@ -773,22 +775,30 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
           (int) lrintf (value),
           &eq_state.mode [eq_band],
           &eq_state.slope [eq_band]);
+        ui_eq_state.mode [eq_band] = eq_state.mode [eq_band];
+        ui_eq_state.slope [eq_band] = eq_state.slope [eq_band];
       } break;
 
       case NB_LV2_EQ_FREQ:
         eq_state.freq [eq_band] = value;
+        ui_eq_state.freq [eq_band] = value;
       break;
 
       case NB_LV2_EQ_GAIN:
         eq_state.gain_db [eq_band] = value;
+        ui_eq_state.gain_db [eq_band] = value;
       break;
 
       case NB_LV2_EQ_Q:
         eq_state.q [eq_band] = value;
+        ui_eq_state.q [eq_band] = value;
       break;
     }
 
-    sync_widgets_from_state (state);
+    c_eqpage_widgets &eqpage =
+      bank == BANK_EQPOST ? eqpage_post : eqpage_pre;
+    eqpage.sync_band_from_state (ui_eq_state, eq_band);
+    eqpage.graph.state_changed (false);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;

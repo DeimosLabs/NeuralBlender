@@ -1345,7 +1345,6 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
 
   graph.set_highlighted_band (highlighted);
   apply_external_highlight (highlighted);
-  graph.invalidate ();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2538,7 +2537,10 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       eqpage.graph.state_changed ();
 
     on_eq_band (widget, bank, band);
-    finish ();
+    if ((_widget_role) widget->role == ROLE_EQ_GRAPH)
+      event.handled = true;
+    else
+      finish ();
     return true;
   };
 

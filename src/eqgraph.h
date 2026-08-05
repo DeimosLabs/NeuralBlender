@@ -33,7 +33,7 @@ public:
   void render_base (cairo_t *cr);
   void on_paint (cairo_t *cr);
   void set_state (c_eq_state *state);
-  void state_changed ();
+  void state_changed (bool force_redraw = true);
   void set_highlighted_band (int band);
   void on_resize (int w, int h);
   bool on_mouse_down (int x, int y, int button) override;
@@ -82,6 +82,8 @@ private:
   int samplerate = 0;
   
   c_eq_state *state = NULL;
+  c_eq_state rendered_state;
+  bool rendered_state_valid = false;
   std::vector<float> curves [EQ_NUM_BANDS];
   std::vector<float> curve;
   
