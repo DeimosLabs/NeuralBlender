@@ -1479,7 +1479,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   img_logo.set_tooltip ("Click for tuner");
   img_logo.role = ROLE_TUNER;
   
-  const int tabbutton_padding = 16;
+  const int tabbutton_padding = 12;
   btn_tab_pedals.create (&cont_toparea, "PDL", 0, 0, 84, 50);
   btn_tab_pedals.role = ROLE_PAGESWITCH;
   btn_tab_pedals.bank = BANK_PEDAL;
