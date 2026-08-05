@@ -1479,39 +1479,42 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   img_logo.set_tooltip ("Click for tuner");
   img_logo.role = ROLE_TUNER;
   
-  const int tabbutton_padding = 12;
+  const int tabbutton_padding = 0;
   btn_tab_pedals.create (&cont_toparea, "PDL", 0, 0, 84, 50);
   btn_tab_pedals.role = ROLE_PAGESWITCH;
   btn_tab_pedals.bank = BANK_PEDAL;
   btn_tab_pedals.page = PAGE_PEDAL;
   btn_tab_pedals.set_image_default (data_icon_power_on_png);
   btn_tab_pedals.padding = tabbutton_padding;
+  btn_tab_pedals.align = nbtk::TEXT_LEFT;
   btn_tab_eqpre.create (&cont_toparea, "EQ1", 0, 0, 84, 50);
   btn_tab_eqpre.role = ROLE_PAGESWITCH;
   btn_tab_eqpre.bank = BANK_EQPRE;
   btn_tab_eqpre.page = PAGE_EQPRE;
   btn_tab_eqpre.set_image_default (data_icon_power_on_png);
   btn_tab_eqpre.padding = tabbutton_padding;
+  btn_tab_eqpre.align = nbtk::TEXT_LEFT;
   btn_tab_models.create (&cont_toparea, "AMP", 0, 0, 84, 50);
   btn_tab_models.role = ROLE_PAGESWITCH;
   btn_tab_models.bank = BANK_AMP;
   btn_tab_models.page = PAGE_AMP;
   btn_tab_models.set_image_default (data_icon_power_on_png);
   btn_tab_models.padding = tabbutton_padding;
+  btn_tab_models.align = nbtk::TEXT_LEFT;
   btn_tab_eqpost.create (&cont_toparea, "EQ2", 0, 0, 84, 50);
   btn_tab_eqpost.role = ROLE_PAGESWITCH;
   btn_tab_eqpost.bank = BANK_EQPOST;
   btn_tab_eqpost.page = PAGE_EQPOST;
   btn_tab_eqpost.set_image_default (data_icon_power_on_png);
   btn_tab_eqpost.padding = tabbutton_padding;
-
-
+  btn_tab_eqpost.align = nbtk::TEXT_LEFT;
   btn_tab_cabs.create (&cont_toparea, "CAB", 0, 0, 84, 50);
   btn_tab_cabs.role = ROLE_PAGESWITCH;
   btn_tab_cabs.bank = BANK_CAB;
   btn_tab_cabs.page = PAGE_CAB;
   btn_tab_cabs.set_image_default (data_icon_power_on_png);
   btn_tab_cabs.padding = tabbutton_padding;
+  btn_tab_cabs.align = nbtk::TEXT_LEFT;
   btn_tab_other.create (&cont_toparea, "...", 0, 0, 84, 50);
   btn_tab_other.role = ROLE_PAGESWITCH;
   btn_tab_other.bank = BANK_AMP;

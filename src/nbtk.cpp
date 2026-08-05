@@ -1259,11 +1259,16 @@ void c_button::draw (cairo_t *cr) {
       if (have_text)
         cairo_text_extents (cr, label.c_str (), &ext);
 
+      const double min_img_h = std::max (1.0, (double) h * 0.35);
+      if (have_text && align == TEXT_LEFT) {
+        img_h = min_img_h;
+        img_w = img_h * iw / ih;
+      }
+
       double total_w = img_w + gap + (have_text ? ext.width : 0.0);
       const double max_total_w = std::max (1.0, (double) w - pad * 2.0);
       if (have_text && total_w > max_total_w) {
         const double excess = total_w - max_total_w;
-        const double min_img_h = std::max (1.0, (double) h * 0.35);
         img_h = std::max (min_img_h, img_h - excess);
         img_w = img_h * iw / ih;
         total_w = img_w + gap + ext.width;
