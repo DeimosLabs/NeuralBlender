@@ -82,6 +82,7 @@ int c_pitchtracker::get_best_lag (const std::vector<float> &buf, int step,
                                   float *r_score) {
   const int min_freq = 25;
   const int max_freq = 1000;
+  constexpr float first_valley_threshold = 0.1f;
   
   if (buf.size () < 2 || step <= 0)
     return 0;
@@ -100,31 +101,34 @@ int c_pitchtracker::get_best_lag (const std::vector<float> &buf, int step,
   float best_score = get_lag_score (buf, start_lag);
   lag_scores [start_lag] = best_score;
   int best_lag = start_lag;
-  int count = 0;
-  float scoreavg = 0.0;
+  int score_count = 1;
+  float score_sum = best_score;
   
   for (int lag = start_lag + step; lag < end_lag; lag += step) {
     float s = get_lag_score (buf, lag);
-    scoreavg += s;
-    count++;
+    score_sum += s;
+    score_count++;
     lag_scores [lag] = s;
     if (s < best_score) {
       best_score = s;
       best_lag = lag;
     }
   }
-  scoreavg /= count;
-  
-  //debug ("scoreavg=%f, best_score=%f", scoreavg, best_score);
-  
-  int oct = best_lag / 2;
-  if (oct >= start_lag) {
-    float oct_score = get_lag_score (buf, oct);
-    lag_scores [oct] = oct_score;
 
-    if (oct_score <= best_score * 1.25f) {
-      best_lag = oct;
-      best_score = oct_score;
+  const float score_average = score_sum / (float) score_count;
+  const float acceptable_score = score_average * first_valley_threshold;
+
+  // Period multiples can have a slightly lower absolute score than the
+  // fundamental due to integer sample alignment. Prefer the first strong
+  // local minimum instead of the global minimum in that case.
+  for (int lag = start_lag + step; lag + step < end_lag; lag += step) {
+    const float score = lag_scores [lag];
+    if (score <= acceptable_score &&
+        score <= lag_scores [lag - step] &&
+        score <= lag_scores [lag + step]) {
+      best_lag = lag;
+      best_score = score;
+      break;
     }
   }
 
