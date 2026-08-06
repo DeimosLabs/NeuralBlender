@@ -18,6 +18,12 @@
 #define NB_URI "http://deimos.ca/neuralblender"
 #define LV2_METER_FPS 30.0
 
+enum _lv2_spectrum_select {
+  LV2_SPECTRUM_OFF = 0,
+  LV2_SPECTRUM_PRE,
+  LV2_SPECTRUM_POST
+};
+
 enum nb_lv2_port {
   PORT_AUDIO_IN = 0,
   PORT_AUDIO_OUT,
@@ -411,6 +417,9 @@ public:
   LV2_URID urid_eq_master_gain [BANK_COUNT] = {};
   LV2_URID urid_meters = 0;
   LV2_URID urid_stats = 0;
+  LV2_URID urid_spectrum_select = 0;
+  LV2_URID urid_spectrum_pre = 0;
+  LV2_URID urid_spectrum_post = 0;
   LV2_URID urid_samplerate = 0;
   LV2_URID urid_calib_target_db = 0;
   LV2_URID urid_calib_bass = 0;
@@ -484,6 +493,12 @@ public:
       map->map (map->handle, NB_URI "#Meters");
     urid_stats =
       map->map (map->handle, NB_URI "#Stats");
+    urid_spectrum_select =
+      map->map (map->handle, NB_URI "#SpectrumSelect");
+    urid_spectrum_pre =
+      map->map (map->handle, NB_URI "#SpectrumPre");
+    urid_spectrum_post =
+      map->map (map->handle, NB_URI "#SpectrumPost");
     urid_samplerate =
       map->map (map->handle, NB_URI "#Samplerate");
     urid_calib_target_db =
@@ -528,6 +543,8 @@ public:
 enum _ui_feedback_type {
   ATOM_METERS,
   ATOM_STATS,
+  ATOM_SPECTRUM_PRE,
+  ATOM_SPECTRUM_POST,
   ATOM_UNKNOWN
 };
 
@@ -547,6 +564,7 @@ public:
   bool write_model_path (_lane_bank bank, size_t which, const char *filename);
   bool write_float_property (LV2_URID property, float value);
   bool write_int_property (LV2_URID property, int32_t value);
+  void select_spectrum_for_visible_page ();
   void request_current_state ();
 
   bool load_model (_lane_bank bank, size_t which, const char *filename) override;

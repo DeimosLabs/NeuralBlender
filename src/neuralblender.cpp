@@ -396,6 +396,236 @@ static SF_VIRTUAL_IO g_sndfile_mem_vio {
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
+// c_spectrum_analyzer
+
+#ifdef HAVE_FFTW
+
+static std::mutex g_fftw_planner_mutex;
+
+c_spectrum_analyzer::c_spectrum_analyzer () { CP
+  constexpr float two_pi = 6.28318530717958647692f;
+
+  for (size_t i = 0; i < window.size (); ++i) {
+    const float phase =
+      two_pi * (float) i / (float) (window.size () - 1);
+
+    window [i] = 0.5f - 0.5f * cosf (phase);
+    window_sum += window [i];
+  }
+
+  {
+    std::lock_guard<std::mutex> lock (g_fftw_planner_mutex);
+    fft_plan = fftwf_plan_dft_r2c_1d (
+      SPECTRUM_FFT_SIZE,
+      fft_input.data (),
+      fft_output.data (),
+      FFTW_ESTIMATE);
+  }
+}
+
+c_spectrum_analyzer::~c_spectrum_analyzer () { CP
+  if (fft_plan) {
+    std::lock_guard<std::mutex> lock (g_fftw_planner_mutex);
+    fftwf_destroy_plan (fft_plan);
+    fft_plan = nullptr;
+  }
+}
+
+void c_spectrum_analyzer::set_samplerate (int sr) {
+  samplerate = std::max (0, sr);
+  generate_spectrum_frequencies (frequencies.data (), frequencies.size ());
+}
+
+void c_spectrum_analyzer::publish_snapshot () {
+  float *dst = snapshots [write_snapshot].data ();
+  const size_t front = SPECTRUM_FFT_SIZE - write_pos;
+
+  memcpy (dst, ring.data () + write_pos, front * sizeof (float));
+  if (write_pos > 0) {
+    memcpy (
+      dst + front,
+      ring.data (),
+      write_pos * sizeof (float));
+  }
+
+  const uint64_t sequence =
+    published_sequence.load (std::memory_order_relaxed) + 1;
+  snapshot_sequences [write_snapshot] = sequence;
+  published_sequence.store (sequence, std::memory_order_release);
+  published_snapshot.store (write_snapshot, std::memory_order_release);
+
+  const int reader = reading_snapshot.load (std::memory_order_acquire);
+  for (int i = 1; i < 3; ++i) {
+    const int candidate = (write_snapshot + i) % 3;
+    if (candidate != reader) {
+      write_snapshot = candidate;
+      break;
+    }
+  }
+}
+
+bool c_spectrum_analyzer::copy_latest_snapshot (
+    float *out, uint64_t &sequence) const {
+  if (!out)
+    return false;
+
+  for (;;) {
+    const int index = published_snapshot.load (std::memory_order_acquire);
+    if (index < 0)
+      return false;
+
+    reading_snapshot.store (index, std::memory_order_release);
+    if (published_snapshot.load (std::memory_order_acquire) != index) {
+      reading_snapshot.store (-1, std::memory_order_release);
+      continue;
+    }
+
+    memcpy (out, snapshots [index].data (), SPECTRUM_FFT_SIZE * sizeof (float));
+    sequence = snapshot_sequences [index];
+    reading_snapshot.store (-1, std::memory_order_release);
+    return true;
+  }
+}
+
+void c_spectrum_analyzer::publish_magnitudes (const float *values) {
+  if (!values)
+    return;
+
+  memcpy (
+    magnitude_buffers [write_magnitudes].data (),
+    values,
+    SPECTRUM_BINS * sizeof (float));
+
+  published_magnitudes.store (write_magnitudes, std::memory_order_release);
+
+  const int reader = reading_magnitudes.load (std::memory_order_acquire);
+  for (int i = 1; i < 3; ++i) {
+    const int candidate = (write_magnitudes + i) % 3;
+    if (candidate != reader) {
+      write_magnitudes = candidate;
+      break;
+    }
+  }
+}
+
+void c_spectrum_analyzer::process_block (const float *buf, size_t count) {
+  const bool requested = enabled.load (std::memory_order_acquire);
+  if (requested != capture_active) {
+    capture_active = requested;
+    if (capture_active) {
+      write_pos = 0;
+      total_samples = 0;
+      next_snapshot_at = SPECTRUM_FFT_SIZE;
+      ring.fill (0.0f);
+      published_snapshot.store (-1, std::memory_order_release);
+    }
+  }
+
+  if (!capture_active || !buf || count == 0)
+    return;
+
+  while (count > 0) {
+    const size_t until_wrap = SPECTRUM_FFT_SIZE - write_pos;
+    const uint64_t until_snapshot = next_snapshot_at - total_samples;
+    const size_t chunk = std::min (
+      count,
+      std::min (until_wrap, (size_t) until_snapshot));
+
+    memcpy (ring.data () + write_pos, buf, chunk * sizeof (float));
+    write_pos = (write_pos + chunk) % SPECTRUM_FFT_SIZE;
+    total_samples += chunk;
+    buf += chunk;
+    count -= chunk;
+
+    if (total_samples == next_snapshot_at) {
+      publish_snapshot ();
+      next_snapshot_at += SPECTRUM_HOP_SIZE;
+    }
+  }
+}
+
+bool c_spectrum_analyzer::analyze () {
+  if (!enabled.load (std::memory_order_acquire) ||
+      !fft_plan || samplerate <= 0 || window_sum <= 0.0f)
+    return false;
+
+  uint64_t sequence = 0;
+  if (!copy_latest_snapshot (fft_input.data (), sequence) ||
+      sequence == analyzed_sequence)
+    return false;
+
+  for (size_t i = 0; i < fft_input.size (); ++i)
+    fft_input [i] *= window [i];
+
+  fftwf_execute (fft_plan);
+
+  const float fft_bin_hz = (float) samplerate / (float) SPECTRUM_FFT_SIZE;
+  const float magnitude_scale = 2.0f / window_sum;
+  const int last_fft_bin = SPECTRUM_FFT_SIZE / 2;
+
+  auto fft_magnitude = [&] (int bin) {
+    const float re = fft_output [bin] [0];
+    const float im = fft_output [bin] [1];
+    return sqrtf (re * re + im * im) * magnitude_scale;
+  };
+
+  for (size_t i = 0; i < frequencies.size (); ++i) {
+    const float fft_position = frequencies [i] / fft_bin_hz;
+    if (fft_position < 0.0f || fft_position >= (float) last_fft_bin) {
+      magnitude_work [i] = -120.0f;
+      continue;
+    }
+
+    const int bin0 = (int) floorf (fft_position);
+    const int bin1 = std::min (bin0 + 1, last_fft_bin);
+    const float fraction = fft_position - (float) bin0;
+    const float magnitude =
+      fft_magnitude (bin0) +
+      (fft_magnitude (bin1) - fft_magnitude (bin0)) * fraction;
+
+    magnitude_work [i] = std::max (
+      -120.0f,
+      20.0f * log10f (std::max (magnitude, 1.0e-6f)));
+  }
+
+  publish_magnitudes (magnitude_work.data ());
+  analyzed_sequence = sequence;
+  return true;
+}
+
+bool c_spectrum_analyzer::copy_bins (float *out, size_t count) const {
+  if (!out || count == 0)
+    return false;
+
+  for (;;) {
+    const int index = published_magnitudes.load (std::memory_order_acquire);
+    if (index < 0)
+      return false;
+
+    reading_magnitudes.store (index, std::memory_order_release);
+    if (published_magnitudes.load (std::memory_order_acquire) != index) {
+      reading_magnitudes.store (-1, std::memory_order_release);
+      continue;
+    }
+
+    const size_t copy_count = std::min (count, (size_t) SPECTRUM_BINS);
+    memcpy (out, magnitude_buffers [index].data (), copy_count * sizeof (float));
+    reading_magnitudes.store (-1, std::memory_order_release);
+    return true;
+  }
+}
+
+void c_spectrum_analyzer::start () {
+  enabled.store (true, std::memory_order_release);
+}
+
+void c_spectrum_analyzer::stop () {
+  enabled.store (false, std::memory_order_release);
+}
+
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
 // c_biquad, c_eq
 
 // the bulk of our math processing. piece of cake :D
@@ -424,12 +654,12 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
       return;
     
     case EQ_BELL:
-      b0_ = 1.0f + alpha * a;
+      b0_ =  1.0f + alpha * a;
       b1_ = -2.0f * cw;
-      b2_ = 1.0f - alpha * a;
-      a0_ = 1.0f + alpha / a;
+      b2_ =  1.0f - alpha * a;
+      a0_ =  1.0f + alpha / a;
       a1_ = -2.0f * cw;
-      a2_ = 1.0f - alpha / a;
+      a2_ =  1.0f - alpha / a;
 
       inv_a0 = 1.0f / a0_;
     break;
@@ -446,12 +676,12 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
     break;
 
     case EQ_HIPASS:
-      b0_ = (1.0f + cw) * 0.5f;
+      b0_ =  (1.0f + cw) * 0.5f;
       b1_ = -(1.0f + cw);
-      b2_ = (1.0f + cw) * 0.5f;
-      a0_ =  1.0f + alpha;
-      a1_ = -2.0f * cw;
-      a2_ =  1.0f - alpha;
+      b2_ =  (1.0f + cw) * 0.5f;
+      a0_ =   1.0f + alpha;
+      a1_ =  -2.0f * cw;
+      a2_ =   1.0f - alpha;
 
       inv_a0 = 1.0f / a0_;
     break;
@@ -509,6 +739,16 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
   a2 = a2_ * inv_a0;
 }
 
+void c_biquad::disable () { CP
+  b0 = 1.0f;
+  b1 = b2 = a1 = a2 = 0.0f;
+  for (int i = 0; i < EQ_SLOPE_MAX; i++) {
+    z1 [i] = 0.0f;
+    z2 [i] = 0.0f;
+  }
+  mode = EQ_OFF;
+}
+
 _eq_band_mode g_defaultmodes [] = { EQ_HIPASS, EQ_LOWSHELF, EQ_BELL, EQ_BELL,
                                     EQ_BELL, EQ_BELL, EQ_HISHELF, EQ_LOWPASS };
 
@@ -524,18 +764,11 @@ static uint32_t eq_param_xfade_samples_for_rate (int samplerate) {
     (uint32_t) lrintf ((float) samplerate * EQ_PARAM_XFADE_MS * 0.001f));
 }
 
-void c_biquad::disable () { CP
-  b0 = 1.0f;
-  b1 = b2 = a1 = a2 = 0.0f;
-  for (int i = 0; i < EQ_SLOPE_MAX; i++) {
-    z1 [i] = 0.0f;
-    z2 [i] = 0.0f;
-  }
-  mode = EQ_OFF;
-}
-
 void c_eq::set_samplerate (int sr) {
   samplerate = sr;
+  m_spectrum_input.set_samplerate (sr);
+  m_spectrum_output.set_samplerate (sr);
+
   if (samplerate <= 0) {
     for (int i = 0; i < EQ_NUM_BANDS; i++)
       bands [i].disable ();
@@ -568,10 +801,10 @@ float c_biquad::response_db (float freq, float samplerate) const {
   const float c2 = cosf (2.0f * w0);
   const float s2 = sinf (2.0f * w0);
 
-  const float nr = b0 + b1 * c1 + b2 * c2;
+  const float nr =   b0 + b1 * c1 + b2 * c2;
   const float ni =      - b1 * s1 - b2 * s2;
   const float dr = 1.0f + a1 * c1 + a2 * c2;
-  const float di =        - a1 * s1 - a2 * s2;
+  const float di =      - a1 * s1 - a2 * s2;
 
   const float n2 = nr * nr + ni * ni;
   const float d2 = std::max (dr * dr + di * di, 1.0e-20f);
@@ -685,45 +918,55 @@ void c_eq::process_block (float *buf, uint32_t nframes) {
   if (!buf || nframes == 0)
     return;
 
-  for (int b = 0; b < EQ_NUM_BANDS; ++b) {
-    c_biquad &band = bands [b];
-    if (!enabled [b] || band.mode == EQ_OFF)
-      continue;
+#ifdef HAVE_FFTW
+  m_spectrum_input.process_block (buf, nframes);
+#endif
 
-    if (coeff_xfade_len [b] > 0 &&
-        coeff_xfade_pos [b] < coeff_xfade_len [b]) {
-      c_biquad &old_band = old_bands [b];
-      for (uint32_t i = 0; i < nframes; ++i) {
-        if (coeff_xfade_pos [b] >= coeff_xfade_len [b]) {
-          buf [i] = band.process (buf [i]);
-          continue;
+  if (on) {
+    for (int b = 0; b < EQ_NUM_BANDS; ++b) {
+      c_biquad &band = bands [b];
+      if (!enabled [b] || band.mode == EQ_OFF)
+        continue;
+
+      if (coeff_xfade_len [b] > 0 &&
+          coeff_xfade_pos [b] < coeff_xfade_len [b]) {
+        c_biquad &old_band = old_bands [b];
+        for (uint32_t i = 0; i < nframes; ++i) {
+          if (coeff_xfade_pos [b] >= coeff_xfade_len [b]) {
+            buf [i] = band.process (buf [i]);
+            continue;
+          }
+
+          const float x = buf [i];
+          const float y_old = old_band.process (x);
+          const float y_new = band.process (x);
+          const float t =
+            (float) (coeff_xfade_pos [b] + 1) / (float) coeff_xfade_len [b];
+          buf [i] = y_old + (y_new - y_old) * t;
+          coeff_xfade_pos [b]++;
         }
 
-        const float x = buf [i];
-        const float y_old = old_band.process (x);
-        const float y_new = band.process (x);
-        const float t =
-          (float) (coeff_xfade_pos [b] + 1) / (float) coeff_xfade_len [b];
-        buf [i] = y_old + (y_new - y_old) * t;
-        coeff_xfade_pos [b]++;
+        if (coeff_xfade_pos [b] >= coeff_xfade_len [b]) {
+          old_bands [b].mode = EQ_OFF;
+          coeff_xfade_pos [b] = 0;
+          coeff_xfade_len [b] = 0;
+        }
+      } else {
+        for (uint32_t i = 0; i < nframes; ++i)
+          buf [i] = band.process (buf [i]);
       }
+    }
 
-      if (coeff_xfade_pos [b] >= coeff_xfade_len [b]) {
-        old_bands [b].mode = EQ_OFF;
-        coeff_xfade_pos [b] = 0;
-        coeff_xfade_len [b] = 0;
-      }
-    } else {
+    const float master_gain = db_to_gain (master_gain_db);
+    if (fabsf (master_gain - 1.0f) > 0.000001f) {
       for (uint32_t i = 0; i < nframes; ++i)
-        buf [i] = band.process (buf [i]);
+        buf [i] *= master_gain;
     }
   }
 
-  const float master_gain = db_to_gain (master_gain_db);
-  if (fabsf (master_gain - 1.0f) > 0.000001f) {
-    for (uint32_t i = 0; i < nframes; ++i)
-      buf [i] *= master_gain;
-  }
+#ifdef HAVE_FFTW
+  m_spectrum_output.process_block (buf, nframes);
+#endif
 }
 
 bool c_eq::set_enabled (int band_, bool enabled_) {
@@ -899,8 +1142,6 @@ void c_delayline::process_block (float *in, float *out, uint32_t nframes) {
 // c_convolver
 
 #ifdef HAVE_FFTW
-
-static std::mutex g_fftw_planner_mutex;
 
 static void convolver_trim_trailing_silence (
     std::vector<float> &v,
@@ -3299,16 +3540,14 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
       pedal_mask, pedal_mask, 0, 1);
 
     update_input_meter (BANK_EQPRE, m_stage_buf_a.data (), nframes);
-    if (eq_pre.on)
-      eq_pre.process_block (m_stage_buf_a.data (), nframes);
+    eq_pre.process_block (m_stage_buf_a.data (), nframes);
 
     render_bank (
       BANK_AMP, m_stage_buf_a.data (), m_stage_buf_b.data (), nframes,
       mask, mask, 0, 1);
 
     update_input_meter (BANK_EQPOST, m_stage_buf_b.data (), nframes);
-    if (eq_post.on)
-      eq_post.process_block (m_stage_buf_b.data (), nframes);
+    eq_post.process_block (m_stage_buf_b.data (), nframes);
 
     render_bank (
       BANK_CAB, m_stage_buf_b.data (), out, nframes,
@@ -3322,16 +3561,14 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
       pedal_mask, pedal_mask, 0, 1);
 
     update_input_meter (BANK_EQPRE, m_stage_buf_a.data (), nframes);
-    if (eq_pre.on)
-      eq_pre.process_block (m_stage_buf_a.data (), nframes);
+    eq_pre.process_block (m_stage_buf_a.data (), nframes);
 
     render_bank (
       BANK_AMP, m_stage_buf_a.data (), m_stage_buf_b.data (), nframes,
       xfade_old_mask, xfade_new_mask, xfade_pos, xfade_len);
 
     update_input_meter (BANK_EQPOST, m_stage_buf_b.data (), nframes);
-    if (eq_post.on)
-      eq_post.process_block (m_stage_buf_b.data (), nframes);
+    eq_post.process_block (m_stage_buf_b.data (), nframes);
 
     render_bank (
       BANK_CAB, m_stage_buf_b.data (), out, nframes,

@@ -172,6 +172,8 @@ struct Plugin : public c_lv2_urids {
   std::atomic<float> detected_tuner_freq { 0.0f };
   std::atomic<float> detected_tuner_note { 0.0f };
   std::atomic<float> detected_tuner_cents { 0.0f };
+  std::atomic<int> spectrum_select { LV2_SPECTRUM_OFF };
+  std::atomic<bool> spectrum_dirty { false };
   
 };
 
@@ -197,6 +199,36 @@ static c_eq *lv2_eq_for_bank (Plugin *self, _lane_bank bank) {
     default:
       return NULL;
   }
+}
+
+static c_eq *lv2_eq_for_spectrum (Plugin *self, int selection) {
+  if (!self)
+    return NULL;
+  if (selection == LV2_SPECTRUM_PRE)
+    return &self->blender.eq_pre;
+  if (selection == LV2_SPECTRUM_POST)
+    return &self->blender.eq_post;
+  return NULL;
+}
+
+static void select_spectrum (Plugin *self, int selection) {
+  if (!self)
+    return;
+
+  selection = std::clamp (
+    selection, (int) LV2_SPECTRUM_OFF, (int) LV2_SPECTRUM_POST);
+  const int old = self->spectrum_select.load (std::memory_order_acquire);
+  if (selection == old)
+    return;
+
+  if (c_eq *eq = lv2_eq_for_spectrum (self, old))
+    eq->stop_spectra ();
+  if (c_eq *eq = lv2_eq_for_spectrum (self, selection))
+    eq->start_spectra ();
+
+  self->spectrum_dirty.store (false, std::memory_order_release);
+  self->spectrum_select.store (selection, std::memory_order_release);
+  self->loader_cv.notify_one ();
 }
 
 static bool read_changed (const float *port, float &last, float &value) {
@@ -294,6 +326,7 @@ static void loader_main (Plugin *self) { CP
     bool do_ir_pitch = false;
     float ir_pitch_value = 0.0f;
     bool do_tuner = false;
+    int spectrum_select = LV2_SPECTRUM_OFF;
     std::string path;
     { // scope: only hold this lock while moving pending jobs into locals
       std::unique_lock<std::mutex> lock (self->loader_mutex);
@@ -387,6 +420,8 @@ static void loader_main (Plugin *self) { CP
 
       if (!do_load && !do_calib_all && !do_calib && !do_ir_pitch)
         do_tuner = self->tuner_enabled.load (std::memory_order_acquire);
+      spectrum_select =
+        self->spectrum_select.load (std::memory_order_acquire);
     } // unlocks here
 
     if (do_load) {
@@ -448,6 +483,11 @@ static void loader_main (Plugin *self) { CP
       self->detected_tuner_cents.store (
         self->blender.pitchtracker.detected_cents.load (std::memory_order_acquire),
         std::memory_order_release);
+    }
+
+    if (c_eq *eq = lv2_eq_for_spectrum (self, spectrum_select)) {
+      if (eq->analyze_spectra ())
+        self->spectrum_dirty.store (true, std::memory_order_release);
     }
   }
 }
@@ -1206,6 +1246,39 @@ static void forge_meter_notify (Plugin *self) {
   lv2_atom_forge_pop (&self->forge, &frame);
 }
 
+static bool forge_spectrum_notify (Plugin *self, int selection) {
+  c_eq *eq = lv2_eq_for_spectrum (self, selection);
+  if (!eq)
+    return false;
+
+  float values [SPECTRUM_BINS * 2];
+  if (!eq->copy_spectrum_input_bins (values, SPECTRUM_BINS) ||
+      !eq->copy_spectrum_output_bins (
+        values + SPECTRUM_BINS, SPECTRUM_BINS))
+    return false;
+
+  const LV2_URID property =
+    selection == LV2_SPECTRUM_PRE
+      ? self->urid_spectrum_pre
+      : self->urid_spectrum_post;
+
+  LV2_Atom_Forge_Frame frame;
+  lv2_atom_forge_frame_time (&self->forge, 0);
+  lv2_atom_forge_object (
+    &self->forge, &frame, 0, self->urid_patch_Set);
+  lv2_atom_forge_key (&self->forge, self->urid_patch_property);
+  lv2_atom_forge_urid (&self->forge, property);
+  lv2_atom_forge_key (&self->forge, self->urid_patch_value);
+  lv2_atom_forge_vector (
+    &self->forge,
+    sizeof (float),
+    self->urid_atom_Float,
+    SPECTRUM_BINS * 2,
+    values);
+  lv2_atom_forge_pop (&self->forge, &frame);
+  return true;
+}
+
 static void forge_stats_notify (Plugin *self) {
   float values [BANK_COUNT * NB_NUM_MODELS * NB_STATS_PER_LANE];
   size_t n = 0;
@@ -1605,20 +1678,34 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       self->notify_samplerate = false;
     }
 
-	    const bool sent_stats_notify =
-	      !sent_bank_bypass_notify &&
-	      !sent_eq_notify &&
-	      !sent_samplerate_notify &&
-	      self->stats_dirty.exchange (false, std::memory_order_acq_rel);
-	    if (sent_stats_notify)
-	      forge_stats_notify (self);
+    const bool sent_stats_notify =
+      !sent_path_notify &&
+      !sent_bank_bypass_notify &&
+      !sent_eq_notify &&
+      !sent_samplerate_notify &&
+      self->stats_dirty.exchange (false, std::memory_order_acq_rel);
+    if (sent_stats_notify)
+      forge_stats_notify (self);
 
-	    const uint32_t meter_interval =
-	      (uint32_t) (self->samplerate > 0.0 ? self->samplerate / LV2_METER_FPS : 1600.0);
-	    if (!sent_path_notify && !sent_bank_bypass_notify && !sent_eq_notify &&
-	        !sent_samplerate_notify &&
-	        !sent_stats_notify &&
-	        self->meter_notify_samples >= meter_interval) {
+    bool sent_spectrum_notify = false;
+    if (!sent_path_notify && !sent_bank_bypass_notify && !sent_eq_notify &&
+        !sent_samplerate_notify && !sent_stats_notify &&
+        self->spectrum_dirty.exchange (false, std::memory_order_acq_rel)) {
+      const int selection =
+        self->spectrum_select.load (std::memory_order_acquire);
+      sent_spectrum_notify = forge_spectrum_notify (self, selection);
+      if (!sent_spectrum_notify && selection != LV2_SPECTRUM_OFF)
+        self->spectrum_dirty.store (true, std::memory_order_release);
+    }
+
+    const uint32_t meter_interval =
+      (uint32_t) (self->samplerate > 0.0
+        ? self->samplerate / LV2_METER_FPS
+        : 1600.0);
+    if (!sent_path_notify && !sent_bank_bypass_notify && !sent_eq_notify &&
+        !sent_samplerate_notify && !sent_stats_notify &&
+        !sent_spectrum_notify &&
+        self->meter_notify_samples >= meter_interval) {
       forge_meter_notify (self);
       self->meter_notify_samples = 0;
     }
@@ -1677,6 +1764,14 @@ static void run (LV2_Handle instance, uint32_t nframes) {
 	          set_calib_target_db (self, ((const LV2_Atom_Float *) value)->body);
 	        continue;
 	      }
+
+      if (prop == self->urid_spectrum_select) {
+        if (value->type == self->urid_atom_Int) {
+          select_spectrum (
+            self, ((const LV2_Atom_Int *) value)->body);
+        }
+        continue;
+      }
 
 			      if (value->type != self->urid_atom_Path &&
 		          value->type != self->urid_atom_String)

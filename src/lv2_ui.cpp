@@ -142,6 +142,16 @@ bool c_lv2_ui::write_int_property (LV2_URID property, int32_t value) {
   return true;
 }
 
+void c_lv2_ui::select_spectrum_for_visible_page () {
+  int selection = LV2_SPECTRUM_OFF;
+  if (visible_page == PAGE_EQPRE)
+    selection = LV2_SPECTRUM_PRE;
+  else if (visible_page == PAGE_EQPOST)
+    selection = LV2_SPECTRUM_POST;
+
+  write_int_property (urid_spectrum_select, selection);
+}
+
 void c_lv2_ui::request_current_state () {
   if (!write || !map)
     return;
@@ -472,6 +482,7 @@ void c_lv2_ui::on_eq_master_gain (
 void c_lv2_ui::on_bank_switch (nbtk::c_widget *w, int n) {
   c_neuralblender_ui::on_bank_switch (w, n);
   write_control (PORT_ACTIVE_PAGE, (float) visible_page);
+  select_spectrum_for_visible_page ();
 }
 
 void c_lv2_ui::apply_prefs (t_prefs &p) {
@@ -688,6 +699,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     c_neuralblender_ui::on_bank_switch (nullptr, page);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
+    select_spectrum_for_visible_page ();
     return;
   }
 
@@ -1018,6 +1030,22 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
       break;
     }
 
+    case ATOM_SPECTRUM_PRE:
+    case ATOM_SPECTRUM_POST: {
+      if (count < SPECTRUM_BINS * 2)
+        return;
+
+      c_eqgraph &graph =
+        type == ATOM_SPECTRUM_PRE
+          ? eqpage_pre.graph
+          : eqpage_post.graph;
+      graph.set_spectrum (
+        values,
+        values + SPECTRUM_BINS,
+        SPECTRUM_BINS);
+      break;
+    }
+
     default: CP
       break;
   }
@@ -1049,6 +1077,14 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
   }
   if (prop == urid_stats) {
     set_ui_values (value, ATOM_STATS);
+    return;
+  }
+  if (prop == urid_spectrum_pre) {
+    set_ui_values (value, ATOM_SPECTRUM_PRE);
+    return;
+  }
+  if (prop == urid_spectrum_post) {
+    set_ui_values (value, ATOM_SPECTRUM_POST);
     return;
   }
 
@@ -1276,7 +1312,8 @@ static void cleanup (LV2UI_Handle handle) { CP
   c_lv2_ui *ui = (c_lv2_ui *) handle;
   if (!ui)
     return;
-  
+
+  ui->write_int_property (ui->urid_spectrum_select, LV2_SPECTRUM_OFF);
   CP
   save_lv2_ui_config (ui);
   delete ui;

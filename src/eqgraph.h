@@ -12,6 +12,7 @@
 
 #include "neuralblender.h"
 #include "nbtk.h"
+#include "spectrum.h"
 
 #define CURVE_RECALC_MS 30
 #define CURVE_POINTS    640
@@ -33,6 +34,8 @@ public:
   void render_base (cairo_t *cr);
   void on_paint (cairo_t *cr);
   void set_state (c_eq_state *state);
+  void set_spectrum (
+    const float *input_db, const float *output_db, size_t count);
   void state_changed (bool force_redraw = true);
   void set_highlighted_band (int band);
   void on_resize (int w, int h);
@@ -47,6 +50,7 @@ public:
   float freq_min = 20.0f;     // NOTE TO SELF: check for hard coded <---
   float freq_max = 20000.0f; 
   float db_range = 36.0f;
+  float spectrum_floor_db = -90.0f;
   float handle_size = 12.0f;
     
 private:
@@ -55,6 +59,9 @@ private:
   float curve_x_to_freq (float x) const;
   float db_to_y (float gain_db) const;
   float y_to_db (float y) const;
+  float spectrum_db_to_y (float db) const;
+  void draw_spectrum (cairo_t *cr);
+  void path_spectrum (cairo_t *cr, const float *values, size_t count);
   
   inline bool mouse_in () { return mouse_x >= 0 && mouse_y >= 0; }
   
@@ -86,6 +93,10 @@ private:
   bool rendered_state_valid = false;
   std::vector<float> curves [EQ_NUM_BANDS];
   std::vector<float> curve;
+  std::array<float, SPECTRUM_BINS> spectrum_frequencies {};
+  std::array<float, SPECTRUM_BINS> spectrum_input_db {};
+  std::array<float, SPECTRUM_BINS> spectrum_output_db {};
+  bool spectrum_valid = false;
   
   bool curves_dirty = true;
   uint64_t curves_last_ms = 0;

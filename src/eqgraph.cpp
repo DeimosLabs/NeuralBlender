@@ -11,7 +11,10 @@
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_BLUE
 #include "cmdline_debug.h"
 
-c_eqgraph::c_eqgraph () { CP }
+c_eqgraph::c_eqgraph () { CP
+  generate_spectrum_frequencies (
+    spectrum_frequencies.data (), spectrum_frequencies.size ());
+}
 c_eqgraph::~c_eqgraph () {
   CP
   release_pointer_grab ();
@@ -111,6 +114,8 @@ void c_eqgraph::on_paint (cairo_t *cr) {
   if (!curve_surface)
     return;
 
+  draw_spectrum (cr);
+
   cairo_set_source_surface (cr, curve_surface, 0, 0);
   cairo_paint (cr);
 
@@ -171,6 +176,47 @@ void c_eqgraph::on_paint (cairo_t *cr) {
     }
   }
 
+}
+
+void c_eqgraph::draw_spectrum (cairo_t *cr) {
+  if (!cr || !spectrum_valid || w <= 1 || h <= 1)
+    return;
+
+  cairo_save (cr);
+  cairo_rectangle (cr, 0, 0, w, h);
+  cairo_clip (cr);
+  cairo_set_line_join (cr, CAIRO_LINE_JOIN_ROUND);
+  cairo_set_line_cap (cr, CAIRO_LINE_CAP_ROUND);
+
+  cairo_set_line_width (cr, 0.5f);
+  cairo_set_source_rgba (cr, 0.28f, 0.48f, 0.95f, 0.75f);
+  path_spectrum (cr, spectrum_input_db.data (), spectrum_input_db.size ());
+  cairo_stroke (cr);
+
+  cairo_set_line_width (cr, 1.0f);
+  cairo_set_source_rgba (cr, 1.00f, 0.40f, 0.40f, 0.75f);
+  path_spectrum (cr, spectrum_output_db.data (), spectrum_output_db.size ());
+  cairo_stroke (cr);
+
+  cairo_restore (cr);
+}
+
+void c_eqgraph::path_spectrum (
+    cairo_t *cr, const float *values, size_t count) {
+  if (!cr || !values || count == 0)
+    return;
+
+  for (size_t i = 0; i < count; ++i) {
+    const float db = std::isfinite (values [i])
+      ? values [i]
+      : spectrum_floor_db;
+    const float x = freq_to_x (spectrum_frequencies [i]);
+    const float y = spectrum_db_to_y (db);
+    if (i == 0)
+      cairo_move_to (cr, x, y);
+    else
+      cairo_line_to (cr, x, y);
+  }
 }
 
 void c_eqgraph::draw_label (cairo_t *cr, int band) {
@@ -260,6 +306,17 @@ void c_eqgraph::draw_label (cairo_t *cr, int band) {
 void c_eqgraph::set_state (c_eq_state *state_) {
   state = state_;
   state_changed ();
+}
+
+void c_eqgraph::set_spectrum (
+    const float *input_db, const float *output_db, size_t count) {
+  if (!input_db || !output_db || count < SPECTRUM_BINS)
+    return;
+
+  std::copy_n (input_db, SPECTRUM_BINS, spectrum_input_db.begin ());
+  std::copy_n (output_db, SPECTRUM_BINS, spectrum_output_db.begin ());
+  spectrum_valid = true;
+  invalidate ();
 }
 
 static bool eqgraph_states_equal (
@@ -579,6 +636,17 @@ float c_eqgraph::y_to_db (float y) const {
   const float half = h / 2.0f;
   const float db = (half - (float) y) * (db_range * 2) / (float) h;
   return std::clamp (db, -1.0f * db_range, db_range);
+}
+
+float c_eqgraph::spectrum_db_to_y (float db) const {
+  if (h <= 1 || spectrum_floor_db >= 0.0f)
+    return 0.0f;
+
+  const float normalized = std::clamp (
+    (db - spectrum_floor_db) / -spectrum_floor_db,
+    0.0f,
+    1.0f);
+  return (1.0f - normalized) * (float) (h - 1);
 }
 
 int c_eqgraph::find_handle (int x, int y) const {

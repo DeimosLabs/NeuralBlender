@@ -139,6 +139,7 @@ public:
   void write_prefs_to (t_prefs &p) override;
   void apply_effective_controls () override;
   int idle () override;
+  _lane_bank spectrum_bank = BANK_COUNT;
 };
 
 static void refresh_bank_stats (c_neuralblender_ui *ui, _lane_bank bank);
@@ -476,6 +477,44 @@ void c_standalone_ui::apply_effective_controls () {
 int c_standalone_ui::idle () {
   if (g_blender->tuner_on)
     g_blender->pitchtracker.analyze ();
+
+  _lane_bank next_spectrum_bank = BANK_COUNT;
+  if (visible_page == PAGE_EQPRE)
+    next_spectrum_bank = BANK_EQPRE;
+  else if (visible_page == PAGE_EQPOST)
+    next_spectrum_bank = BANK_EQPOST;
+
+  auto spectrum_eq = [&] (_lane_bank bank) -> c_eq * {
+    if (bank == BANK_EQPRE)
+      return &g_blender->eq_pre;
+    if (bank == BANK_EQPOST)
+      return &g_blender->eq_post;
+    return NULL;
+  };
+
+  if (next_spectrum_bank != spectrum_bank) {
+    if (c_eq *eq = spectrum_eq (spectrum_bank))
+      eq->stop_spectra ();
+    if (c_eq *eq = spectrum_eq (next_spectrum_bank))
+      eq->start_spectra ();
+    spectrum_bank = next_spectrum_bank;
+  }
+
+  if (c_eq *eq = spectrum_eq (spectrum_bank)) {
+    if (eq->analyze_spectra ()) {
+      float input_db [SPECTRUM_BINS];
+      float output_db [SPECTRUM_BINS];
+      if (eq->copy_spectrum_input_bins (input_db, SPECTRUM_BINS) &&
+          eq->copy_spectrum_output_bins (output_db, SPECTRUM_BINS)) {
+        c_eqgraph &graph =
+          spectrum_bank == BANK_EQPRE
+            ? eqpage_pre.graph
+            : eqpage_post.graph;
+        graph.set_spectrum (
+          input_db, output_db, SPECTRUM_BINS);
+      }
+    }
+  }
 
   const float gain = g_blender->noisegate_on
     ? g_blender->noisegate.get_current_gain ()

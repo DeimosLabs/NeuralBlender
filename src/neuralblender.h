@@ -31,6 +31,7 @@
 #include <atomic>
 #include <chrono>
 #include <iostream>
+#include <array>
 
 #define RTNEURAL_DEFAULT_ALIGNMENT 16
 #include "RTNeural/RTNeural.h"
@@ -43,6 +44,7 @@
 
 #include "meter.h"
 #include "tuner.h"
+#include "spectrum.h"
 
 #ifdef max
 #undef max
@@ -286,12 +288,84 @@ struct c_neuralblender_state {
   float noiserelease      = 20.0f;
   float calib_target_db   = DB_CALIB_TARGET_DEFAULT;
   int calib_source        = 0; // 0=guitar, 1=bass
-  
+
   c_neuralblender_bank_state banks [BANK_COUNT];
   c_eq_state eqpre;
   c_eq_state eqpost;
   c_neuralblender_lane_state (&lanes) [NB_NUM_MODELS];
 };
+
+#ifdef HAVE_FFTW
+
+class c_spectrum_analyzer {
+public:
+  c_spectrum_analyzer ();
+  ~c_spectrum_analyzer ();
+  c_spectrum_analyzer &operator= (const c_spectrum_analyzer &) = delete;
+  c_spectrum_analyzer (const c_spectrum_analyzer &) = delete;
+
+  void set_samplerate (int samplerate);
+  void process_block (const float *in, size_t count);
+
+  // Called outside the audio thread.
+  bool analyze ();
+  bool copy_bins (float *out, size_t count) const;
+
+  // On EQ graph show/hide.
+  void start ();
+  void stop ();
+
+private:
+  void publish_snapshot ();
+  bool copy_latest_snapshot (float *out, uint64_t &sequence) const;
+  void publish_magnitudes (const float *values);
+
+  int samplerate = 0;
+  size_t write_pos = 0;
+  uint64_t total_samples = 0;
+  uint64_t next_snapshot_at = SPECTRUM_FFT_SIZE;
+  int write_snapshot = 0;
+  std::atomic<int> published_snapshot { -1 };
+  mutable std::atomic<int> reading_snapshot { -1 };
+  std::atomic<uint64_t> published_sequence { 0 };
+  uint64_t snapshot_sequences [3] = { 0 };
+  uint64_t analyzed_sequence = 0;
+
+  std::array<float, SPECTRUM_FFT_SIZE> ring {};
+  std::array<float, SPECTRUM_FFT_SIZE> snapshots [3] {};
+  std::array<float, SPECTRUM_FFT_SIZE> fft_input {};
+  std::array<fftwf_complex, SPECTRUM_FFT_SIZE / 2 + 1> fft_output {};
+
+  std::array<float, SPECTRUM_BINS> frequencies {};
+  std::array<float, SPECTRUM_BINS> magnitude_work {};
+  std::array<float, SPECTRUM_BINS> magnitude_buffers [3] {};
+  int write_magnitudes = 0;
+  std::atomic<int> published_magnitudes { -1 };
+  mutable std::atomic<int> reading_magnitudes { -1 };
+
+  std::array<float, SPECTRUM_FFT_SIZE> window {};
+  float window_sum = 0.0f;
+
+  fftwf_plan fft_plan = nullptr;
+  std::atomic<bool> enabled { false };
+  bool capture_active = false;
+
+};
+
+#else
+
+class c_spectrum_analyzer {
+public:
+
+  void set_samplerate (int) {}
+  void process_block (const float *, size_t) {}
+  bool analyze () { return false; }
+  bool copy_bins (float *, size_t) const { return false; }
+  void start () {}
+  void stop () {}
+};
+
+#endif
 
 class c_biquad {
 public:
@@ -368,6 +442,31 @@ public:
   c_biquad old_bands  [EQ_NUM_BANDS];
   uint32_t coeff_xfade_pos [EQ_NUM_BANDS] = { 0 };
   uint32_t coeff_xfade_len [EQ_NUM_BANDS] = { 0 };
+
+  inline bool analyze_spectra () {
+    const bool input_changed  = m_spectrum_input.analyze ();
+    const bool output_changed = m_spectrum_output.analyze ();
+    return input_changed || output_changed;
+  }
+
+  inline void start_spectra () {
+    m_spectrum_input.start ();
+    m_spectrum_output.start ();
+  }
+  inline void stop_spectra () {
+    m_spectrum_input.stop ();
+    m_spectrum_output.stop ();
+  }
+  inline bool copy_spectrum_input_bins (float *buf, size_t count) const {
+    return m_spectrum_input.copy_bins (buf, count);
+  }
+  inline bool copy_spectrum_output_bins (float *buf, size_t count) const {
+    return m_spectrum_output.copy_bins (buf, count);
+  }
+
+private:
+  c_spectrum_analyzer m_spectrum_input;
+  c_spectrum_analyzer m_spectrum_output;
 };
 
 // a simple but effective noise gate
@@ -684,7 +783,7 @@ public:
   float tuner_cents_off = 0.0f;
   bool mute_all = false;
   bool linked_calib = false;
-  int calib_source = 0; // 0=guitar, 1=bass
+  int calib_source = 0; // for now 0=guitar, 1=bass
   std::atomic<_ramp_state> ramp = RAMP_PLAYING;
   c_vudata *meter_masterin  = NULL;
   c_vudata *meter_masterout = NULL;
@@ -714,6 +813,7 @@ private:
   std::atomic<uint32_t> active_lane_mask  { 0 };
   std::atomic<uint32_t> pending_lane_mask { 0 };
   std::atomic<uint32_t> loaded_lane_mask  { 0 };
+
   bool xfade_active = false;
   uint32_t xfade_old_mask = 0;
   uint32_t xfade_new_mask = 0;
