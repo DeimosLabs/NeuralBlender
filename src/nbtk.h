@@ -973,6 +973,9 @@ public:
   bool button_right_down () const;
   bool check_click_distance (int which_button) const;
   
+  virtual void hide () { c_widget::hide (); }
+  virtual void show () { c_widget::show (); }
+  
 protected:
   virtual void render_base (cairo_t *cr);
   virtual void render_overlay (cairo_t *cr);

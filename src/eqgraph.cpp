@@ -14,10 +14,18 @@
 c_eqgraph::c_eqgraph () { CP
   generate_spectrum_frequencies (
     spectrum_frequencies.data (), spectrum_frequencies.size ());
+  reset_hist ();
+  spectrum_input_db.fill (spectrum_floor_db);
+  spectrum_output_db.fill (spectrum_floor_db);
+  spectrum_input_hold.fill (0.0f);
+  spectrum_output_hold.fill (0.0f);
+  spectrum_last_update_ms = nbtk::now_ms ();
 }
+
 c_eqgraph::~c_eqgraph () {
   CP
   release_pointer_grab ();
+  clear_spectrum_surface ();
   clear_curve_surface ();
 }
 
@@ -114,7 +122,15 @@ void c_eqgraph::on_paint (cairo_t *cr) {
   if (!curve_surface)
     return;
 
-  draw_spectrum (cr);
+  if (spectrum_surface_dirty ||
+      spectrum_surface_w != w || spectrum_surface_h != h) {
+    render_spectrum_surface ();
+  }
+
+  if (spectrum_surface) {
+    cairo_set_source_surface (cr, spectrum_surface, 0, 0);
+    cairo_paint (cr);
+  }
 
   cairo_set_source_surface (cr, curve_surface, 0, 0);
   cairo_paint (cr);
@@ -187,35 +203,52 @@ void c_eqgraph::draw_spectrum (cairo_t *cr) {
   cairo_clip (cr);
   cairo_set_line_join (cr, CAIRO_LINE_JOIN_ROUND);
   cairo_set_line_cap (cr, CAIRO_LINE_CAP_ROUND);
-
+  
+  cairo_set_source_rgba (cr, 0.28f, 0.48f, 0.75f, 0.2f);
+  path_spectrum (cr, spectrum_hist.data (), spectrum_hist.size (), true);
+  cairo_fill (cr);
+  
   cairo_set_line_width (cr, 0.5f);
   cairo_set_source_rgba (cr, 0.28f, 0.48f, 0.95f, 0.75f);
   path_spectrum (cr, spectrum_input_db.data (), spectrum_input_db.size ());
   cairo_stroke (cr);
-
+  
   cairo_set_line_width (cr, 1.0f);
   cairo_set_source_rgba (cr, 1.00f, 0.40f, 0.40f, 0.75f);
   path_spectrum (cr, spectrum_output_db.data (), spectrum_output_db.size ());
   cairo_stroke (cr);
-
+  
   cairo_restore (cr);
 }
 
-void c_eqgraph::path_spectrum (
-    cairo_t *cr, const float *values, size_t count) {
+void c_eqgraph::path_spectrum (cairo_t *cr, const float *values,
+                               size_t count, bool fill) {
   if (!cr || !values || count == 0)
     return;
+  
+  const float baseline_y = (float) (h - 1);
+  float x = freq_to_x (spectrum_frequencies [0]);
+  float y = spectrum_db_to_y (
+    std::isfinite (values [0]) ? values [0] : spectrum_floor_db);
 
-  for (size_t i = 0; i < count; ++i) {
-    const float db = std::isfinite (values [i])
-      ? values [i]
-      : spectrum_floor_db;
-    const float x = freq_to_x (spectrum_frequencies [i]);
-    const float y = spectrum_db_to_y (db);
-    if (i == 0)
-      cairo_move_to (cr, x, y);
-    else
-      cairo_line_to (cr, x, y);
+  cairo_new_path (cr);
+  if (fill) {
+    cairo_move_to (cr, x, baseline_y);
+    cairo_line_to (cr, x, y);
+  } else {
+    cairo_move_to (cr, x, y);
+  }
+
+  for (size_t i = 1; i < count; ++i) {
+    const float db = std::isfinite (values [i]) ? values [i] : spectrum_floor_db;
+    x = freq_to_x (spectrum_frequencies [i]);
+    y = spectrum_db_to_y (db);
+    cairo_line_to (cr, x, y);
+  }
+
+  if (fill) {
+    cairo_line_to (cr, x, baseline_y);
+    cairo_close_path (cr);
   }
 }
 
@@ -308,15 +341,148 @@ void c_eqgraph::set_state (c_eq_state *state_) {
   state_changed ();
 }
 
+void c_eqgraph::reset_hist () {
+  spectrum_hist.fill (spectrum_floor_db);
+  spectrum_surface_dirty = true;
+  invalidate ();
+}
+
+void c_eqgraph::update_one_falling_curve (
+    const float *incoming,
+    std::array<float, SPECTRUM_BINS> &curve,
+    std::array<float, SPECTRUM_BINS> &hold,
+    float dt) {
+
+  for (size_t i = 0; i < SPECTRUM_BINS; ++i) {
+    const float db = std::isfinite (incoming [i]) ? incoming [i] : spectrum_floor_db;
+    
+    if (db >= curve [i]) {
+      curve [i] = db;
+      hold [i] = spectrum_hold_seconds;
+      continue;
+    }
+    
+    float fall_dt = dt;
+    
+    if (hold [i] > 0.0f) {
+      fall_dt = std::max (0.0f, dt - hold [i]);
+      hold [i] = std::max (0.0f, hold [i] - dt);
+    }
+    
+    curve [i] = std::max (
+      db,
+      curve [i] - spectrum_fall_db_per_second * fall_dt);
+  }
+}
+
+void c_eqgraph::update_falling_curves (
+    const float *input_db,
+    const float *output_db) {
+  
+  const uint64_t now = nbtk::now_ms ();
+  
+  float dt = spectrum_last_update_ms
+    ? static_cast<float> (now - spectrum_last_update_ms) / 1000.0f
+    : 0.0f;
+  
+  spectrum_last_update_ms = now;
+  dt = std::clamp (dt, 0.0f, 0.1f);
+  
+  update_one_falling_curve (
+    input_db,
+    spectrum_input_db,
+    spectrum_input_hold,
+    dt);
+  
+  update_one_falling_curve (
+    output_db,
+    spectrum_output_db,
+    spectrum_output_hold,
+    dt);
+}
+
 void c_eqgraph::set_spectrum (
     const float *input_db, const float *output_db, size_t count) {
   if (!input_db || !output_db || count < SPECTRUM_BINS)
     return;
+  
+  for (size_t i = 0; i < SPECTRUM_BINS; ++i) {
+    const float db = std::isfinite (output_db [i])
+      ? output_db [i]
+      : spectrum_floor_db;
+    spectrum_hist [i] = std::max (spectrum_hist [i], db);
+  }
 
-  std::copy_n (input_db, SPECTRUM_BINS, spectrum_input_db.begin ());
-  std::copy_n (output_db, SPECTRUM_BINS, spectrum_output_db.begin ());
+  update_falling_curves (input_db, output_db);
+  
   spectrum_valid = true;
+  spectrum_surface_dirty = true;
   invalidate ();
+}
+
+void c_eqgraph::clear_spectrum_surface () {
+  if (spectrum_cr) {
+    cairo_destroy (spectrum_cr);
+    spectrum_cr = NULL;
+  }
+
+  if (spectrum_surface) {
+    cairo_surface_destroy (spectrum_surface);
+    spectrum_surface = NULL;
+  }
+
+  spectrum_surface_w = 0;
+  spectrum_surface_h = 0;
+  spectrum_surface_dirty = true;
+}
+
+bool c_eqgraph::ensure_spectrum_surface () {
+  if (w <= 0 || h <= 0)
+    return false;
+
+  if (spectrum_surface &&
+      spectrum_cr &&
+      spectrum_surface_w == w &&
+      spectrum_surface_h == h &&
+      cairo_surface_status (spectrum_surface) == CAIRO_STATUS_SUCCESS &&
+      cairo_status (spectrum_cr) == CAIRO_STATUS_SUCCESS) {
+    return true;
+  }
+
+  clear_spectrum_surface ();
+  spectrum_surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, w, h);
+  if (!spectrum_surface ||
+      cairo_surface_status (spectrum_surface) != CAIRO_STATUS_SUCCESS) {
+    clear_spectrum_surface ();
+    return false;
+  }
+
+  spectrum_cr = cairo_create (spectrum_surface);
+  if (!spectrum_cr || cairo_status (spectrum_cr) != CAIRO_STATUS_SUCCESS) {
+    clear_spectrum_surface ();
+    return false;
+  }
+
+  spectrum_surface_w = w;
+  spectrum_surface_h = h;
+  spectrum_surface_dirty = true;
+  return true;
+}
+
+void c_eqgraph::render_spectrum_surface () {
+  if (!ensure_spectrum_surface () || !spectrum_cr)
+    return;
+
+  cairo_save (spectrum_cr);
+  cairo_set_operator (spectrum_cr, CAIRO_OPERATOR_CLEAR);
+  cairo_paint (spectrum_cr);
+  cairo_restore (spectrum_cr);
+
+  if (spectrum_valid)
+    draw_spectrum (spectrum_cr);
+
+  cairo_surface_flush (spectrum_surface);
+  spectrum_surface_dirty = false;
 }
 
 static bool eqgraph_states_equal (
@@ -632,21 +798,44 @@ float c_eqgraph::db_to_y (float db) const {
 float c_eqgraph::y_to_db (float y) const {
   if (h <= 0)
     return 0.0f;
-
+  
   const float half = h / 2.0f;
   const float db = (half - (float) y) * (db_range * 2) / (float) h;
   return std::clamp (db, -1.0f * db_range, db_range);
 }
 
-float c_eqgraph::spectrum_db_to_y (float db) const {
+/*float c_eqgraph::spectrum_db_to_y (float db) const {
   if (h <= 1 || spectrum_floor_db >= 0.0f)
     return 0.0f;
-
-  const float normalized = std::clamp (
-    (db - spectrum_floor_db) / -spectrum_floor_db,
-    0.0f,
-    1.0f);
+  
+  float normalized = (db - spectrum_floor_db) / -spectrum_floor_db;
+  if (spectrum_normalize) 
+    normalized = std::clamp (
+      normalized,
+      0.0f,
+      1.0f);
+  
   return (1.0f - normalized) * (float) (h - 1);
+}*/
+
+float c_eqgraph::spectrum_db_to_y (float db) const {
+  if (h <= 1 || spectrum_ceiling_db <= spectrum_floor_db)
+    return 0.0f;
+
+  const float range = spectrum_ceiling_db - spectrum_floor_db;
+  float normalized = (db - spectrum_floor_db) / range;
+
+  if (spectrum_normalize)
+    normalized = std::clamp (normalized, 0.0f, 1.0f);
+
+  const float scale = std::max (spectrum_scale, 0.001f);
+
+  // Signed power preserves values outside the graph when not clamping.
+  normalized = std::copysign (
+    std::pow (std::abs (normalized), scale),
+    normalized);
+
+  return (1.0f - normalized) * static_cast<float> (h - 1);
 }
 
 int c_eqgraph::find_handle (int x, int y) const {
@@ -820,6 +1009,11 @@ bool c_eqgraph::on_mouse_down (int mouse_x, int mouse_y, int button) {
   }
 
   nbtk::c_canvas::on_mouse_down (mouse_x, mouse_y, button);
+  
+  if (button == Button2 || button == Button3) {
+    reset_hist ();
+    return true;
+  }
 
   if (button != Button1)
     return true;

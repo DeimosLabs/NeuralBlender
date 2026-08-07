@@ -45,13 +45,23 @@ public:
   void on_mouse_enter () override;
   void on_mouse_leave () override;
   inline int get_mouse_handle () const { return mouse_handle; }
+  void reset_hist ();
+  void update_falling_curves (const float *input, const float *output);
+  void update_one_falling_curve (
+    const float *in,
+    std::array<float, SPECTRUM_BINS> &curve,
+    std::array<float, SPECTRUM_BINS> &hold,
+    float dt);
   
   bool always_show_handles = false;
   float freq_min = 20.0f;     // NOTE TO SELF: check for hard coded <---
   float freq_max = 20000.0f; 
   float db_range = 36.0f;
-  float spectrum_floor_db = -90.0f;
   float handle_size = 12.0f;
+  float spectrum_floor_db = -84.0f;
+  float spectrum_ceiling_db = 6.0f;
+  float spectrum_scale = 1.0f;
+  bool spectrum_normalize = false;
     
 private:
   float freq_to_x (float freq) const;
@@ -61,7 +71,11 @@ private:
   float y_to_db (float y) const;
   float spectrum_db_to_y (float db) const;
   void draw_spectrum (cairo_t *cr);
-  void path_spectrum (cairo_t *cr, const float *values, size_t count);
+  void path_spectrum (cairo_t *cr, const float *values,
+                      size_t count, bool fill = false);
+  void clear_spectrum_surface ();
+  bool ensure_spectrum_surface ();
+  void render_spectrum_surface ();
   
   inline bool mouse_in () { return mouse_x >= 0 && mouse_y >= 0; }
   
@@ -93,10 +107,24 @@ private:
   bool rendered_state_valid = false;
   std::vector<float> curves [EQ_NUM_BANDS];
   std::vector<float> curve;
-  std::array<float, SPECTRUM_BINS> spectrum_frequencies {};
-  std::array<float, SPECTRUM_BINS> spectrum_input_db {};
-  std::array<float, SPECTRUM_BINS> spectrum_output_db {};
+  std::array<float,  SPECTRUM_BINS> spectrum_frequencies {};
+  std::array<float,  SPECTRUM_BINS> spectrum_input_db {};
+  std::array<float,  SPECTRUM_BINS> spectrum_output_db {};
+  std::array<float,  SPECTRUM_BINS> spectrum_hist {};
+  std::array<float,  SPECTRUM_BINS> spectrum_input_hold {};
+  std::array<float,  SPECTRUM_BINS> spectrum_output_hold {};
+
+  size_t spectrum_last_update_ms    = 0;
+  float spectrum_hold_seconds       = 0.0f;
+  float spectrum_fall_db_per_second = 96.0f;
+
   bool spectrum_valid = false;
+  bool spectrum_surface_dirty = true;
+
+  cairo_surface_t *spectrum_surface = NULL;
+  cairo_t *spectrum_cr = NULL;
+  int spectrum_surface_w = 0;
+  int spectrum_surface_h = 0;
   
   bool curves_dirty = true;
   uint64_t curves_last_ms = 0;
