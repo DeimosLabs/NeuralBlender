@@ -107,8 +107,8 @@ void c_eqgraph::on_paint (cairo_t *cr) {
   if (!state)
     return;
   
-  static nbtk::c_printfps p ("on_paint: ");
-  p.tick ();
+  //static nbtk::c_printfps p ("on_paint: ");
+  //p.tick ();
   
   const uint64_t now = nbtk::now_ms ();
   if (!curve_surface ||
@@ -538,8 +538,8 @@ void c_eqgraph::render_curve_surface () {
   if (!ensure_curve_surface () || !curve_cr)
     return;
 
-  static nbtk::c_printfps p ("render_curve_surface: ");
-  p.tick ();
+  //static nbtk::c_printfps p ("render_curve_surface: ");
+  //p.tick ();
   
   cairo_save (curve_cr);
   cairo_set_operator (curve_cr, CAIRO_OPERATOR_CLEAR);
@@ -675,8 +675,8 @@ void c_eqgraph::path_curve (cairo_t *cr, const std::vector<float> &v) {
   if (!v.size () || !cr)
     return;
 
-  static nbtk::c_printfps p ("path curve: ");
-  p.tick ();
+  //static nbtk::c_printfps p ("path curve: ");
+  //p.tick ();
   
   const size_t n = v.size ();
   const float denom = (n > 1) ? (float) (n - 1) : 1.0f;
@@ -710,8 +710,8 @@ void c_eqgraph::generate_curves () { CP
   if (!state || w <= 0)
     return;
   
-  static nbtk::c_printfps p ("generate_curves: ");
-  p.tick ();
+  //static nbtk::c_printfps p ("generate_curves: ");
+  //p.tick ();
   
   curve.assign (CURVE_POINTS, 0.0f);
   for (int band = 0; band < EQ_NUM_BANDS; ++band)
