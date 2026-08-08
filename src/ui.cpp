@@ -2546,13 +2546,10 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
     if ((_widget_role) widget->role == ROLE_EQ_GRAPH)
       eqpage.sync_band_from_state (eq, band);
     else
-      eqpage.graph.state_changed ();
+      eqpage.graph.state_changed (false);
 
     on_eq_band (widget, bank, band);
-    if ((_widget_role) widget->role == ROLE_EQ_GRAPH)
-      event.handled = true;
-    else
-      finish ();
+    event.handled = true;
     if (changed_enabled)
       sync_eq_graph_highlight (event.source);
     return true;
@@ -2574,8 +2571,11 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       state.eqpost = eq;
     else
       state.eqpre = eq;
+    c_eqpage_widgets &eqpage =
+      bank == BANK_EQPOST ? eqpage_post : eqpage_pre;
+    eqpage.graph.state_changed (false);
     on_eq_master_gain (event.source, bank, eq.master_gain_db);
-    finish ();
+    event.handled = true;
     return;
   }
 
@@ -2955,6 +2955,9 @@ int c_neuralblender_ui::idle () {
 
   if (nbtk_app.backend)
     nbtk_app.backend->run_events (&app);
+
+  eqpage_pre.graph.tick ();
+  eqpage_post.graph.tick ();
 
   sync_eq_graph_highlight ();
 

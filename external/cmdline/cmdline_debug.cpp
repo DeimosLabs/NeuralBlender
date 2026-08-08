@@ -10,19 +10,11 @@
 #include <cstdarg>
 #include <chrono>
 #include <cstring>
-#include <string>
 #include <string_view>
 
 namespace {
 
-uint64_t now_ms () {
-  using clock = std::chrono::steady_clock;
-  return static_cast<uint64_t> (
-    std::chrono::duration_cast<std::chrono::milliseconds> (
-      clock::now ().time_since_epoch ()).count ());
-}
-
-std::string basename (const char *path) {
+std::string cmdline_basename (const char *path) {
   if (!path)
     return {};
 
@@ -34,7 +26,7 @@ std::string basename (const char *path) {
 #endif
 }
 
-std::string short_function_name (const char *func) {
+std::string cmdline_short_function_name (const char *func) {
   if (!func)
     return {};
 
@@ -61,11 +53,11 @@ std::string make_prefix (const char *color,
     prefix += color;
 
   prefix += '[';
-  prefix += basename (file);
+  prefix += cmdline_basename (file);
   prefix += ':';
   prefix += std::to_string (line);
   prefix += ' ';
-  prefix += short_function_name (func);
+  prefix += cmdline_short_function_name (func);
   prefix += "] ";
 
   if (color)
@@ -123,7 +115,7 @@ int cmdline_debug (std::FILE *out,
 
 #ifdef CMDLINE_DEBUG_TIMESTAMPS
   std::fprintf (out, "[%08llu] ",
-                static_cast<unsigned long long> (now_ms ()));
+                static_cast<unsigned long long> (_cmdline_now_ms ()));
 #endif
 
   va_list args;

@@ -36,6 +36,7 @@ public:
   void set_state (c_eq_state *state);
   void set_spectrum (
     const float *input_db, const float *output_db, size_t count);
+  void tick ();
   void state_changed (bool force_redraw = true);
   void set_highlighted_band (int band);
   void on_resize (int w, int h);
@@ -128,6 +129,7 @@ private:
   
   bool curves_dirty = true;
   uint64_t curves_last_ms = 0;
+  uint64_t last_paint_ms = 0;
   //static constexpr uint64_t CURVE_RECALC_MS = 50;
   
   cairo_surface_t *curve_surface = NULL;

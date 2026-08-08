@@ -11,6 +11,8 @@
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_BLUE
 #include "cmdline_debug.h"
 
+#define PRINTFPS(x)    { static nbtk::c_printfps p (x); p.tick (); }
+
 c_eqgraph::c_eqgraph () { CP
   generate_spectrum_frequencies (
     spectrum_frequencies.data (), spectrum_frequencies.size ());
@@ -109,8 +111,10 @@ void c_eqgraph::on_paint (cairo_t *cr) {
   
   //static nbtk::c_printfps p ("on_paint: ");
   //p.tick ();
+  printfps ("on_paint");
   
   const uint64_t now = nbtk::now_ms ();
+  last_paint_ms = now;
   if (!curve_surface ||
       (curves_dirty && now - curves_last_ms >= CURVE_RECALC_MS)) {
     generate_curves ();
@@ -417,7 +421,17 @@ void c_eqgraph::set_spectrum (
   
   spectrum_valid = true;
   spectrum_surface_dirty = true;
-  invalidate ();
+  if (nbtk::now_ms () - last_paint_ms >= CURVE_RECALC_MS)
+    invalidate ();
+}
+
+void c_eqgraph::tick () {
+  if (!is_visible () || (!curves_dirty && !spectrum_surface_dirty))
+    return;
+
+  const uint64_t now = nbtk::now_ms ();
+  if (now - last_paint_ms >= CURVE_RECALC_MS)
+    invalidate ();
 }
 
 void c_eqgraph::clear_spectrum_surface () {
@@ -865,7 +879,7 @@ void c_eqgraph::mark_curves_dirty (bool force_redraw) {
   const uint64_t now = nbtk::now_ms ();
   if (force_redraw ||
       !curve_surface ||
-      now - curves_last_ms >= CURVE_RECALC_MS) {
+      now - last_paint_ms >= CURVE_RECALC_MS) {
     invalidate ();
   }
 }

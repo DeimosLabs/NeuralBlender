@@ -507,6 +507,9 @@ int c_lv2_ui::idle () {
   if (nbtk_app.backend)
     nbtk_app.backend->run_events (&app);
 
+  eqpage_pre.graph.tick ();
+  eqpage_post.graph.tick ();
+
   nbtk_app.tick ();
 
   redraw_meters_now ();
