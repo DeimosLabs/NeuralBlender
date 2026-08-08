@@ -39,7 +39,7 @@ inline constexpr const char *ANSI_CYAN         = "\x1B[1;36m";
 inline constexpr const char *ANSI_WHITE        = "\x1B[1;37m";
 inline constexpr const char *ANSI_RESET        = "\x1B[0m";
 
-#define cmdline_printfps(a,b,c,d,e,f) { static c_cmdline_printfps p; \
+#define cmdline_debugfps(a,b,c,d,e,f) { static c_cmdline_printfps p; \
         long int x=p.tick (); if (x>0) debug ("%s: %ld calls/sec.", f, x); }
 
 namespace {
@@ -89,7 +89,8 @@ public:
 #endif
 
 #ifndef __FUNC__
-#define __FUNC__ __PRETTY_FUNCTION__
+#define __FUNC__ __func__
+//#define __FUNC__ __PRETTY_FUNCTION__
 #endif
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -107,14 +108,14 @@ static inline int cmdline_debug (std::FILE *out,
                    const char *fmt,
                    ...) CMDLINE_PRINTF_FORMAT (6, 7);
 
-static inline const char *cmdline_basename(const char *path) {
+static inline const char *cmdline_basename (const char *path) {
   if (!path)
     return "";
 
 #ifdef DEBUG_FULL_PATHS
   return path;
 #else
-  const char *slash = std::strrchr(path, '/');
+  const char *slash = std::strrchr (path, '/');
   return slash ? slash + 1 : path;
 #endif
 }
@@ -148,13 +149,12 @@ static inline int cmdline_debug (
   return result;
 }
 
-
 #undef CMDLINE_PRINTF_FORMAT
 
 #define debug(...) cmdline_debug(stderr,CMDLINE_DEBUG_COLOR,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
 #define CP         { debug("\x1B[1;37m____CHECKPOINT____\x1B[0m"); }
 #define BP         { debug("\x1B[1;37m____BREAKPOINT____\x1B[0m"); getc(stdin); }
-#define printfps(f) { cmdline_printfps(stderr,CMDLINE_DEBUG_COLOR,__FILE__,__LINE__,__FUNC__,f); }
+#define debugfps(f) { cmdline_debugfps(stderr,CMDLINE_DEBUG_COLOR,__FILE__,__LINE__,__FUNC__,f); }
 #else
 #define debug(...)    do {} while (0)
 #define printfps(...) do {} while (0)
