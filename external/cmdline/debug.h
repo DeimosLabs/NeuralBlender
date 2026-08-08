@@ -156,10 +156,10 @@ static inline int cmdline_debug (
 #define BP         { debug("\x1B[1;37m____BREAKPOINT____\x1B[0m"); getc(stdin); }
 #define debugfps(f) { cmdline_debugfps(stderr,CMDLINE_DEBUG_COLOR,__FILE__,__LINE__,__FUNC__,f); }
 #else
-#define debug(...)    do {} while (0)
-#define printfps(...) do {} while (0)
-#define CP            do {} while (0)
-#define BP            do {} while (0)
+#define debug(...)    do {} while (0);
+#define printfps(...) do {} while (0);
+#define CP            do {} while (0);
+#define BP            do {} while (0);
 #endif
 
 #endif
