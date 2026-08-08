@@ -35,9 +35,8 @@
 
 #include "data.h"
 
-#define CMDLINE_IMPLEMENTATION
 #define CMDLINE_DEBUG_COLOR ANSI_RED
-#include "cmdline_debug.h"
+#include "cmdline/debug.h"
 
 extern const char *g_build_timestamp;
 

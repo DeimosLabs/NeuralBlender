@@ -21,7 +21,7 @@
 #include "data/data.h"
 
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_CYAN
-#include "cmdline_debug.h"
+#include "cmdline/debug.h"
 
 static constexpr float DEFAULT_BG_R = 0.125f;
 static constexpr float DEFAULT_BG_G = 0.125f;

@@ -11,7 +11,7 @@
 #include <limits>
 
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_GREEN
-#include "cmdline_debug.h"
+#include "cmdline/debug.h"
 
 #ifndef METER_DATA_ONLY
 #include "nbtk.h"

@@ -10,7 +10,7 @@
 #include "configfile.h"
 
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_YELLOW
-#include "cmdline_debug.h"
+#include "cmdline/debug.h"
 
 struct s_option {
   std::string name;

@@ -42,9 +42,8 @@
 #define NB_URI "http://deimos.ca/neuralblender"
 #define LV2_METER_FPS 30.0
 
-#define CMDLINE_IMPLEMENTATION
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_RED
-#include "cmdline_debug.h"
+#include "cmdline/debug.h"
 
 
 struct Plugin : public c_lv2_urids {

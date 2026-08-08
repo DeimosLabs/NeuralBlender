@@ -54,13 +54,13 @@ function(add_neuralblender_gui_library target_name)
 
   target_include_directories(${target_name} PUBLIC
     ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/external
     ${CMAKE_CURRENT_BINARY_DIR}
   )
 
   target_link_libraries(${target_name} PUBLIC
     neuralblender_core
     Eigen3::Eigen
-    neuralblender_cmdline_debug
     neuralblender_config
     PkgConfig::X11
     PkgConfig::CAIRO
@@ -131,37 +131,18 @@ add_custom_target(generate_inline_data
   DEPENDS ${INLINE_DATA_CPP} ${INLINE_DATA_H}
 )
 
-add_library(neuralblender_cmdline_debug STATIC
-  external/cmdline/cmdline_debug.cpp
-)
-
 add_library(neuralblender_config STATIC
   src/configfile.cpp
-)
-
-set_target_properties(neuralblender_cmdline_debug PROPERTIES
-  POSITION_INDEPENDENT_CODE ON
 )
 
 set_target_properties(neuralblender_config PROPERTIES
   POSITION_INDEPENDENT_CODE ON
 )
 
-target_include_directories(neuralblender_cmdline_debug PUBLIC
-  ${PROJECT_SOURCE_DIR}/external/cmdline
-)
-
 target_include_directories(neuralblender_config PUBLIC
   ${PROJECT_SOURCE_DIR}/src
+  ${PROJECT_SOURCE_DIR}/external
 )
-
-target_link_libraries(neuralblender_config PUBLIC
-  neuralblender_cmdline_debug
-)
-
-if (TRACE)
-  target_compile_definitions(neuralblender_cmdline_debug PUBLIC CMDLINE_DEBUG_TIMESTAMPS)
-endif()
 
 add_library(neuralblender_data OBJECT
   ${INLINE_DATA_CPP}
@@ -234,6 +215,7 @@ target_include_directories(neuralblender_core PUBLIC
 target_include_directories(neuralblender_meter_data PUBLIC
   ${CMAKE_CURRENT_BINARY_DIR}
   ${PROJECT_SOURCE_DIR}
+  ${PROJECT_SOURCE_DIR}/external
   ${PROJECT_SOURCE_DIR}/src
 )
 
@@ -255,7 +237,6 @@ target_link_libraries(neuralblender_core PUBLIC
   PkgConfig::FFTW3F
   PkgConfig::SNDFILE
   PkgConfig::SAMPLERATE
-  neuralblender_cmdline_debug
   neuralblender_config
 )
 
@@ -307,7 +288,6 @@ if (STANDALONE)
     
     target_link_libraries(neuralblender PRIVATE
       neuralblender_core
-      neuralblender_cmdline_debug
       Threads::Threads
       PkgConfig::JACK
     )
@@ -388,7 +368,6 @@ if (LV2)
   
   target_link_libraries(neuralblender_lv2 PRIVATE
     neuralblender_core
-    neuralblender_cmdline_debug
     Threads::Threads
     PkgConfig::LV2_DEPS
   )
@@ -439,7 +418,6 @@ if (LV2)
     
     target_link_libraries(neuralblender_ui PRIVATE
       neuralblender_gui_lv2
-      neuralblender_cmdline_debug
       neuralblender_config
       PkgConfig::LV2_DEPS
     )

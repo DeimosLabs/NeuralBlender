@@ -19,7 +19,7 @@
 #include "data/data.h"
 
 #define CMDLINE_DEBUG_COLOR ANSI_MAGENTA
-#include "cmdline_debug.h"
+#include "cmdline/debug.h"
 
 #define MIN_WINDOW_HEIGHT (120 + (130 * NB_NUM_MODELS))
 //#define DEFAULT_WINDOW_HEIGHT (12 + std::min (640, (52 + (180 * NB_NUM_MODELS))))

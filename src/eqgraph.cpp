@@ -9,7 +9,7 @@
 #include "eqgraph.h"
 
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_BLUE
-#include "cmdline_debug.h"
+#include "cmdline/debug.h"
 
 #define PRINTFPS(x)    { static nbtk::c_printfps p (x); p.tick (); }
 

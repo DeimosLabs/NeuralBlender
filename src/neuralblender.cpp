@@ -47,7 +47,7 @@
 
 
 #define CMDLINE_DEBUG_COLOR ANSI_BLUE
-#include "cmdline_debug.h"
+#include "cmdline/debug.h"
 
 //#define STANDALONE // done for us by build system (currently cmake)
 

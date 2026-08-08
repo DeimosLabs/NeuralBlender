@@ -25,9 +25,8 @@
 
 #define NB_UI_URI "http://deimos.ca/neuralblender#ui"
 
-#define CMDLINE_IMPLEMENTATION
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_MAGENTA
-#include "cmdline_debug.h"
+#include "cmdline/debug.h"
 
 void c_lv2_ui::write_control (uint32_t port, float value) {
   if (updating_from_host || !write)

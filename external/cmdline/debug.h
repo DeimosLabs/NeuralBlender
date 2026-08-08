@@ -2,6 +2,11 @@
 /* Loosely based on my old cmdline library that worked but
  * honestly wasn't very well written. Hopefully this version is better =)
  *
+ * To use:
+ *
+ * #define CMDLINE_DEBUG
+ * #include <cmdline/debug.h>
+ *
  *   - delt.
  */
 
@@ -12,6 +17,9 @@
 #include <cstdint>
 #include <string>
 #include <chrono>
+#include <cstdarg>
+#include <cstring>
+#include <string_view>
 
 inline constexpr const char *ANSI_BLACK        = "\x1B[0;30m";
 inline constexpr const char *ANSI_DARK_RED     = "\x1B[0;31m";
@@ -33,7 +41,9 @@ inline constexpr const char *ANSI_RESET        = "\x1B[0m";
 
 #define cmdline_printfps(a,b,c,d,e,f) { static c_cmdline_printfps p; \
         long int x=p.tick (); if (x>0) debug ("%s: %ld calls/sec.", f, x); }
-        
+
+namespace {
+
 inline uint64_t _cmdline_now_ms () {
   using clock = std::chrono::steady_clock;
   return static_cast<uint64_t> (
@@ -67,24 +77,89 @@ public:
   }
 };
 
+} // namespace
+
+#ifdef CMDLINE_DEBUG
+#ifndef CMDLINE_DEBUG_COLOR
+#define CMDLINE_DEBUG_COLOR ANSI_RED
+#endif
+
+#ifndef CMDLINE_DEBUG_TIMESTAMPS
+#define CMDLINE_DEBUG_TIMESTAMPS
+#endif
+
+#ifndef __FUNC__
+#define __FUNC__ __PRETTY_FUNCTION__
+#endif
+
 #if defined(__GNUC__) || defined(__clang__)
-int cmdline_debug (std::FILE *out,
-                   const char *color,
-                   const char *file,
-                   int line,
-                   const char *func,
-                   const char *fmt,
-                   ...) __attribute__((format(printf, 6, 7)));
-
+#define CMDLINE_PRINTF_FORMAT(fmt_index, first_arg) \
+  __attribute__ ((format (printf, fmt_index, first_arg)))
 #else
+#define CMDLINE_PRINTF_FORMAT(fmt_index, first_arg)
+#endif
 
-int cmdline_debug (std::FILE *out,
+static inline int cmdline_debug (std::FILE *out,
                    const char *color,
                    const char *file,
                    int line,
                    const char *func,
                    const char *fmt,
-                   ...);
+                   ...) CMDLINE_PRINTF_FORMAT (6, 7);
+
+static inline const char *cmdline_basename(const char *path) {
+  if (!path)
+    return "";
+
+#ifdef DEBUG_FULL_PATHS
+  return path;
+#else
+  const char *slash = std::strrchr(path, '/');
+  return slash ? slash + 1 : path;
+#endif
+}
+
+static inline int cmdline_debug (
+    std::FILE *out,
+    const char *color,
+    const char *file,
+    int line,
+    const char *func,
+    const char *fmt,
+    ...) {
+
+  if (!out)
+    out = stderr;
+
+#ifdef CMDLINE_DEBUG_TIMESTAMPS
+  std::fprintf (out, "[%08llu] ", static_cast<unsigned long long> (_cmdline_now_ms ()));
+#endif
+
+  std::fprintf (out, "%s[%s:%d %s] %s", color ? color : ANSI_DARK_GREY,
+       cmdline_basename (file), line, func ? func : "", ANSI_RESET);
+
+  va_list args;
+  va_start (args, fmt);
+  const int result = std::vfprintf (out, fmt ? fmt : "(null)", args);
+  va_end (args);
+
+  std::fputc ('\n', out);
+  std::fflush (out);
+  return result;
+}
+
+
+#undef CMDLINE_PRINTF_FORMAT
+
+#define debug(...) cmdline_debug(stderr,CMDLINE_DEBUG_COLOR,__FILE__,__LINE__,__FUNC__,__VA_ARGS__)
+#define CP         { debug("\x1B[1;37m____CHECKPOINT____\x1B[0m"); }
+#define BP         { debug("\x1B[1;37m____BREAKPOINT____\x1B[0m"); getc(stdin); }
+#define printfps(f) { cmdline_printfps(stderr,CMDLINE_DEBUG_COLOR,__FILE__,__LINE__,__FUNC__,f); }
+#else
+#define debug(...)    do {} while (0)
+#define printfps(...) do {} while (0)
+#define CP            do {} while (0)
+#define BP            do {} while (0)
 #endif
 
 #endif

@@ -9,7 +9,7 @@
 #include <limits>
 
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_GREEN
-#include "cmdline_debug.h"
+#include "cmdline/debug.h"
 
 #define ZLIB_BUFFER_SIZE 65536
 #define GZIP_WINDOW_BITS 31

@@ -21,7 +21,7 @@
 #endif
 
 #define CMDLINE_DEBUG_COLOR ANSI_CYAN
-#include "cmdline_debug.h"
+#include "cmdline/debug.h"
 
 #ifdef METER_DATA_ONLY
 
