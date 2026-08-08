@@ -65,7 +65,7 @@ void c_eqgraph::render_base (cairo_t *cr) {
   cairo_stroke (cr);
   
   cairo_set_source_rgba, (cr, 0, 0, 1, 1);
-  cairo_set_font_size (cr, 11);
+  cairo_set_font_size (cr, get_app_font_size () * nbtk::TEXTSIZE_SMALL);
   
   cairo_text_extents_t ext;
   cairo_text_extents (cr, "Ay", &ext);
@@ -285,7 +285,7 @@ void c_eqgraph::draw_label (cairo_t *cr, int band) {
     hz_format = showfreq < 100 ? "%.2f%s" : "%.1f%s";
   }
   
-  cairo_set_font_size (cr, 11);
+  cairo_set_font_size (cr, get_app_font_size () * nbtk::TEXTSIZE_MINI);
   cairo_select_font_face (cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
   cairo_text_extents_t ext;
   cairo_text_extents (cr, "Ay", &ext);

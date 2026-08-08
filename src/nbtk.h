@@ -36,6 +36,7 @@
 
 namespace nbtk {
 
+static constexpr float FONTSIZE_BASE    = 13.0f; // BASE font size
 static constexpr float TEXTSIZE_MINI    = 0.75f; // about  9pt on 13pt base
 static constexpr float TEXTSIZE_SMALL   = 0.80f; // about 10pt on 13pt base
 static constexpr float TEXTSIZE_COMPACT = 0.90f; // about 11pt on 13pt base
@@ -242,6 +243,7 @@ public:
   bool set_label (const std::string &text);
   void set_tooltip (const char *text);
   void set_font (cairo_t *cr) {}
+  float get_app_font_size ();
   
   c_app *app = nullptr;
   c_toplevelwindow *toplevel = nullptr;

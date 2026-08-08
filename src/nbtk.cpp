@@ -689,6 +689,10 @@ bool c_widget::mouse_move_tree (int px, int py) {
   return on_mouse_move (lx, ly);
 }
 
+float c_widget::get_app_font_size () {
+  return app ? app->fontsize * app->font_scale : FONTSIZE_BASE;
+}
+
 bool c_widget::update_hover_tree (int px, int py) {
   if (!visible || !enabled || !contains_local (px, py)) {
     clear_hover_tree ();
