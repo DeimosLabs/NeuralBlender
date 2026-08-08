@@ -45,6 +45,7 @@
 #include "meter.h"
 #include "tuner.h"
 #include "spectrum.h"
+#include "state.h"
 
 #ifdef max
 #undef max
@@ -107,15 +108,6 @@ struct c_printfps {
     }
   }
 };
-#endif
-
-// TODO: fix this shit
-#ifndef DEBUG_SHOW_RATE
-//#ifdef DEBUG
-#define DEBUG_SHOW_RATE(x) {static c_printfps fps(x);fps.tick();}
-//#else
-//#define DEBUG_SHOW_RATE(x)
-//#endif
 #endif
 
 enum _eq_band_mode {

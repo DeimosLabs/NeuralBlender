@@ -297,15 +297,15 @@ void c_eqgraph::draw_label (cairo_t *cr, int band) {
   
   snprintf (buf [0], 63, "%d: %s", band + 1, modenames [state->mode [band]]);
   snprintf (buf [1], 63, hz_format.c_str (), showfreq, hz_unit.c_str ());
-  snprintf (buf [2], 63, "%s%.1fdB", gain < 0.0f ? "-" : "+", fabs (gain));
-  snprintf (buf [3], 63, "Q=%.2f", q);
+  snprintf (buf [3], 63, "%s%.1fdB", gain < 0.0f ? "-" : "+", fabs (gain));
+  snprintf (buf [4], 63, "Q=%.2f", q);
   if (note >= 8 && note <= 184) {
-    snprintf (buf [4], 63, "%s%d (%s%.3f)", 
+    snprintf (buf [2], 63, "%s%d (%s%.3f)", 
               g_note_names_sharps [note % 12],
               (int) (note / 12 - 1),
               cents < 0 ? "-" : "+", fabs (cents));
   } else {
-    snprintf (buf [4], 63, "");
+    snprintf (buf [2], 63, "");
   }
   
   cairo_text_extents (cr, "(A-0 (9999.9Hz)", &ext);

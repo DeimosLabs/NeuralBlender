@@ -7,7 +7,7 @@
 #include <string>
 #include <cctype>
 #include <vector>
-#include "configfile.h"
+#include "state.h"
 
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_YELLOW
 #include "cmdline/debug.h"
@@ -81,6 +81,9 @@ std::string c_configfile::get_path () {
   
   return std::string (c) + "/" + CONFIG_FILE_NAME;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// c_configfile
 
 void c_configfile::process_in (int which, std::string value) {
   debug ("which=%d (%s), value='%s'", 
@@ -236,3 +239,7 @@ bool c_configfile::write_file (std::string path) { CP
   
   return static_cast<bool> (f);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// structs serialize/deserialize functions
+

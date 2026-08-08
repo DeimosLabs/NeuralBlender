@@ -132,7 +132,7 @@ add_custom_target(generate_inline_data
 )
 
 add_library(neuralblender_config STATIC
-  src/configfile.cpp
+  src/state.cpp
 )
 
 set_target_properties(neuralblender_config PROPERTIES

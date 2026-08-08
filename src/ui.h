@@ -25,7 +25,7 @@
 #include <string>
 #include <vector>
 
-#include "configfile.h"
+#include "state.h"
 #include "nbtk.h"
 #include "tuner.h"
 #include "eqgraph.h"

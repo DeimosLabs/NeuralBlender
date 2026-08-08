@@ -41,7 +41,7 @@
 
 #include "neuralblender.h"
 #include "data.h"
-#include "configfile.h"
+#include "state.h"
 
 //#define DEBUG
 
