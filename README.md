@@ -66,7 +66,7 @@ cmake ..
 make -j$(nproc) && sudo make install
 ```
 
-To uninstall:
+To uninstall, go back to the same build directory and run:
 
 ```
 sudo make uninstall
