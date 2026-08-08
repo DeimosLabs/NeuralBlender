@@ -11,8 +11,6 @@
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_BLUE
 #include "cmdline/debug.h"
 
-#define PRINTFPS(x)    { static nbtk::c_printfps p (x); p.tick (); }
-
 c_eqgraph::c_eqgraph () { CP
   generate_spectrum_frequencies (
     spectrum_frequencies.data (), spectrum_frequencies.size ());
@@ -109,9 +107,7 @@ void c_eqgraph::on_paint (cairo_t *cr) {
   if (!state)
     return;
   
-  //static nbtk::c_printfps p ("on_paint: ");
-  //p.tick ();
-  printfps ("on_paint");
+  //debugfps ("on_paint");
   
   const uint64_t now = nbtk::now_ms ();
   last_paint_ms = now;
@@ -552,9 +548,6 @@ void c_eqgraph::render_curve_surface () {
   if (!ensure_curve_surface () || !curve_cr)
     return;
 
-  //static nbtk::c_printfps p ("render_curve_surface: ");
-  //p.tick ();
-  
   cairo_save (curve_cr);
   cairo_set_operator (curve_cr, CAIRO_OPERATOR_CLEAR);
   cairo_paint (curve_cr);
@@ -689,9 +682,6 @@ void c_eqgraph::path_curve (cairo_t *cr, const std::vector<float> &v) {
   if (!v.size () || !cr)
     return;
 
-  //static nbtk::c_printfps p ("path curve: ");
-  //p.tick ();
-  
   const size_t n = v.size ();
   const float denom = (n > 1) ? (float) (n - 1) : 1.0f;
   const float xscale = (w > 1) ? (float) (w - 1) / denom : 0.0f;
@@ -720,12 +710,9 @@ static int eqgraph_oversampling_for_q (float q) {
   return 1;
 }
 
-void c_eqgraph::generate_curves () { CP
+void c_eqgraph::generate_curves () {
   if (!state || w <= 0)
     return;
-  
-  //static nbtk::c_printfps p ("generate_curves: ");
-  //p.tick ();
   
   curve.assign (CURVE_POINTS, 0.0f);
   for (int band = 0; band < EQ_NUM_BANDS; ++band)

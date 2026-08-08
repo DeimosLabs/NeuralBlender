@@ -57,6 +57,25 @@ static constexpr uint32_t MAX_IR_PARTITIONS = 4096; // about 3sec at 64smp. buff
 
 // a few helper functions
 
+static inline cpx cpx_mul (const cpx &a, const cpx &b) {
+  cpx ret;
+  ret.r = a.r * b.r - a.i * b.i;
+  ret.i = a.r * b.i + a.i * b.r;
+  return ret;
+}
+
+static inline void cpx_add (cpx &a, const cpx &b) {
+  a.r += b.r;
+  a.i += b.i;
+}
+
+static void clear_cpx_vector (std::vector<cpx> &v) {
+  for (cpx &x : v) {
+    x.r = 0.0f;
+    x.i = 0.0f;
+  }
+}
+
 // not using this one, let's keep it for now
 static void fade_block_in_out (float *f, size_t nframes) {
   if (!f || nframes < 3)
@@ -1307,6 +1326,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
 }
 
 c_convolver::c_convolver () { CP }
+
 c_convolver::~c_convolver () { CP
   clear ();
 }
@@ -1402,7 +1422,7 @@ static bool convolver_resample_ir (
       dst [i] = src.back ();
       continue;
     }
-
+    
     const size_t i1 = i0 + 1;
     const float frac = (float) (pos - (double) i0);
     dst [i] = src [i0] + (src [i1] - src [i0]) * frac;
@@ -1410,25 +1430,6 @@ static bool convolver_resample_ir (
 
   convolver_trim_trailing_silence (dst);
   return !dst.empty ();
-}
-
-static inline cpx cpx_mul (const cpx &a, const cpx &b) {
-  cpx ret;
-  ret.r = a.r * b.r - a.i * b.i;
-  ret.i = a.r * b.i + a.i * b.r;
-  return ret;
-}
-
-static inline void cpx_add (cpx &a, const cpx &b) {
-  a.r += b.r;
-  a.i += b.i;
-}
-
-static void clear_cpx_vector (std::vector<cpx> &v) {
-  for (cpx &x : v) {
-    x.r = 0.0f;
-    x.i = 0.0f;
-  }
 }
 
 bool c_convolver::load_ir (
@@ -1620,21 +1621,23 @@ bool c_convolver::rebuild_resampled_ir () {
 }
 
 // THIS MUST BE CALLED FROM THE LOADER THREAD!!!
+// Currently, lv2 audio thread calls this on block size change from host
 bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
+  debug ("blocksize=%d", (int) blocksize);
   if (m_ir.empty () || blocksize == 0)
     return false;
-    
+  
   clear_fft_state ();
-
+  
   m_blocksize = blocksize;
   m_partition_size = blocksize;
   m_fft_size = m_partition_size * 2;
-
+  
   m_num_partitions =
     ceil_div_u32 (m_ir.size (), m_partition_size);
   if (m_num_partitions == 0)
     return false;
-
+  
   if (m_num_partitions > MAX_IR_PARTITIONS) {
     std::cerr << "NeuralBlender: Error: refusing to enable oversized IR realtime convolution: "
               << m_ir.size () << " samples at blocksize " << blocksize
@@ -1643,7 +1646,7 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
     clear_fft_state ();
     return false;
   }
-
+  
   m_overlap.resize (m_partition_size);
   std::fill (m_overlap.begin (), m_overlap.end (), 0.0f);
   m_direct_history.resize (m_ir.size ());
@@ -1652,15 +1655,15 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
   m_variable_input.reserve ((size_t) m_partition_size * 2);
   m_fft_sync_out.resize (m_partition_size);
   m_direct_pos = 0;
-
+  
   // frequency-domain sizes for real FFT
   m_freq_bins = (m_fft_size / 2) + 1;
-
+  
   // frequency-domain IR partitions
   m_ir_fft.resize (m_num_partitions);
   for (std::vector<cpx> &partition : m_ir_fft)
     partition.resize (m_freq_bins);
-
+  
   // freq-domain accumulation ring
   // 1 slot per IR partition.
   m_accum_fft.resize (m_num_partitions);
@@ -1675,18 +1678,18 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
     (float *) fftwf_alloc_real (m_fft_size);
   m_fftw_time_out =
     (float *) fftwf_alloc_real (m_fft_size);
-
+  
   m_fftw_freq_in =
     (fftwf_complex *) fftwf_alloc_complex (m_freq_bins);
   m_fftw_freq_out =
     (fftwf_complex *) fftwf_alloc_complex (m_freq_bins);
-
+  
   if (!m_fftw_time_in || !m_fftw_time_out ||
       !m_fftw_freq_in || !m_fftw_freq_out) {
     clear_fft_state ();
     return false;
   }
-
+  
   {
     std::lock_guard<std::mutex> lock (g_fftw_planner_mutex);
     m_forward_plan =
@@ -1703,7 +1706,7 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
         m_fftw_time_out,
         FFTW_ESTIMATE);
   }
-
+  
   if (!m_forward_plan || !m_inverse_plan) {
     clear_fft_state ();
     return false;
@@ -1719,24 +1722,25 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
       if (ir_offset + j < m_ir.size ())
         m_fftw_time_in [j] = m_ir [ir_offset + j];
     }
-
+    
     fftwf_execute (m_forward_plan);
-
+    
     // Copy FFTW output into our persistent IR partition bins.
     for (uint32_t bin = 0; bin < m_freq_bins; ++bin) {
       m_ir_fft [p] [bin].r = m_fftw_freq_out [bin] [0];
       m_ir_fft [p] [bin].i = m_fftw_freq_out [bin] [1];
     }
   }
-
+  
   // reset runtime state
   reset ();
   m_ready = true;
-
+  
   return true;
 }
 
 void c_convolver::process_fft_block (const float *in, float *out) {
+
   if (!in || !out || !m_ready || m_blocksize == 0)
     return;
 
@@ -1806,7 +1810,7 @@ void c_convolver::process_direct_block (
     const float *in,
     float *out,
     uint32_t nframes) {
-
+  
   if (!in || !out || nframes == 0)
     return;
 
@@ -1863,6 +1867,8 @@ void c_convolver::process_block (
     process_fft_block (in, out);
     return;
   }
+  
+  debug ("nframes=%d, m_blocksize=%d", (int) nframes, (int) m_blocksize);
 
   m_variable_input.insert (m_variable_input.end (), in, in + nframes);
   process_direct_block (in, out, nframes);
