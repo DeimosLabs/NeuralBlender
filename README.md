@@ -63,7 +63,7 @@ cd NeuralBlender
 mkdir build
 cd build
 cmake ..
-make                 # or make -j$(nproc) to build faster
+make -j$(nproc)
 sudo make install
 ```
 
