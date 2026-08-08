@@ -40,11 +40,8 @@
 #endif
 
 #include "neuralblender.h"
-#include "data.h"
-#include "state.h"
 
 //#define DEBUG
-
 
 #define CMDLINE_DEBUG_COLOR ANSI_BLUE
 #include "cmdline/debug.h"
