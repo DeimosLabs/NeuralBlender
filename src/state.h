@@ -10,12 +10,14 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 #include "constants.h"
 
 #define CONFIG_FILE_NAME             ".config/neuralblender.conf"
 #define CONFIG_KEY_NAME_MODEL_CWD    "model_path"
 #define CONFIG_KEY_NAME_IR_CWD       "ir_path"
+#define CONFIG_KEY_NAME_PRESET_CWD   "preset_path"
 #define CONFIG_KEY_NAME_ADV          "show_advanced"
 #define CONFIG_KEY_NAME_EXCL         "excl_default"
 #define CONFIG_KEY_NAME_CALIB        "calib_default"
@@ -26,29 +28,12 @@
 #define CONFIG_KEY_NAME_BYP_RCLICK   "bypass_rightclick"
 #define CONFIG_KEY_NAME_TOOLTIPS     "show_tooltips"
 #define CONFIG_DEFAULT_DIR           "/"
+#define CONFIG_KEY_NAME_EQ           "eq" // this may appear multiple times for EQ presets
 
-class c_configfile {
-public:
-  c_configfile ();
-  bool read_file (std::string path);
-  bool read_file ();
-  bool write_file (std::string path);
-  bool write_file ();
-  std::string get_path ();
-  bool set_item (size_t n, std::string value);
-  std::string get_item (size_t n);
-  bool set_item (std::string name, std::string value);
-  std::string get_item (std::string name);
-  int find_item (std::string name);
-  void dump (); // for debugging
-
-  static bool istrue (std::string name);
+void split_at_equal (std::string s, std::string &before, std::string &after);
+void split_at (std::string s, std::vector<std::string> &v, const char c = ',');
+bool istrue (std::string name);
   
-private:
-  void process_in (int which, std::string value);
-  void process_out (int which, std::string value);
-};
-
 enum _eq_band_mode {
   EQ_OFF,
   EQ_HIPASS,
@@ -58,6 +43,45 @@ enum _eq_band_mode {
   EQ_LOWPASS,
   EQ_KEEP // means don't change current setting
 };
+
+static inline int eq_mode_to_type (_eq_band_mode mode, int slope) {
+  if (slope < 1)
+    slope = 1;
+  else if (slope > EQ_SLOPE_MAX)
+    slope = EQ_SLOPE_MAX;
+
+  switch (mode) {
+    case EQ_HIPASS:   return slope - 1;
+    case EQ_LOWSHELF: return 4;
+    case EQ_BELL:     return 5;
+    case EQ_HISHELF:  return 6;
+    case EQ_LOWPASS:  return 6 + slope;
+    default:          return 5;
+  }
+}
+
+static inline void eq_type_to_mode (
+    int type, _eq_band_mode &mode, int &slope) {
+  if (type < 0)
+    type = 0;
+  else if (type > 10)
+    type = 10;
+
+  slope = 1;
+  if (type <= 3) {
+    mode = EQ_HIPASS;
+    slope = type + 1;
+  } else if (type == 4) {
+    mode = EQ_LOWSHELF;
+  } else if (type == 5) {
+    mode = EQ_BELL;
+  } else if (type == 6) {
+    mode = EQ_HISHELF;
+  } else {
+    mode = EQ_LOWPASS;
+    slope = type - 6;
+  }
+}
 
 extern float g_defaultfreqs [];
 extern _eq_band_mode g_defaultmodes [];
@@ -94,9 +118,21 @@ enum _mix_mode {
   MIX_SILENCE
 };
 
+enum _eq_which {
+  EQ_PRE,
+  EQ_POST,
+  EQ_PRESET
+};
+
 struct c_mix_state {
   _mix_mode mode;
   uint32_t lane_mask;
+};
+
+enum class t_parse_result {
+  not_mine,
+  parsed,
+  invalid
 };
 
 struct c_neuralblender_lane_state {
@@ -110,6 +146,9 @@ struct c_neuralblender_lane_state {
   bool loaded = false;
   bool dcflip = false;
   bool do_calib = false;
+
+  void to_strings (_lane_bank bank, int lane, std::vector<std::string> &v);
+  t_parse_result from_strings (_lane_bank bank, int lane, std::vector<std::string> &v);
 };
 
 struct c_neuralblender_bank_state {
@@ -129,19 +168,29 @@ struct c_eq_state {
       q [i] = 1.0f;
     }
   }
-
+  
+  void to_string (std::string &s);
+  t_parse_result from_string (std::string s);
+  
+  std::string preset_name;
   bool on = false;
   float master_gain_db = 0.0f;
-  bool enabled [EQ_NUM_BANDS] = {};
-  _eq_band_mode mode [EQ_NUM_BANDS] = {};
-  int slope [EQ_NUM_BANDS] = {};
-  float freq [EQ_NUM_BANDS] = {};
-  float gain_db [EQ_NUM_BANDS] = {};
-  float q [EQ_NUM_BANDS] = {};
+  _eq_which which = EQ_PRESET;
+
+  bool enabled [EQ_NUM_BANDS]        = { false, false, false, false, false, false, false, false };
+  _eq_band_mode mode [EQ_NUM_BANDS]  = { EQ_HIPASS, EQ_LOWSHELF, EQ_BELL, EQ_BELL, 
+                                         EQ_BELL, EQ_BELL, EQ_HISHELF, EQ_LOWPASS };
+  float freq [EQ_NUM_BANDS]          = { 50, 100, 250, 500, 1000, 2000, 4000, 8000 };
+  float gain_db [EQ_NUM_BANDS]       = { 0, 0, 0, 0, 0, 0, 0, 0 };
+  int slope [EQ_NUM_BANDS]           = { 1, 1, 1, 1, 1, 1, 1, 1 };
+  float q [EQ_NUM_BANDS]             = { 1, 1, 1, 1, 1, 1, 1, 1 };
 };
 
 struct c_neuralblender_state {
-  c_neuralblender_state () : lanes (banks [BANK_AMP].lanes) { }
+  c_neuralblender_state () : lanes (banks [BANK_AMP].lanes) {
+    eqpre.which = EQ_PRE;
+    eqpost.which = EQ_POST;
+  }
   c_neuralblender_state (const c_neuralblender_state &other)
       : lanes (banks [BANK_AMP].lanes) {
     *this = other;
@@ -182,6 +231,11 @@ struct c_neuralblender_state {
     return *this;
   }
 
+  void to_strings (std::vector<std::string> &v);
+  bool from_strings (std::vector<std::string> &v);
+  bool read_from (const std::string &filename);
+  bool write_to (const std::string &filename);
+
   std::string current_dir;
   bool bypass             = false;
   bool pedal_bypass       = false;
@@ -209,4 +263,26 @@ struct c_neuralblender_state {
   c_eq_state eqpre;
   c_eq_state eqpost;
   c_neuralblender_lane_state (&lanes) [NB_NUM_MODELS];
+};
+
+class c_configfile {
+public:
+  c_configfile ();
+  bool read_file (std::string path);
+  bool read_file ();
+  bool write_file (std::string path);
+  bool write_file ();
+  std::string get_path ();
+  bool set_item (size_t n, std::string value);
+  std::string get_item (size_t n);
+  bool set_item (std::string name, std::string value);
+  std::string get_item (std::string name);
+  int find_item (std::string name);
+  void dump (); // for debugging
+  static inline bool istrue (std::string s) { return ::istrue (s); }
+  std::vector<c_eq_state> eq_presets;
+
+private:
+  void process_in (int which, std::string value);
+  void process_out (int which, std::string value);
 };

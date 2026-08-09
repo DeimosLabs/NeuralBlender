@@ -559,6 +559,8 @@ public:
   float delay_ms (_lane_bank bank, size_t which) const;
   float delay_ms (size_t which) const;
   void get_state (c_neuralblender_state &state) const;
+  // Restores models and controls; call only from a non-RT thread.
+  bool set_state (const c_neuralblender_state &state);
   bool dcflip (_lane_bank bank, size_t which, bool b);
   bool calib_on (_lane_bank bank, size_t which, bool b);
   bool is_dcflipped (_lane_bank bank, size_t which);

@@ -3047,6 +3047,88 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
   }
 }
 
+bool c_neuralblender::set_state (const c_neuralblender_state &state) {
+  bool ret = true;
+
+  set_bypass (state.bypass);
+  set_pedal_bypass (state.pedal_bypass);
+  set_amp_bypass (state.amp_bypass);
+  set_cab_bypass (state.cab_bypass);
+
+  do_vu = state.do_vu;
+  mute_all = state.mute_all;
+  noisegate_on = state.noisegate_on;
+  tuner_on = state.tuner_on;
+  tuner_base_freq = state.tuner_base_freq;
+  calib_source = state.calib_source;
+
+  if (!std::isfinite (state.master_gain) ||
+      state.master_gain < 0.0f || state.master_gain > 10.0f) {
+    ret = false;
+  } else {
+    master_gain = state.master_gain;
+  }
+  ret &= set_presence (state.presence);
+  ret &= set_calib_target_db (state.calib_target_db);
+  noisegate.set_threshold (state.noisethresh);
+  noisegate.set_attack (state.noiseattack);
+  noisegate.set_hold (state.noisehold);
+  noisegate.set_release (state.noiserelease);
+
+  const auto apply_eq = [this, &ret] (
+      _lane_bank bank, const c_eq_state &eq_state) {
+    ret &= set_eq_bypass (bank, !eq_state.on);
+    ret &= set_eq_master_gain_db (bank, eq_state.master_gain_db);
+    for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
+      ret &= set_eq_band (
+        bank,
+        band,
+        eq_state.enabled [band],
+        eq_state.mode [band],
+        eq_state.slope [band],
+        eq_state.freq [band],
+        eq_state.gain_db [band],
+        eq_state.q [band]);
+    }
+  };
+  apply_eq (BANK_EQPRE, state.eqpre);
+  apply_eq (BANK_EQPOST, state.eqpost);
+
+  static constexpr _lane_bank model_banks [] = {
+    BANK_PEDAL, BANK_AMP, BANK_CAB
+  };
+  for (_lane_bank bank : model_banks) {
+    const c_neuralblender_bank_state &bank_state = state.banks [bank];
+    banks [bank].linked_calib = bank_state.linked_calib;
+    ret &= set_exclusive_lane (bank, bank_state.exclusive_lane);
+
+    for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
+      const c_neuralblender_lane_state &lane_state = bank_state.lanes [lane];
+      ret &= set_gain_in (bank, lane, lane_state.gain_in);
+      ret &= set_gain_out (bank, lane, lane_state.gain_out);
+      ret &= set_dry_out (bank, lane, lane_state.dry_out);
+      ret &= dcflip (bank, lane, lane_state.dcflip);
+      ret &= calib_on (bank, lane, lane_state.do_calib);
+
+      if (lane_state.filename.empty ()) {
+        if (which_amp (bank, lane).loaded ())
+          ret &= unload_model (bank, lane);
+      } else if (!which_amp (bank, lane).loaded () ||
+                 which_amp (bank, lane).model_filename () != lane_state.filename) {
+        ret &= load_model (bank, lane, lane_state.filename.c_str ());
+      }
+
+      ret &= set_ir_pitch (bank, lane, lane_state.ir_pitch_semitones);
+      ret &= set_delay_ms (bank, lane, lane_state.delay_ms);
+      ret &= set_lane_mute (bank, lane, lane_state.lane_mute);
+    }
+  }
+
+  linked_calib = banks [BANK_AMP].linked_calib;
+  update_effective_trim ();
+  return ret;
+}
+
 void c_neuralblender::update_mutes () {
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; bank++) {
     uint32_t loaded_mask = 0;

@@ -206,40 +206,14 @@ enum nb_lv2_eq_param {
 };
 
 static inline int nb_lv2_encode_eq_mode (_eq_band_mode mode, int slope) {
-  slope = std::clamp (slope, 1, EQ_SLOPE_MAX);
-
-  switch (mode) {
-    case EQ_HIPASS:   return slope - 1;      // 0..3
-    case EQ_LOWSHELF: return 4;
-    case EQ_BELL:     return 5;
-    case EQ_HISHELF:  return 6;
-    case EQ_LOWPASS:  return 6 + slope;      // 7..10
-    default:          return 5;
-  }
+  return eq_mode_to_type (mode, slope);
 }
 
 static inline void nb_lv2_decode_eq_mode (
     int value, _eq_band_mode *mode, int *slope) {
-
-  value = std::clamp (value, 0, 10);
-
   _eq_band_mode next_mode = EQ_BELL;
   int next_slope = 1;
-
-  if (value <= 3) {
-    next_mode = EQ_HIPASS;
-    next_slope = value + 1;
-  } else if (value == 4) {
-    next_mode = EQ_LOWSHELF;
-  } else if (value == 5) {
-    next_mode = EQ_BELL;
-  } else if (value == 6) {
-    next_mode = EQ_HISHELF;
-  } else {
-    next_mode = EQ_LOWPASS;
-    next_slope = value - 6;
-  }
-
+  eq_type_to_mode (value, next_mode, next_slope);
   if (mode)
     *mode = next_mode;
   if (slope)

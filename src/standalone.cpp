@@ -569,7 +569,7 @@ static void ui_main () {
         state.banks [bank].lanes [i].do_calib = true;
     }
   }
-  g_ui->sync_widgets_from_state (state);
+  g_ui->sync_widgets_from_state (state, true);
   g_ui->apply_effective_controls ();
   ui_started.store (true, std::memory_order_release);
   fprintf (stderr, "UI running...\n");
@@ -633,7 +633,16 @@ bool parse_args (int argc, char **argv, c_neuralblender *blender) {
 }
 
 int main (int argc, char **argv) {
+  char buf [1024];
+  c_neuralblender_state nbstate;
+  
   g_blender = new c_neuralblender;
+  
+  std::string nbstate_path = std::string (getenv ("HOME")) + "/.config/neuralblender.state";
+  const bool have_saved_state = nbstate.read_from (nbstate_path);
+  if (have_saved_state) {
+    debug ("loaded config state");
+  }
 
 #ifdef HAVE_GUI
   g_ui = new c_standalone_ui (g_blender);
@@ -660,19 +669,19 @@ int main (int argc, char **argv) {
   
   pitchtracker.dump ();
   exit (0);
+  
+  // object parse/serialize test
+  c_eq_state teststate;
+  teststate.on = true;
+  teststate.master_gain_db = 9.5f;
+  teststate.which = EQ_PRE;
+
+  std::string s;
+  teststate.to_string (s);
+  teststate.from_string (s);
+  exit (0);
   */
   
-  if (!parse_args (argc, argv, g_blender)) {
-    printf ("Error parsing command line\n");
-    do_usage (argc, argv);
-    return 1;
-  }
-  
-  if (g_blender->banks [BANK_AMP].lanes [0].filename != "")
-    g_blender->load_model (BANK_AMP, 0, g_blender->banks [BANK_AMP].lanes [0].filename.c_str ());
-  if (g_blender->banks [BANK_AMP].lanes [1].filename != "")
-    g_blender->load_model (BANK_AMP, 1, g_blender->banks [BANK_AMP].lanes [1].filename.c_str ());
-
   jack_client = jack_client_open ("NeuralBlender", JackNullOption, nullptr);
   if (!jack_client) {
     fprintf (stderr, "could not open JACK client\n");
@@ -711,6 +720,27 @@ int main (int argc, char **argv) {
     g_ui->set_samplerate (samplerate);
 #endif
   g_blender->set_blocksize (jack_get_buffer_size (jack_client));
+
+  if (have_saved_state && !g_blender->set_state (nbstate))
+    fprintf (stderr, "NeuralBlender: some saved state values could not be restored\n");
+
+  std::string state_models [2] = {
+    g_blender->banks [BANK_AMP].lanes [0].filename,
+    g_blender->banks [BANK_AMP].lanes [1].filename
+  };
+  if (!parse_args (argc, argv, g_blender)) {
+    printf ("Error parsing command line\n");
+    do_usage (argc, argv);
+    jack_client_close (jack_client);
+    jack_client = nullptr;
+    return 1;
+  }
+  for (size_t lane = 0; lane < 2; ++lane) {
+    const std::string &filename =
+      g_blender->banks [BANK_AMP].lanes [lane].filename;
+    if (!filename.empty () && filename != state_models [lane])
+      g_blender->load_model (BANK_AMP, lane, filename.c_str ());
+  }
   
 #ifdef HAVE_GUI
   ui_thread = std::thread (ui_main);
@@ -748,6 +778,11 @@ int main (int argc, char **argv) {
   while (g_running)
     usleep (10000);
   CP
+  
+  // test serialize
+  g_blender->get_state (nbstate);
+  nbstate.write_to (nbstate_path);
+  
   jack_client_close (jack_client);
   jack_client = nullptr;
   CP
@@ -756,6 +791,8 @@ int main (int argc, char **argv) {
     ui_thread.join ();
   save_standalone_config ();
 #endif
+  CP
+  delete g_blender;
   CP
   return 0;
 }
