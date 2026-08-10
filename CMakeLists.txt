@@ -66,6 +66,11 @@ function(add_neuralblender_gui_library target_name)
     PkgConfig::CAIRO
   )
 
+  if (TARGET PkgConfig::XRANDR)
+    target_link_libraries(${target_name} PUBLIC PkgConfig::XRANDR)
+    target_compile_definitions(${target_name} PRIVATE NBTK_HAVE_XRANDR=1)
+  endif()
+
   target_compile_definitions(${target_name} PUBLIC HAVE_GUI=1)
 
   if (ARGN)
@@ -332,8 +337,14 @@ endif()
 
 if (GUI)
   pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11)
+  pkg_check_modules(XRANDR QUIET IMPORTED_TARGET xrandr)
   pkg_check_modules(CAIRO REQUIRED IMPORTED_TARGET cairo)
   message(STATUS "X11: found")
+  if (XRANDR_FOUND)
+    message(STATUS "XRandR: found")
+  else()
+    message(STATUS "XRandR: not found, using root-window bounds")
+  endif()
   message(STATUS "Cairo: found")
 
   add_neuralblender_gui_library(neuralblender_gui)
