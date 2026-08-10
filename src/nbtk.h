@@ -797,6 +797,7 @@ public:
   virtual std::unique_ptr<c_tooltip> create_tooltip (c_widget *owner);
   virtual t_point root_to_screen (t_point p) const;
   virtual t_point screen_to_root (t_point p) const;
+  virtual t_rect screen_bounds_at (t_point p) const;
   virtual void on_event (t_event &event);
   virtual void on_action (t_action_event &event);
   virtual void on_command (t_command_event &event);
@@ -898,6 +899,7 @@ public:
   virtual t_native_window root_window (t_native_handle widget, bool is_widget) const = 0;
   virtual t_point root_to_screen (t_native_handle widget, t_point p) const = 0;
   virtual t_point screen_to_root (t_native_handle widget, t_point p) const = 0;
+  virtual t_rect screen_bounds_at (t_native_handle widget, t_point p) const = 0;
 };
 
 std::unique_ptr<c_native_backend> create_native_backend ();

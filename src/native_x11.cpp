@@ -6,9 +6,14 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <vector>
 
 #include "nbtk.h"
+
+#ifdef NBTK_HAVE_XRANDR
+#include <X11/extensions/Xrandr.h>
+#endif
 
 struct nbtk::t_native_childlist {
   std::vector<nbtk::t_native_widget *> children;
@@ -360,6 +365,61 @@ public:
         &ry);
 
     return { (int) (rx / hdpi), (int) (ry / hdpi) };
+  }
+
+  t_rect screen_bounds_at (t_native_handle handle, t_point p) const override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (!widget || !widget->app || !widget->app->dpy)
+      return { 0, 0, 1, 1 };
+
+    Display *display = widget->app->dpy;
+    const int screen = DefaultScreen (display);
+    const float hdpi = widget->app->hdpi > 0.0f ? widget->app->hdpi : 1.0f;
+
+#ifdef NBTK_HAVE_XRANDR
+    const int native_x = (int) (p.x * hdpi);
+    const int native_y = (int) (p.y * hdpi);
+    int monitor_count = 0;
+    XRRMonitorInfo *monitors = XRRGetMonitors (
+        display, RootWindow (display, screen), True, &monitor_count);
+
+    const XRRMonitorInfo *best = nullptr;
+    long long best_distance = std::numeric_limits<long long>::max ();
+    for (int i = 0; monitors && i < monitor_count; ++i) {
+      const XRRMonitorInfo &monitor = monitors [i];
+      const int right = monitor.x + (int) monitor.width - 1;
+      const int bottom = monitor.y + (int) monitor.height - 1;
+      const int nearest_x = std::clamp (native_x, monitor.x, right);
+      const int nearest_y = std::clamp (native_y, monitor.y, bottom);
+      const long long dx = (long long) native_x - nearest_x;
+      const long long dy = (long long) native_y - nearest_y;
+      const long long distance = dx * dx + dy * dy;
+      if (distance < best_distance) {
+        best = &monitor;
+        best_distance = distance;
+      }
+    }
+
+    if (best) {
+      const t_rect bounds {
+        (int) (best->x / hdpi),
+        (int) (best->y / hdpi),
+        std::max (1, (int) (best->width / hdpi)),
+        std::max (1, (int) (best->height / hdpi))
+      };
+      XRRFreeMonitors (monitors);
+      return bounds;
+    }
+    if (monitors)
+      XRRFreeMonitors (monitors);
+#endif
+
+    return {
+      0,
+      0,
+      std::max (1, (int) (DisplayWidth (display, screen) / hdpi)),
+      std::max (1, (int) (DisplayHeight (display, screen) / hdpi))
+    };
   }
 };
 

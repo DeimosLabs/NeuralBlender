@@ -4664,6 +4664,25 @@ bool c_app::focus_next (bool reverse) {
   return true;
 }
 
+static constexpr int tooltip_offset_x = 14;
+static constexpr int tooltip_offset_y = 20;
+
+static void show_tooltip_popup (c_app *app) {
+  if (!app || !app->tooltip_popup)
+    return;
+
+  const t_rect bounds = app->screen_bounds_at (
+      { app->tooltip_root_x - tooltip_offset_x,
+        app->tooltip_root_y - tooltip_offset_y });
+  const int max_x = std::max (
+      bounds.x, bounds.x + bounds.w - app->tooltip_popup->w);
+  const int max_y = std::max (
+      bounds.y, bounds.y + bounds.h - app->tooltip_popup->h);
+  app->tooltip_popup->show_at_screen_pos (
+      std::clamp (app->tooltip_root_x, bounds.x, max_x),
+      std::clamp (app->tooltip_root_y, bounds.y, max_y));
+}
+
 void c_app::tick () {
   if (active_combobox)
     active_combobox->tick_drag ();
@@ -4694,7 +4713,7 @@ void c_app::tick () {
     tooltip_popup->set_text (tooltip_pending_widget->tooltip.c_str ());
   }
 
-  tooltip_popup->show_at_screen_pos (tooltip_root_x, tooltip_root_y);
+  show_tooltip_popup (this);
 }
 
 void c_app::update_tooltip (c_widget *widget, int root_x, int root_y) {
@@ -4708,7 +4727,8 @@ void c_app::update_tooltip (c_widget *widget, int root_x, int root_y) {
     return;
   }
 
-  const t_point screen = root_to_screen ({ root_x + 14, root_y + 20 });
+  const t_point screen = root_to_screen (
+      { root_x + tooltip_offset_x, root_y + tooltip_offset_y });
   tooltip_root_x = screen.x;
   tooltip_root_y = screen.y;
 
@@ -4737,7 +4757,7 @@ void c_app::update_tooltip (c_widget *widget, int root_x, int root_y) {
     tooltip_popup->set_text (widget->tooltip.c_str ());
   }
 
-  tooltip_popup->show_at_screen_pos (tooltip_root_x, tooltip_root_y);
+  show_tooltip_popup (this);
 }
 
 void c_app::hide_tooltip () {
@@ -6127,6 +6147,15 @@ nbtk::t_point c_app::screen_to_root (nbtk::t_point p) const {
     return embedded_window ? embedded_window->screen_to_local (p) : p;
 
   return backend->screen_to_root (active_toplevel->widget, p);
+}
+
+nbtk::t_rect c_app::screen_bounds_at (nbtk::t_point p) const {
+  if (!backend || !active_toplevel || !active_toplevel->widget) {
+    const t_point origin = root_to_screen ({ 0, 0 });
+    return { origin.x, origin.y, root ? root->w : 1, root ? root->h : 1 };
+  }
+
+  return backend->screen_bounds_at (active_toplevel->widget, p);
 }
 
 void c_app::on_action (nbtk::t_action_event &event) {
