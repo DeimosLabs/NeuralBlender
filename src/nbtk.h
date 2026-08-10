@@ -129,6 +129,8 @@ class c_native_backend;
 class c_tooltip;
 class c_filepicker;
 class c_valueeditor_popup;
+class c_askstring_dialog;
+class c_askyesno_dialog;
 
 enum class _event_type {
   unknown,
@@ -137,6 +139,18 @@ enum class _event_type {
   mouse,
   key,
   value_changed
+};
+
+enum class _command_result {
+  none,
+  accepted,
+  rejected,
+  cancelled
+};
+
+enum _nbtk_command : int64_t {
+  NBTK_CMD_NONE = -2,
+  NBTK_CMD_SET_VALUE = -1
 };
 
 struct t_event {
@@ -157,7 +171,9 @@ struct t_action_event : public t_event {
 };
 
 struct t_command_event : public t_action_event {
-  int command = 0;
+  int64_t command = 0;
+  _command_result result = _command_result::none;
+  std::string text;
 
   t_command_event ();
 };
@@ -235,6 +251,11 @@ public:
   virtual void move (int x, int y);
   virtual void resize (int w, int h);
   virtual void move_resize (int x, int y, int w, int h);
+  virtual void shrinkwrap (
+      int padding_x = 16,
+      int padding_y = -1,
+      bool center_x = false,
+      bool center_y = true);
   virtual bool highlighted () const;
   bool set_external_highlight (bool b);
   void invalidate ();
@@ -314,6 +335,7 @@ public:
   virtual t_rect value_area_rect () const;
   virtual t_rect value_label_rect () const;
   virtual void draw_value_label (cairo_t *cr);
+  void on_command (t_command_event &event) override;
 
   float min = 0.0f;
   float max = 1.0f;
@@ -419,6 +441,11 @@ public:
   c_checkbox ();
 
   void draw (cairo_t *cr) override;
+  void shrinkwrap (
+      int padding_x = 16,
+      int padding_y = -1,
+      bool center_x = false,
+      bool center_y = true) override;
 };
 
 class c_container;
@@ -655,6 +682,11 @@ public:
   bool hit_value_label (int x, int y) const override;
   t_rect value_area_rect () const override;
   t_rect value_label_rect () const override;
+  void shrinkwrap (
+      int padding_x = 16,
+      int padding_y = -1,
+      bool center_x = false,
+      bool center_y = true) override;
 
   float drag_sensitivity = 0.005f;
   float log_taper = 1.0f;
@@ -749,6 +781,17 @@ public:
   virtual void tick ();
   virtual void update_tooltip (c_widget *widget, int root_x, int root_y);
   virtual void hide_tooltip ();
+  virtual void ask_string (
+      c_widget *response_target,
+      int64_t command,
+      const std::string &title,
+      const std::string &prompt,
+      const std::string &initial_value = "");
+  virtual void ask_yes_no (
+      c_widget *response_target,
+      int64_t command,
+      const std::string &title,
+      const std::string &question);
 
   virtual std::unique_ptr<c_popupwindow> create_popup (c_widget *owner);
   virtual std::unique_ptr<c_tooltip> create_tooltip (c_widget *owner);
@@ -800,6 +843,8 @@ public:
   std::vector<std::unique_ptr<c_widget>> widgets;
   std::vector<std::unique_ptr<c_popupwindow>> popups;
   std::unique_ptr<c_tooltip> tooltip_popup;
+  std::unique_ptr<c_askstring_dialog> askstring_dialog;
+  std::unique_ptr<c_askyesno_dialog> askyesno_dialog;
   bool show_tooltips = true;
   c_widget *focused_widget = nullptr;
   c_widget *hovered_widget = nullptr;
@@ -1153,6 +1198,7 @@ public:
   virtual void on_resize ();
   virtual void on_configure_notify ();
   virtual void on_action (nbtk::t_action_event &event);
+  virtual void on_command (nbtk::t_command_event &event);
   virtual void on_close ()  {};
   
   static void cb_expose (void *w, void *user_data);
@@ -1228,6 +1274,63 @@ private:
   cairo_t *buffer_cr = NULL;
   int buffer_surface_w = 0;
   int buffer_surface_h = 0;
+};
+
+class c_askstring_dialog : public c_toplevelwindow {
+public:
+  bool create (
+      c_app *app,
+      t_native_window parent,
+      t_native_handle owner);
+  void ask (
+      c_widget *response_target,
+      int64_t command,
+      const std::string &title,
+      const std::string &prompt,
+      const std::string &initial_value);
+  void on_resize () override;
+  void on_action (t_action_event &event) override;
+  bool on_key_down (int key) override;
+  void on_close () override;
+
+private:
+  void finish (_command_result result);
+
+  c_widget *response_target = nullptr;
+  int64_t response_command = NBTK_CMD_NONE;
+  c_frame frame;
+  c_label label_prompt;
+  c_textbox textbox;
+  c_button btn_ok;
+  c_button btn_cancel;
+};
+
+class c_askyesno_dialog : public c_toplevelwindow {
+public:
+  bool create (
+      c_app *app,
+      t_native_window parent,
+      t_native_handle owner);
+  void ask (
+      c_widget *response_target,
+      int64_t command,
+      const std::string &title,
+      const std::string &question);
+  void on_resize () override;
+  void on_action (t_action_event &event) override;
+  bool on_key_down (int key) override;
+  void on_close () override;
+
+private:
+  void finish (_command_result result);
+
+  c_widget *response_target = nullptr;
+  int64_t response_command = NBTK_CMD_NONE;
+  c_frame frame;
+  c_label label_question;
+  c_button btn_yes;
+  c_button btn_no;
+  c_button btn_cancel;
 };
 
 class c_filepicker : public c_toplevelwindow {

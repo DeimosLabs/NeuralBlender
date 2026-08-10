@@ -107,7 +107,17 @@ enum _widget_role {
   ROLE_EQ_Q,
   ROLE_EQ_MASTER_GAIN,
   ROLE_EQ_GRAPH,
+  ROLE_EQ_LOADPRESET,
+  ROLE_EQ_SAVEPRESET,
+  ROLE_EQ_DELETEPRESET,
+  ROLE_EQ_CLEARHIST,
   ROLE_UNKNOWN
+};
+
+enum _ui_command {
+  CMD_EQ_SAVEPRESET,
+  CMD_EQ_DELETEPRESET,
+  CMD_EQ_RESET
 };
 
 class c_neuralblender;
@@ -197,6 +207,7 @@ public:
   void on_resize () override;
   void on_configure_notify () override;
   void on_action (nbtk::t_action_event &event) override;
+  void on_command (nbtk::t_command_event &event) override;
   void on_hover_changed (nbtk::c_widget *hovered) override;
 
 private:
@@ -225,6 +236,91 @@ public:
   size_t lane = (size_t) -1;
   uint64_t bank = (uint64_t) -1;
   c_neuralblender_ui *ui = NULL;
+};
+
+class c_freqknob : public nbtk::c_knob {
+public:
+  c_freqknob () {
+    show_value = false;
+  }
+
+  std::string get_label_string () const override {
+    return nbtk::c_knob::get_value_string () + "Hz";
+  }
+};
+
+class c_qknob : public nbtk::c_knob {
+public:
+  c_qknob () {
+    show_value = false;
+  }
+
+  std::string get_label_string () const override {
+    return "Q=" + nbtk::c_knob::get_value_string ();
+  }
+};
+
+class c_gainknob : public nbtk::c_knob {
+public:
+  c_gainknob () {
+    show_value = false;
+  }
+
+  std::string get_label_string () const override {
+    return /*"Gain: " + */nbtk::c_knob::get_value_string () + "dB";
+  }
+};
+
+class c_gainslider : public nbtk::c_slider {
+public:
+  std::string get_label_string () const override {
+    return nbtk::c_slider::get_value_string () + "dB";
+  }
+};
+
+class c_eqband_widgets {
+public:
+  //nbtk::c_container   container;
+  c_gainslider        slider_gain;
+  nbtk::c_checkbox    btn_on;
+  nbtk::c_combobox    menu_mode;
+  c_freqknob          knob_freq;
+  c_qknob             knob_q;
+};
+
+class c_eqpage_widgets {
+public:
+  void create (
+      c_neuralblender_ui *ui,
+      nbtk::c_widget *parent,
+      nbtk::t_native_handle native_owner,
+      size_t bank_id,
+      //size_t lane_id,
+      int x, int y, int w, int h);
+  
+  void move_resize (int x, int y, int w, int h);
+  void sync_from_state (const c_eq_state &state);
+  void sync_band_from_state (const c_eq_state &state, size_t band);
+  void sync_highlight_from_hover (nbtk::c_widget *hovered);
+  void set_state (nbtk::_widget_state state);
+  bool on_action (nbtk::t_action_event &event);
+  bool on_command (nbtk::t_command_event &event);
+  
+  size_t              bank_id = BANK_NONE;
+  nbtk::c_widget      cont_sliders;
+  nbtk::c_container   cont_graph;
+  nbtk::c_frame       frame;
+  c_eqgraph           graph;
+  nbtk::c_label       label;
+  nbtk::c_combobox    menu_presets;
+  nbtk::c_button      btn_savepreset;
+  nbtk::c_button      btn_deletepreset;
+  nbtk::c_button      btn_clearhist;
+  c_gainknob          knob_gain;
+  nbtk::c_frame       cont_bands;
+  c_eqband_widgets    bands [EQ_NUM_BANDS];
+  
+  c_neuralblender_ui  *ui;
 };
 
 class c_lane_widgets {
@@ -291,84 +387,6 @@ public:
   int last_h = 0;
 };
 
-class c_freqknob : public nbtk::c_knob {
-public:
-  c_freqknob () {
-    show_value = false;
-  }
-
-  std::string get_label_string () const override {
-    return nbtk::c_knob::get_value_string () + "Hz";
-  }
-};
-
-class c_qknob : public nbtk::c_knob {
-public:
-  c_qknob () {
-    show_value = false;
-  }
-
-  std::string get_label_string () const override {
-    return "Q=" + nbtk::c_knob::get_value_string ();
-  }
-};
-
-class c_gainknob : public nbtk::c_knob {
-public:
-  c_gainknob () {
-    show_value = false;
-  }
-
-  std::string get_label_string () const override {
-    return "Gain: " + nbtk::c_knob::get_value_string () + "dB";
-  }
-};
-
-class c_gainslider : public nbtk::c_slider {
-public:
-  std::string get_label_string () const override {
-    return nbtk::c_slider::get_value_string () + "dB";
-  }
-};
-
-class c_eqband_widgets {
-public:
-  //nbtk::c_container   container;
-  c_gainslider        slider_gain;
-  nbtk::c_checkbox    btn_on;
-  nbtk::c_combobox    menu_mode;
-  c_freqknob          knob_freq;
-  c_qknob             knob_q;
-};
-
-class c_eqpage_widgets {
-public:
-  void create (
-      c_neuralblender_ui *ui,
-      nbtk::c_widget *parent,
-      nbtk::t_native_handle native_owner,
-      size_t bank_id,
-      //size_t lane_id,
-      int x, int y, int w, int h);
-  
-  void move_resize (int x, int y, int w, int h);
-  void sync_from_state (const c_eq_state &state);
-  void sync_band_from_state (const c_eq_state &state, size_t band);
-  void sync_highlight_from_hover (nbtk::c_widget *hovered);
-  void set_state (nbtk::_widget_state state);
-  
-  nbtk::c_widget      cont_sliders;
-  nbtk::c_container   cont_graph;
-  nbtk::c_frame       frame;
-  c_eqgraph           graph;
-  nbtk::c_label       label;
-  c_gainknob          knob_gain;
-  nbtk::c_frame       cont_bands;
-  c_eqband_widgets    bands [EQ_NUM_BANDS];
-  
-  c_neuralblender_ui  *ui;
-};
-
 class c_neuralblender_ui {
 public:
   c_neuralblender_ui ();
@@ -402,11 +420,21 @@ public:
   bool linked_calib_for_bank (_lane_bank bank) const;
   void set_linked_calib_for_bank (_lane_bank bank, bool b);
   void update_stats ();
+  void on_command (nbtk::t_command_event &event);
   //void excl_select (size_t which);
   void sync_widgets_from_state (const c_neuralblender_state &state, bool scan_dirs = false);
   void write_calib_state_if_consistent ();
   virtual void apply_effective_controls ();
   void set_threshgain (float f);
+  void sync_eq_presets ();
+  void load_eq_preset (int bank, int which);
+  void save_eq_preset (int which);
+  void save_eq_preset_callback (int which);
+  void delete_preset (int which);
+  void clear_hold (int bank);
+  void load_preset (size_t bank_id, std::string name);
+  void save_preset (size_t bank_id, std::string name);
+  bool delete_selected_eq_preset (size_t bank_id);
 
   bool load_model (size_t which, const char *filename);
   virtual bool load_model (_lane_bank bank, size_t which, const char *filename) = 0;

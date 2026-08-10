@@ -605,8 +605,12 @@ void c_widget::on_action (t_action_event &event) {
 }
 
 void c_widget::on_command (t_command_event &event) {
-  if (parent && !event.handled)
+  if (action_parent && !event.handled)
+    action_parent->on_command (event);
+  else if (parent && !event.handled)
     parent->on_command (event);
+  else if (toplevel && !event.handled)
+    toplevel->on_command (event);
   else if (app && !event.handled)
     app->on_command (event);
 }
@@ -802,6 +806,71 @@ static int tk_measure_text_width (const std::string &text, float font_size) {
   return (int) std::ceil (ext.x_advance);
 }
 
+static t_point tk_measure_text_size (
+    const std::string &text,
+    float font_size) {
+  if (text.empty ())
+    return { 0, 0 };
+
+  cairo_surface_t *surface =
+    cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 1, 1);
+  cairo_t *cr = cairo_create (surface);
+  cairo_set_font_size (cr, font_size);
+
+  cairo_text_extents_t ext {};
+  cairo_text_extents (cr, text.c_str (), &ext);
+
+  cairo_destroy (cr);
+  cairo_surface_destroy (surface);
+  return {
+    (int) std::ceil (ext.width),
+    (int) std::ceil (ext.height)
+  };
+}
+
+static void tk_shrinkwrap_widget (
+    c_widget &widget,
+    int content_w,
+    int content_h,
+    int padding_x,
+    int padding_y,
+    bool center_x,
+    bool center_y) {
+  int new_x = widget.x;
+  int new_y = widget.y;
+  int new_w = widget.w;
+  int new_h = widget.h;
+
+  if (padding_x >= 0) {
+    new_w = std::max (1, content_w + padding_x);
+    if (center_x)
+      new_x += (widget.w - new_w) / 2;
+  }
+  if (padding_y >= 0) {
+    new_h = std::max (1, content_h + padding_y);
+    if (center_y)
+      new_y += (widget.h - new_h) / 2;
+  }
+
+  widget.move_resize (new_x, new_y, new_w, new_h);
+}
+
+void c_widget::shrinkwrap (
+    int padding_x,
+    int padding_y,
+    bool center_x,
+    bool center_y) {
+  const t_point text = tk_measure_text_size (label, font_size ());
+  tk_shrinkwrap_widget (
+    *this,
+    text.x,
+    text.y,
+    padding_x,
+    padding_y,
+    center_x,
+    center_y);
+}
+
 float c_valuewidget::quantize_value (float value_) const {
   if (step <= 0.0f)
     return value_;
@@ -895,6 +964,20 @@ bool c_valuewidget::parse_value_string (
 
 bool c_valuewidget::hit_value_label (int x_, int y_) const {
   return value_label_rect ().contains (x_, y_);
+}
+
+void c_valuewidget::on_command (t_command_event &event) {
+  if (event.command == NBTK_CMD_SET_VALUE) {
+    if (event.result == _command_result::accepted) {
+      float parsed = 0.0f;
+      if (parse_value_string (event.text, parsed))
+        set_value (parsed, true);
+    }
+    event.handled = true;
+    return;
+  }
+
+  c_widget::on_command (event);
 }
 
 void c_valuewidget::show_value_editor () {
@@ -1492,6 +1575,25 @@ void c_checkbox::draw (cairo_t *cr) {
       bx + box + 8 + text_x,
       ((double) h - ext.height) * 0.5 - ext.y_bearing);
   cairo_show_text (cr, label.c_str ());
+}
+
+void c_checkbox::shrinkwrap (
+    int padding_x,
+    int padding_y,
+    bool center_x,
+    bool center_y) {
+  const t_point text = tk_measure_text_size (label, font_size ());
+  const int box = std::max (16, std::min (h - 4, 24));
+  const int content_w = 2 + box + (label.empty () ? 0 : 8 + text.x);
+  const int content_h = std::max (box, text.y);
+  tk_shrinkwrap_widget (
+    *this,
+    content_w,
+    content_h,
+    padding_x,
+    padding_y,
+    center_x,
+    center_y);
 }
 
 c_scrollbar::c_scrollbar () {
@@ -3221,6 +3323,50 @@ t_rect c_knob::value_label_rect () const {
   }
 }
 
+void c_knob::shrinkwrap (
+    int padding_x,
+    int padding_y,
+    bool center_x,
+    bool center_y) {
+  const std::string label_text = get_label_string ();
+  const t_point text = tk_measure_text_size (
+    label_text,
+    font_size (label_text_size));
+  const t_rect control = value_area_rect ();
+  const int control_size = std::max (1, std::min (control.w, control.h));
+
+  int content_w = control_size;
+  int content_h = control_size;
+  if (!label_text.empty () && label_position != LABEL_NONE) {
+    switch (label_position) {
+      case LABEL_LEFT:
+      case LABEL_RIGHT:
+        content_w += label_gap + text.x;
+        content_h = std::max (content_h, text.y);
+        break;
+
+      case LABEL_ABOVE:
+      case LABEL_BELOW:
+        content_w = std::max (content_w, text.x);
+        content_h += label_gap + text.y;
+        break;
+
+      case LABEL_NONE:
+      default:
+        break;
+    }
+  }
+
+  tk_shrinkwrap_widget (
+    *this,
+    content_w,
+    content_h,
+    padding_x,
+    padding_y,
+    center_x,
+    center_y);
+}
+
 bool c_knob::highlighted () const {
   return c_widget::highlighted () || hovered || widget_has_focus (*this);
 }
@@ -4191,76 +4337,25 @@ bool c_canvas::check_click_distance (int which) const {
          std::abs (mouse_y - mousedown_y [which]) <= click_distance;
 }
 
-void c_canvas::render_base (cairo_t *cr) {
-  (void) cr;
-}
-
-void c_canvas::render_overlay (cairo_t *cr) {
-  (void) cr;
-}
-
-void c_canvas::on_paint (cairo_t *cr) {
-  (void) cr;
-}
-
-void c_canvas::on_resize (int w_, int h_) {
-  (void) w_;
-  (void) h_;
-}
-
-void c_canvas::on_mousemove (int x_, int y_) {
-  (void) x_;
-  (void) y_;
-}
-
-void c_canvas::on_mousedown (int which) {
-  (void) which;
-}
-
-void c_canvas::on_mouseup (int which) {
-  (void) which;
-}
-
-void c_canvas::on_mousedown_left () {
-}
-
-void c_canvas::on_mouseup_left () {
-}
-
-void c_canvas::on_mousedown_middle () {
-}
-
-void c_canvas::on_mouseup_middle () {
-}
-
-void c_canvas::on_mousedown_right () {
-}
-
-void c_canvas::on_mouseup_right () {
-}
-
-void c_canvas::on_mouseleave () {
-}
-
-void c_canvas::on_mousewheel_v (int howmuch) {
-  (void) howmuch;
-}
-
-void c_canvas::on_mousewheel_h (int howmuch) {
-  (void) howmuch;
-}
-
-void c_canvas::on_keydown (int keycode, bool is_repeat) {
-  (void) keycode;
-  (void) is_repeat;
-}
-
-void c_canvas::on_keyup (int keycode) {
-  (void) keycode;
-}
-
-void c_canvas::on_visible () {
-}
+void c_canvas::render_base (cairo_t *cr) { (void) cr; }
+void c_canvas::render_overlay (cairo_t *cr) { (void) cr; }
+void c_canvas::on_paint (cairo_t *cr) { (void) cr; }
+void c_canvas::on_resize (int w_, int h_) { (void) w_; (void) h_; }
+void c_canvas::on_mousemove (int x_, int y_) { (void) x_; (void) y_; }
+void c_canvas::on_mousedown (int which) { (void) which; }
+void c_canvas::on_mouseup (int which) { (void) which; }
+void c_canvas::on_mousedown_left () {}
+void c_canvas::on_mouseup_left () {}
+void c_canvas::on_mousedown_middle () {}
+void c_canvas::on_mouseup_middle () {}
+void c_canvas::on_mousedown_right () {}
+void c_canvas::on_mouseup_right () {}
+void c_canvas::on_mouseleave () {}
+void c_canvas::on_mousewheel_v (int howmuch) { (void) howmuch; }
+void c_canvas::on_mousewheel_h (int howmuch) { (void) howmuch; }
+void c_canvas::on_keydown (int keycode, bool is_repeat) { (void) keycode; (void) is_repeat; }
+void c_canvas::on_keyup (int keycode) { (void) keycode; }
+void c_canvas::on_visible () { }
 
 t_point c_widget::local_to_root (t_point p) const {
   p.x += x;
@@ -4655,12 +4750,69 @@ void c_app::hide_tooltip () {
     tooltip_popup->close ();
 }
 
+static t_native_window dialog_native_parent (
+    c_app *app,
+    t_native_handle owner) {
+
+  if (!app || !app->backend || !owner)
+    return 0;
+  return app->backend->root_window (owner, false);
+}
+
+void c_app::ask_string (
+    c_widget *response_target,
+    int64_t command,
+    const std::string &title,
+    const std::string &prompt,
+    const std::string &initial_value) {
+
+  t_native_handle owner = active_toplevel
+    ? active_toplevel->native_handle ()
+    : nullptr;
+  if (!askstring_dialog) {
+    askstring_dialog = std::make_unique<c_askstring_dialog> ();
+    if (!askstring_dialog->create (
+          this, dialog_native_parent (this, owner), owner)) {
+      askstring_dialog.reset ();
+      return;
+    }
+  }
+
+  askstring_dialog->ask (
+    response_target, command, title, prompt, initial_value);
+}
+
+void c_app::ask_yes_no (
+    c_widget *response_target,
+    int64_t command,
+    const std::string &title,
+    const std::string &question) {
+
+  t_native_handle owner = active_toplevel
+    ? active_toplevel->native_handle ()
+    : nullptr;
+  if (!askyesno_dialog) {
+    askyesno_dialog = std::make_unique<c_askyesno_dialog> ();
+    if (!askyesno_dialog->create (
+          this, dialog_native_parent (this, owner), owner)) {
+      askyesno_dialog.reset ();
+      return;
+    }
+  }
+
+  askyesno_dialog->ask (response_target, command, title, question);
+}
+
 void c_app::on_event (t_event &event) {
   (void) event;
 }
 
 void c_app::on_command (t_command_event &event) {
-  on_action (event);
+  if (action_toplevel)
+    action_toplevel->on_command (event);
+
+  if (!event.handled)
+    on_event (event);
 }
 
 void c_nativewindow::create (c_app *app_, int x_, int y_, int w_, int h_) {
@@ -5173,9 +5325,13 @@ void c_valueeditor_popup::commit () {
     return;
   }
 
-  float parsed = 0.0f;
-  if (value_widget->parse_value_string (textbox.text (), parsed))
-    value_widget->set_value (parsed, true);
+  t_command_event event;
+  event.source = &textbox;
+  event.source_id = textbox.id;
+  event.command = NBTK_CMD_SET_VALUE;
+  event.result = _command_result::accepted;
+  event.text = textbox.text ();
+  value_widget->on_command (event);
 
   close ();
 }
@@ -5858,6 +6014,10 @@ void c_native_toplevelwindow::on_action (nbtk::t_action_event &event) {
   (void) event;
 }
 
+void c_native_toplevelwindow::on_command (nbtk::t_command_event &event) {
+  on_action (event);
+}
+
 void c_app::invalidate_rect (int x, int y, int w, int h) {
   if (backend && active_toplevel) {
     backend->invalidate (active_toplevel->widget);
@@ -6276,6 +6436,201 @@ void c_toplevelwindow::auto_quit_on_close (bool b) {
   quit_on_close = b;
   if (b)
     auto_close (false);
+}
+
+bool c_askstring_dialog::create (
+    c_app *app_, t_native_window parent_, t_native_handle owner_) {
+  if (!c_toplevelwindow::create (
+        app_, parent_, "Enter value", 0, 0, 440, 164, owner_))
+    return false;
+
+  auto_hide_on_close (false);
+  frame.create (&root_widget, "", 12, 12, 416, 92);
+  label_prompt.create (&frame, "", 12, 10, 392, 28);
+  label_prompt.align = TEXT_LEFT;
+  textbox.create (&frame, "", 12, 44, 392, 36);
+  btn_cancel.create (&root_widget, "Cancel", 252, 112, 84, 40);
+  btn_ok.create (&root_widget, "OK", 344, 112, 84, 40);
+  set_min_size_to_current ();
+  return true;
+}
+
+void c_askstring_dialog::ask (
+    c_widget *response_target_,
+    int64_t command,
+    const std::string &title,
+    const std::string &prompt,
+    const std::string &initial_value) {
+  response_target = response_target_;
+  response_command = command;
+  set_title (title.c_str ());
+  label_prompt.set_label (prompt);
+  textbox.set_text (initial_value.c_str ());
+  textbox.cursor = textbox.text ().size ();
+  textbox.selection_anchor = 0;
+  center_over_transient_owner ();
+  activate ();
+  show ();
+  if (app)
+    app->set_focus (&textbox);
+}
+
+void c_askstring_dialog::on_resize () {
+  c_toplevelwindow::on_resize ();
+  frame.move_resize (12, 12, std::max (1, w () - 24), 92);
+  label_prompt.move_resize (12, 10, std::max (1, frame.w - 24), 28);
+  textbox.move_resize (12, 44, std::max (1, frame.w - 24), 36);
+  btn_ok.move_resize (std::max (12, w () - 96), h () - 52, 84, 40);
+  btn_cancel.move_resize (std::max (12, w () - 188), h () - 52, 84, 40);
+}
+
+void c_askstring_dialog::finish (_command_result result) {
+  c_widget *target = response_target;
+  const int64_t command = response_command;
+  const std::string text = textbox.text ();
+  response_target = nullptr;
+  response_command = NBTK_CMD_NONE;
+  hide ();
+
+  if (!target)
+    return;
+  if (target->toplevel)
+    target->toplevel->activate ();
+
+  t_command_event event;
+  event.source = target;
+  event.source_id = target->id;
+  event.command = command;
+  event.result = result;
+  event.text = text;
+  target->on_command (event);
+}
+
+void c_askstring_dialog::on_action (t_action_event &event) {
+  if (event.source == &textbox || event.source == &btn_ok) {
+    event.handled = true;
+    finish (_command_result::accepted);
+    return;
+  }
+  if (event.source == &btn_cancel) {
+    event.handled = true;
+    finish (_command_result::cancelled);
+    return;
+  }
+  c_toplevelwindow::on_action (event);
+}
+
+bool c_askstring_dialog::on_key_down (int key) {
+  if (key == KEY_RETURN) {
+    finish (_command_result::accepted);
+    return true;
+  }
+  if (key == KEY_ESCAPE) {
+    finish (_command_result::cancelled);
+    return true;
+  }
+  return c_toplevelwindow::on_key_down (key);
+}
+
+void c_askstring_dialog::on_close () {
+  finish (_command_result::cancelled);
+}
+
+bool c_askyesno_dialog::create (
+    c_app *app_, t_native_window parent_, t_native_handle owner_) {
+  if (!c_toplevelwindow::create (
+        app_, parent_, "Confirm", 0, 0, 440, 152, owner_))
+    return false;
+
+  auto_hide_on_close (false);
+  frame.create (&root_widget, "", 12, 12, 416, 76);
+  label_question.create (&frame, "", 12, 12, 392, 52);
+  label_question.align = TEXT_LEFT;
+  btn_cancel.create (&root_widget, "Cancel", 160, 100, 84, 40);
+  btn_no.create (&root_widget, "No", 252, 100, 84, 40);
+  btn_yes.create (&root_widget, "Yes", 344, 100, 84, 40);
+  set_min_size_to_current ();
+  return true;
+}
+
+void c_askyesno_dialog::ask (
+    c_widget *response_target_,
+    int64_t command,
+    const std::string &title,
+    const std::string &question) {
+  response_target = response_target_;
+  response_command = command;
+  set_title (title.c_str ());
+  label_question.set_label (question);
+  center_over_transient_owner ();
+  activate ();
+  show ();
+  if (app)
+    app->set_focus (&btn_yes);
+}
+
+void c_askyesno_dialog::on_resize () {
+  c_toplevelwindow::on_resize ();
+  frame.move_resize (12, 12, std::max (1, w () - 24), 76);
+  label_question.move_resize (12, 12, std::max (1, frame.w - 24), 52);
+  btn_yes.move_resize (std::max (12, w () - 96), h () - 52, 84, 40);
+  btn_no.move_resize (std::max (12, w () - 188), h () - 52, 84, 40);
+  btn_cancel.move_resize (std::max (12, w () - 280), h () - 52, 84, 40);
+}
+
+void c_askyesno_dialog::finish (_command_result result) {
+  c_widget *target = response_target;
+  const int64_t command = response_command;
+  response_target = nullptr;
+  response_command = NBTK_CMD_NONE;
+  hide ();
+
+  if (!target)
+    return;
+  if (target->toplevel)
+    target->toplevel->activate ();
+
+  t_command_event event;
+  event.source = target;
+  event.source_id = target->id;
+  event.command = command;
+  event.result = result;
+  target->on_command (event);
+}
+
+void c_askyesno_dialog::on_action (t_action_event &event) {
+  if (event.source == &btn_yes) {
+    event.handled = true;
+    finish (_command_result::accepted);
+    return;
+  }
+  if (event.source == &btn_no) {
+    event.handled = true;
+    finish (_command_result::rejected);
+    return;
+  }
+  if (event.source == &btn_cancel) {
+    event.handled = true;
+    finish (_command_result::cancelled);
+    return;
+  }
+  c_toplevelwindow::on_action (event);
+}
+
+bool c_askyesno_dialog::on_key_down (int key) {
+  if (key == KEY_RETURN) {
+    finish (_command_result::accepted);
+    return true;
+  }
+  if (key == KEY_ESCAPE) {
+    finish (_command_result::cancelled);
+    return true;
+  }
+  return c_toplevelwindow::on_key_down (key);
+}
+
+void c_askyesno_dialog::on_close () {
+  finish (_command_result::cancelled);
 }
 
 void c_toplevelwindow::cb_button_press (

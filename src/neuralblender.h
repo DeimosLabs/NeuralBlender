@@ -210,8 +210,8 @@ public:
     return x;
   }
 
-
-  /*inline float process (float x) {
+  /* old version w/o slope
+  inline float process (float x) {
     const float y = b0 * x + z1;
     z1 = b1 * x - a1 * y + z2;
     z2 = b2 * x - a2 * y;

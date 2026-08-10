@@ -162,6 +162,13 @@ void c_neuralblendermainwindow::on_action (nbtk::t_action_event &event) {
     ui->on_action (event);
 }
 
+void c_neuralblendermainwindow::on_command (nbtk::t_command_event &event) {
+  if (ui)
+    ui->on_command (event);
+  if (!event.handled)
+    nbtk::c_toplevelwindow::on_command (event);
+}
+
 void c_neuralblendermainwindow::on_hover_changed (nbtk::c_widget *hovered) {
   if (ui)
     ui->sync_eq_graph_highlight (hovered);
@@ -1051,10 +1058,11 @@ void c_eqpage_widgets::create (
     c_neuralblender_ui       *ui_,
     nbtk::c_widget           *parent,
     nbtk::t_native_handle    native_owner,
-    size_t                   bank_id,
+    size_t                   bank_id_,
     //size_t                   lane_id,
     int x, int y, int w, int h) { CP
   
+  bank_id = bank_id_;
   char buf [128];
   ui = ui_;
   std::string eqstr;
@@ -1074,8 +1082,30 @@ void c_eqpage_widgets::create (
   graph.role = ROLE_EQ_GRAPH;
   graph.bank = bank_id;
   //cont_graph.hide ();
-  label.create (&frame, eqstr.c_str (), 0, 0, 300, 30);
+  label.create (&frame, eqstr.c_str (), 0, 0, 200, 30);
   label.align = nbtk::TEXT_LEFT;
+  
+  menu_presets.create (&cont_bands, "", 0, 0, 256, 32);
+  btn_savepreset.create (&cont_bands, "", 0, 0, 32, 32);
+  btn_deletepreset.create (&cont_bands, "", 0, 0, 32, 32);
+  btn_clearhist.create (&cont_bands, "", 0, 0, 32, 32);
+  btn_savepreset.set_image_default (data_icon_floppy_png);
+  btn_deletepreset.set_image_default (data_icon_x_big_png);
+  btn_clearhist.set_image_default (data_icon_waveform_png);
+  
+  menu_presets.set_tooltip ("EQ presets");
+  btn_savepreset.set_tooltip ("Save this preset...");
+  btn_deletepreset.set_tooltip ("Delete this preset");
+  btn_clearhist.set_tooltip ("Clear graph hold");
+  menu_presets.role = ROLE_EQ_LOADPRESET;
+  btn_savepreset.role = ROLE_EQ_SAVEPRESET;
+  btn_deletepreset.role = ROLE_EQ_DELETEPRESET;
+  btn_clearhist.role = ROLE_EQ_CLEARHIST;
+  menu_presets.bank = bank_id;
+  btn_savepreset.bank = bank_id;
+  btn_deletepreset.bank = bank_id;
+  btn_clearhist.bank = bank_id;
+  
   knob_gain.text_size = 0.75;
   knob_gain.label_position = nbtk::LABEL_LEFT;
   knob_gain.label_align = nbtk::TEXT_LEFT;
@@ -1207,17 +1237,28 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   
   label.move_resize (padding, padding, std::max (1, frame_w / 2), title_h);
   knob_gain.move_resize (
-    std::max (padding + 80, frame_w - padding - 128),
+    std::max (padding + 80, frame_w - padding - 98),
     padding,
-    120,
+    90,
     title_h);
+  label.shrinkwrap ();
   cont_bands.move_resize (0, 0, frame_w, frame_h);
+  const int btn_size = label.h;
   const int toprect_x = inner_x;
   const int toprect_w = inner_w;
+  const int presets_x = label.x + label.w;
+  const int presets_w = knob_gain.x - presets_x - btn_size * 4;
+  const int btn_top = 8;
+  menu_presets.move_resize (presets_x, btn_top, presets_w, btn_size);
   
   cont_graph.move_resize (toprect_x, graph_top, toprect_w, graph_h);
   graph.move_resize (0, 0, toprect_w, graph_h);
   cont_sliders.move_resize (toprect_x, slider_top, toprect_w, slider_h);
+  
+  const int btn_left = menu_presets.x + menu_presets.w + 4;
+  btn_savepreset.move_resize (btn_left, btn_top, btn_size, btn_size);
+  btn_deletepreset.move_resize (btn_left + btn_size + 4, btn_top, btn_size, btn_size);
+  btn_clearhist.move_resize (btn_left + (btn_size + 4) * 2, btn_top, btn_size, btn_size);
   
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     const int local_band_x = i * band_w;
@@ -1348,6 +1389,68 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
 
   graph.set_highlighted_band (highlighted);
   apply_external_highlight (highlighted);
+}
+
+bool c_eqpage_widgets::on_action (nbtk::t_action_event &event) {
+  nbtk::c_widget *widget = event.source;
+  if (!widget || widget->bank != graph.bank)
+    return false;
+
+  switch ((_widget_role) widget->role) {
+    case ROLE_EQ_LOADPRESET:
+      ui->load_preset (bank_id, menu_presets.selected_text ());
+    break;
+    
+    case ROLE_EQ_SAVEPRESET:
+      ui->nbtk_app.ask_string (
+        widget,
+        CMD_EQ_SAVEPRESET,
+        "Save EQ preset",
+        "Preset name",
+        "");
+    break;
+    
+    case ROLE_EQ_DELETEPRESET:
+      ui->nbtk_app.ask_yes_no (
+        widget,
+        CMD_EQ_DELETEPRESET,
+        "Delete EQ preset",
+        "Delete the selected EQ preset?");
+    break;
+    
+    case ROLE_EQ_CLEARHIST:
+      graph.reset_hist ();
+    break;
+    
+    default:
+      return false;
+  }
+  
+  event.handled = true;
+  return true;
+}
+
+bool c_eqpage_widgets::on_command (nbtk::t_command_event &event) {
+  if (!event.source || event.source->bank != graph.bank || !ui)
+    return false;
+  
+  switch ((_ui_command) event.command) {
+    case CMD_EQ_SAVEPRESET:
+      if (event.result == nbtk::_command_result::accepted)
+        ui->save_preset (bank_id, event.text);
+    break;
+    
+    case CMD_EQ_DELETEPRESET:
+      if (event.result == nbtk::_command_result::accepted)
+        ui->delete_selected_eq_preset (bank_id);
+    break;
+    
+    default:
+      return false;
+  }
+  
+  event.handled = true;
+  return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2318,6 +2421,10 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       finish ();
     return true;
   };
+  
+  if (eqpage_pre.on_action (event) ||
+    eqpage_post.on_action (event))
+  return;
 
   if (handle_bank_switch (btn_tab_pedals, PAGE_PEDAL, BANK_PEDAL) ||
       handle_bank_switch (btn_tab_eqpre, PAGE_EQPRE, BANK_EQPRE) ||
@@ -2421,7 +2528,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
         state.tuner_base_freq = 440.0f;
         on_tuner_base_freq (&button, state.tuner_base_freq);
       break;
-
+      
       default:
       break;
     }
@@ -2652,6 +2759,123 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
   if (handle_textbox (text_other_tuner, ROLE_TUNER_BASE_FREQ) ||
       handle_textbox (text_other_calib, ROLE_CALIB_TARGET_DB))
     return;
+}
+
+void c_neuralblender_ui::on_command (nbtk::t_command_event &event) {
+  if (eqpage_pre.on_command (event) ||
+      eqpage_post.on_command (event))
+    return;
+}
+
+void c_neuralblender_ui::load_preset (size_t bank_id, std::string name) { CP
+  if (name.empty ()) {
+    debug ("empty preset name");
+    return;
+  }
+
+  if (bank_id != BANK_EQPRE && bank_id != BANK_EQPOST) {
+    debug ("invalid EQ bank ID %d", (int) bank_id);
+    return;
+  }
+
+  const auto preset = std::find_if (
+    configfile.eq_presets.begin (),
+    configfile.eq_presets.end (),
+    [&name] (const c_eq_state &candidate) {
+      return candidate.preset_name == name;
+    });
+  if (preset == configfile.eq_presets.end ()) {
+    debug ("EQ preset '%s' not found", name.c_str ());
+    return;
+  }
+
+  const _lane_bank bank = (_lane_bank) bank_id;
+  c_eq_state loaded = *preset;
+  loaded.which = bank == BANK_EQPOST ? EQ_POST : EQ_PRE;
+
+  c_eq_state &ui_eq = ui_eq_state_for_bank (bank);
+  c_eq_state &state_eq = bank == BANK_EQPOST ? state.eqpost : state.eqpre;
+  c_eqpage_widgets &eqpage =
+    bank == BANK_EQPOST ? eqpage_post : eqpage_pre;
+
+  ui_eq = loaded;
+  state_eq = loaded;
+  const bool bypass = !loaded.on;
+  set_bank_bypass_for_state (state, bank, bypass);
+
+  on_bank_bypass (nullptr, bank, bypass);
+  on_eq_master_gain (&eqpage.knob_gain, bank, loaded.master_gain_db);
+  for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
+    on_eq_band (&eqpage.bands [band].btn_on, bank, band);
+    on_eq_band (&eqpage.bands [band].menu_mode, bank, band);
+    on_eq_band (&eqpage.bands [band].slider_gain, bank, band);
+    on_eq_band (&eqpage.bands [band].knob_freq, bank, band);
+    on_eq_band (&eqpage.bands [band].knob_q, bank, band);
+  }
+
+  sync_widgets_from_state (state);
+  const int selected = (int) std::distance (
+    configfile.eq_presets.begin (), preset);
+  eqpage.menu_presets.set_selected (selected);
+}
+
+void c_neuralblender_ui::save_preset (size_t bank_id, std::string name) { CP
+  c_eq_state *preset = NULL;
+  
+  if (!name.size ()) {
+    debug ("empty name");
+    return;
+  }
+  
+  switch (bank_id) {
+    case BANK_EQPRE:
+      preset = &ui_eqpre;
+    break;
+    
+    case BANK_EQPOST:
+      preset = &ui_eqpost;
+    break;
+    
+    default:
+      debug ("invalid bank ID");
+    break;
+  }
+  
+  if (!preset) {
+    debug ("!preset");
+    return;
+  }
+  
+  c_eq_state newpreset = *preset;
+  newpreset.which = EQ_PRESET;
+  newpreset.on = !bank_bypass_for_state (state, (_lane_bank) bank_id);
+  newpreset.preset_name = name;
+  newpreset.builtin = false;
+  
+  configfile.eq_presets.push_back (newpreset);
+  sync_widgets_from_state (state);
+}
+
+bool c_neuralblender_ui::delete_selected_eq_preset (size_t bank_id) {
+  debug ("bank_id=%d", (int) bank_id);
+  switch (bank_id) {
+    case BANK_EQPRE: CP
+      configfile.delete_eq_preset (eqpage_pre.menu_presets.selected_text ());
+      sync_widgets_from_state (state);
+      return true;
+    break;
+    
+    case BANK_EQPOST: CP
+      configfile.delete_eq_preset (eqpage_pre.menu_presets.selected_text ());
+      sync_widgets_from_state (state);
+      return true;
+    break;
+    
+    default:
+      debug ("got unknown bank ID %d", (int) bank_id);
+      return false;
+    break;
+  }
 }
 
 void c_neuralblender_ui::set_threshgain (float f) {
@@ -3177,6 +3401,36 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   btn_other_excl_pedal.set_value (exclusive_lane_for_bank (BANK_PEDAL) > 0);
   btn_other_excl_amp.set_value (exclusive_lane_for_bank (BANK_AMP) > 0);
   btn_other_excl_cab.set_value (exclusive_lane_for_bank (BANK_CAB) > 0);
+  
+  eqpage_pre.menu_presets.clear ();
+  eqpage_post.menu_presets.clear ();
+  int selected_pre = -1;
+  int selected_post = -1;
+  bool exact_pre = false;
+  bool exact_post = false;
+  for (int i = 0; i < configfile.eq_presets.size (); i++) {
+    const c_eq_state &preset = configfile.eq_presets [i];
+    std::string name = preset.preset_name;
+    //debug ("adding eq preset: %s", name.c_str ());
+    eqpage_pre.menu_presets.add (name);
+    eqpage_post.menu_presets.add (name);
+    if (same_eq_preset (ui_eqpre, preset)) {
+      selected_pre = i;
+      exact_pre = true;
+    } else if (!exact_pre && selected_pre < 0 &&
+               same_eq_settings (ui_eqpre, preset)) {
+      selected_pre = i;
+    }
+    if (same_eq_preset (ui_eqpost, preset)) {
+      selected_post = i;
+      exact_post = true;
+    } else if (!exact_post && selected_post < 0 &&
+               same_eq_settings (ui_eqpost, preset)) {
+      selected_post = i;
+    }
+  }
+  eqpage_pre.menu_presets.set_selected (selected_pre);
+  eqpage_post.menu_presets.set_selected (selected_post);
 
   if (!page_has_bank (visible_page)) {
     updating_from_state = false;
@@ -3217,6 +3471,6 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
           nbtk::WSTATE_NORMAL);
     }
   }
-
+  
   updating_from_state = false;
 }

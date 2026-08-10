@@ -30,10 +30,6 @@
 #define CONFIG_DEFAULT_DIR           "/"
 #define CONFIG_KEY_NAME_EQ           "eq" // this may appear multiple times for EQ presets
 
-void split_at_equal (std::string s, std::string &before, std::string &after);
-void split_at (std::string s, std::vector<std::string> &v, const char c = ',');
-bool istrue (std::string name);
-  
 enum _eq_band_mode {
   EQ_OFF,
   EQ_HIPASS,
@@ -87,6 +83,7 @@ extern float g_defaultfreqs [];
 extern _eq_band_mode g_defaultmodes [];
 
 enum _lane_bank {
+  BANK_NONE = -1,
   BANK_PEDAL = 0,
   BANK_EQPRE,
   BANK_AMP,
@@ -173,6 +170,7 @@ struct c_eq_state {
   t_parse_result from_string (std::string s);
   
   std::string preset_name;
+  bool builtin = false;
   bool on = false;
   float master_gain_db = 0.0f;
   _eq_which which = EQ_PRESET;
@@ -265,6 +263,13 @@ struct c_neuralblender_state {
   c_neuralblender_lane_state (&lanes) [NB_NUM_MODELS];
 };
 
+void split_at_equal (std::string s, std::string &before, std::string &after);
+void split_at (std::string s, std::vector<std::string> &v, const char c = ',');
+bool istrue (std::string name);
+bool same_eq_preset (const c_eq_state &a, const c_eq_state &b);
+// same as above but doesn't compare name
+bool same_eq_settings (const c_eq_state &a, const c_eq_state &b);
+  
 class c_configfile {
 public:
   c_configfile ();
@@ -280,6 +285,8 @@ public:
   int find_item (std::string name);
   void dump (); // for debugging
   static inline bool istrue (std::string s) { return ::istrue (s); }
+  void reset_eq_presets ();
+  int delete_eq_preset (std::string name);
   std::vector<c_eq_state> eq_presets;
 
 private:

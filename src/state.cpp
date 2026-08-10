@@ -204,6 +204,72 @@ void c_configfile::dump () {
   }
 }
 
+int c_configfile::delete_eq_preset (std::string name) {
+  int ret = 0;
+  std::vector <c_eq_state> new_presets;
+  
+  //for (int i = eq_presets.size () - 1; i >= 0; i--) {
+  for (int i = 0; i < eq_presets.size (); i++) {
+    if (!eq_presets [i].builtin && eq_presets [i].preset_name == name) {
+      debug ("deleted: %s", name.c_str ());
+      ret++;
+    } else {
+      debug ("passed: %s", eq_presets [i].preset_name.c_str ());
+      new_presets.push_back (eq_presets [i]);
+    }
+  }
+  
+  eq_presets.clear ();
+  eq_presets = new_presets;
+  return ret;
+}
+
+void c_configfile::reset_eq_presets () {
+  static const char *builtin [] = {
+    "eq=off;0.00;off:off:off:off:off:off:off:off;0:4:5:5:5:5:6:7;50.000:100.000:250.000:500.000:1000.000:2000.000:4000.000:8000.000;0.000:0.000:0.000:0.000:0.000:0.000:0.000:0.000;1.000:1.000:1.000:1.000:1.000:1.000:1.000:1.000;\"[Builtin] Flat\"",
+    "eq=off;0.00;on:on:off:on:on:off:on:off;1:4:5:5:5:5:6:7;90.000:336.807:250.000:556.271:1000.000:2000.000:4000.000:8000.000;0.000:-9.767:0.000:-11.442:12.000:0.000:-4.000:0.000;1.000:1.000:1.000:3.740:1.500:1.000:1.000:1.000;\"[Builtin] Pre-gain sharpness\"",
+    NULL
+  };
+  c_eq_state state;
+  int i;
+  
+  eq_presets.clear ();
+  
+  for (i = 0; builtin [i] && builtin [i] [0]; i++) {
+    if (state.from_string (std::string (builtin [i])) == t_parse_result::parsed) {
+      debug ("adding builtin preset %d, '%s'", i, state.preset_name.c_str ());
+      state.builtin = true;
+      eq_presets.push_back (state);
+    }
+  }
+}
+
+bool same_eq_settings (
+    const c_eq_state &a,
+    const c_eq_state &b) {
+  if (a.on != b.on ||
+      a.master_gain_db != b.master_gain_db)
+    return false;
+
+  for (int i = 0; i < EQ_NUM_BANDS; ++i) {
+    if (a.enabled [i] != b.enabled [i] ||
+        a.mode [i] != b.mode [i] ||
+        a.slope [i] != b.slope [i] ||
+        a.freq [i] != b.freq [i] ||
+        a.gain_db [i] != b.gain_db [i] ||
+        a.q [i] != b.q [i])
+      return false;
+  }
+
+  return true;
+}
+
+bool same_eq_preset (
+    const c_eq_state &a,
+    const c_eq_state &b) {
+  return a.preset_name == b.preset_name && same_eq_settings (a, b);
+}
+
 bool c_configfile::read_file () { CP
   std::string path = get_path ();
   return read_file (path);
@@ -215,7 +281,8 @@ bool c_configfile::read_file (std::string path) { CP
     return false;
   }
   
-  eq_presets.clear ();
+  //eq_presets.clear ();
+  reset_eq_presets ();
   
   std::vector<std::string> lines = read_lines (path);
   if (lines.size () <= 0) {
@@ -239,7 +306,15 @@ bool c_configfile::read_file (std::string path) { CP
             if (eq_state.preset_name.size () == 0) {
               eq_state.preset_name = "Unnamed " + std::to_string (unnamed_eq_id++);
             }
-            eq_presets.push_back (eq_state);
+
+            const bool duplicates_builtin = std::any_of (
+              eq_presets.begin (),
+              eq_presets.end (),
+              [&eq_state] (const c_eq_state &existing) {
+                return existing.builtin && same_eq_preset (existing, eq_state);
+              });
+            if (!duplicates_builtin)
+              eq_presets.push_back (eq_state);
           } else {
             debug ("invalid EQ line: %s", lines [i].c_str ());
           }
@@ -276,9 +351,11 @@ bool c_configfile::write_file (std::string path) { CP
   }
   
   for (size_t i = 0; i < eq_presets.size (); i++) {
-    std::string eqstring;
-    eq_presets [i].to_string (eqstring);
-    f << eqstring << "\n";
+    if (!eq_presets [i].builtin) {
+      std::string eqstring;
+      eq_presets [i].to_string (eqstring);
+      f << eqstring << "\n";
+    }
   }
   
   return static_cast<bool> (f);
