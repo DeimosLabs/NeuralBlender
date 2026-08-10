@@ -116,6 +116,7 @@ enum _widget_role {
 
 enum _ui_command {
   CMD_EQ_SAVEPRESET,
+  CMD_EQ_REPLACEPRESET,
   CMD_EQ_DELETEPRESET,
   CMD_EQ_RESET
 };
@@ -319,6 +320,7 @@ public:
   c_gainknob          knob_gain;
   nbtk::c_frame       cont_bands;
   c_eqband_widgets    bands [EQ_NUM_BANDS];
+  std::string         pending_preset_name;
   
   c_neuralblender_ui  *ui;
 };
@@ -415,6 +417,7 @@ public:
   c_vudata &input_vudata_for_bank (_lane_bank bank);
   void redraw_visible_meters ();
   void redraw_tuner_if_needed ();
+  void refresh_config_if_needed ();
   int exclusive_lane_for_bank (_lane_bank bank) const;
   void set_exclusive_lane_for_bank (_lane_bank bank, int lane);
   bool linked_calib_for_bank (_lane_bank bank) const;
@@ -578,6 +581,7 @@ public:
   c_neuralblender_state state;
   c_eq_state ui_eqpre;
   c_eq_state ui_eqpost;
+  uint64_t last_config_check_ms = 0;
   _lane_bank visible_bank = BANK_AMP;
   _ui_page visible_page = PAGE_AMP;
   size_t last_exclusive_lane [BANK_COUNT] = {0, 0, 0}; // 1-based lane remembered when exclusive mode is off

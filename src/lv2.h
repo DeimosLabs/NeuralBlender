@@ -532,8 +532,13 @@ public:
   float tuner_freq_value = 0.0f;
   float tuner_note_value = 0.0f;
   float tuner_cents_value = 0.0f;
+  bool expected_control_valid [PORT_COUNT] = {};
+  float expected_control_value [PORT_COUNT] = {};
+  uint64_t expected_control_time [PORT_COUNT] = {};
 
   void write_control (uint32_t port, float value);
+  bool consume_expected_control (
+    uint32_t port, float value, float tolerance = 0.0f);
   uint32_t lane_port (size_t lane, uint32_t first) const;
   bool write_model_path (_lane_bank bank, size_t which, const char *filename);
   bool write_float_property (LV2_URID property, float value);

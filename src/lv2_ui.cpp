@@ -31,7 +31,27 @@
 void c_lv2_ui::write_control (uint32_t port, float value) {
   if (updating_from_host || !write)
     return;
+  if (port < PORT_COUNT) {
+    expected_control_valid [port] = true;
+    expected_control_value [port] = value;
+    expected_control_time [port] = nbtk::now_ms ();
+  }
   write (controller, port, sizeof (value), 0, &value);
+}
+
+bool c_lv2_ui::consume_expected_control (
+    uint32_t port, float value, float tolerance) {
+  if (port >= PORT_COUNT || !expected_control_valid [port])
+    return false;
+
+  if (nbtk::now_ms () - expected_control_time [port] > 1000) {
+    expected_control_valid [port] = false;
+    return false;
+  }
+
+  if (fabsf (expected_control_value [port] - value) <= tolerance)
+    expected_control_valid [port] = false;
+  return true;
 }
 
 uint32_t c_lv2_ui::lane_port (size_t lane, uint32_t first) const {
@@ -506,6 +526,8 @@ int c_lv2_ui::idle () {
   if (nbtk_app.backend)
     nbtk_app.backend->run_events (&app);
 
+  refresh_config_if_needed ();
+
   eqpage_pre.graph.tick ();
   eqpage_post.graph.tick ();
 
@@ -711,15 +733,22 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
       port == PORT_EQPOST_BYPASS ||
       port == PORT_CAB_BYPASS) {
     const bool bypassed = value >= 0.5f;
+    const bool expected = consume_expected_control (port, value, 0.01f);
     if (port == PORT_PEDAL_BYPASS)
       state.pedal_bypass = bypassed;
-    else if (port == PORT_EQPRE_BYPASS)
+    else if (port == PORT_EQPRE_BYPASS) {
+      if (!expected && state.eqpre_bypass != bypassed)
+        state.eqpre.preset_name.clear ();
       state.eqpre_bypass = bypassed;
-    else if (port == PORT_CAB_BYPASS)
+      state.eqpre.on = !bypassed;
+    } else if (port == PORT_CAB_BYPASS)
       state.cab_bypass = bypassed;
-    else if (port == PORT_EQPOST_BYPASS)
+    else if (port == PORT_EQPOST_BYPASS) {
+      if (!expected && state.eqpost_bypass != bypassed)
+        state.eqpost.preset_name.clear ();
       state.eqpost_bypass = bypassed;
-    else
+      state.eqpost.on = !bypassed;
+    } else
       state.amp_bypass = bypassed;
     sync_widgets_from_state (state);
     updating_from_state = old_updating_from_state;
@@ -733,8 +762,14 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
       port == PORT_EQPOST_MASTER_GAIN ? BANK_EQPOST : BANK_EQPRE;
     c_eq_state &eq_state =
       eq_bank == BANK_EQPOST ? state.eqpost : state.eqpre;
+    c_eq_state &ui_eq_state = ui_eq_state_for_bank (eq_bank);
+    const bool expected = consume_expected_control (port, value, 0.0051f);
+    if (!expected && fabsf (eq_state.master_gain_db - value) > 0.0051f) {
+      eq_state.preset_name.clear ();
+      ui_eq_state.preset_name.clear ();
+    }
     eq_state.master_gain_db = value;
-    ui_eq_state_for_bank (eq_bank).master_gain_db = value;
+    ui_eq_state.master_gain_db = value;
     if (eq_bank == BANK_EQPOST)
       eqpage_post.knob_gain.set_value (value);
     else
@@ -777,36 +812,54 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     c_eq_state &eq_state =
       bank == BANK_EQPOST ? state.eqpost : state.eqpre;
     c_eq_state &ui_eq_state = ui_eq_state_for_bank (bank);
+    bool changed = false;
+    const bool expected = consume_expected_control (port, value, 0.00051f);
 
     switch (eq_param) {
-      case NB_LV2_EQ_ENABLED:
-        eq_state.enabled [eq_band] = value >= 0.5f;
+      case NB_LV2_EQ_ENABLED: {
+        const bool enabled = value >= 0.5f;
+        changed = eq_state.enabled [eq_band] != enabled;
+        eq_state.enabled [eq_band] = enabled;
         ui_eq_state.enabled [eq_band] = eq_state.enabled [eq_band];
-      break;
+      } break;
 
       case NB_LV2_EQ_MODE: {
+        _eq_band_mode mode;
+        int slope;
         nb_lv2_decode_eq_mode (
           (int) lrintf (value),
-          &eq_state.mode [eq_band],
-          &eq_state.slope [eq_band]);
+          &mode,
+          &slope);
+        changed = eq_state.mode [eq_band] != mode ||
+                  eq_state.slope [eq_band] != slope;
+        eq_state.mode [eq_band] = mode;
+        eq_state.slope [eq_band] = slope;
         ui_eq_state.mode [eq_band] = eq_state.mode [eq_band];
         ui_eq_state.slope [eq_band] = eq_state.slope [eq_band];
       } break;
 
       case NB_LV2_EQ_FREQ:
+        changed = fabsf (eq_state.freq [eq_band] - value) > 0.00051f;
         eq_state.freq [eq_band] = value;
         ui_eq_state.freq [eq_band] = value;
       break;
 
       case NB_LV2_EQ_GAIN:
+        changed = fabsf (eq_state.gain_db [eq_band] - value) > 0.00051f;
         eq_state.gain_db [eq_band] = value;
         ui_eq_state.gain_db [eq_band] = value;
       break;
 
       case NB_LV2_EQ_Q:
+        changed = fabsf (eq_state.q [eq_band] - value) > 0.00051f;
         eq_state.q [eq_band] = value;
         ui_eq_state.q [eq_band] = value;
       break;
+    }
+
+    if (changed && !expected) {
+      eq_state.preset_name.clear ();
+      ui_eq_state.preset_name.clear ();
     }
 
     c_eqpage_widgets &eqpage =

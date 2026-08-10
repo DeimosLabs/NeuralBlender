@@ -5,8 +5,12 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <fcntl.h>
 #include <fstream>
 #include <string>
+#include <sys/file.h>
+#include <unistd.h>
 #include <vector>
 #include "state.h"
 
@@ -87,6 +91,29 @@ static bool write_lines (
 
   return static_cast<bool> (f);
 }
+
+class c_config_write_lock {
+public:
+  explicit c_config_write_lock (const std::string &path) {
+    fd = open ((path + ".lock").c_str (), O_CREAT | O_RDWR, 0600);
+    if (fd >= 0 && flock (fd, LOCK_EX) != 0) {
+      close (fd);
+      fd = -1;
+    }
+  }
+
+  ~c_config_write_lock () {
+    if (fd >= 0) {
+      flock (fd, LOCK_UN);
+      close (fd);
+    }
+  }
+
+  bool locked () const { return fd >= 0; }
+
+private:
+  int fd = -1;
+};
 
 bool istrue (std::string value) {
   //std::string value = get_item (name);
@@ -221,7 +248,27 @@ int c_configfile::delete_eq_preset (std::string name) {
   
   eq_presets.clear ();
   eq_presets = new_presets;
+
+  pending_eq_additions.erase (
+    std::remove_if (
+      pending_eq_additions.begin (),
+      pending_eq_additions.end (),
+      [&name] (const c_eq_state &preset) {
+        return preset.preset_name == name;
+      }),
+    pending_eq_additions.end ());
+  if (ret > 0 && std::find (
+        pending_eq_deletions.begin (),
+        pending_eq_deletions.end (),
+        name) == pending_eq_deletions.end ()) {
+    pending_eq_deletions.push_back (name);
+  }
   return ret;
+}
+
+void c_configfile::add_eq_preset (const c_eq_state &preset) {
+  eq_presets.push_back (preset);
+  pending_eq_additions.push_back (preset);
 }
 
 void c_configfile::reset_eq_presets () {
@@ -247,17 +294,23 @@ void c_configfile::reset_eq_presets () {
 bool same_eq_settings (
     const c_eq_state &a,
     const c_eq_state &b) {
+  // match at the precision used by c_eq_state::to_string().
+  const auto same_float = [] (float x, float y, float tolerance) {
+    return std::isfinite (x) && std::isfinite (y) &&
+           std::fabs (x - y) <= tolerance;
+  };
+
   if (a.on != b.on ||
-      a.master_gain_db != b.master_gain_db)
+      !same_float (a.master_gain_db, b.master_gain_db, 0.0051f))
     return false;
 
   for (int i = 0; i < EQ_NUM_BANDS; ++i) {
     if (a.enabled [i] != b.enabled [i] ||
         a.mode [i] != b.mode [i] ||
         a.slope [i] != b.slope [i] ||
-        a.freq [i] != b.freq [i] ||
-        a.gain_db [i] != b.gain_db [i] ||
-        a.q [i] != b.q [i])
+        !same_float (a.freq [i], b.freq [i], 0.00051f) ||
+        !same_float (a.gain_db [i], b.gain_db [i], 0.00051f) ||
+        !same_float (a.q [i], b.q [i], 0.00051f))
       return false;
   }
 
@@ -268,6 +321,52 @@ bool same_eq_preset (
     const c_eq_state &a,
     const c_eq_state &b) {
   return a.preset_name == b.preset_name && same_eq_settings (a, b);
+}
+
+std::string sanitize_eq_preset_name (std::string name) {
+  static const std::string builtin_tag = "[Builtin]";
+  size_t pos = 0;
+  while ((pos = name.find (builtin_tag, pos)) != std::string::npos)
+    name.erase (pos, builtin_tag.size ());
+  return strip_whitespace (name);
+}
+
+static std::vector<c_eq_state> read_user_eq_presets (
+    const std::string &path) {
+  std::vector<c_eq_state> presets;
+  int unnamed_eq_id = 1;
+
+  for (const std::string &line : read_lines (path)) {
+    std::string token, value;
+    split_at_equal (line, token, value);
+    if (strip_whitespace (token) != "eq")
+      continue;
+
+    c_eq_state preset;
+    if (preset.from_string ("eq=" + strip_whitespace (value)) !=
+        t_parse_result::parsed)
+      continue;
+    if (preset.preset_name.empty ())
+      preset.preset_name = "Unnamed " + std::to_string (unnamed_eq_id++);
+    preset.builtin = false;
+    presets.push_back (preset);
+  }
+
+  return presets;
+}
+
+static bool same_eq_preset_list (
+    const std::vector<c_eq_state> &a,
+    const std::vector<c_eq_state> &b) {
+  if (a.size () != b.size ())
+    return false;
+
+  for (size_t i = 0; i < a.size (); ++i) {
+    if (a [i].builtin != b [i].builtin ||
+        !same_eq_preset (a [i], b [i]))
+      return false;
+  }
+  return true;
 }
 
 bool c_configfile::read_file () { CP
@@ -283,6 +382,8 @@ bool c_configfile::read_file (std::string path) { CP
   
   //eq_presets.clear ();
   reset_eq_presets ();
+  pending_eq_additions.clear ();
+  pending_eq_deletions.clear ();
   
   std::vector<std::string> lines = read_lines (path);
   if (lines.size () <= 0) {
@@ -328,8 +429,55 @@ bool c_configfile::read_file (std::string path) { CP
   }
   //debug ("dump:");
   //this->dump ();
+
+  std::error_code ec;
+  config_mtime = std::filesystem::last_write_time (path, ec);
+  config_mtime_valid = !ec;
   
   return true;
+}
+
+bool c_configfile::refresh_eq_presets_if_changed () {
+  const std::string path = get_path ();
+  std::error_code ec;
+  const std::filesystem::file_time_type mtime =
+    std::filesystem::last_write_time (path, ec);
+  if (ec || (config_mtime_valid && mtime == config_mtime))
+    return false;
+
+  const std::vector<c_eq_state> old_presets = eq_presets;
+  std::vector<c_eq_state> disk_presets = read_user_eq_presets (path);
+
+  reset_eq_presets ();
+  for (const c_eq_state &preset : disk_presets) {
+    const bool duplicates_builtin = std::any_of (
+      eq_presets.begin (),
+      eq_presets.end (),
+      [&preset] (const c_eq_state &existing) {
+        return existing.builtin && same_eq_preset (existing, preset);
+      });
+    if (!duplicates_builtin)
+      eq_presets.push_back (preset);
+  }
+
+  for (const std::string &name : pending_eq_deletions) {
+    eq_presets.erase (
+      std::remove_if (
+        eq_presets.begin (),
+        eq_presets.end (),
+        [&name] (const c_eq_state &preset) {
+          return !preset.builtin && preset.preset_name == name;
+        }),
+      eq_presets.end ());
+  }
+  eq_presets.insert (
+    eq_presets.end (),
+    pending_eq_additions.begin (),
+    pending_eq_additions.end ());
+
+  config_mtime = mtime;
+  config_mtime_valid = true;
+  return !same_eq_preset_list (old_presets, eq_presets);
 }
 
 bool c_configfile::write_file () { CP
@@ -342,23 +490,63 @@ bool c_configfile::write_file (std::string path) { CP
   if (p.has_parent_path ())
     mkdir_p (p.parent_path ().string ());
 
-  std::ofstream f (path);
-  
+  c_config_write_lock lock (path);
+  if (!lock.locked ()) {
+    debug ("can't lock '%s' for writing", path.c_str ());
+    return false;
+  }
+
+  std::vector<c_eq_state> merged_presets = read_user_eq_presets (path);
+
+  for (const std::string &name : pending_eq_deletions) {
+    merged_presets.erase (
+      std::remove_if (
+        merged_presets.begin (),
+        merged_presets.end (),
+        [&name] (const c_eq_state &preset) {
+          return preset.preset_name == name;
+        }),
+      merged_presets.end ());
+  }
+  merged_presets.insert (
+    merged_presets.end (),
+    pending_eq_additions.begin (),
+    pending_eq_additions.end ());
+
+  std::vector<std::string> lines;
   for (size_t i = 0; g_options [i].name.size () > 0; i++) {
-    std::string line = g_options [i].name + "=" + g_options [i].value;
-    //debug ("i=%d, line='%s'", (int) i, line.c_str ());
-    f << line << "\n";
+    lines.push_back (g_options [i].name + "=" + g_options [i].value);
   }
-  
-  for (size_t i = 0; i < eq_presets.size (); i++) {
-    if (!eq_presets [i].builtin) {
-      std::string eqstring;
-      eq_presets [i].to_string (eqstring);
-      f << eqstring << "\n";
-    }
+
+  for (c_eq_state &preset : merged_presets) {
+    std::string eqstring;
+    preset.to_string (eqstring);
+    lines.push_back (eqstring);
   }
-  
-  return static_cast<bool> (f);
+
+  const std::string tmp_path =
+    path + ".tmp." + std::to_string ((long long) getpid ()) + "." +
+    std::to_string ((unsigned long long) (uintptr_t) this);
+  if (!write_lines (tmp_path, lines))
+    return false;
+
+  std::error_code ec;
+  std::filesystem::rename (tmp_path, path, ec);
+  if (ec) {
+    std::filesystem::remove (tmp_path);
+    debug ("can't replace '%s': %s", path.c_str (), ec.message ().c_str ());
+    return false;
+  }
+
+  config_mtime = std::filesystem::last_write_time (path, ec);
+  config_mtime_valid = !ec;
+
+  reset_eq_presets ();
+  eq_presets.insert (
+    eq_presets.end (), merged_presets.begin (), merged_presets.end ());
+  pending_eq_additions.clear ();
+  pending_eq_deletions.clear ();
+  return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

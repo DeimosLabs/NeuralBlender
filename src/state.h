@@ -266,6 +266,7 @@ struct c_neuralblender_state {
 void split_at_equal (std::string s, std::string &before, std::string &after);
 void split_at (std::string s, std::vector<std::string> &v, const char c = ',');
 bool istrue (std::string name);
+std::string sanitize_eq_preset_name (std::string name);
 bool same_eq_preset (const c_eq_state &a, const c_eq_state &b);
 // same as above but doesn't compare name
 bool same_eq_settings (const c_eq_state &a, const c_eq_state &b);
@@ -277,6 +278,7 @@ public:
   bool read_file ();
   bool write_file (std::string path);
   bool write_file ();
+  bool refresh_eq_presets_if_changed ();
   std::string get_path ();
   bool set_item (size_t n, std::string value);
   std::string get_item (size_t n);
@@ -286,10 +288,15 @@ public:
   void dump (); // for debugging
   static inline bool istrue (std::string s) { return ::istrue (s); }
   void reset_eq_presets ();
+  void add_eq_preset (const c_eq_state &preset);
   int delete_eq_preset (std::string name);
   std::vector<c_eq_state> eq_presets;
 
 private:
   void process_in (int which, std::string value);
   void process_out (int which, std::string value);
+  std::vector<c_eq_state> pending_eq_additions;
+  std::vector<std::string> pending_eq_deletions;
+  std::filesystem::file_time_type config_mtime {};
+  bool config_mtime_valid = false;
 };
