@@ -15,6 +15,7 @@
 #include "constants.h"
 
 #define CONFIG_FILE_NAME             ".config/neuralblender.conf"
+#define CONFIG_STATE_NAME            ".config/neuralblender.state"
 #define CONFIG_KEY_NAME_MODEL_CWD    "model_path"
 #define CONFIG_KEY_NAME_IR_CWD       "ir_path"
 #define CONFIG_KEY_NAME_PRESET_CWD   "preset_path"

@@ -137,11 +137,22 @@ public:
   void apply_prefs (t_prefs &p) override;
   void write_prefs_to (t_prefs &p) override;
   void apply_effective_controls () override;
+  bool set_dsp_state (const c_neuralblender_state &src) override;
+  void get_dsp_state (c_neuralblender_state &dest) override;
   int idle () override;
   _lane_bank spectrum_bank = BANK_COUNT;
 };
 
 static void refresh_bank_stats (c_neuralblender_ui *ui, _lane_bank bank);
+
+void c_standalone_ui::get_dsp_state (c_neuralblender_state &dest) {
+  blender->get_state (dest);
+}
+
+bool c_standalone_ui::set_dsp_state (
+    const c_neuralblender_state &src) {
+  return blender && blender->set_state (src);
+}
 
 bool c_standalone_ui::load_model (
     _lane_bank bank, size_t which, const char *filename) {
@@ -638,7 +649,7 @@ int main (int argc, char **argv) {
   
   g_blender = new c_neuralblender;
   
-  std::string nbstate_path = std::string (getenv ("HOME")) + "/.config/neuralblender.state";
+  std::string nbstate_path = std::string (getenv ("HOME")) + CONFIG_STATE_NAME;
   const bool have_saved_state = nbstate.read_from (nbstate_path);
   if (have_saved_state) {
     debug ("loaded config state");

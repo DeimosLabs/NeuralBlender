@@ -591,6 +591,8 @@ public:
   void set_ui_values (const LV2_Atom *value, _ui_feedback_type type);
   void handle_atom_event (const LV2_Atom *atom);
   void subscribe_ports ();
+  bool set_dsp_state (const c_neuralblender_state &state) override;
+  void get_dsp_state (c_neuralblender_state &state) override;
 };
 
 #endif // LV2_UI

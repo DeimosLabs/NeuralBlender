@@ -352,7 +352,7 @@ void colortheme_apply (float r, float g, float b,
       bigarray [i] = std::clamp (bigarray [i], 0.0f, 1.0f);
     }
   }
-  
+
   if (flip) {
     // swap begin/end of each outline gradient
     swap_outline_gradients (g_current_colors);
@@ -613,6 +613,27 @@ void c_widget::on_command (t_command_event &event) {
     toplevel->on_command (event);
   else if (app && !event.handled)
     app->on_command (event);
+}
+
+bool c_widget::emit_command (
+    bool value,
+    int source_index,
+    const std::string &text) {
+
+  if (command == NBTK_CMD_NONE)
+    return false;
+
+  t_command_event event;
+  event.source = this;
+  event.source_id = id;
+  event.source_index = source_index;
+  event.mouse_button = last_mouse_button;
+  event.value = value;
+  event.command = command;
+  event.result = _command_result::accepted;
+  event.text = text;
+  on_command (event);
+  return true;
 }
 
 void c_widget::draw_tree (cairo_t *cr) {
@@ -1433,6 +1454,9 @@ bool c_button::on_mouse_up (int x_, int y_, int button) {
   if (is_toggle)
     value = !value;
 
+  if (emit_command (value, -1, label))
+    return true;
+
   t_action_event event;
   event.source = this;
   event.source_id = id;
@@ -1455,6 +1479,11 @@ bool c_button::on_key_down (int key) {
 
   if (is_toggle)
     value = !value;
+
+  if (emit_command (value, -1, label)) {
+    invalidate ();
+    return true;
+  }
 
   t_action_event event;
   event.source = this;
@@ -2440,6 +2469,11 @@ void c_listbox::emit_action (bool activated) {
 
 void c_listbox::emit_action (bool activated, int index) {
   debug ("activated=%d, index=%d", (int) activated, index);
+  const std::string text =
+    index >= 0 && index < (int) rows.size () ? rows [index].label : "";
+  if (emit_command (activated, index, text))
+    return;
+
   t_action_event event;
   event.source = this;
   event.source_id = id;
@@ -3043,6 +3077,9 @@ void c_combobox::sync_list_geometry () {
 }
 
 void c_combobox::emit_action () {
+  if (emit_command (selected >= 0, selected, selected_text ()))
+    return;
+
   t_action_event event;
   event.source = this;
   event.source_id = id;
@@ -3897,7 +3934,10 @@ bool c_textbox::on_text_input (const char *text) {
 
   std::string printable;
   for (const unsigned char *p = (const unsigned char *) text; *p; ++p) {
-    if (*p >= 0x20 && *p != 0x7f)
+    if (*p >= 0x20 &&
+        *p != 0x7f &&
+        (accepted_chars.empty () ||
+         accepted_chars.find ((char) *p) != std::string::npos))
       printable.push_back ((char) *p);
   }
   if (printable.empty ())
@@ -3934,6 +3974,9 @@ const std::string &c_textbox::text () const {
 }
 
 void c_textbox::emit_action () {
+  if (emit_command (true, -1, value))
+    return;
+
   t_action_event event;
   event.source = this;
   event.source_id = id;
@@ -4557,8 +4600,64 @@ void c_app::draw () {
   cairo_restore (cr);
 }
 
+static bool close_active_menu (c_app *app) {
+  if (!app || !app->active_menu || !app->active_menu->visible)
+    return false;
+
+  app->active_menu->close_tree ();
+  return true;
+}
+
+static c_topmenu *topmenu_at (
+    c_widget *widget,
+    int px,
+    int py) {
+
+  if (!widget ||
+      !widget->visible ||
+      !widget->enabled ||
+      !widget->contains_local (px, py))
+    return nullptr;
+
+  const int lx = px - widget->x;
+  const int ly = py - widget->y;
+  for (auto it = widget->children.rbegin ();
+       it != widget->children.rend ();
+       ++it) {
+    if (c_topmenu *menu = topmenu_at (*it, lx, ly))
+      return menu;
+  }
+
+  return dynamic_cast<c_topmenu *> (widget);
+}
+
+static bool switch_active_topmenu_at (
+    c_app *app,
+    c_widget *root,
+    int x,
+    int y) {
+
+  if (!app || !app->active_menu || !app->active_menu->visible)
+    return false;
+
+  c_topmenu *menu = topmenu_at (root, x, y);
+  if (!menu)
+    return false;
+
+  if (!menu->menu_visible)
+    menu->show_menu ();
+  return true;
+}
+
 void c_app::dispatch_mouse_down (int x, int y, int button) {
   hide_tooltip ();
+
+  if (active_menu && active_menu->visible) {
+    if (button == Button1 && switch_active_topmenu_at (this, root, x, y))
+      return;
+    close_active_menu (this);
+    return;
+  }
 
   for (auto it = popups.rbegin (); it != popups.rend (); it++) {
     c_popupwindow *popup = it->get ();
@@ -4585,6 +4684,11 @@ void c_app::dispatch_mouse_up (int x, int y, int button) {
 void c_app::dispatch_mouse_move (int x, int y) {
   if (!root)
     return;
+
+  if (active_menu && active_menu->visible) {
+    switch_active_topmenu_at (this, root, x, y);
+    return;
+  }
 
   hovered_widget = nullptr;
   root->update_hover_tree (x, y);
@@ -4784,7 +4888,8 @@ void c_app::ask_string (
     int64_t command,
     const std::string &title,
     const std::string &prompt,
-    const std::string &initial_value) {
+    const std::string &initial_value,
+    const std::string &accept_chars) {
 
   t_native_handle owner = active_toplevel
     ? active_toplevel->native_handle ()
@@ -4799,14 +4904,17 @@ void c_app::ask_string (
   }
 
   askstring_dialog->ask (
-    response_target, command, title, prompt, initial_value);
+    response_target, command, title, prompt, initial_value, accept_chars);
 }
 
 void c_app::ask_yes_no (
     c_widget *response_target,
     int64_t command,
     const std::string &title,
-    const std::string &question) {
+    const std::string &question,
+    const std::string &cancel_text,
+    const std::string &no_text,
+    const std::string &yes_text) {
 
   t_native_handle owner = active_toplevel
     ? active_toplevel->native_handle ()
@@ -4820,7 +4928,12 @@ void c_app::ask_yes_no (
     }
   }
 
-  askyesno_dialog->ask (response_target, command, title, question);
+  askyesno_dialog->ask (response_target, command, title, question,
+                        cancel_text, no_text, yes_text);
+}
+
+void c_app::show_message (const std::string title, const std::string msg) {
+  ask_yes_no (nullptr, NBTK_CMD_NONE, title, msg, "", "", "OK");
 }
 
 void c_app::on_event (t_event &event) {
@@ -4993,6 +5106,10 @@ bool c_popupwindow::takes_focus () const {
   return true;
 }
 
+bool c_popupwindow::pointer_grab_owner_events () const {
+  return false;
+}
+
 bool c_popupwindow::on_mouse_up (int x_, int y_, int button) {
   if (c_combobox *combobox = dynamic_cast<c_combobox *> (owner)) {
     if (combobox->on_popup_mouse_up (this, x_, y_, button))
@@ -5033,7 +5150,8 @@ void c_popupwindow::show () {
     nbtk::t_native_widget *w = as_native_widget (widget);
     native_widget_show (w);
     if (app && app->backend)
-      pointer_grabbed = app->backend->grab_pointer (widget);
+      pointer_grabbed = app->backend->grab_pointer (
+          widget, pointer_grab_owner_events ());
     if (takes_focus () && app && app->backend)
       app->backend->set_keyboard_focus (widget);
     close_on_release = false;
@@ -5111,6 +5229,32 @@ void c_popupwindow::cb_button_press (
     }
   }
 
+  if (self->app &&
+      self->app->active_menu &&
+      self->app->active_menu->visible) {
+    const t_point screen = self->local_to_screen ({ x, y });
+    c_menu *target = self->app->active_menu->menu_at_screen (screen);
+    if (target && target != self) {
+      const t_point local = target->screen_to_local (screen);
+      target->on_mouse_down (local.x, local.y, button);
+      return;
+    }
+    if (!target) {
+      const t_point root = self->app->screen_to_root (screen);
+      if (button == Button1 &&
+          switch_active_topmenu_at (
+              self->app,
+              self->app->active_toplevel
+                ? &self->app->active_toplevel->root_widget
+                : self->app->root,
+              root.x,
+              root.y))
+        return;
+      close_active_menu (self->app);
+      return;
+    }
+  }
+
   if (self->close_on_outside_click () &&
       (x < 0 || y < 0 || x >= self->w || y >= self->h)) {
     self->close_on_release = true;
@@ -5165,6 +5309,31 @@ void c_popupwindow::cb_button_release (
     }
   }
 
+  if (self->app &&
+      self->app->active_menu &&
+      self->app->active_menu->visible) {
+    const t_point screen = self->local_to_screen ({ x, y });
+    c_menu *target = self->app->active_menu->menu_at_screen (screen);
+    if (target && target != self) {
+      const t_point local = target->screen_to_local (screen);
+      target->on_mouse_up (local.x, local.y, button);
+      return;
+    }
+    if (!target) {
+      const t_point root = self->app->screen_to_root (screen);
+      if (switch_active_topmenu_at (
+              self->app,
+              self->app->active_toplevel
+                ? &self->app->active_toplevel->root_widget
+                : self->app->root,
+              root.x,
+              root.y))
+        return;
+      close_active_menu (self->app);
+      return;
+    }
+  }
+
   if (self->mouse_captured && self->app && self->app->focused_widget) {
     t_point local = self->app->focused_widget->root_to_local ({ x, y });
     self->app->focused_widget->on_mouse_up (
@@ -5205,6 +5374,29 @@ void c_popupwindow::cb_motion (
   if (c_combobox *combobox = dynamic_cast<c_combobox *> (self->owner)) {
     if (combobox->on_popup_mouse_move (self, x, y)) {
       native_widget_invalidate (w);
+      return;
+    }
+  }
+
+  if (self->app &&
+      self->app->active_menu &&
+      self->app->active_menu->visible) {
+    const t_point screen = self->local_to_screen ({ x, y });
+    c_menu *target = self->app->active_menu->menu_at_screen (screen);
+    if (target && target != self) {
+      const t_point local = target->screen_to_local (screen);
+      target->on_mouse_move (local.x, local.y);
+      return;
+    }
+    if (!target) {
+      const t_point root = self->app->screen_to_root (screen);
+      switch_active_topmenu_at (
+          self->app,
+          self->app->active_toplevel
+            ? &self->app->active_toplevel->root_widget
+            : self->app->root,
+          root.x,
+          root.y);
       return;
     }
   }
@@ -5287,6 +5479,651 @@ void c_popupwindow::cb_key_release (
     self->app->dispatch_key_up (tk_key);
 
   native_widget_invalidate (w);
+}
+
+void c_menulistbox::draw (cairo_t *cr) {
+  if (!cr || !menu)
+    return;
+
+  const t_statecolors &frame_colors = colors_for (
+      WSTYLE_FRAME, WSTATE_NORMAL);
+  const t_statecolors &selected_colors = colors_for (
+      WSTYLE_BUTTON, WSTATE_HOVER);
+  const t_gradientcolors &bg = get_colortheme ()->window_bg;
+
+  tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, NBTK_MENU_RADIUS);
+  cairo_set_source_rgba (cr, bg.r1, bg.g1, bg.b1, bg.a1);
+  cairo_fill_preserve (cr);
+  tk_set_gradient (cr, h, frame_colors.outline);
+  cairo_set_line_width (cr, 1.0);
+  cairo_stroke (cr);
+
+  cairo_save (cr);
+  cairo_rectangle (cr, 2, 2, std::max (0, w - 4), std::max (0, h - 4));
+  cairo_clip (cr);
+  cairo_set_font_size (cr, font_size ());
+  cairo_font_extents_t font_ext {};
+  cairo_font_extents (cr, &font_ext);
+  const double baseline =
+    ((double) row_height - font_ext.ascent - font_ext.descent) * 0.5 +
+    font_ext.ascent;
+
+  for (int row = 0; row < visible_rows (); ++row) {
+    const int index = first_visible + row;
+    if (index >= (int) menu->items.size ())
+      break;
+
+    const t_menuitem &item = menu->items [index];
+    const int y0 = row * row_height;
+    if (item.type == MENUITEM_SEPARATOR) {
+      cairo_set_source_rgba (
+          cr,
+          frame_colors.outline.r1,
+          frame_colors.outline.g1,
+          frame_colors.outline.b1,
+          frame_colors.outline.a1);
+      cairo_set_line_width (cr, 1.0);
+      cairo_move_to (cr, 8, y0 + row_height / 2 + 0.5);
+      cairo_line_to (cr, w - 8, y0 + row_height / 2 + 0.5);
+      cairo_stroke (cr);
+      continue;
+    }
+
+    if (index == selected) {
+      tk_path_rounded_rect (
+          cr, 4, y0 + 2, w - 8, row_height - 4,
+          std::min ((float) NBTK_MENU_RADIUS, (float) row_height * 0.25f));
+      tk_set_gradient (cr, row_height, selected_colors.bg);
+      cairo_fill (cr);
+    }
+
+    tk_set_text_fg (cr, item.enabled);
+    if (item.type == MENUITEM_CHECK && item.checked) {
+      cairo_set_line_width (cr, 2.0);
+      cairo_set_line_cap (cr, CAIRO_LINE_CAP_ROUND);
+      cairo_move_to (cr, 9, y0 + row_height * 0.52);
+      cairo_line_to (cr, 13, y0 + row_height * 0.68);
+      cairo_line_to (cr, 20, y0 + row_height * 0.32);
+      cairo_stroke (cr);
+    } else if (item.type == MENUITEM_RADIO) {
+      const double cx = 14.0;
+      const double cy = y0 + row_height * 0.5;
+      cairo_set_line_width (cr, 1.5);
+      cairo_arc (cr, cx, cy, 5.0, 0.0, 2.0 * M_PI);
+      cairo_stroke (cr);
+      if (item.checked) {
+        cairo_arc (cr, cx, cy, 2.5, 0.0, 2.0 * M_PI);
+        cairo_fill (cr);
+      }
+    }
+
+    cairo_move_to (cr, 28, y0 + baseline);
+    cairo_show_text (cr, item.label.c_str ());
+
+    if (item.submenu) {
+      const double cx = w - 13.0;
+      const double cy = y0 + row_height * 0.5;
+      cairo_move_to (cr, cx - 2.5, cy - 4.0);
+      cairo_line_to (cr, cx + 2.5, cy);
+      cairo_line_to (cr, cx - 2.5, cy + 4.0);
+      cairo_close_path (cr);
+      cairo_fill (cr);
+    }
+  }
+  cairo_restore (cr);
+}
+
+bool c_menulistbox::on_mouse_move (int x_, int y_) {
+  (void) x_;
+  if (!menu)
+    return false;
+
+  const int index = row_at (y_);
+  if (menu->item_selectable (index))
+    set_selected (index, true);
+  else if (selected != -1)
+    set_selected (-1, true);
+  return true;
+}
+
+bool c_menulistbox::on_key_down (int key) {
+  if (!menu)
+    return false;
+
+  switch (key) {
+    case KEY_UP:
+      set_selected (menu->next_selectable (selected, -1), true);
+      return true;
+    case KEY_DOWN:
+      set_selected (menu->next_selectable (selected, 1), true);
+      return true;
+    case KEY_HOME:
+      set_selected (menu->next_selectable (-1, 1), true);
+      return true;
+    case KEY_END:
+      set_selected (menu->next_selectable (0, -1), true);
+      return true;
+    case KEY_RIGHT:
+      if (selected >= 0 && menu->items [selected].submenu) {
+        menu->select_item (selected);
+        c_menu *submenu = menu->items [selected].submenu;
+        submenu->listbox.set_selected (
+            submenu->next_selectable (-1, 1), true);
+      }
+      return true;
+    case KEY_LEFT:
+      if (menu->parent_menu) {
+        c_menu *parent = menu->parent_menu;
+        menu->hide ();
+        if (parent->app)
+          parent->app->set_focus (&parent->listbox);
+      } else {
+        menu->close_tree ();
+      }
+      return true;
+    case KEY_RETURN:
+    case KEY_SPACE:
+      menu->activate_item (selected);
+      return true;
+    case KEY_ESCAPE:
+      menu->close_tree ();
+      return true;
+    default:
+      return false;
+  }
+}
+
+void c_menulistbox::on_select (int index) {
+  if (menu)
+    menu->select_item (index);
+}
+
+void c_menulistbox::on_activate (int index) {
+  if (menu)
+    menu->activate_item (index);
+}
+
+c_menu::~c_menu () = default;
+
+void c_menu::configure (
+    c_app *app_,
+    c_widget *command_target_,
+    c_menu *parent_) {
+
+  app = app_;
+  command_target = command_target_;
+  parent_menu = parent_;
+}
+
+int c_menu::add_item (
+    const std::string &label,
+    int64_t command,
+    _menuitem_type type,
+    bool enabled,
+    bool checked) {
+
+  t_menuitem item;
+  item.label = label;
+  item.command = command;
+  item.enabled = enabled;
+  item.type = type;
+  item.checked = checked;
+  items.push_back (item);
+  return (int) items.size () - 1;
+}
+
+int c_menu::add_separator () {
+  t_menuitem item;
+  item.enabled = false;
+  item.type = MENUITEM_SEPARATOR;
+  items.push_back (item);
+  return (int) items.size () - 1;
+}
+
+c_menu *c_menu::add_submenu (const std::string &label, bool enabled) {
+  auto submenu = std::make_unique<c_menu> ();
+  c_menu *ret = submenu.get ();
+  ret->configure (app, command_target, this);
+  owned_submenus.push_back (std::move (submenu));
+  t_menuitem item;
+  item.label = label;
+  item.submenu = ret;
+  item.enabled = enabled;
+  items.push_back (item);
+  ret->parent_row = (int) items.size () - 1;
+  return ret;
+}
+
+void c_menu::clear () {
+  close_tree ();
+  items.clear ();
+  owned_submenus.clear ();
+  if (listbox.id)
+    listbox.clear ();
+}
+
+void c_menu::ensure_native () {
+  if (widget || !app)
+    return;
+
+  t_native_handle native_owner =
+    app->active_toplevel ? app->active_toplevel->widget : nullptr;
+  if (!native_owner)
+    return;
+
+  create_native_for_owner (app, command_target, native_owner, 1, 1);
+  root.corner_radius = NBTK_MENU_RADIUS;
+  listbox.create (&root, "", 0, 0, 1, 1);
+  listbox.menu = this;
+  listbox.row_height = row_height;
+  listbox.activate_on_single_click = true;
+  listbox.activate_on_doubleclick = false;
+  listbox.wants_keyboard_focus = true;
+}
+
+void c_menu::sync_geometry (int max_height) {
+  ensure_native ();
+  if (!widget)
+    return;
+
+  int content_width = min_width;
+  for (const t_menuitem &item : items)
+    content_width = std::max (
+        content_width,
+        tk_measure_text_width (item.label, listbox.font_size ()) + 56);
+  content_width = std::clamp (content_width, min_width, max_width);
+
+  const int natural_height = std::max (1, (int) items.size ()) * row_height + 4;
+  const int visible_height = std::max (
+      row_height + 4,
+      std::min (natural_height, std::max (row_height + 4, max_height)));
+  move_resize (x, y, content_width, visible_height);
+  root.move_resize (0, 0, content_width, visible_height);
+  listbox.move_resize (0, 0, content_width, visible_height);
+  listbox.row_height = row_height;
+
+  std::vector<std::string> labels;
+  labels.reserve (items.size ());
+  for (const t_menuitem &item : items)
+    labels.push_back (item.label);
+  listbox.set_items (labels);
+}
+
+static void suspend_widget_hover_for_menu (c_app *app) {
+  if (!app)
+    return;
+
+  app->hide_tooltip ();
+  app->hovered_widget = nullptr;
+  if (app->active_toplevel) {
+    c_toplevelwindow *toplevel = app->active_toplevel;
+    c_widget *old_hovered = toplevel->hovered_widget;
+    toplevel->root_widget.clear_hover_tree ();
+    toplevel->hovered_widget = nullptr;
+    toplevel->set_mouse_cursor (MOUSE_CURSOR_DEFAULT);
+    toplevel->save_state ();
+    if (old_hovered)
+      toplevel->on_hover_changed (nullptr);
+  } else if (app->root) {
+    app->root->clear_hover_tree ();
+    app->set_mouse_cursor (MOUSE_CURSOR_DEFAULT);
+  }
+}
+
+void c_menu::show_below (c_widget *anchor) {
+  if (!app || !anchor || items.empty ())
+    return;
+
+  const t_point below = anchor->local_to_screen ({ 0, anchor->h });
+  const t_rect bounds = app->screen_bounds_at (below);
+  sync_geometry (bounds.h - 8);
+  if (!widget)
+    return;
+
+  int px = below.x;
+  int py = below.y;
+  if (py + h > bounds.y + bounds.h)
+    py = anchor->local_to_screen ({ 0, 0 }).y - h;
+  px = std::clamp (px, bounds.x, std::max (bounds.x, bounds.x + bounds.w - w));
+  py = std::clamp (py, bounds.y, std::max (bounds.y, bounds.y + bounds.h - h));
+
+  suspend_widget_hover_for_menu (app);
+  listbox.set_selected (next_selectable (-1, 1), false);
+  show_at_screen_pos (px, py);
+  app->active_menu = this;
+  app->set_focus (&listbox);
+}
+
+void c_menu::show_beside (c_menu *parent, int row) {
+  if (!app || !parent || items.empty ())
+    return;
+
+  const int row_y =
+    (row - parent->listbox.first_visible) * parent->row_height;
+  const t_point right { parent->x + parent->w, parent->y + row_y };
+  const t_rect bounds = app->screen_bounds_at (right);
+  sync_geometry (bounds.h - 8);
+  if (!widget)
+    return;
+
+  int px = right.x;
+  int py = right.y;
+  if (px + w > bounds.x + bounds.w)
+    px = parent->x - w;
+  px = std::clamp (px, bounds.x, std::max (bounds.x, bounds.x + bounds.w - w));
+  py = std::clamp (py, bounds.y, std::max (bounds.y, bounds.y + bounds.h - h));
+
+  listbox.set_selected (-1, false);
+  show_at_screen_pos (px, py);
+}
+
+bool c_menu::item_selectable (int index) const {
+  return index >= 0 &&
+    index < (int) items.size () &&
+    items [index].enabled &&
+    items [index].type != MENUITEM_SEPARATOR;
+}
+
+int c_menu::next_selectable (int from, int direction) const {
+  if (items.empty ())
+    return -1;
+
+  const int count = (int) items.size ();
+  int index = from;
+  for (int i = 0; i < count; ++i) {
+    index = (index + direction + count) % count;
+    if (item_selectable (index))
+      return index;
+  }
+  return -1;
+}
+
+void c_menu::show_submenu (int index) {
+  c_menu *submenu = item_selectable (index) ? items [index].submenu : nullptr;
+  if (open_submenu == submenu)
+    return;
+
+  if (open_submenu)
+    open_submenu->hide ();
+  open_submenu = submenu;
+  if (open_submenu)
+    open_submenu->show_beside (this, index);
+}
+
+void c_menu::select_item (int index) {
+  if (!item_selectable (index)) {
+    listbox.set_selected (-1, false);
+    show_submenu (-1);
+    return;
+  }
+  show_submenu (index);
+}
+
+void c_menu::activate_item (int index) {
+  if (!item_selectable (index))
+    return;
+
+  if (items [index].submenu) {
+    show_submenu (index);
+    if (open_submenu && app) {
+      open_submenu->listbox.set_selected (
+          open_submenu->next_selectable (-1, 1), true);
+      app->set_focus (&open_submenu->listbox);
+    }
+    return;
+  }
+
+  if (items [index].type == MENUITEM_CHECK) {
+    items [index].checked = !items [index].checked;
+  } else if (items [index].type == MENUITEM_RADIO) {
+    int first = index;
+    int last = index;
+    while (first > 0 && items [first - 1].type == MENUITEM_RADIO)
+      --first;
+    while (last + 1 < (int) items.size () &&
+           items [last + 1].type == MENUITEM_RADIO)
+      ++last;
+    for (int i = first; i <= last; ++i)
+      items [i].checked = i == index;
+  }
+
+  const t_menuitem item = items [index];
+  c_widget *target = command_target;
+  root_menu ()->hide ();
+  if (!target || item.command == NBTK_CMD_NONE)
+    return;
+
+  t_command_event event;
+  event.source = target;
+  event.source_id = target->id;
+  event.source_index = index;
+  event.command = item.command;
+  event.result = _command_result::accepted;
+  event.text = item.label;
+  event.value = item.checked;
+  target->on_command (event);
+}
+
+c_menu *c_menu::root_menu () {
+  c_menu *root = this;
+  while (root->parent_menu)
+    root = root->parent_menu;
+  return root;
+}
+
+c_menu *c_menu::menu_at_screen (t_point point) {
+  c_menu *root = root_menu ();
+  c_menu *menu = root;
+  while (menu->open_submenu && menu->open_submenu->visible)
+    menu = menu->open_submenu;
+
+  for (c_menu *candidate = menu; candidate; candidate = candidate->parent_menu) {
+    if (candidate->visible &&
+        point.x >= candidate->x &&
+        point.y >= candidate->y &&
+        point.x < candidate->x + candidate->w &&
+        point.y < candidate->y + candidate->h)
+      return candidate;
+  }
+
+  return nullptr;
+}
+
+void c_menu::close_tree () {
+  root_menu ()->hide ();
+}
+
+bool c_menu::on_key_down (int key) {
+  if (key == KEY_ESCAPE) {
+    close_tree ();
+    return true;
+  }
+  return c_popupwindow::on_key_down (key);
+}
+
+bool c_menu::pointer_grab_owner_events () const {
+  return true;
+}
+
+void c_menu::close () {
+  close_tree ();
+}
+
+void c_menu::hide () {
+  if (open_submenu) {
+    c_menu *submenu = open_submenu;
+    open_submenu = nullptr;
+    submenu->hide ();
+  }
+
+  c_popupwindow::hide ();
+  if (app && app->active_menu == this)
+    app->active_menu = nullptr;
+  if (parent_menu) {
+    if (parent_menu->open_submenu == this)
+      parent_menu->open_submenu = nullptr;
+  } else if (c_topmenu *top = dynamic_cast<c_topmenu *> (command_target)) {
+    top->menu_closed ();
+  }
+}
+
+c_topmenu::c_topmenu () {
+  corner_radius = NBTK_MENU_RADIUS;
+  align = TEXT_CENTER;
+}
+
+c_topmenu::~c_topmenu () = default;
+
+void c_topmenu::draw (cairo_t *cr) {
+  if (!cr)
+    return;
+
+  if (menu_visible || highlighted ()) {
+    const t_statecolors &colors = colors_for (
+        WSTYLE_BUTTON, menu_visible ? WSTATE_ON : WSTATE_HOVER);
+    tk_path_rounded_rect (cr, 1, 1, w - 2, h - 2, corner_radius);
+    tk_set_gradient (cr, h, colors.bg);
+    cairo_fill (cr);
+  }
+
+  cairo_set_font_size (cr, font_size (TEXTSIZE_NORMAL));
+  tk_set_text_fg (cr, enabled);
+  cairo_text_extents_t ext {};
+  cairo_text_extents (cr, label.c_str (), &ext);
+  cairo_move_to (
+      cr,
+      ((double) w - ext.width) * 0.5 - ext.x_bearing,
+      ((double) h - ext.height) * 0.5 - ext.y_bearing);
+  cairo_show_text (cr, label.c_str ());
+}
+
+bool c_topmenu::on_mouse_down (int x_, int y_, int button) {
+  c_button::on_mouse_down (x_, y_, button);
+  if (button == Button1)
+    show_menu ();
+  return true;
+}
+
+bool c_topmenu::on_mouse_up (int x_, int y_, int button) {
+  (void) x_;
+  (void) y_;
+  mouse_down_inside = false;
+  return c_widget::on_mouse_up (x_, y_, button);
+}
+
+bool c_topmenu::on_key_down (int key) {
+  if (key == KEY_RETURN || key == KEY_SPACE || key == KEY_DOWN) {
+    show_menu ();
+    return true;
+  }
+  return false;
+}
+
+void c_topmenu::on_mouse_enter () {
+  c_button::on_mouse_enter ();
+  if (c_menubar *bar = dynamic_cast<c_menubar *> (parent)) {
+    if (bar->open_topmenu && bar->open_topmenu != this)
+      show_menu ();
+  }
+}
+
+c_menu *c_topmenu::get_menu () {
+  if (!popup_menu) {
+    popup_menu = std::make_unique<c_menu> ();
+    popup_menu->configure (app, this);
+  }
+  return popup_menu.get ();
+}
+
+int c_topmenu::add_item (
+    const std::string &label_,
+    int64_t command,
+    _menuitem_type type,
+    bool enabled,
+    bool checked) {
+  return get_menu ()->add_item (label_, command, type, enabled, checked);
+}
+
+int c_topmenu::add_separator () {
+  return get_menu ()->add_separator ();
+}
+
+c_menu *c_topmenu::add_submenu (const std::string &label_, bool enabled) {
+  return get_menu ()->add_submenu (label_, enabled);
+}
+
+void c_topmenu::show_menu () {
+  c_menu *menu = get_menu ();
+  if (!menu || menu->items.empty ())
+    return;
+
+  if (c_menubar *bar = dynamic_cast<c_menubar *> (parent))
+    bar->open_menu (this);
+  menu_visible = true;
+  pressed = false;
+  invalidate ();
+  menu->show_below (this);
+}
+
+void c_topmenu::hide_menu () {
+  if (popup_menu)
+    popup_menu->hide ();
+  else
+    menu_closed ();
+}
+
+void c_topmenu::menu_closed () {
+  if (!menu_visible)
+    return;
+  menu_visible = false;
+  pressed = false;
+  invalidate ();
+  if (c_menubar *bar = dynamic_cast<c_menubar *> (parent))
+    bar->menu_closed (this);
+}
+
+c_menubar::~c_menubar () = default;
+
+c_topmenu *c_menubar::add_menu (const std::string &label_) {
+  auto menu = std::make_unique<c_topmenu> ();
+  c_topmenu *ret = menu.get ();
+  ret->create (this, label_.c_str (), 0, 0, 1, std::max (1, h));
+  menus.push_back (std::move (menu));
+  layout_menus ();
+  return ret;
+}
+
+void c_menubar::layout_menus () {
+  int px = 0;
+  for (const std::unique_ptr<c_topmenu> &menu : menus) {
+    const int width =
+      tk_measure_text_width (menu->label, menu->font_size ()) + item_padding;
+    menu->move_resize (px, 0, std::max (1, width), std::max (1, h));
+    px += width + item_gap;
+  }
+}
+
+void c_menubar::move_resize (int x_, int y_, int w_, int h_) {
+  c_container::move_resize (x_, y_, w_, h_);
+  layout_menus ();
+}
+
+void c_menubar::open_menu (c_topmenu *menu) {
+  if (open_topmenu == menu)
+    return;
+  if (open_topmenu)
+    open_topmenu->hide_menu ();
+  open_topmenu = menu;
+}
+
+void c_menubar::menu_closed (c_topmenu *menu) {
+  if (open_topmenu == menu)
+    open_topmenu = nullptr;
+}
+
+void c_menubar::close_menus () {
+  if (open_topmenu)
+    open_topmenu->hide_menu ();
 }
 
 void c_valueeditor_popup::create_for_value (
@@ -6489,11 +7326,13 @@ void c_askstring_dialog::ask (
     int64_t command,
     const std::string &title,
     const std::string &prompt,
-    const std::string &initial_value) {
+    const std::string &initial_value,
+    const std::string &accept_chars) {
   response_target = response_target_;
   response_command = command;
   set_title (title.c_str ());
   label_prompt.set_label (prompt);
+  textbox.accepted_chars = accept_chars;
   textbox.set_text (initial_value.c_str ());
   textbox.cursor = textbox.text ().size ();
   textbox.selection_anchor = 0;
@@ -6575,9 +7414,9 @@ bool c_askyesno_dialog::create (
   frame.create (&root_widget, "", 12, 12, 416, 76);
   label_question.create (&frame, "", 12, 12, 392, 52);
   label_question.align = TEXT_LEFT;
-  btn_cancel.create (&root_widget, "Cancel", 160, 100, 84, 40);
-  btn_no.create (&root_widget, "No", 252, 100, 84, 40);
-  btn_yes.create (&root_widget, "Yes", 344, 100, 84, 40);
+  btn_cancel.create (&root_widget, "", 160, 100, 84, 40);
+  btn_no.create (&root_widget, "", 252, 100, 84, 40);
+  btn_yes.create (&root_widget, "", 344, 100, 84, 40);
   set_min_size_to_current ();
   return true;
 }
@@ -6586,11 +7425,34 @@ void c_askyesno_dialog::ask (
     c_widget *response_target_,
     int64_t command,
     const std::string &title,
-    const std::string &question) {
+    const std::string &question,
+    const std::string &cancel_text,
+    const std::string &no_text,
+    const std::string &yes_text) {
+
+  debug ("cancel_text=%s, no_text=%s, yes_text=%s",
+          cancel_text.c_str (), no_text.c_str (), yes_text.c_str ());
   response_target = response_target_;
   response_command = command;
   set_title (title.c_str ());
   label_question.set_label (question);
+
+  if (cancel_text != "") { CP
+    btn_cancel.set_label (cancel_text);
+    btn_cancel.show ();
+  } else { CP
+    btn_cancel.hide ();
+  }
+
+  if (no_text != "") { CP
+    btn_no.set_label (no_text);
+    btn_no.show ();
+  } else { CP
+    btn_no.hide ();
+  }
+
+  btn_yes.set_label (yes_text.size () ? yes_text : "Yes");
+
   center_over_transient_owner ();
   activate ();
   show ();
@@ -6679,6 +7541,19 @@ void c_toplevelwindow::cb_button_press (
     const int button = native_button_from_event (event);
     const int rx = native_event_x (event) / w->app->hdpi;
     const int ry = native_event_y (event) / w->app->hdpi;
+    if (self->app->active_menu && self->app->active_menu->visible) {
+      if (button == Button1 &&
+          switch_active_topmenu_at (
+              self->app, &self->root_widget, rx, ry)) {
+        self->save_state ();
+        native_widget_invalidate (w);
+        return;
+      }
+      close_active_menu (self->app);
+      self->save_state ();
+      native_widget_invalidate (w);
+      return;
+    }
     const bool handled = self->root_widget.mouse_down_tree (
       rx,
       ry,
@@ -6747,10 +7622,15 @@ void c_toplevelwindow::cb_motion (
 
   c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->app) {
-    nbtk::c_widget *old_hovered = self->hovered_widget;
-    self->activate ();
     const int rx = native_event_x (event) / w->app->hdpi;
     const int ry = native_event_y (event) / w->app->hdpi;
+    if (self->app->active_menu && self->app->active_menu->visible) {
+      switch_active_topmenu_at (
+          self->app, &self->root_widget, rx, ry);
+      return;
+    }
+    nbtk::c_widget *old_hovered = self->hovered_widget;
+    self->activate ();
     if (self->app->mouse_captured && self->app->mouse_capture_widget) {
       nbtk::t_point local =
         self->app->mouse_capture_widget->root_to_local ({ rx, ry });
@@ -6778,12 +7658,18 @@ void c_toplevelwindow::cb_enter (void *w_, void *user_data) {
 
   c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->app) {
-    nbtk::c_widget *old_hovered = self->hovered_widget;
     nbtk::t_point local;
     if (!self->app->backend ||
         !self->app->backend->query_pointer (w, &local))
       return;
 
+    if (self->app->active_menu && self->app->active_menu->visible) {
+      switch_active_topmenu_at (
+          self->app, &self->root_widget, local.x, local.y);
+      return;
+    }
+
+    nbtk::c_widget *old_hovered = self->hovered_widget;
     self->activate ();
     self->app->hovered_widget = nullptr;
     self->root_widget.update_hover_tree (local.x, local.y);
@@ -6807,6 +7693,8 @@ void c_toplevelwindow::cb_leave (void *w_, void *user_data) {
 
   c_toplevelwindow *self = (c_toplevelwindow *) w->parent_struct;
   if (self->app) {
+    if (self->app->active_menu && self->app->active_menu->visible)
+      return;
     nbtk::c_widget *old_hovered = self->hovered_widget;
     self->activate ();
     self->app->hide_tooltip ();
@@ -7222,6 +8110,10 @@ void nbtk::c_filepicker::create (
   vscrollbar.set_container (&listbox);
   vscrollbar.set_orientation (SCROLLBAR_VERTICAL);
 
+  label_filename.create (&frame, "Filename:", 12, 320, 76, 32);
+  label_filename.align = TEXT_LEFT;
+  text_filename.create (&frame, "", 88, 320, 402, 32);
+
   combo_filter.create (&root_widget, "Files", 8, 380, 100, 30);
   combo_filter.visible_rows_max = 6;
   combo_filter.set_items (filter_labels);
@@ -7237,6 +8129,7 @@ void nbtk::c_filepicker::create (
   btn_ok.create (&root_widget, "OK", 342, 380, 80, 30);
   btn_ok.set_image_default (data_icon_xputty_approved_png);
 
+  set_save_as (false);
   on_resize ();
 }
 
@@ -7249,8 +8142,73 @@ void nbtk::c_filepicker::show () {
 
   activate ();
   scan_current_dir ();
+  if (save_as && app) {
+    app->set_focus (&text_filename);
+    text_filename.cursor = text_filename.text ().size ();
+    text_filename.selection_anchor = 0;
+  }
   center_over_transient_owner ();
   c_native_toplevelwindow::show ();
+}
+
+void nbtk::c_filepicker::show_open (
+    c_widget *response_target_,
+    int64_t command) {
+
+  response_target = response_target_;
+  response_command = command;
+  pending_save_path.clear ();
+  set_save_as (false);
+  show ();
+}
+
+void nbtk::c_filepicker::show_save_as (
+    c_widget *response_target_,
+    int64_t command,
+    const std::string &filename) {
+
+  response_target = response_target_;
+  response_command = command;
+  pending_save_path.clear ();
+  set_save_as (true);
+  text_filename.set_text (filename.c_str ());
+  show ();
+}
+
+void nbtk::c_filepicker::show_save_as (const std::string &filename) {
+  response_target = nullptr;
+  response_command = NBTK_CMD_NONE;
+  pending_save_path.clear ();
+  set_save_as (true);
+  text_filename.set_text (filename.c_str ());
+  show ();
+}
+
+void nbtk::c_filepicker::set_save_as (
+    bool enabled,
+    const std::string &filename) {
+
+  save_as = enabled;
+  if (save_as) {
+    if (!filename.empty () || text_filename.text ().empty ())
+      text_filename.set_text (filename.c_str ());
+    label_filename.show ();
+    text_filename.show ();
+    btn_ok.set_label ("Save");
+  } else {
+    label_filename.hide ();
+    text_filename.hide ();
+    btn_ok.set_label ("Open");
+  }
+
+  if (widget)
+    on_resize ();
+}
+
+void nbtk::c_filepicker::set_save_suffix (std::string suffix) {
+  while (!suffix.empty () && suffix.front () == '*')
+    suffix.erase (suffix.begin ());
+  save_suffix = std::move (suffix);
 }
 
 void nbtk::c_filepicker::clear_allowed_filters () {
@@ -7310,13 +8268,20 @@ void nbtk::c_filepicker::on_resize () {
   const int frame_h = std::max (80, button_y - pad * 2);
   const int frame_w = std::max (120, ww - pad * 2);
   const int scroll_w = NBTK_SCROLLBAR_WIDTH;
-  const int list_h = std::max (24, frame_h - list_y - 12);
+  const int filename_h = 32;
+  const int filename_gap = 8;
+  const int filename_y = frame_h - 12 - filename_h;
+  const int list_bottom = save_as ? filename_y - filename_gap : frame_h - 12;
+  const int list_h = std::max (24, list_bottom - list_y);
   const int list_w = std::max (24, frame_w - 36 - scroll_w);
 
   frame.move_resize (pad, pad, frame_w, frame_h);
   text_path.move_resize (12, 12, std::max (24, frame_w - 24), 32);
   listbox.move_resize (12, list_y, list_w, list_h);
   vscrollbar.move_resize (12 + list_w + 4, list_y, scroll_w, list_h);
+  label_filename.move_resize (12, filename_y, 76, filename_h);
+  text_filename.move_resize (
+      88, filename_y, std::max (24, frame_w - 100), filename_h);
   listbox.sync_scrollbar ();
   combo_filter.move_resize (pad, button_y, 120, button_h);
   btn_show_hidden.move_resize (pad + 138, button_y, 152, button_h);
@@ -7346,7 +8311,7 @@ void nbtk::c_filepicker::on_action (t_action_event &event) {
 
   if (event.source_id == btn_cancel.id) {
     event.handled = true;
-    hide ();
+    finish (_command_result::cancelled);
     return;
   }
 
@@ -7366,17 +8331,55 @@ void nbtk::c_filepicker::on_action (t_action_event &event) {
     return;
   }
 
+  if (save_as && event.source_id == listbox.id && !event.value) {
+    event.handled = true;
+    const int selected = event.source_index;
+    if (selected >= 0 && selected < (int) rows.size () &&
+        !rows [selected].directory)
+      text_filename.set_text (rows [selected].label.c_str ());
+    return;
+  }
+
   if (event.source_id == btn_ok.id ||
+      event.source_id == text_filename.id ||
       (event.source_id == listbox.id && event.value)) {
     event.handled = true;
     const int selected =
       event.source_id == listbox.id ? event.source_index : listbox.selected;
-    if (selected >= 0 && selected < (int) rows.size () && rows [selected].directory) {
+    if ((!save_as || event.source_id == listbox.id) &&
+        selected >= 0 && selected < (int) rows.size () &&
+        rows [selected].directory) {
       set_current_dir (rows [selected].path);
     } else {
+      if (save_as &&
+          event.source_id == listbox.id &&
+          selected >= 0 && selected < (int) rows.size ())
+        text_filename.set_text (rows [selected].label.c_str ());
       std::string path = selected_path ();
-      if (!path.empty ())
-        on_file_select (path);
+      if (!path.empty ()) {
+        struct stat st;
+        if (save_as && !stat (path.c_str (), &st)) {
+          if (S_ISDIR (st.st_mode)) {
+            set_current_dir (path);
+            return;
+          }
+
+          pending_save_path = path;
+          if (app) {
+            app->ask_yes_no (
+                &frame,
+                NBTK_CMD_FILEPICKER_OVERWRITE,
+                "Replace file?",
+                "A file named '" + path_basename (path) +
+                  "' already exists. Replace it?",
+                "",
+                "Cancel",
+                "Replace");
+          }
+        } else {
+          accept_path (path);
+        }
+      }
     }
     return;
   }
@@ -7384,13 +8387,66 @@ void nbtk::c_filepicker::on_action (t_action_event &event) {
   nbtk::c_toplevelwindow::on_action (event);
 }
 
+void nbtk::c_filepicker::on_command (t_command_event &event) {
+  if (event.command == NBTK_CMD_FILEPICKER_OVERWRITE) {
+    event.handled = true;
+    const std::string path = pending_save_path;
+    pending_save_path.clear ();
+    if (event.result == _command_result::accepted && !path.empty ())
+      accept_path (path);
+    return;
+  }
+
+  nbtk::c_toplevelwindow::on_command (event);
+}
+
 bool nbtk::c_filepicker::on_key_down (int key) {
   if (key == KEY_ESCAPE) {
-    hide ();
+    finish (_command_result::cancelled);
     return true;
   }
 
   return nbtk::c_toplevelwindow::on_key_down (key);
+}
+
+void nbtk::c_filepicker::on_close () {
+  finish (_command_result::cancelled);
+}
+
+void nbtk::c_filepicker::accept_path (const std::string &path) {
+  if (path.empty ())
+    return;
+
+  if (response_target)
+    finish (_command_result::accepted, path);
+  else
+    on_file_select (path);
+}
+
+void nbtk::c_filepicker::finish (
+    _command_result result,
+    const std::string &path) {
+
+  c_widget *target = response_target;
+  const int64_t command = response_command;
+  response_target = nullptr;
+  response_command = NBTK_CMD_NONE;
+  pending_save_path.clear ();
+  hide ();
+
+  if (!target)
+    return;
+
+  if (target->toplevel)
+    target->toplevel->activate ();
+
+  t_command_event event;
+  event.source = target;
+  event.source_id = target->id;
+  event.command = command;
+  event.result = result;
+  event.text = path;
+  target->on_command (event);
 }
 
 bool nbtk::c_filepicker::c_path_textbox::on_tab (bool shift) {
@@ -7658,6 +8714,20 @@ bool nbtk::c_filepicker::is_visible () const {
 }
 
 std::string nbtk::c_filepicker::selected_path () const {
+  if (save_as) {
+    const std::string filename = text_filename.text ();
+    if (filename.empty ())
+      return "";
+    std::string path = path_normalize (
+        path_is_absolute (filename)
+          ? filename
+          : path_join (current_dir.empty () ? "." : current_dir, filename));
+    if (!save_suffix.empty () &&
+        !filepicker_suffix_match (path, save_suffix))
+      path += save_suffix;
+    return path;
+  }
+
   if (listbox.selected < 0 || listbox.selected >= (int) rows.size ())
     return "";
 

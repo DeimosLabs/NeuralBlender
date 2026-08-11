@@ -161,7 +161,7 @@ public:
       XFlush (widget->app->dpy);
   }
 
-  bool grab_pointer (t_native_handle handle) override {
+  bool grab_pointer (t_native_handle handle, bool owner_events) override {
     nbtk::t_native_widget *widget = as_native_widget (handle);
     if (!widget || !widget->app || !widget->app->dpy)
       return false;
@@ -169,7 +169,7 @@ public:
     const int grab = XGrabPointer (
         widget->app->dpy,
         widget->widget,
-        False,
+        owner_events ? True : False,
         ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
         GrabModeAsync,
         GrabModeAsync,

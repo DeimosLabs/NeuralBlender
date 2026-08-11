@@ -21,7 +21,8 @@
 #define CMDLINE_DEBUG_COLOR ANSI_MAGENTA
 #include "cmdline/debug.h"
 
-#define MIN_WINDOW_HEIGHT (120 + (130 * NB_NUM_MODELS))
+#define LANE_HEIGHT 130
+#define MIN_WINDOW_HEIGHT (120 + (LANE_HEIGHT * NB_NUM_MODELS))
 //#define DEFAULT_WINDOW_HEIGHT (12 + std::min (640, (52 + (180 * NB_NUM_MODELS))))
 #define DEFAULT_WINDOW_HEIGHT MIN_WINDOW_HEIGHT
 #define MIN_WINDOW_WIDTH 640
@@ -53,17 +54,18 @@ static constexpr _lane_bank MODEL_BANKS [] = {
 };
 
 const t_eq_mode_choice g_eq_mode_choices [] = {
-  { "HPx1",  EQ_HIPASS,     1 },
-  { "HPx2",  EQ_HIPASS,     2 },
-  { "HPx3",  EQ_HIPASS,     3 },
-  { "HPx4",  EQ_HIPASS,     4 },
-  { "Low",   EQ_LOWSHELF,   1 },
-  { "Bell",  EQ_BELL,       1 },
-  { "High",  EQ_HISHELF,    1 },
-  { "LPx1",  EQ_LOWPASS,    1 },
-  { "LPx2",  EQ_LOWPASS,    2 },
-  { "LPx3",  EQ_LOWPASS,    3 },
-  { "LPx4",  EQ_LOWPASS,    4 },
+  // name    mode         slope
+  { "HPx1",  EQ_HIPASS,   1 },
+  { "HPx2",  EQ_HIPASS,   2 },
+  { "HPx3",  EQ_HIPASS,   3 },
+  { "HPx4",  EQ_HIPASS,   4 },
+  { "Low",   EQ_LOWSHELF, 1 },
+  { "Bell",  EQ_BELL,     1 },
+  { "High",  EQ_HISHELF,  1 },
+  { "LPx1",  EQ_LOWPASS,  1 },
+  { "LPx2",  EQ_LOWPASS,  2 },
+  { "LPx3",  EQ_LOWPASS,  3 },
+  { "LPx4",  EQ_LOWPASS,  4 },
 };
 
 static bool filename_ends_with (const std::string &path, const char *suffix) {
@@ -87,91 +89,6 @@ static bool is_supported_model_filename_lower (const std::string &lower) {
          filename_ends_with (lower, ".aidax") ||
          filename_ends_with (lower, ".wav.gz");
 #endif
-}
-
-bool c_neuralblendermainwindow::create (
-    c_neuralblender_ui *ui_,
-    nbtk::t_native_window parent_,
-    const char *title_,
-    int x, int y, int w, int h,
-    nbtk::t_native_handle owner) {
-
-  ui = ui_;
-  if (!c_toplevelwindow::create (&ui_->nbtk_app, parent_, title_, x, y, w, h, owner))
-    return false;
-
-  auto_close (false);
-  auto_hide_on_close (false);
-  auto_quit_on_close (true);
-  ui_->window = window;
-  return true;
-}
-
-void c_neuralblendermainwindow::show () {
-  if (!widget)
-    return;
-
-  children_mapped = false;
-  nbtk::c_toplevelwindow::show ();
-}
-
-void c_neuralblendermainwindow::show_children () {
-  if (!widget || children_mapped)
-    return;
-
-  children_mapped = true;
-  if (ui)
-    ui->sync_page_visibility ();
-}
-
-void c_neuralblendermainwindow::on_expose () {
-  if (!widget)
-    return;
-
-  nbtk::c_toplevelwindow::on_expose ();
-  show_children ();
-}
-
-void c_neuralblendermainwindow::on_resize () { CP
-  if (!widget || !ui)
-    return;
-
-  int width = 0;
-  int height = 0;
-  bool visible = false;
-  if (!get_metrics (&width, &height, &visible) || !visible)
-    return;
-
-  debug ("mainwindow resize: metrics=%d,%d init=%d,%d",
-         width, height,
-         widget->scale.init_width, widget->scale.init_height);
-  nbtk::c_toplevelwindow::on_resize ();
-  ui->on_window_resize (width, height);
-}
-
-void c_neuralblendermainwindow::on_configure_notify () {
-  if (!ui)
-    return;
-
-  nbtk::c_toplevelwindow::on_configure_notify ();
-  ui->on_window_configured ();
-}
-
-void c_neuralblendermainwindow::on_action (nbtk::t_action_event &event) {
-  if (ui)
-    ui->on_action (event);
-}
-
-void c_neuralblendermainwindow::on_command (nbtk::t_command_event &event) {
-  if (ui)
-    ui->on_command (event);
-  if (!event.handled)
-    nbtk::c_toplevelwindow::on_command (event);
-}
-
-void c_neuralblendermainwindow::on_hover_changed (nbtk::c_widget *hovered) {
-  if (ui)
-    ui->sync_eq_graph_highlight (hovered);
 }
 
 bool is_supported_model_filename (const std::string &path) {
@@ -268,6 +185,94 @@ bool write_prefs_to_config (c_configfile &configfile, const t_prefs &prefs) {
     CONFIG_KEY_NAME_TOOLTIPS, prefs.show_tooltips ? "1" : "0");
 
   return configfile.write_file ();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// c_neuralblendermainwindow
+
+bool c_neuralblendermainwindow::create (
+    c_neuralblender_ui *ui_,
+    nbtk::t_native_window parent_,
+    const char *title_,
+    int x, int y, int w, int h,
+    nbtk::t_native_handle owner) {
+
+  ui = ui_;
+  if (!c_toplevelwindow::create (&ui_->nbtk_app, parent_, title_, x, y, w, h, owner))
+    return false;
+
+  auto_close (false);
+  auto_hide_on_close (false);
+  auto_quit_on_close (true);
+  ui_->window = window;
+  return true;
+}
+
+void c_neuralblendermainwindow::show () {
+  if (!widget)
+    return;
+
+  children_mapped = false;
+  nbtk::c_toplevelwindow::show ();
+}
+
+void c_neuralblendermainwindow::show_children () {
+  if (!widget || children_mapped)
+    return;
+
+  children_mapped = true;
+  if (ui)
+    ui->sync_page_visibility ();
+}
+
+void c_neuralblendermainwindow::on_expose () {
+  if (!widget)
+    return;
+
+  nbtk::c_toplevelwindow::on_expose ();
+  show_children ();
+}
+
+void c_neuralblendermainwindow::on_resize () { CP
+  if (!widget || !ui)
+    return;
+
+  int width = 0;
+  int height = 0;
+  bool visible = false;
+  if (!get_metrics (&width, &height, &visible) || !visible)
+    return;
+
+  debug ("mainwindow resize: metrics=%d,%d init=%d,%d",
+         width, height,
+         widget->scale.init_width, widget->scale.init_height);
+  nbtk::c_toplevelwindow::on_resize ();
+  ui->on_window_resize (width, height);
+}
+
+void c_neuralblendermainwindow::on_configure_notify () {
+  if (!ui)
+    return;
+
+  nbtk::c_toplevelwindow::on_configure_notify ();
+  ui->on_window_configured ();
+}
+
+void c_neuralblendermainwindow::on_action (nbtk::t_action_event &event) {
+  if (ui)
+    ui->on_action (event);
+}
+
+void c_neuralblendermainwindow::on_command (nbtk::t_command_event &event) {
+  if (ui)
+    ui->on_command (event);
+  if (!event.handled)
+    nbtk::c_toplevelwindow::on_command (event);
+}
+
+void c_neuralblendermainwindow::on_hover_changed (nbtk::c_widget *hovered) {
+  if (ui)
+    ui->sync_eq_graph_highlight (hovered);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -466,7 +471,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   const int panel_x = 12;
   const int panel_y = 12;
   const int panel_w = 424;
-
+  
   frame_main.create (root, "", panel_x, panel_y, panel_w, 420);
 
   image_toplogo.create (&frame_main, "", 85, 12, 256, 32);
@@ -555,7 +560,8 @@ void c_neuralblender_filepicker::create (
 
 void c_neuralblender_filepicker::show () {
   if (current_dir.empty () && ui) {
-    const _lane_bank bank_ = bank < BANK_COUNT ? (_lane_bank) bank : BANK_AMP;
+    const _lane_bank bank_ =
+      bank < BANK_COUNT ? (_lane_bank) bank : BANK_NONE;
     current_dir = ui->configfile.get_item (cwd_config_key_for_bank_ui (bank_));
   }
   if (current_dir.empty ())
@@ -567,7 +573,8 @@ void c_neuralblender_filepicker::show () {
 void c_neuralblender_filepicker::set_current_dir (std::string str) {
   current_dir = std::move (str);
   if (ui && !current_dir.empty ()) {
-    const _lane_bank bank_ = bank < BANK_COUNT ? (_lane_bank) bank : BANK_AMP;
+    const _lane_bank bank_ =
+      bank < BANK_COUNT ? (_lane_bank) bank : BANK_NONE;
     ui->configfile.set_item (cwd_config_key_for_bank_ui (bank_), current_dir);
   }
   scan_current_dir ();
@@ -605,7 +612,7 @@ void c_neuralblender_filepicker::on_file_select (
   scan_current_dir ();
   ui->load_model (bank_, lane, filename.c_str ());
 
-  nbtk::c_combobox *cb = &ui->lanes_for_bank (bank_) [lane].menu_list;
+  nbtk::c_combobox *cb = &ui->lanes_for_bank (bank_) [lane].cb_list;
   cb->clear ();
   add_files_from_dir (cb);
   ui->on_fileselected (cb, filename.c_str ());
@@ -696,7 +703,7 @@ void c_lane_widgets::on_action (nbtk::t_action_event &event) {
 
       case ROLE_BROWSE:
         ui->on_filebrowse (&button);
-        filepicker.show ();
+        filepicker.show_open (&btn_browse, CMD_MODEL_FILE_SELECTED);
       break;
 
       case ROLE_CLEAR:
@@ -730,10 +737,10 @@ void c_lane_widgets::on_action (nbtk::t_action_event &event) {
       handle_button (btn_calib, ROLE_CALIBRATE))
     return;
 
-  if (event.source_id == menu_list.id) {
+  if (event.source_id == cb_list.id) {
     event.handled = true;
-    const int x = menu_list.get_selection ();
-    if (x < 0 || x >= (int) menu_list.items.size ())
+    const int x = cb_list.get_selection ();
+    if (x < 0 || x >= (int) cb_list.items.size ())
       return;
 
     std::string dir = filepicker.combo_dir.empty () ?
@@ -741,7 +748,7 @@ void c_lane_widgets::on_action (nbtk::t_action_event &event) {
     std::string fullpath = dir;
     if (!fullpath.empty () && fullpath.back () != '/')
       fullpath += '/';
-    fullpath += menu_list.items [x];
+    fullpath += cb_list.items [x];
 
     const _lane_bank bank = bank_id < BANK_COUNT ? (_lane_bank) bank_id : BANK_AMP;
     ui->load_model (bank, lane_id, fullpath.c_str ());
@@ -793,11 +800,11 @@ void c_lane_widgets::create (
   knob_delay.set_value (0);
   knob_delay.set_step (0.01);
 
-  menu_list.create (&lane_frame, "", 0, 0, 320, 32);
-  menu_list.role = ROLE_LOADFILE;
-  menu_list.bank = bank_id;
-  menu_list.lane = lane_id;
-  menu_list.wheel_selects_item = true;
+  cb_list.create (&lane_frame, "", 0, 0, 320, 32);
+  cb_list.role = ROLE_LOADFILE;
+  cb_list.bank = bank_id;
+  cb_list.lane = lane_id;
+  cb_list.wheel_selects_item = true;
 
   meter_out.create (&lane_root, "", 0, 0, METER_WIDTH, 120);
   meter_out.set_vudata (&vudata_out);
@@ -931,7 +938,7 @@ void c_lane_widgets::create (
     filepicker.add_allowed_filter ("*", "All files");
   }
   
-  menu_list.set_tooltip ("Currently loaded model/IR, lists others in same directory");
+  cb_list.set_tooltip ("Currently loaded model/IR, lists others in same directory");
   knob_gain_in.set_tooltip ("Input going into this model (NAM)");
   knob_ir_pitch.set_tooltip ("Shift the pitch of this IR by 100ths of a semitone");
   knob_gain_out.set_tooltip ("Scale output from this model");
@@ -974,12 +981,12 @@ void c_lane_widgets::move_resize (
   knob_size = std::min (knob_size, std::max (48, (h * 5) / 8));
   const int knob_top = (h - knob_size) / 2 - 16;
   const int knob_right = w - knob_size * 3 - 8;
-  const int menu_x = 16 + knob_size;//delay.x () + delay.w () + 8;
-  const int menu_width = std::max (64, w - menu_x - (w - knob_right) - button_padding - 10);
-  menu_list.move_resize (menu_x, 12, menu_width, 32 + (h / 20));
-  //int button_width = std::max (24, (menu_list.w () + button_padding) / 3 - button_padding);
-  int button_left = menu_list.x;
-  int button_top = menu_list.y + menu_list.h + 8;
+  const int list_x = 16 + knob_size;//delay.x () + delay.w () + 8;
+  const int list_width = std::max (64, w - list_x - (w - knob_right) - button_padding - 10);
+  cb_list.move_resize (list_x, 12, list_width, 32 + (h / 20));
+  //int button_width = std::max (24, (cb_list.w () + button_padding) / 3 - button_padding);
+  int button_left = cb_list.x;
+  int button_top = cb_list.y + cb_list.h + 8;
   int button_width = std::clamp (std::min (h - 68, w / 10), 24, 96);
   
   knob_delay.move_resize (12, knob_top, knob_size, knob_size + 16);
@@ -993,7 +1000,7 @@ void c_lane_widgets::move_resize (
                          button_top, button_width, button_width);
                          
   int mute_x = btn_flip.x + btn_calib.w + button_padding;
-  int mute_width = std::max (24, menu_list.x + menu_list.w - mute_x);
+  int mute_width = std::max (24, cb_list.x + cb_list.w - mute_x);
   btn_mute.move_resize (mute_x,
                          button_top, mute_width, button_width);
   if (btn_mute.w > 80) {
@@ -1085,26 +1092,26 @@ void c_eqpage_widgets::create (
   label.create (&frame, eqstr.c_str (), 0, 0, 200, 30);
   label.align = nbtk::TEXT_LEFT;
   
-  menu_presets.create (&cont_bands, "", 0, 0, 256, 32);
+  cb_presets.create (&cont_bands, "", 0, 0, 256, 32);
   btn_savepreset.create (&cont_bands, "", 0, 0, 32, 32);
   btn_deletepreset.create (&cont_bands, "", 0, 0, 32, 32);
-  btn_clearhist.create (&cont_bands, "", 0, 0, 32, 32);
+  btn_clearhold.create (&cont_bands, "", 0, 0, 32, 32);
   btn_savepreset.set_image_default (data_icon_floppy_png);
   btn_deletepreset.set_image_default (data_icon_x_big_png);
-  btn_clearhist.set_image_default (data_icon_waveform_png);
+  btn_clearhold.set_image_default (data_icon_waveform_png);
   
-  menu_presets.set_tooltip ("EQ presets");
+  cb_presets.set_tooltip ("EQ presets");
   btn_savepreset.set_tooltip ("Save this preset...");
   btn_deletepreset.set_tooltip ("Delete this preset");
-  btn_clearhist.set_tooltip ("Clear graph hold (also middle click on graph)");
-  menu_presets.role = ROLE_EQ_LOADPRESET;
-  btn_savepreset.role = ROLE_EQ_SAVEPRESET;
-  btn_deletepreset.role = ROLE_EQ_DELETEPRESET;
-  btn_clearhist.role = ROLE_EQ_CLEARHIST;
-  menu_presets.bank = bank_id;
+  btn_clearhold.set_tooltip ("Clear graph hold (also middle click on graph)");
+  cb_presets.role = ROLE_EQ_LOAD_PRESET;
+  btn_savepreset.role = ROLE_EQ_SAVE_PRESET;
+  btn_deletepreset.role = ROLE_EQ_DELETE_PRESET;
+  btn_clearhold.role = ROLE_EQ_CLEARHOLD;
+  cb_presets.bank = bank_id;
   btn_savepreset.bank = bank_id;
   btn_deletepreset.bank = bank_id;
-  btn_clearhist.bank = bank_id;
+  btn_clearhold.bank = bank_id;
   
   knob_gain.text_size = 0.75;
   knob_gain.label_position = nbtk::LABEL_LEFT;
@@ -1145,22 +1152,22 @@ void c_eqpage_widgets::create (
     snprintf (buf, 127, "Toggle band %d on/off", i + 1);
     bands [i].btn_on.set_tooltip (buf);
     
-    bands [i].menu_mode.create (&cont_bands, "", 0, 280, 92, 32);
-    //bands [i].menu_mode.set_items ({
+    bands [i].cb_mode.create (&cont_bands, "", 0, 280, 92, 32);
+    //bands [i].cb_mode.set_items ({
     //  "HP", "Low", "Bell", "High", "LP"
     //});
     
     std::vector<std::string> modeitems;
     for (int mode = UI_EQ_HIPASS1; mode <= UI_EQ_LOWPASS4; mode++)
       modeitems.push_back (std::string (g_eq_mode_choices [mode].name));
-    bands [i].menu_mode.set_items (modeitems);
-    bands [i].menu_mode.role = ROLE_EQ_MODE;
-    bands [i].menu_mode.bank = bank_id;
-    bands [i].menu_mode.lane = i;
-    bands [i].menu_mode.set_selected ((int) g_eq_defaultmodes [i]);
-    bands [i].menu_mode.text_size = 0.75;
+    bands [i].cb_mode.set_items (modeitems);
+    bands [i].cb_mode.role = ROLE_EQ_MODE;
+    bands [i].cb_mode.bank = bank_id;
+    bands [i].cb_mode.lane = i;
+    bands [i].cb_mode.set_selected ((int) g_eq_defaultmodes [i]);
+    bands [i].cb_mode.text_size = 0.75;
     snprintf (buf, 127, "Band %d filtering mode", i + 1);
-    bands [i].menu_mode.set_tooltip (buf);
+    bands [i].cb_mode.set_tooltip (buf);
 
     bands [i].knob_freq.create (&cont_bands, "Freq", 0, 300, 36, 50);
     bands [i].knob_freq.role = ROLE_EQ_FREQ;
@@ -1215,11 +1222,11 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   const int slider_widget_w = std::max (slider_w, band_w - 4);
   const int label_h = 18;
   const int checkbox = 24;
-  const int menu_h = 24;
+  const int mode_h = 24;
   const int knob_w = std::min (64, std::max (42, band_w - 8));
-  const int menu_w = std::min (80, std::max (44, band_w - 8));
+  const int mode_w = std::min (80, std::max (44, band_w - 8));
   const int knob_h = 64;
-  const int controls_h = checkbox + menu_h + knob_h * 2 + 18;
+  const int controls_h = checkbox + mode_h + knob_h * 2 + 18;
   const int graph_top = inner_y;
   const int top_area_h = std::max (1, inner_h - controls_h);
   const int graph_h = cont_graph.visible ?
@@ -1231,8 +1238,8 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
     1,
     top_area_h - graph_h - graph_gap);
   const int checkbox_y = slider_top + slider_h + 6;
-  const int menu_y = checkbox_y + checkbox + 6;
-  const int freq_y = menu_y + menu_h + 6;
+  const int mode_y = checkbox_y + checkbox + 6;
+  const int freq_y = mode_y + mode_h + 6;
   const int q_y = freq_y + knob_h;
   
   label.move_resize (padding, padding, std::max (1, frame_w / 2), title_h);
@@ -1249,16 +1256,16 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   const int presets_x = label.x + label.w;
   const int presets_w = knob_gain.x - presets_x - btn_size * 4;
   const int btn_top = 8;
-  menu_presets.move_resize (presets_x, btn_top, presets_w, btn_size);
+  cb_presets.move_resize (presets_x, btn_top, presets_w, btn_size);
   
   cont_graph.move_resize (toprect_x, graph_top, toprect_w, graph_h);
   graph.move_resize (0, 0, toprect_w, graph_h);
   cont_sliders.move_resize (toprect_x, slider_top, toprect_w, slider_h);
   
-  const int btn_left = menu_presets.x + menu_presets.w + 4;
+  const int btn_left = cb_presets.x + cb_presets.w + 4;
   btn_savepreset.move_resize (btn_left, btn_top, btn_size, btn_size);
   btn_deletepreset.move_resize (btn_left + btn_size + 4, btn_top, btn_size, btn_size);
-  btn_clearhist.move_resize (btn_left + (btn_size + 4) * 2, btn_top, btn_size, btn_size);
+  btn_clearhold.move_resize (btn_left + (btn_size + 4) * 2, btn_top, btn_size, btn_size);
   
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     const int local_band_x = i * band_w;
@@ -1270,8 +1277,8 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
       local_center_x - slider_widget_w / 2, 0, slider_widget_w, slider_h);
     bands [i].btn_on.move_resize (
       center_x - checkbox / 2, checkbox_y, checkbox, checkbox);
-    bands [i].menu_mode.move_resize (
-      center_x - menu_w / 2, menu_y, menu_w, menu_h);
+    bands [i].cb_mode.move_resize (
+      center_x - mode_w / 2, mode_y, mode_w, mode_h);
     bands [i].knob_freq.move_resize (
       center_x - knob_w / 2, freq_y, knob_w, knob_h);
     bands [i].knob_q.move_resize (
@@ -1303,7 +1310,7 @@ void c_eqpage_widgets::sync_band_from_state (
       break;
     }
   }
-  bands [band].menu_mode.set_selected (mode_index);
+  bands [band].cb_mode.set_selected (mode_index);
   bands [band].slider_gain.set_value (eq_state.gain_db [band]);
   bands [band].knob_freq.set_value (eq_state.freq [band]);
   bands [band].knob_q.set_value (eq_state.q [band]);
@@ -1332,7 +1339,7 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
   auto set_band_external_highlight = [&] (int band, bool highlighted) {
     bands [band].slider_gain.set_external_highlight (highlighted);
     bands [band].btn_on.set_external_highlight (highlighted);
-    bands [band].menu_mode.set_external_highlight (highlighted);
+    bands [band].cb_mode.set_external_highlight (highlighted);
     bands [band].knob_freq.set_external_highlight (highlighted);
     bands [band].knob_q.set_external_highlight (highlighted);
   };
@@ -1357,7 +1364,7 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
     for (int i = 0; i < EQ_NUM_BANDS; ++i) {
       if (is_descendant_of (&bands [i].slider_gain, hovered) ||
           is_descendant_of (&bands [i].btn_on, hovered) ||
-          is_descendant_of (&bands [i].menu_mode, hovered) ||
+          is_descendant_of (&bands [i].cb_mode, hovered) ||
           is_descendant_of (&bands [i].knob_freq, hovered) ||
           is_descendant_of (&bands [i].knob_q, hovered)) {
         highlighted = i;
@@ -1370,7 +1377,7 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
     for (int i = 0; i < EQ_NUM_BANDS; ++i) {
       if (bands [i].slider_gain.mouse_inside ||
           bands [i].btn_on.mouse_inside ||
-          bands [i].menu_mode.mouse_inside ||
+          bands [i].cb_mode.mouse_inside ||
           bands [i].knob_freq.mouse_inside ||
           bands [i].knob_q.mouse_inside) {
         highlighted = i;
@@ -1397,28 +1404,28 @@ bool c_eqpage_widgets::on_action (nbtk::t_action_event &event) {
     return false;
 
   switch ((_widget_role) widget->role) {
-    case ROLE_EQ_LOADPRESET:
-      ui->load_preset (bank_id, menu_presets.selected_text ());
+    case ROLE_EQ_LOAD_PRESET:
+      ui->load_eq_preset (bank_id, cb_presets.selected_text ());
     break;
     
-    case ROLE_EQ_SAVEPRESET:
+    case ROLE_EQ_SAVE_PRESET:
       ui->nbtk_app.ask_string (
         widget,
-        CMD_EQ_SAVEPRESET,
+        CMD_EQ_SAVE_PRESET,
         "Save EQ preset",
         "Preset name",
         "");
     break;
     
-    case ROLE_EQ_DELETEPRESET:
+    case ROLE_EQ_DELETE_PRESET:
       ui->nbtk_app.ask_yes_no (
         widget,
-        CMD_EQ_DELETEPRESET,
+        CMD_EQ_DELETE_PRESET,
         "Delete EQ preset",
         "Delete the selected EQ preset?");
     break;
     
-    case ROLE_EQ_CLEARHIST:
+    case ROLE_EQ_CLEARHOLD:
       graph.reset_hist ();
     break;
     
@@ -1435,7 +1442,7 @@ bool c_eqpage_widgets::on_command (nbtk::t_command_event &event) {
     return false;
   
   switch ((_ui_command) event.command) {
-    case CMD_EQ_SAVEPRESET: {
+    case CMD_EQ_SAVE_PRESET: {
       if (event.result != nbtk::_command_result::accepted)
         break;
 
@@ -1450,30 +1457,30 @@ bool c_eqpage_widgets::on_command (nbtk::t_command_event &event) {
           return preset.preset_name == name;
         });
       if (existing == ui->configfile.eq_presets.end ()) {
-        ui->save_preset (bank_id, name);
+        ui->save_eq_preset (bank_id, name);
       } else if (existing->builtin) {
         debug ("can't replace builtin EQ preset '%s'", name.c_str ());
       } else {
         pending_preset_name = name;
         ui->nbtk_app.ask_yes_no (
           &btn_savepreset,
-          CMD_EQ_REPLACEPRESET,
+          CMD_EQ_REPLACE_PRESET,
           "Replace EQ preset",
           "A preset with this name already exists. Replace it?");
       }
     } break;
 
-    case CMD_EQ_REPLACEPRESET: {
+    case CMD_EQ_REPLACE_PRESET: {
       const std::string name = pending_preset_name;
       pending_preset_name.clear ();
       if (event.result == nbtk::_command_result::accepted &&
           !name.empty () &&
           ui->configfile.delete_eq_preset (name) > 0) {
-        ui->save_preset (bank_id, name);
+        ui->save_eq_preset (bank_id, name);
       }
     } break;
     
-    case CMD_EQ_DELETEPRESET:
+    case CMD_EQ_DELETE_PRESET:
       if (event.result == nbtk::_command_result::accepted)
         ui->delete_selected_eq_preset (bank_id);
     break;
@@ -1530,6 +1537,12 @@ void c_neuralblender_ui::update_ir_cwd (std::string path) {
   CP
   debug ("path='%s'", path.c_str ());
   configfile.set_item (CONFIG_KEY_NAME_IR_CWD, nbtk::path_dirname (path));
+}
+
+void c_neuralblender_ui::update_preset_cwd (std::string path) {
+  CP
+  debug ("path='%s'", path.c_str ());
+  configfile.set_item (CONFIG_KEY_NAME_PRESET_CWD, nbtk::path_dirname (path));
 }
 
 bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
@@ -1603,6 +1616,19 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   cont_eqpost.create (&mainwindow.root_widget, "", 0, 120, 640, 480);
   cont_cabs.create (&mainwindow.root_widget, "", 0, 120, 640, 480);
   cont_other.create (&mainwindow.root_widget, "", 0, 120, 640, 480);
+  
+  menubar.create (&mainwindow.root_widget, "", 0, 0, 640, 24);
+  menu_presets = menubar.add_menu ("Presets");
+  menu_misc = menubar.add_menu ("Misc");
+  menu_presets->add_item ("Load...", CMD_LOAD_PRESET);
+  menu_presets->add_item ("Save...", CMD_SAVE_PRESET);
+#ifndef LV2
+  menu_presets->add_item ("Quit", CMD_QUIT);
+#else
+  //menu_presets->add_item ("Close", CMD_CLOSE);
+#endif
+  menu_misc->add_item ("Settings...", CMD_PREFS);
+  menu_misc->add_item ("About...", CMD_ABOUT);
   
   eqpage_pre.create (this, &cont_eqpre, mainwindow.native_handle (),
                      BANK_EQPRE, 0, 0, 640, 600);
@@ -1913,6 +1939,23 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_other_tuner_default.set_tooltip ("Reset tuner to A=440");
   btn_other_bass.set_tooltip ("Calibrate models/IR output levels for bass guitar");
   
+  const nbtk::t_native_window filepicker_parent =
+    nbtk_app.backend
+      ? nbtk_app.backend->root_window (mainwindow.native_handle (), false)
+      : 0;
+  filepicker.create (
+      this,
+      &nbtk_app,
+      filepicker_parent,
+      mainwindow.native_handle (),
+      (size_t) -1,
+      (uint64_t) -1,
+      "Select preset");
+  filepicker.clear_allowed_filters ();
+  filepicker.add_allowed_filter ("*.nbstate", "NB presets");
+  filepicker.add_allowed_filter ("*", "All files");
+  filepicker.set_save_suffix (".nbstate");
+  
   ui_ready = true;
   move_resize ();
   mainwindow.show ();
@@ -1947,11 +1990,12 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     
     //if (do_set_min_size)
     mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
-    
+
+    int menuheight = 24;
     int toparea = std::max (window_height / 5, 116);
     if (toparea < 32) toparea = 32;
-    cont_toparea.move_resize (0, 0, window_width, toparea);
-    const int page_y = toparea + 8;
+    cont_toparea.move_resize (0, menuheight, window_width, toparea);
+    const int page_y = toparea + 8 + menuheight;
     const int bottom_inset = 8;
     const int page_h = std::max (1, window_height - page_y - bottom_inset);
     cont_pedals.move_resize (0, page_y, window_width, page_h);
@@ -1974,8 +2018,8 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     
     const int btnl = 16;
           int btnh = std::max (48, toparea / 2 - 14);
-          int btnw = std::min (76, btnh * 2);
-              btnw = std::max (btnw, window_width / 8);
+          int btnw = std::min (74, btnh * 2);
+              btnw = std::max (btnw, window_width / 8) - 2;
     if (btnh > window_width / 12)
       btnh = window_width / 12;
     const int btnr = window_width - 12;
@@ -2340,6 +2384,8 @@ static _lane_bank bank_for_page (_ui_page page) {
 }
 
 static const char *cwd_config_key_for_bank_ui (_lane_bank bank) {
+  if (bank == BANK_NONE)
+    return CONFIG_KEY_NAME_PRESET_CWD;
   return bank == BANK_CAB ? CONFIG_KEY_NAME_IR_CWD : CONFIG_KEY_NAME_MODEL_CWD;
 }
 
@@ -2806,9 +2852,76 @@ void c_neuralblender_ui::on_command (nbtk::t_command_event &event) {
   if (eqpage_pre.on_command (event) ||
       eqpage_post.on_command (event))
     return;
+    
+  switch (event.command) {
+    case CMD_LOAD_PRESET: CP
+      // ...
+      filepicker.set_title ("Load NeuralBlender preset");
+      filepicker.show_open (event.source, CMD_LOAD_PRESET_CB);
+      event.handled = true;
+    break;
+
+    case CMD_SAVE_PRESET: CP
+      filepicker.set_title ("Save NeuralBlender preset as");
+      filepicker.show_save_as (event.source, CMD_SAVE_PRESET_CB);
+      event.handled = true;
+    break;
+    
+    
+    case CMD_LOAD_PRESET_CB:
+      event.handled = true;
+      if (event.result == nbtk::_command_result::accepted) {
+        load_preset_file (event.text);
+      }
+    break;
+
+    case CMD_SAVE_PRESET_CB:
+      event.handled = true;
+      if (event.result == nbtk::_command_result::accepted) {
+        save_preset_file (event.text);
+      }
+    break;
+      
+    case CMD_PREFS:
+      write_prefs_to (prefs);
+      prefswindow.get_prefs_from (prefs);
+      prefswindow.show ();
+      on_prefs ();
+      event.handled = true;
+    break;
+
+    case CMD_ABOUT:
+      aboutwindow.show ();
+      on_about ();
+      event.handled = true;
+    break;
+
+    case CMD_QUIT:
+      mainwindow.on_close ();
+      event.handled = true;
+    break;
+    
+    case CMD_CLOSE:
+      mainwindow.hide ();
+      event.handled = true;
+    break;
+
+    case CMD_MODEL_FILE_SELECTED:
+      event.handled = true;
+      if (event.result == nbtk::_command_result::accepted &&
+          event.source &&
+          event.source->bank < BANK_COUNT &&
+          event.source->lane < NB_NUM_MODELS) {
+        const _lane_bank bank = (_lane_bank) event.source->bank;
+        c_lane_widgets *lanes = lanes_for_bank (bank);
+        if (lanes)
+          lanes [event.source->lane].filepicker.on_file_select (event.text);
+      }
+    break;
+  }
 }
 
-void c_neuralblender_ui::load_preset (size_t bank_id, std::string name) { CP
+void c_neuralblender_ui::load_eq_preset (size_t bank_id, std::string name) { CP
   if (name.empty ()) {
     debug ("empty preset name");
     return;
@@ -2848,7 +2961,7 @@ void c_neuralblender_ui::load_preset (size_t bank_id, std::string name) { CP
   on_eq_master_gain (&eqpage.knob_gain, bank, loaded.master_gain_db);
   for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
     on_eq_band (&eqpage.bands [band].btn_on, bank, band);
-    on_eq_band (&eqpage.bands [band].menu_mode, bank, band);
+    on_eq_band (&eqpage.bands [band].cb_mode, bank, band);
     on_eq_band (&eqpage.bands [band].slider_gain, bank, band);
     on_eq_band (&eqpage.bands [band].knob_freq, bank, band);
     on_eq_band (&eqpage.bands [band].knob_q, bank, band);
@@ -2857,10 +2970,10 @@ void c_neuralblender_ui::load_preset (size_t bank_id, std::string name) { CP
   sync_widgets_from_state (state);
   const int selected = (int) std::distance (
     configfile.eq_presets.begin (), preset);
-  eqpage.menu_presets.set_selected (selected);
+  eqpage.cb_presets.set_selected (selected);
 }
 
-void c_neuralblender_ui::save_preset (size_t bank_id, std::string name) { CP
+void c_neuralblender_ui::save_eq_preset (size_t bank_id, std::string name) { CP
   name = sanitize_eq_preset_name (name);
   c_eq_state *preset = NULL;
   
@@ -2911,7 +3024,7 @@ bool c_neuralblender_ui::delete_selected_eq_preset (size_t bank_id) {
   switch (bank_id) {
     case BANK_EQPRE: CP
       if (configfile.delete_eq_preset (
-            eqpage_pre.menu_presets.selected_text ()) > 0 &&
+            eqpage_pre.cb_presets.selected_text ()) > 0 &&
           !configfile.write_file ())
         debug ("failed to write EQ preset deletion");
       sync_widgets_from_state (state);
@@ -2920,7 +3033,7 @@ bool c_neuralblender_ui::delete_selected_eq_preset (size_t bank_id) {
     
     case BANK_EQPOST: CP
       if (configfile.delete_eq_preset (
-            eqpage_post.menu_presets.selected_text ()) > 0 &&
+            eqpage_post.cb_presets.selected_text ()) > 0 &&
           !configfile.write_file ())
         debug ("failed to write EQ preset deletion");
       sync_widgets_from_state (state);
@@ -2933,6 +3046,37 @@ bool c_neuralblender_ui::delete_selected_eq_preset (size_t bank_id) {
     break;
   }
 }
+
+void c_neuralblender_ui::load_preset_file (std::string filename) {
+  c_neuralblender_state loaded;
+
+  if (!loaded.read_from (filename)) {
+    debug ("failed to load preset: %s", filename.c_str ());
+    return;
+  }
+
+  if (!set_dsp_state (loaded)) {
+    debug ("failed to apply preset: %s", filename.c_str ());
+    return;
+  }
+
+  update_preset_cwd (filename);
+  state = loaded;
+  sync_widgets_from_state (state, true);
+}
+
+void c_neuralblender_ui::save_preset_file (std::string filename) {
+  c_neuralblender_state snapshot;
+  get_dsp_state (snapshot);
+
+  if (!snapshot.write_to (filename)) {
+    debug ("failed to save preset: %s", filename.c_str ());
+    return;
+  }
+
+  update_preset_cwd (filename);
+}
+
 
 void c_neuralblender_ui::set_threshgain (float f) {
   meter_in [BANK_PEDAL].set_compression_gain (f);
@@ -3230,8 +3374,8 @@ void c_neuralblender_ui::on_excl_use (nbtk::c_widget *w, bool b) {
 void c_neuralblender_ui::refresh_config_if_needed () {
   const uint64_t now = nbtk::now_ms ();
   if (now - last_config_check_ms >= 500 &&
-      nbtk_app.active_combobox != &eqpage_pre.menu_presets &&
-      nbtk_app.active_combobox != &eqpage_post.menu_presets) {
+      nbtk_app.active_combobox != &eqpage_pre.cb_presets &&
+      nbtk_app.active_combobox != &eqpage_post.cb_presets) {
     last_config_check_ms = now;
     if (configfile.refresh_eq_presets_if_changed ())
       sync_eq_presets ();
@@ -3289,7 +3433,7 @@ void c_neuralblender_ui::clear_lane_model_ui (_lane_bank bank, size_t which) {
     bank = BANK_AMP;
 
   state.banks [bank].lanes [which].filename.clear ();
-  lanes_for_bank (bank) [which].menu_list.clear ();
+  lanes_for_bank (bank) [which].cb_list.clear ();
 }
 
 void c_neuralblender_ui::clear_lane_model_ui (size_t which) {
@@ -3340,8 +3484,8 @@ void c_neuralblender_ui::write_calib_state_if_consistent () {
 }
 
 void c_neuralblender_ui::sync_eq_presets () {
-  eqpage_pre.menu_presets.clear ();
-  eqpage_post.menu_presets.clear ();
+  eqpage_pre.cb_presets.clear ();
+  eqpage_post.cb_presets.clear ();
   int selected_pre = -1;
   int selected_post = -1;
   bool exact_pre = false;
@@ -3350,8 +3494,8 @@ void c_neuralblender_ui::sync_eq_presets () {
   for (int i = 0; i < configfile.eq_presets.size (); i++) {
     const c_eq_state &preset = configfile.eq_presets [i];
     const std::string &name = preset.preset_name;
-    eqpage_pre.menu_presets.add (name);
-    eqpage_post.menu_presets.add (name);
+    eqpage_pre.cb_presets.add (name);
+    eqpage_post.cb_presets.add (name);
 
     if (!ui_eqpre.preset_name.empty () &&
         ui_eqpre.preset_name == preset.preset_name) {
@@ -3372,8 +3516,8 @@ void c_neuralblender_ui::sync_eq_presets () {
     }
   }
 
-  eqpage_pre.menu_presets.set_selected (selected_pre);
-  eqpage_post.menu_presets.set_selected (selected_post);
+  eqpage_pre.cb_presets.set_selected (selected_pre);
+  eqpage_post.cb_presets.set_selected (selected_post);
 }
 
 void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &state_,
@@ -3432,7 +3576,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
       //filepickers [i].selected_file = lane.filename;
       if (scan_dirs) {
         if (lane.filename.empty ()) {
-          bank_lanes [i].menu_list.clear ();
+          bank_lanes [i].cb_list.clear ();
         } else {
           c_neuralblender_filepicker &fp = bank_lanes [i].filepicker;
           if (fp.current_dir.empty ()) {
@@ -3443,7 +3587,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
               fp.current_dir = CONFIG_DEFAULT_DIR;
           }
           fp.scan_current_dir ();
-          fp.add_files_from_dir (&bank_lanes [i].menu_list);
+          fp.add_files_from_dir (&bank_lanes [i].cb_list);
         }
       }
     }

@@ -107,18 +107,29 @@ enum _widget_role {
   ROLE_EQ_Q,
   ROLE_EQ_MASTER_GAIN,
   ROLE_EQ_GRAPH,
-  ROLE_EQ_LOADPRESET,
-  ROLE_EQ_SAVEPRESET,
-  ROLE_EQ_DELETEPRESET,
-  ROLE_EQ_CLEARHIST,
+  ROLE_EQ_LOAD_PRESET,
+  ROLE_EQ_SAVE_PRESET,
+  ROLE_EQ_DELETE_PRESET,
+  ROLE_EQ_CLEARHOLD,
   ROLE_UNKNOWN
 };
 
 enum _ui_command {
-  CMD_EQ_SAVEPRESET,
-  CMD_EQ_REPLACEPRESET,
-  CMD_EQ_DELETEPRESET,
-  CMD_EQ_RESET
+  CMD_NOOP,
+  CMD_LOAD_PRESET,
+  CMD_SAVE_PRESET,
+  CMD_LOAD_PRESET_CB,
+  CMD_SAVE_PRESET_CB,
+  CMD_PREFS,
+  CMD_ABOUT,
+  CMD_QUIT,
+  CMD_CLOSE,
+  CMD_EQ_LOAD_PRESET,
+  CMD_EQ_SAVE_PRESET,
+  CMD_EQ_REPLACE_PRESET,
+  CMD_EQ_DELETE_PRESET,
+  CMD_EQ_RESET,
+  CMD_MODEL_FILE_SELECTED
 };
 
 class c_neuralblender;
@@ -181,7 +192,7 @@ public:
   void on_resize () override;
   bool on_key_down (int key) override;
   void on_action (nbtk::t_action_event &event);
-
+  
   c_neuralblender_ui *ui = NULL;
   nbtk::c_frame frame_main;
   nbtk::c_staticimage image_toplogo;
@@ -284,7 +295,7 @@ public:
   //nbtk::c_container   container;
   c_gainslider        slider_gain;
   nbtk::c_checkbox    btn_on;
-  nbtk::c_combobox    menu_mode;
+  nbtk::c_combobox    cb_mode;
   c_freqknob          knob_freq;
   c_qknob             knob_q;
 };
@@ -313,10 +324,10 @@ public:
   nbtk::c_frame       frame;
   c_eqgraph           graph;
   nbtk::c_label       label;
-  nbtk::c_combobox    menu_presets;
+  nbtk::c_combobox    cb_presets;
   nbtk::c_button      btn_savepreset;
   nbtk::c_button      btn_deletepreset;
-  nbtk::c_button      btn_clearhist;
+  nbtk::c_button      btn_clearhold;
   c_gainknob          knob_gain;
   nbtk::c_frame       cont_bands;
   c_eqband_widgets    bands [EQ_NUM_BANDS];
@@ -368,7 +379,7 @@ public:
   nbtk::c_button btn_clear;
   nbtk::c_button btn_flip;
   nbtk::c_button btn_calib;
-  nbtk::c_combobox menu_list;
+  nbtk::c_combobox cb_list;
   //c_label label_flip;
   //c_label label_calib;
   nbtk::c_label label_frames;
@@ -400,8 +411,9 @@ public:
   void draw ();
   void clear_lane_model_ui (_lane_bank bank, size_t which);
   void clear_lane_model_ui (size_t which);
-  void update_ir_cwd (std::string path);
   void update_model_cwd (std::string path);
+  void update_ir_cwd (std::string path);
+  void update_preset_cwd (std::string path);
 
   void set_lane_mute (_lane_bank bank, size_t which, bool b);
   void set_lane_mute (size_t which, bool b);
@@ -435,9 +447,11 @@ public:
   void save_eq_preset_callback (int which);
   void delete_preset (int which);
   void clear_hold (int bank);
-  void load_preset (size_t bank_id, std::string name);
-  void save_preset (size_t bank_id, std::string name);
+  void load_eq_preset (size_t bank_id, std::string name);
+  void save_eq_preset (size_t bank_id, std::string name);
   bool delete_selected_eq_preset (size_t bank_id);
+  void load_preset_file (std::string name);
+  void save_preset_file (std::string name);
 
   bool load_model (size_t which, const char *filename);
   virtual bool load_model (_lane_bank bank, size_t which, const char *filename) = 0;
@@ -471,6 +485,8 @@ public:
   virtual void on_threshgain (nbtk::c_widget *w, float f)            = 0;
   virtual void on_eq_band (nbtk::c_widget *w, _lane_bank bank, size_t band) = 0;
   virtual void on_eq_master_gain (nbtk::c_widget *w, _lane_bank bank, float f) = 0;
+  virtual void get_dsp_state (c_neuralblender_state &dest)           = 0;
+  virtual bool set_dsp_state (const c_neuralblender_state &src)      = 0;
   virtual void on_excl (nbtk::c_widget *w, int n)                       ; // UI only
           void on_excl_use (nbtk::c_widget *w, bool b)                  ;
           void on_action (nbtk::t_action_event &event)                  ;
@@ -501,10 +517,14 @@ public:
   c_neuralblendermainwindow mainwindow;
   c_aboutwindow aboutwindow;
   c_prefswindow prefswindow;
+  c_neuralblender_filepicker filepicker;
   nbtk::t_native_window parent;
   int tuner_height = 56;
   bool do_set_min_size = false; // ugly hack for ardour's window size shenanigans
   
+  nbtk::c_menubar menubar;
+  nbtk::c_topmenu *menu_presets;
+  nbtk::c_topmenu *menu_misc;
   nbtk::c_container cont_toparea;
   nbtk::c_container cont_pedals;
   nbtk::c_container cont_eqpre;

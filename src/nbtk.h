@@ -125,6 +125,10 @@ class c_scrollbar;
 class c_nativewindow;
 class c_toplevelwindow;
 class c_popupwindow;
+class c_menu;
+class c_menulistbox;
+class c_topmenu;
+class c_menubar;
 class c_native_backend;
 class c_tooltip;
 class c_filepicker;
@@ -149,6 +153,7 @@ enum class _command_result {
 };
 
 enum _nbtk_command : int64_t {
+  NBTK_CMD_FILEPICKER_OVERWRITE = -3,
   NBTK_CMD_NONE = -2,
   NBTK_CMD_SET_VALUE = -1
 };
@@ -178,7 +183,7 @@ struct t_command_event : public t_action_event {
   t_command_event ();
 };
 
-enum e_key {
+enum _special_key {
   KEY_UNKNOWN = 0,
   KEY_TAB,
   KEY_BACKSPACE,
@@ -229,6 +234,10 @@ public:
   virtual void on_event (t_event &event);
   virtual void on_action (t_action_event &event);
   virtual void on_command (t_command_event &event);
+  bool emit_command (
+      bool value = false,
+      int source_index = -1,
+      const std::string &text = "");
 
   void draw_tree (cairo_t *cr);
   bool mouse_down_tree (int x, int y, int button);
@@ -276,6 +285,7 @@ public:
   uint64_t lane = (uint64_t) -1;
   uint64_t bank = (uint64_t) -1;
   uint64_t page = 0;
+  int64_t command = NBTK_CMD_NONE;
   void *userdata1 = nullptr;
   void *userdata2 = nullptr;
   
@@ -723,6 +733,7 @@ public:
   const std::string &text () const;
 
   std::string value;
+  std::string accepted_chars;
   size_t cursor = 0;
   size_t selection_anchor = 0;
 
@@ -786,12 +797,18 @@ public:
       int64_t command,
       const std::string &title,
       const std::string &prompt,
-      const std::string &initial_value = "");
+      const std::string &initial_value = "",
+      const std::string &accept_chars = "");
   virtual void ask_yes_no (
       c_widget *response_target,
       int64_t command,
       const std::string &title,
-      const std::string &question);
+      const std::string &question,
+      const std::string &cancel_text = "",
+      const std::string &no_text = "No",
+      const std::string &yes_text = "Yes");
+
+  virtual void show_message (const std::string title, const std::string msg);
 
   virtual std::unique_ptr<c_popupwindow> create_popup (c_widget *owner);
   virtual std::unique_ptr<c_tooltip> create_tooltip (c_widget *owner);
@@ -853,6 +870,7 @@ public:
   c_widget *tooltip_pending_widget = nullptr;
   c_widget *mouse_capture_widget = nullptr;
   c_combobox *active_combobox = nullptr;
+  c_menu *active_menu = nullptr;
   uint64_t tooltip_pending_since = 0;
   int tooltip_root_x = 0;
   int tooltip_root_y = 0;
@@ -884,7 +902,9 @@ public:
       int *h) const = 0;
   virtual void invalidate (t_native_handle widget) = 0;
   virtual void flush (t_native_handle widget) = 0;
-  virtual bool grab_pointer (t_native_handle widget) = 0;
+  virtual bool grab_pointer (
+      t_native_handle widget,
+      bool owner_events = false) = 0;
   virtual void ungrab_pointer (t_native_handle widget) = 0;
   virtual bool query_pointer (t_native_handle widget, t_point *local) const = 0;
   virtual void set_window_background (
@@ -953,6 +973,7 @@ public:
   virtual void close ();
   virtual bool close_on_outside_click () const;
   virtual bool takes_focus () const;
+  virtual bool pointer_grab_owner_events () const;
   bool on_mouse_up (int x, int y, int button) override;
   void on_action (t_action_event &event) override;
   void invalidate_rect (int x, int y, int w, int h) override;
@@ -971,6 +992,127 @@ public:
   t_native_handle widget = nullptr;
   bool pointer_grabbed = false;
   bool close_on_release = false;
+};
+
+enum _menuitem_type {
+  MENUITEM_REGULAR,
+  MENUITEM_CHECK,
+  MENUITEM_RADIO,
+  MENUITEM_SEPARATOR
+};
+
+struct t_menuitem {
+  std::string label;
+  int64_t command = NBTK_CMD_NONE;
+  c_menu *submenu = nullptr;
+  bool enabled = true;
+  _menuitem_type type = MENUITEM_REGULAR;
+  bool checked = false;
+};
+
+class c_menulistbox : public c_listbox {
+public:
+  void draw (cairo_t *cr) override;
+  bool on_mouse_move (int x, int y) override;
+  bool on_key_down (int key) override;
+  void on_select (int index) override;
+  void on_activate (int index) override;
+
+  c_menu *menu = nullptr;
+};
+
+class c_menu : public c_popupwindow {
+public:
+  ~c_menu () override;
+
+  void configure (c_app *app, c_widget *command_target, c_menu *parent = nullptr);
+  int add_item (
+      const std::string &label,
+      int64_t command,
+      _menuitem_type type = MENUITEM_REGULAR,
+      bool enabled = true,
+      bool checked = false);
+  int add_separator ();
+  c_menu *add_submenu (const std::string &label, bool enabled = true);
+  void clear ();
+  void show_below (c_widget *anchor);
+  void show_beside (c_menu *parent, int row);
+  void select_item (int index);
+  void activate_item (int index);
+  c_menu *menu_at_screen (t_point point);
+  void close_tree ();
+  bool item_selectable (int index) const;
+  int next_selectable (int from, int direction) const;
+  bool on_key_down (int key) override;
+  bool pointer_grab_owner_events () const override;
+  void close () override;
+  void hide () override;
+
+  std::vector<t_menuitem> items;
+  c_menulistbox listbox;
+  c_widget *command_target = nullptr;
+  c_menu *parent_menu = nullptr;
+  c_menu *open_submenu = nullptr;
+  int parent_row = -1;
+  int row_height = 24;
+  int min_width = 120;
+  int max_width = 480;
+
+private:
+  void ensure_native ();
+  void sync_geometry (int max_height);
+  void show_submenu (int index);
+  c_menu *root_menu ();
+
+  std::vector<std::unique_ptr<c_menu>> owned_submenus;
+};
+
+class c_topmenu : public c_button {
+public:
+  c_topmenu ();
+  ~c_topmenu () override;
+
+  void draw (cairo_t *cr) override;
+  bool on_mouse_down (int x, int y, int button) override;
+  bool on_mouse_up (int x, int y, int button) override;
+  bool on_key_down (int key) override;
+  void on_mouse_enter () override;
+  c_menu *get_menu ();
+  int add_item (
+      const std::string &label,
+      int64_t command,
+      _menuitem_type type = MENUITEM_REGULAR,
+      bool enabled = true,
+      bool checked = false);
+  int add_separator ();
+  c_menu *add_submenu (const std::string &label, bool enabled = true);
+  void show_menu ();
+  void hide_menu ();
+  void menu_closed ();
+
+  bool menu_visible = false;
+
+private:
+  std::unique_ptr<c_menu> popup_menu;
+};
+
+class c_menubar : public c_container {
+public:
+  ~c_menubar () override;
+
+  c_topmenu *add_menu (const std::string &label);
+  void layout_menus ();
+  void move_resize (int x, int y, int w, int h) override;
+  void open_menu (c_topmenu *menu);
+  void menu_closed (c_topmenu *menu);
+  void close_menus ();
+
+  int item_padding = 20;
+  int item_gap = 0;
+  c_topmenu *open_topmenu = nullptr;
+
+private:
+  std::vector<std::unique_ptr<c_topmenu>> menus;
 };
 
 class c_valueeditor_popup : public c_popupwindow {
@@ -1289,7 +1431,8 @@ public:
       int64_t command,
       const std::string &title,
       const std::string &prompt,
-      const std::string &initial_value);
+      const std::string &initial_value,
+      const std::string &accept_chars = "");
   void on_resize () override;
   void on_action (t_action_event &event) override;
   bool on_key_down (int key) override;
@@ -1317,7 +1460,10 @@ public:
       c_widget *response_target,
       int64_t command,
       const std::string &title,
-      const std::string &question);
+      const std::string &question,
+      const std::string &cancel_text = "",
+      const std::string &no_text = "No",
+      const std::string &yes_text = "Yes");
   void on_resize () override;
   void on_action (t_action_event &event) override;
   bool on_key_down (int key) override;
@@ -1351,10 +1497,25 @@ public:
       const char *title);
 
   virtual void show ();
+
+  void show_open (
+      c_widget *response_target,
+      int64_t command);
+
+  void show_save_as (
+      c_widget *response_target,
+      int64_t command,
+      const std::string &filename = "");
+
+  void show_save_as (const std::string &filename = "");
+  void set_save_as (bool enabled, const std::string &filename = "");
+  void set_save_suffix (std::string suffix);
   void hide ();
   void on_resize () override;
   void on_action (t_action_event &event) override;
+  void on_command (t_command_event &event) override;
   bool on_key_down (int key) override;
+  void on_close () override;
 
   void scan_current_dir ();
   bool complete_path_from_textbox ();
@@ -1376,6 +1537,8 @@ public:
   c_path_textbox text_path;
   c_listbox listbox;
   c_scrollbar vscrollbar;
+  c_label label_filename;
+  c_textbox text_filename;
   c_combobox combo_filter;
   c_checkbox btn_show_hidden;
   c_button btn_ok;
@@ -1392,10 +1555,22 @@ public:
   t_native_handle owner_widget = nullptr;
   bool show_hidden = false;
   bool sort_case_sensitive = false;
+  bool save_as = false;
+  std::string save_suffix;
+  std::string pending_save_path;
   std::string last_completion_text;
   std::string last_completion_dir_path;
   bool last_completion_was_dir = false;
   bool last_completion_can_focus_list = false;
+
+private:
+  void finish (
+      _command_result result,
+      const std::string &path = "");
+  void accept_path (const std::string &path);
+
+  c_widget *response_target = nullptr;
+  int64_t response_command = NBTK_CMD_NONE;
 };
 
 } // namespace nbtk

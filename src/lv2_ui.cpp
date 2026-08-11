@@ -196,6 +196,122 @@ bool c_lv2_ui::load_model (
   return write_model_path (bank, which, filename);
 }
 
+void c_lv2_ui::get_dsp_state (c_neuralblender_state &dest) {
+  dest = state;
+}
+
+bool c_lv2_ui::set_dsp_state (const c_neuralblender_state &src) {
+  if (!write || !map)
+    return false;
+
+  static constexpr _lane_bank model_banks [] = {
+    BANK_PEDAL, BANK_AMP, BANK_CAB
+  };
+
+  // Queue model changes first so the following controls apply to the new model.
+  for (_lane_bank bank : model_banks) {
+    for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
+      write_model_path (
+        bank,
+        lane,
+        src.banks [bank].lanes [lane].filename.c_str ());
+    }
+  }
+
+  write_control (PORT_BYPASS, src.bypass ? 0.0f : 1.0f);
+  write_control (PORT_PEDAL_BYPASS, src.pedal_bypass ? 1.0f : 0.0f);
+  write_control (PORT_EQPRE_BYPASS, src.eqpre.on ? 0.0f : 1.0f);
+  write_control (PORT_AMP_BYPASS, src.amp_bypass ? 1.0f : 0.0f);
+  write_control (PORT_EQPOST_BYPASS, src.eqpost.on ? 0.0f : 1.0f);
+  write_control (PORT_CAB_BYPASS, src.cab_bypass ? 1.0f : 0.0f);
+  write_control (PORT_VU_ENABLE, src.do_vu ? 1.0f : 0.0f);
+  write_control (PORT_MUTE_ALL, src.mute_all ? 1.0f : 0.0f);
+  write_control (PORT_CALIB_SOURCE, (float) src.calib_source);
+  write_control (PORT_CALIB_TARGET_DB, src.calib_target_db);
+  write_control (PORT_NOISEGATE_ENABLED, src.noisegate_on ? 1.0f : 0.0f);
+  write_control (PORT_NOISEGATE_THRESHOLD, src.noisethresh);
+  write_control (PORT_NOISEGATE_ATTACK, src.noiseattack);
+  write_control (PORT_NOISEGATE_HOLD, src.noisehold);
+  write_control (PORT_NOISEGATE_RELEASE, src.noiserelease);
+  write_control (PORT_TUNER_ON, src.tuner_on ? 1.0f : 0.0f);
+  write_control (PORT_TUNER_BASE_FREQ, src.tuner_base_freq);
+  write_control (PORT_MASTER_GAIN, gain_to_db (src.master_gain));
+  write_control (PORT_PRESENCE, src.presence);
+
+  write_control (
+    PORT_EXCLUSIVE_LANE_PEDAL,
+    (float) src.banks [BANK_PEDAL].exclusive_lane);
+  write_control (
+    PORT_EXCLUSIVE_LANE_AMP,
+    (float) src.banks [BANK_AMP].exclusive_lane);
+  write_control (
+    PORT_EXCLUSIVE_LANE_CAB,
+    (float) src.banks [BANK_CAB].exclusive_lane);
+  write_control (
+    PORT_LINKED_CALIB_PEDAL,
+    src.banks [BANK_PEDAL].linked_calib ? 1.0f : 0.0f);
+  write_control (
+    PORT_LINKED_CALIB_AMP,
+    src.banks [BANK_AMP].linked_calib ? 1.0f : 0.0f);
+  write_control (
+    PORT_LINKED_CALIB_CAB,
+    src.banks [BANK_CAB].linked_calib ? 1.0f : 0.0f);
+
+  for (_lane_bank bank : model_banks) {
+    for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
+      const c_neuralblender_lane_state &lane_state =
+        src.banks [bank].lanes [lane];
+      const auto port = [bank, lane] (uint32_t param) {
+        return nb_lv2_bank_lane_port (bank, lane, param);
+      };
+
+      write_control (
+        port (NB_LV2_LANE_GAIN_IN),
+        gain_to_db (lane_state.gain_in));
+      write_control (
+        port (NB_LV2_LANE_IR_PITCH),
+        lane_state.ir_pitch_semitones);
+      write_control (
+        port (NB_LV2_LANE_GAIN_OUT),
+        gain_to_db (lane_state.gain_out));
+      write_control (
+        port (NB_LV2_LANE_DRY_OUT),
+        lane_state.dry_out > 0.0f
+          ? gain_to_db (lane_state.dry_out)
+          : DB_SILENCE);
+      write_control (port (NB_LV2_LANE_DELAY), lane_state.delay_ms);
+      write_control (
+        port (NB_LV2_LANE_MUTE), lane_state.lane_mute ? 1.0f : 0.0f);
+      write_control (
+        port (NB_LV2_LANE_DCFLIP), lane_state.dcflip ? 1.0f : 0.0f);
+      write_control (
+        port (NB_LV2_LANE_CALIBRATE), lane_state.do_calib ? 1.0f : 0.0f);
+    }
+  }
+
+  const auto write_eq = [this] (_lane_bank bank, const c_eq_state &eq) {
+    write_control (nb_lv2_eq_master_gain_port (bank), eq.master_gain_db);
+    for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
+      write_control (
+        nb_lv2_eq_port (bank, band, NB_LV2_EQ_ENABLED),
+        eq.enabled [band] ? 1.0f : 0.0f);
+      write_control (
+        nb_lv2_eq_port (bank, band, NB_LV2_EQ_MODE),
+        (float) nb_lv2_encode_eq_mode (eq.mode [band], eq.slope [band]));
+      write_control (
+        nb_lv2_eq_port (bank, band, NB_LV2_EQ_FREQ), eq.freq [band]);
+      write_control (
+        nb_lv2_eq_port (bank, band, NB_LV2_EQ_GAIN), eq.gain_db [band]);
+      write_control (
+        nb_lv2_eq_port (bank, band, NB_LV2_EQ_Q), eq.q [band]);
+    }
+  };
+
+  write_eq (BANK_EQPRE, src.eqpre);
+  write_eq (BANK_EQPOST, src.eqpost);
+  return true;
+}
+
 void c_lv2_ui::on_gain_in (nbtk::c_widget *w, float f) {
   CP
   write_control (widget_lane_port (w, NB_LV2_LANE_GAIN_IN), gain_to_db (f));
