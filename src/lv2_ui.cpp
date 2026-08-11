@@ -110,7 +110,7 @@ bool c_lv2_ui::write_model_path (
          lv2_atom_total_size (atom),
          urid_atom_eventTransfer,
          atom);
-  return path [0] != '\0';
+  return true; //path [0] != '\0';
 }
 
 bool c_lv2_ui::write_float_property (LV2_URID property, float value) {
@@ -638,6 +638,20 @@ bool c_lv2_ui::request_window_size (int w, int h) {
 int c_lv2_ui::idle () {
   if (!ui_ready)
     return 0;
+
+  t_neuralblender_error error;
+  bool have_error = false;
+  
+  if (!nbtk_app.dialog_visible ()) {
+    std::lock_guard<std::mutex> lock (pending_error_mutex);
+    if (!pending_errors.empty ()) {
+      error = std::move (pending_errors.front ());
+      pending_errors.pop_front ();
+      have_error = true;
+    }
+  }
+  if (have_error)
+    handle_error (error);
 
   if (nbtk_app.backend)
     nbtk_app.backend->run_events (&app);
@@ -1242,6 +1256,40 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
     return;
 
   const LV2_URID prop = ((const LV2_Atom_URID *) property)->body;
+  if (prop == urid_error &&
+      (value->type == urid_atom_Blank || value->type == urid_atom_Object)) {
+    const LV2_Atom_Object *error_obj = (const LV2_Atom_Object *) value;
+    const LV2_Atom *code_atom = NULL;
+    const LV2_Atom *bank_atom = NULL;
+    const LV2_Atom *lane_atom = NULL;
+    const LV2_Atom *filename_atom = NULL;
+    lv2_atom_object_get (
+      error_obj,
+      urid_error_code, &code_atom,
+      urid_error_bank, &bank_atom,
+      urid_error_lane, &lane_atom,
+      urid_error_filename, &filename_atom,
+      0);
+
+    if (code_atom && bank_atom && lane_atom && filename_atom &&
+        code_atom->type == urid_atom_Int &&
+        bank_atom->type == urid_atom_Int &&
+        lane_atom->type == urid_atom_Int &&
+        (filename_atom->type == urid_atom_Path ||
+         filename_atom->type == urid_atom_String)) {
+      t_neuralblender_error error;
+      error.code = (size_t) ((const LV2_Atom_Int *) code_atom)->body;
+      error.bank = (size_t) ((const LV2_Atom_Int *) bank_atom)->body;
+      error.lane = (size_t) ((const LV2_Atom_Int *) lane_atom)->body;
+      error.filename = (const char *) LV2_ATOM_BODY_CONST (filename_atom);
+      if (error.code > NB_ERROR_NONE &&
+          error.bank < BANK_COUNT && error.lane < NB_NUM_MODELS) {
+        std::lock_guard<std::mutex> lock (pending_error_mutex);
+        pending_errors.push_back (std::move (error));
+      }
+    }
+    return;
+  }
   if (prop == urid_meters) {
     set_ui_values (value, ATOM_METERS);
     return;

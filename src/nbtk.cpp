@@ -4952,6 +4952,14 @@ void c_app::on_command (t_command_event &event) {
     on_event (event);
 }
 
+bool c_app::dialog_visible () {
+  if ((askstring_dialog && askstring_dialog->is_active ()) ||
+      (askyesno_dialog && askyesno_dialog->is_active ()))
+    return true;
+    
+  return false;
+}
+
 void c_nativewindow::create (c_app *app_, int x_, int y_, int w_, int h_) {
   app = app_;
   x = x_;
@@ -5098,7 +5106,7 @@ void c_popupwindow::show_at_screen_pos (int x_, int y_) { CP
   show ();
 }
 
-void c_popupwindow::close () { CP
+void c_popupwindow::close () {
   hide ();
 }
 
@@ -6792,6 +6800,15 @@ bool c_native_toplevelwindow::is_created () const {
   return widget != NULL;
 }
 
+bool c_native_toplevelwindow::is_visible () const {
+  nbtk::t_native_widget *native_widget = nbtk::as_native_widget (widget);
+  return native_widget && native_widget->visible;
+}
+
+bool c_native_toplevelwindow::has_focus () const {
+  return is_visible () && widget && backend && backend->has_keyboard_focus (widget);
+}
+
 nbtk::t_native_handle c_native_toplevelwindow::native_handle () const {
   return widget;
 }
@@ -7309,16 +7326,80 @@ void c_toplevelwindow::auto_quit_on_close (bool b) {
     auto_close (false);
 }
 
-bool c_askstring_dialog::create (
-    c_app *app_, t_native_window parent_, t_native_handle owner_) {
+bool c_ask_dialog::create (
+    c_app *app_,
+    t_native_window parent_,
+    t_native_handle owner_,
+    const char *title,
+    int height) {
   if (!c_toplevelwindow::create (
-        app_, parent_, "Enter value", 0, 0, 440, 164, owner_))
+        app_, parent_, title, 0, 0, 440, height, owner_))
     return false;
 
   auto_hide_on_close (false);
-  frame.create (&root_widget, "", 12, 12, 416, 92);
-  label_prompt.create (&frame, "", 12, 10, 392, 28);
-  label_prompt.align = TEXT_LEFT;
+  frame.create (&root_widget, "", 12, 12, 416, std::max (1, height - 72));
+  for (c_label &label : message_labels) {
+    label.create (&frame, "", 12, 10, 392, 1);
+    label.align = TEXT_LEFT;
+    label.hide ();
+  }
+  return true;
+}
+
+bool c_ask_dialog::is_active () const {
+  return active;
+}
+
+void c_ask_dialog::set_message (const std::string &message) {
+  message_line_count = 0;
+  size_t start = 0;
+
+  while (message_line_count < MAX_MESSAGE_LINES) {
+    const size_t end = message.find ('\n', start);
+    message_labels [message_line_count].set_label (
+      message.substr (start, end == std::string::npos
+        ? std::string::npos
+        : end - start));
+    message_labels [message_line_count].show ();
+    ++message_line_count;
+
+    if (end == std::string::npos)
+      break;
+    start = end + 1;
+  }
+
+  for (size_t i = message_line_count; i < MAX_MESSAGE_LINES; ++i) {
+    message_labels [i].set_label ("");
+    message_labels [i].hide ();
+  }
+}
+
+void c_ask_dialog::layout_message (int x, int y, int w, int h) {
+  if (message_line_count == 0)
+    return;
+
+  const int line_h = std::max (1, h / (int) message_line_count);
+  for (size_t i = 0; i < message_line_count; ++i) {
+    const int line_y = y + (int) i * line_h;
+    const int this_h = i + 1 == message_line_count
+      ? std::max (1, y + h - line_y)
+      : line_h;
+    message_labels [i].move_resize (x, line_y, std::max (1, w), this_h);
+  }
+}
+
+void c_ask_dialog::on_resize () {
+  c_toplevelwindow::on_resize ();
+  frame.move_resize (12, 12, std::max (1, w () - 24),
+                     std::max (1, h () - 72));
+}
+
+bool c_askstring_dialog::create (
+    c_app *app_, t_native_window parent_, t_native_handle owner_) {
+  if (!c_ask_dialog::create (
+        app_, parent_, owner_, "Enter value", 164))
+    return false;
+
   textbox.create (&frame, "", 12, 44, 392, 36);
   btn_cancel.create (&root_widget, "Cancel", 252, 112, 84, 40);
   btn_ok.create (&root_widget, "OK", 344, 112, 84, 40);
@@ -7333,10 +7414,14 @@ void c_askstring_dialog::ask (
     const std::string &prompt,
     const std::string &initial_value,
     const std::string &accept_chars) {
+  active = true;
   response_target = response_target_;
   response_command = command;
   set_title (title.c_str ());
-  label_prompt.set_label (prompt);
+  set_message (prompt);
+  const int message_h = std::max (28, (int) message_line_count * 20);
+  request_size (std::max (440, w ()), 164 + message_h - 28);
+  on_resize ();
   textbox.accepted_chars = accept_chars;
   textbox.set_text (initial_value.c_str ());
   textbox.cursor = textbox.text ().size ();
@@ -7349,15 +7434,17 @@ void c_askstring_dialog::ask (
 }
 
 void c_askstring_dialog::on_resize () {
-  c_toplevelwindow::on_resize ();
-  frame.move_resize (12, 12, std::max (1, w () - 24), 92);
-  label_prompt.move_resize (12, 10, std::max (1, frame.w - 24), 28);
-  textbox.move_resize (12, 44, std::max (1, frame.w - 24), 36);
+  c_ask_dialog::on_resize ();
+  const int textbox_y = std::max (44, frame.h - 48);
+  layout_message (
+    12, 10, std::max (1, frame.w - 24), std::max (28, textbox_y - 16));
+  textbox.move_resize (12, textbox_y, std::max (1, frame.w - 24), 36);
   btn_ok.move_resize (std::max (12, w () - 96), h () - 52, 84, 40);
   btn_cancel.move_resize (std::max (12, w () - 188), h () - 52, 84, 40);
 }
 
 void c_askstring_dialog::finish (_command_result result) {
+  active = false;
   c_widget *target = response_target;
   const int64_t command = response_command;
   const std::string text = textbox.text ();
@@ -7402,7 +7489,7 @@ bool c_askstring_dialog::on_key_down (int key) {
     finish (_command_result::cancelled);
     return true;
   }
-  return c_toplevelwindow::on_key_down (key);
+  return c_ask_dialog::on_key_down (key);
 }
 
 void c_askstring_dialog::on_close () {
@@ -7411,14 +7498,10 @@ void c_askstring_dialog::on_close () {
 
 bool c_askyesno_dialog::create (
     c_app *app_, t_native_window parent_, t_native_handle owner_) {
-  if (!c_toplevelwindow::create (
-        app_, parent_, "Confirm", 0, 0, 440, 152, owner_))
+  if (!c_ask_dialog::create (
+        app_, parent_, owner_, "Confirm", 152))
     return false;
 
-  auto_hide_on_close (false);
-  frame.create (&root_widget, "", 12, 12, 416, 76);
-  label_question.create (&frame, "", 12, 12, 392, 52);
-  label_question.align = TEXT_LEFT;
   btn_cancel.create (&root_widget, "", 160, 100, 84, 40);
   btn_no.create (&root_widget, "", 252, 100, 84, 40);
   btn_yes.create (&root_widget, "", 344, 100, 84, 40);
@@ -7435,12 +7518,16 @@ void c_askyesno_dialog::ask (
     const std::string &no_text,
     const std::string &yes_text) {
 
+  active = true;
   debug ("cancel_text=%s, no_text=%s, yes_text=%s",
           cancel_text.c_str (), no_text.c_str (), yes_text.c_str ());
   response_target = response_target_;
   response_command = command;
   set_title (title.c_str ());
-  label_question.set_label (question);
+  set_message (question);
+  const int message_h = std::max (52, (int) message_line_count * 20);
+  request_size (std::max (440, w ()), 152 + message_h - 52);
+  on_resize ();
 
   if (cancel_text != "") { CP
     btn_cancel.set_label (cancel_text);
@@ -7466,15 +7553,16 @@ void c_askyesno_dialog::ask (
 }
 
 void c_askyesno_dialog::on_resize () {
-  c_toplevelwindow::on_resize ();
-  frame.move_resize (12, 12, std::max (1, w () - 24), 76);
-  label_question.move_resize (12, 12, std::max (1, frame.w - 24), 52);
+  c_ask_dialog::on_resize ();
+  layout_message (
+    12, 12, std::max (1, frame.w - 24), std::max (52, frame.h - 24));
   btn_yes.move_resize (std::max (12, w () - 96), h () - 52, 84, 40);
   btn_no.move_resize (std::max (12, w () - 188), h () - 52, 84, 40);
   btn_cancel.move_resize (std::max (12, w () - 280), h () - 52, 84, 40);
 }
 
 void c_askyesno_dialog::finish (_command_result result) {
+  active = false;
   c_widget *target = response_target;
   const int64_t command = response_command;
   response_target = nullptr;
@@ -7522,7 +7610,7 @@ bool c_askyesno_dialog::on_key_down (int key) {
     finish (_command_result::cancelled);
     return true;
   }
-  return c_toplevelwindow::on_key_down (key);
+  return c_ask_dialog::on_key_down (key);
 }
 
 void c_askyesno_dialog::on_close () {

@@ -7,6 +7,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <atomic>
+#include <deque>
+#include <mutex>
 
 #include <lv2/atom/atom.h>
 #include <lv2/atom/forge.h>
@@ -381,6 +384,7 @@ public:
   LV2_URID urid_atom_Path = 0;
   LV2_URID urid_atom_String = 0;
   LV2_URID urid_atom_Blank = 0;
+  LV2_URID urid_atom_Object = 0;
   LV2_URID urid_atom_Float = 0;
   LV2_URID urid_atom_Int = 0;
   LV2_URID urid_atom_Vector = 0;
@@ -395,6 +399,11 @@ public:
   LV2_URID urid_spectrum_pre = 0;
   LV2_URID urid_spectrum_post = 0;
   LV2_URID urid_samplerate = 0;
+  LV2_URID urid_error = 0;
+  LV2_URID urid_error_code = 0;
+  LV2_URID urid_error_bank = 0;
+  LV2_URID urid_error_lane = 0;
+  LV2_URID urid_error_filename = 0;
   LV2_URID urid_calib_target_db = 0;
   LV2_URID urid_calib_bass = 0;
   LV2_URID urid_bank_bypass [BANK_COUNT] = {};
@@ -423,6 +432,8 @@ public:
       map->map (map->handle, LV2_ATOM__String);
     urid_atom_Blank =
       map->map (map->handle, LV2_ATOM__Blank);
+    urid_atom_Object =
+      map->map (map->handle, LV2_ATOM__Object);
     urid_atom_Float =
       map->map (map->handle, LV2_ATOM__Float);
     urid_atom_Int =
@@ -475,6 +486,16 @@ public:
       map->map (map->handle, NB_URI "#SpectrumPost");
     urid_samplerate =
       map->map (map->handle, NB_URI "#Samplerate");
+    urid_error =
+      map->map (map->handle, NB_URI "#Error");
+    urid_error_code =
+      map->map (map->handle, NB_URI "#ErrorCode");
+    urid_error_bank =
+      map->map (map->handle, NB_URI "#ErrorBank");
+    urid_error_lane =
+      map->map (map->handle, NB_URI "#ErrorLane");
+    urid_error_filename =
+      map->map (map->handle, NB_URI "#ErrorFilename");
     urid_calib_target_db =
       map->map (map->handle, NB_URI "#CalibTargetDb");
     urid_calib_bass =
@@ -535,6 +556,8 @@ public:
   bool expected_control_valid [PORT_COUNT] = {};
   float expected_control_value [PORT_COUNT] = {};
   uint64_t expected_control_time [PORT_COUNT] = {};
+  std::mutex pending_error_mutex;
+  std::deque<t_neuralblender_error> pending_errors;
 
   void write_control (uint32_t port, float value);
   bool consume_expected_control (

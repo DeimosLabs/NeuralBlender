@@ -10,7 +10,9 @@
 #define NB_NUM_PEDALS            4
 #define NB_NUM_MODELS            4
 #define NB_NUM_CABS              4
-#define NB_MAX_LANES             4
+//#define NB_MAX_LANES             4
+static constexpr size_t NB_MAX_LANES = 
+        std::max (NB_NUM_PEDALS, std::max (NB_NUM_MODELS, NB_NUM_CABS));
 #define NB_STATS_PER_LANE        3 // dsp->ui: delay frames, model type, trim
 #define NB_FREQ_MIN              20.0f
 #define NB_FREQ_MAX              20000.0f
@@ -34,3 +36,30 @@
 #define EQ_SLOPE_MAX             4
 #define EQ_PARAM_XFADE_MS        2.0f
 #define IR_SILENCE_THRESHOLD     -80.0f
+
+enum _nb_error_code {
+  NB_ERROR_NONE = 0,
+  NB_ERROR_INTERNAL,
+  NB_ERROR_FILE_NOTFOUND,
+  NB_ERROR_FILE_NOTFOUND_NAM,
+  NB_ERROR_FILE_NOTFOUND_WAV,
+  NB_ERROR_FILE_READ_NAM,
+  NB_ERROR_FILE_READ_JSON,
+  NB_ERROR_FILE_READ_WAV,
+  NB_ERROR_FILE_READ_GZIP,
+  NB_ERROR_FILENAME_NAM,
+  NB_ERROR_FILENAME_WAV,
+  NB_ERROR_FILENAME_GZIP,
+  NB_ERROR_FILE_FORMAT_NAM,
+  NB_ERROR_FILE_FORMAT_JSON,
+  NB_ERROR_FILE_FORMAT_WAV,
+  NB_ERROR_FILE_FORMAT_GZIP,
+  NB_ERROR_FILE_SUBFORMAT_NAM,
+  NB_ERROR_FILE_SUBFORMAT_WAV,
+  NB_ERROR_FILE_SIZE,
+  NB_ERROR_FILE_EMPTY,
+  NB_ERROR_FILE_OTHER,
+  NB_ERROR_MEMORY,
+  NB_ERROR_CONVOLVER,
+  NB_ERROR_STATE
+};

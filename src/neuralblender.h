@@ -32,6 +32,7 @@
 #include <chrono>
 #include <iostream>
 #include <array>
+#include <functional>
 
 #include "state.h" // includes constants.h
 
@@ -115,6 +116,13 @@ static inline float gain_to_db (float gain) {
 
   return 20.0f * log10f(gain);
 }*/
+
+struct t_neuralblender_error {
+  size_t code = NB_ERROR_NONE;
+  size_t bank = BANK_NONE;
+  size_t lane = 0;
+  std::string filename;
+};
 
 #ifdef HAVE_FFTW
 
@@ -350,8 +358,8 @@ public:
   c_convolver (const c_convolver &) = delete;
   c_convolver &operator= (const c_convolver &) = delete;
   
-  bool load_ir (const float *ir, uint32_t nframes, uint32_t samplerate = 0);
-  bool load_ir_from_file (const char *filename, int channel = 0);
+  size_t load_ir (const float *ir, uint32_t nframes, uint32_t samplerate = 0);
+  size_t load_ir_from_file (const char *filename, int channel = 0);
   void clear ();
   void reset ();
   void clear_fft_state ();
@@ -360,7 +368,7 @@ public:
   void process_block (const float *in, float *out, uint32_t nframes);
   void set_samplerate (uint32_t samplerate);
   void set_blocksize (uint32_t nframes);
-  bool set_pitch_semitones (float semitones);
+  size_t set_pitch_semitones (float semitones);
   
 private:
   bool rebuild_for_blocksize (uint32_t nframes);
@@ -411,8 +419,8 @@ public:
   c_convolver () { }
   ~c_convolver () { }
 
-  bool load_ir (const float *, uint32_t, uint32_t = 0) { return false; }
-  bool load_ir_from_file (const char *, int = 0) { return false; }
+  size_t load_ir (const float *, uint32_t, uint32_t = 0) { return NB_ERROR_INTERNAL; }
+  size_t load_ir_from_file (const char *, int = 0) { return NB_ERROR_INTERNAL; }
   void clear () { }
   void reset () { }
   void clear_fft_state () { }
@@ -426,7 +434,7 @@ public:
   }
   void set_samplerate (uint32_t) { }
   void set_blocksize (uint32_t) { }
-  bool set_pitch_semitones (float) { return false; }
+  size_t set_pitch_semitones (float) { return NB_ERROR_INTERNAL; }
 };
 
 #endif
@@ -439,8 +447,8 @@ public:
   void set_blocksize (uint32_t bs);
   bool set_ir_pitch (float semitones);
 
-  bool request_load_model (const std::string &filename = "");
-  bool load_model ();
+  size_t request_load_model (const std::string &filename = "");
+  size_t load_model ();
   void unload_model ();
   void reset ();
   float calibrate (float *data, size_t sz);
@@ -479,9 +487,9 @@ public:
 
 private:
   void reset_unlocked ();
-  bool load_model_now (const std::string &filename);
-  bool load_json ( const std::string &filename);
-  bool load_nam ( const std::string &filename);
+  size_t load_model_now (const std::string &filename);
+  size_t load_json ( const std::string &filename);
+  size_t load_nam ( const std::string &filename);
   float get_block_rms (float *data, size_t sz);
   
   // model impl.
@@ -514,6 +522,9 @@ struct c_model_bank {
 // creates NB_NUM_MODELS instances of c_delayline and c_neuralamp
 class c_neuralblender {
 public:
+  using t_error_handler =
+    std::function<void (const t_neuralblender_error &)>;
+
   c_neuralblender ();
   ~c_neuralblender ();
   void set_samplerate (uint32_t sr);
@@ -526,8 +537,11 @@ public:
                    uint32_t old_mask, uint32_t new_mask,
                    uint32_t xfade_pos, uint32_t xfade_len);
   void process_block (float *in, float *out, uint32_t nframes);
-  bool load_model (_lane_bank bank, size_t which, const char *filename);
+  size_t load_model (_lane_bank bank, size_t which, const char *filename);
   bool unload_model (_lane_bank bank, size_t which);
+  void set_error_handler (t_error_handler handler);
+  void throw_error (
+    size_t code, size_t bank, size_t lane, const std::string &filename = "");
   bool set_delay_frames (_lane_bank bank, size_t which, uint32_t frames);
   bool set_delay_ms (_lane_bank bank, size_t which, float ms);
   bool set_gain_in (_lane_bank bank, size_t which, float g);
@@ -631,6 +645,7 @@ private:
   std::atomic<uint32_t> active_lane_mask  { 0 };
   std::atomic<uint32_t> pending_lane_mask { 0 };
   std::atomic<uint32_t> loaded_lane_mask  { 0 };
+  t_error_handler m_error_handler;
 
   bool xfade_active = false;
   uint32_t xfade_old_mask = 0;

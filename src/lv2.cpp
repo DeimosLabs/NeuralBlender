@@ -45,6 +45,15 @@
 #define CMDLINE_DEBUG_COLOR ANSI_DARK_RED
 #include "cmdline/debug.h"
 
+static constexpr uint32_t LV2_ERROR_QUEUE_SIZE = 16;
+static constexpr size_t LV2_ERROR_FILENAME_SIZE = 4096;
+
+struct t_lv2_error_message {
+  int32_t code = NB_ERROR_NONE;
+  int32_t bank = BANK_NONE;
+  int32_t lane = 0;
+  char filename [LV2_ERROR_FILENAME_SIZE] = {};
+};
 
 struct Plugin : public c_lv2_urids {
   // audio buffers
@@ -173,8 +182,34 @@ struct Plugin : public c_lv2_urids {
   std::atomic<float> detected_tuner_cents { 0.0f };
   std::atomic<int> spectrum_select { LV2_SPECTRUM_OFF };
   std::atomic<bool> spectrum_dirty { false };
+  t_lv2_error_message pending_errors [LV2_ERROR_QUEUE_SIZE];
+  std::atomic<uint32_t> pending_error_read { 0 };
+  std::atomic<uint32_t> pending_error_write { 0 };
+  std::atomic<bool> ui_state_requested { false };
   
 };
+
+static void queue_error (
+    Plugin *self, const t_neuralblender_error &error) {
+  if (!self || error.code == NB_ERROR_NONE)
+    return;
+
+  const uint32_t write =
+    self->pending_error_write.load (std::memory_order_relaxed);
+  const uint32_t next = (write + 1) % LV2_ERROR_QUEUE_SIZE;
+  if (next == self->pending_error_read.load (std::memory_order_acquire)) {
+    fprintf (stderr, "NeuralBlender: LV2 error queue full, dropping error %zu\n",
+             error.code);
+    return;
+  }
+
+  t_lv2_error_message &dest = self->pending_errors [write];
+  dest.code = (int32_t) error.code;
+  dest.bank = (int32_t) error.bank;
+  dest.lane = (int32_t) error.lane;
+  snprintf (dest.filename, sizeof (dest.filename), "%s", error.filename.c_str ());
+  self->pending_error_write.store (next, std::memory_order_release);
+}
 
 static bool lv2_is_model_bank (_lane_bank bank) {
   return bank == BANK_PEDAL || bank == BANK_AMP || bank == BANK_CAB;
@@ -431,7 +466,7 @@ static void loader_main (Plugin *self) { CP
       fprintf (stderr, "NeuralBlender: loading model %d:%zu: %s\n",
                (int) bank, which, path.c_str ());
 
-      if (self->blender.load_model (bank, which, path.c_str ())) {
+      if (self->blender.load_model (bank, which, path.c_str ()) == NB_ERROR_NONE) {
         self->current_model [bank] [which] = path;
         self->notify_path [bank] [which] = true;
       } else {
@@ -1147,6 +1182,35 @@ static void forge_float_notify (Plugin *self, LV2_URID property, float value) {
   lv2_atom_forge_pop (&self->forge, &frame);
 }
 
+static void forge_error_notify (
+    Plugin *self, const t_lv2_error_message &error) {
+  LV2_Atom_Forge_Frame frame;
+  LV2_Atom_Forge_Frame error_frame;
+
+  lv2_atom_forge_frame_time (&self->forge, 0);
+  lv2_atom_forge_object (
+    &self->forge, &frame, 0, self->urid_patch_Set);
+  lv2_atom_forge_key (&self->forge, self->urid_patch_property);
+  lv2_atom_forge_urid (&self->forge, self->urid_error);
+  lv2_atom_forge_key (&self->forge, self->urid_patch_value);
+  lv2_atom_forge_object (
+    &self->forge, &error_frame, 0, self->urid_error);
+  lv2_atom_forge_key (&self->forge, self->urid_error_code);
+  lv2_atom_forge_int (&self->forge, error.code);
+  lv2_atom_forge_key (&self->forge, self->urid_error_bank);
+  lv2_atom_forge_int (&self->forge, error.bank);
+  lv2_atom_forge_key (&self->forge, self->urid_error_lane);
+  lv2_atom_forge_int (&self->forge, error.lane);
+  lv2_atom_forge_key (&self->forge, self->urid_error_filename);
+  if (error.filename [0])
+    lv2_atom_forge_path (
+      &self->forge, error.filename, strlen (error.filename) + 1);
+  else
+    lv2_atom_forge_string (&self->forge, "", 1);
+  lv2_atom_forge_pop (&self->forge, &error_frame);
+  lv2_atom_forge_pop (&self->forge, &frame);
+}
+
 static bool forge_next_eq_notify (Plugin *self) {
   if (!self)
     return false;
@@ -1370,6 +1434,12 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
   }
   self->blender.meter_masterin = &self->meter_masterin;
   self->blender.meter_masterout = &self->meter_masterout;
+  self->blender.set_error_handler (
+    [self] (const t_neuralblender_error &error) {
+      if (error.code > NB_ERROR_NONE &&
+          error.bank < BANK_COUNT && error.lane < NB_NUM_MODELS)
+        queue_error (self, error);
+    });
   
   // start loader thread LAST
   self->loader_running = true;
@@ -1624,10 +1694,24 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       self->notify->atom.size);
 
     lv2_atom_forge_sequence_head (&self->forge, &frame, 0);
+
+    const uint32_t error_read =
+      self->pending_error_read.load (std::memory_order_relaxed);
+    const bool sent_error =
+      self->ui_state_requested.load (std::memory_order_acquire) &&
+      error_read != self->pending_error_write.load (std::memory_order_acquire);
+    if (sent_error) {
+      forge_error_notify (self, self->pending_errors [error_read]);
+      self->pending_error_read.store (
+        (error_read + 1) % LV2_ERROR_QUEUE_SIZE,
+        std::memory_order_release);
+    }
     
     // model loaded from UI?
     bool sent_path_notify = false;
     for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
+      if (sent_error)
+        break;
       const size_t bank = (size_t) b;
       for (i = 0; i < NB_NUM_MODELS; i++) {
         if (self->notify_path [bank] [i]) {
@@ -1647,7 +1731,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     }
 
     bool sent_bank_bypass_notify = false;
-    if (!sent_path_notify) {
+    if (!sent_error && !sent_path_notify) {
       for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
         if (self->notify_bank_bypass [bank]) {
           forge_int_notify (
@@ -1662,11 +1746,13 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     }
 
     const bool sent_eq_notify =
+      !sent_error &&
       !sent_path_notify &&
       !sent_bank_bypass_notify &&
       forge_next_eq_notify (self);
 
     const bool sent_samplerate_notify =
+      !sent_error &&
       !sent_path_notify &&
       !sent_bank_bypass_notify &&
       !sent_eq_notify &&
@@ -1678,6 +1764,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     }
 
     const bool sent_stats_notify =
+      !sent_error &&
       !sent_path_notify &&
       !sent_bank_bypass_notify &&
       !sent_eq_notify &&
@@ -1687,7 +1774,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       forge_stats_notify (self);
 
     bool sent_spectrum_notify = false;
-    if (!sent_path_notify && !sent_bank_bypass_notify && !sent_eq_notify &&
+    if (!sent_error && !sent_path_notify && !sent_bank_bypass_notify && !sent_eq_notify &&
         !sent_samplerate_notify && !sent_stats_notify &&
         self->spectrum_dirty.exchange (false, std::memory_order_acq_rel)) {
       const int selection =
@@ -1701,7 +1788,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       (uint32_t) (self->samplerate > 0.0
         ? self->samplerate / LV2_METER_FPS
         : 1600.0);
-    if (!sent_path_notify && !sent_bank_bypass_notify && !sent_eq_notify &&
+    if (!sent_error && !sent_path_notify && !sent_bank_bypass_notify && !sent_eq_notify &&
         !sent_samplerate_notify && !sent_stats_notify &&
         !sent_spectrum_notify &&
         self->meter_notify_samples >= meter_interval) {
@@ -1718,6 +1805,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       const LV2_Atom_Object *obj = (const LV2_Atom_Object *)&ev->body;
       
 	      if (obj->body.otype == self->urid_patch_Get) {
+	        self->ui_state_requested.store (true, std::memory_order_release);
 	        for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
             const size_t bank = (size_t) b;
 	          for (i = 0; i < NB_NUM_MODELS; i++)

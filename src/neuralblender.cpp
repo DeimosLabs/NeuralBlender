@@ -1163,7 +1163,7 @@ static void convolver_trim_trailing_silence (
     std::vector<float> &v,
     float threshold = db_to_gain (IR_SILENCE_THRESHOLD));
 
-static bool read_wav (const char *filename, std::vector<float> &v, int channel, int *sr) {
+static size_t read_wav (const char *filename, std::vector<float> &v, int channel, int *sr) {
   debug ("start");
   
   v.clear ();
@@ -1180,14 +1180,14 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
   if (file_is_gzipped (filename)) {
     if (!read_file_to_mem (filename, filedata)) {
       std::cerr << "NeuralBlender: Error: failed to read gzipped WAV file: " << filename << "\n";
-      return false;
+      return NB_ERROR_FILE_READ_GZIP;
     }
 
     gzip_data = c_gzip::gunzip_memory_block (
         filedata.data (), filedata.size (), &actualsize);
     if (!gzip_data) {
       std::cerr << "NeuralBlender: Error: failed to decompress WAV file: " << filename << "\n";
-      return false;
+      return NB_ERROR_FILE_FORMAT_GZIP;
     }
 
     actualdata = gzip_data;
@@ -1198,7 +1198,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
     if (!f) {
       std::cerr << "NeuralBlender: Error: failed to open gzipped WAV file: " << filename << "\n";
       free (gzip_data);
-      return false;
+      return NB_ERROR_FILE_FORMAT_GZIP;
     }
   }
 
@@ -1208,7 +1208,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
 
   if (!f) {
     std::cerr << "NeuralBlender: Error: failed to open WAV file: " << filename << "\n";
-    return false;
+    return NB_ERROR_FILE_FORMAT_WAV;
   }
   
   if (sr) *sr = info.samplerate;
@@ -1222,7 +1222,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
     if (gzip_data)
       free (gzip_data);
 #endif
-    return false;
+    return NB_ERROR_FILE_SUBFORMAT_WAV;
   }
 
   if (channel < 0 || channel >= chans) {
@@ -1232,7 +1232,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
     if (gzip_data)
       free (gzip_data);
 #endif
-    return false;
+    return NB_ERROR_FILE_SUBFORMAT_WAV;
   }
 
   const double seconds =
@@ -1246,7 +1246,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
     if (gzip_data)
       free (gzip_data);
 #endif
-    return false;
+    return NB_ERROR_FILE_SIZE;
   }
   
   try {
@@ -1258,7 +1258,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
     if (gzip_data)
       free (gzip_data);
 #endif
-    return false;
+    return NB_ERROR_MEMORY;
   }
 
   std::vector<float> buf;
@@ -1271,7 +1271,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
     if (gzip_data)
       free (gzip_data);
 #endif
-    return false;
+    return NB_ERROR_MEMORY;
   }
 
   sf_count_t readframes = 0;
@@ -1293,7 +1293,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
         free (gzip_data);
 #endif
       v.clear ();
-      return false;
+      return NB_ERROR_MEMORY;
     }
 
     readframes += got;
@@ -1307,7 +1307,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
 
   if (readframes <= 0) {
     std::cerr << "NeuralBlender: Error: no samples read from " << filename << "\n";
-    return false;
+    return NB_ERROR_FILE_SIZE;
   }
   
   size_t s1 = v.size ();
@@ -1319,7 +1319,7 @@ static bool read_wav (const char *filename, std::vector<float> &v, int channel, 
               << s1 - s2 << " smp. silence, remaining " << s2 << "\n";
   //}
   
-  return true;
+  return NB_ERROR_NONE;
 }
 
 c_convolver::c_convolver () { CP }
@@ -1429,13 +1429,13 @@ static bool convolver_resample_ir (
   return !dst.empty ();
 }
 
-bool c_convolver::load_ir (
+size_t c_convolver::load_ir (
     const float *ir,
     uint32_t nframes,
     uint32_t samplerate) { CP
 
   if (!ir || nframes == 0)
-    return false;
+    return NB_ERROR_FILE_FORMAT_WAV;
 
   // keep canonical copy for pitch/blocksize rebuilds
   m_ir_source.assign (ir, ir + nframes);
@@ -1448,12 +1448,12 @@ bool c_convolver::load_ir (
 
   if (m_ir_source.empty ()) {
     clear ();
-    return false;
+    return NB_ERROR_FILE_EMPTY;
   }
 
   if (!rebuild_resampled_ir ()) {
     clear ();
-    return false;
+    return NB_ERROR_CONVOLVER;
   }
 
   m_loaded = true;
@@ -1463,22 +1463,23 @@ bool c_convolver::load_ir (
   if (m_blocksize > 0) {
     if (!rebuild_for_blocksize (m_blocksize)) {
       m_ready = false;
-      return false;
+      return NB_ERROR_CONVOLVER;
     }
   }
 
-  return true;
+  return NB_ERROR_NONE;
 }
 
-bool c_convolver::load_ir_from_file (const char *filename, int channel) {
+size_t c_convolver::load_ir_from_file (const char *filename, int channel) {
   if (!filename || !filename [0])
-    return false;
+    return NB_ERROR_FILE_NOTFOUND_WAV;
 
   std::vector<float> ir;
   int sr = 0;
 
-  if (!read_wav (filename, ir, channel, &sr))
-    return false;
+  size_t ret = read_wav (filename, ir, channel, &sr);
+  if (ret != NB_ERROR_NONE)
+    return ret;
 
   return load_ir (ir.data (), (uint32_t) ir.size (), (uint32_t) sr);
 }
@@ -1539,23 +1540,23 @@ void c_convolver::set_blocksize (uint32_t nframes) {
     rebuild_for_blocksize (m_blocksize);
 }
 
-bool c_convolver::set_pitch_semitones (float semitones) {
+size_t c_convolver::set_pitch_semitones (float semitones) {
   semitones = std::clamp (semitones, -12.0f, 12.0f);
   if (semitones == m_pitch_semitones)
-    return true;
+    return NB_ERROR_NONE;
 
   m_pitch_semitones = semitones;
   if (!m_loaded)
-    return true;
+    return NB_ERROR_NONE;
 
   if (!rebuild_resampled_ir ())
-    return false;
+    return NB_ERROR_CONVOLVER;
 
   if (m_blocksize > 0)
-    return rebuild_for_blocksize (m_blocksize);
+    return rebuild_for_blocksize (m_blocksize) ? NB_ERROR_NONE : NB_ERROR_CONVOLVER;
 
   m_ready = false;
-  return true;
+  return NB_ERROR_NONE;
 }
 
 void c_convolver::clear_fft_state () { CP
@@ -1980,7 +1981,7 @@ bool c_neuralamp::set_ir_pitch (float semitones) {
   if (m_engine_mode != ENGINE_IR)
     return true;
 
-  const bool ret = m_convolver.set_pitch_semitones (ir_pitch_semitones);
+  const bool ret = (m_convolver.set_pitch_semitones (ir_pitch_semitones) == NB_ERROR_NONE);
   if (ret) {
     reset_unlocked ();
     ramp_pos = 0;
@@ -2008,7 +2009,7 @@ std::string c_neuralamp::model_filename () const {
   }
 }
 
-bool c_neuralamp::load_nam (const std::string &fn) { CP
+size_t c_neuralamp::load_nam (const std::string &fn) { CP
   bool a2 = false;
   if (nam_file_is_a2 (fn))
     a2 = true;
@@ -2021,7 +2022,7 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
       std::string temp_fn;
       if (!gunzip_file_to_temp (fn, ".nam", temp_fn)) {
         fprintf (stderr, "NeuralBlender: Failed to decompress NAM model: %s\n", fn.c_str ());
-        return false;
+        return NB_ERROR_FILE_READ_GZIP;
       }
 
       try {
@@ -2040,7 +2041,7 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
       fprintf (stderr,
               "NeuralBlender: NAM loader returned null: %s\n",
               fn.c_str ());
-      return false;
+      return NB_ERROR_FILE_READ_NAM;
     }
 
     new_model->Reset (static_cast<double> (samplerate), MAX_BLOCK_SIZE); // revisit later
@@ -2054,7 +2055,7 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
       m_engine_mode = ENGINE_NAM_A2;
     else
       m_engine_mode = ENGINE_NAM_A1;
-    return true;
+    return NB_ERROR_NONE;
   }
   catch (const std::exception &e)
   {
@@ -2063,11 +2064,11 @@ bool c_neuralamp::load_nam (const std::string &fn) { CP
             fn.c_str (),
             e.what ());
 
-    return false;
+    return NB_ERROR_FILE_READ_NAM;
   }
 }
 
-bool c_neuralamp::load_json (const std::string &fn) { CP
+size_t c_neuralamp::load_json (const std::string &fn) { CP
   try {
     std::unique_ptr<RTNeural::Model<float>> new_model;
 #ifdef HAVE_GZIP
@@ -2075,7 +2076,7 @@ bool c_neuralamp::load_json (const std::string &fn) { CP
       nlohmann::json model_json;
       if (!read_gzipped_json_file (fn, model_json)) {
         fprintf (stderr, "NeuralBlender: Failed to decompress model file: %s\n", fn.c_str ());
-        return false;
+        return NB_ERROR_FILE_READ_GZIP;
       }
 
       new_model = RTNeural::json_parser::parseJson<float>(model_json);
@@ -2085,7 +2086,7 @@ bool c_neuralamp::load_json (const std::string &fn) { CP
       std::ifstream file (fn);
       if (!file.is_open ()) {
         fprintf (stderr, "NeuralBlender: Could not open model file: %s\n", fn.c_str ());
-        return false;
+        return NB_ERROR_FILE_READ_JSON;
       }
 
       new_model = RTNeural::json_parser::parseJson<float>(file);
@@ -2093,7 +2094,7 @@ bool c_neuralamp::load_json (const std::string &fn) { CP
 
     if (!new_model) {
       fprintf (stderr, "NeuralBlender: RTNeural parser returned null: %s\n", fn.c_str ());
-      return false;
+      return NB_ERROR_FILE_FORMAT_JSON;
     }
 
     new_model->reset ();
@@ -2102,27 +2103,27 @@ bool c_neuralamp::load_json (const std::string &fn) { CP
     m_engine_mode = ENGINE_JSON;
 
     fprintf (stderr, "NeuralBlender: Loaded model: %s\n", fn.c_str ());
-    return true;
+    return NB_ERROR_NONE;
   }
   catch (const std::exception &e) {
     fprintf (stderr, "NeuralBlender: RTNeural load failed for %s: %s\n",
             fn.c_str (), e.what ());
-    return false;
+    return NB_ERROR_FILE_READ_JSON;
   }
 }
 
-bool c_neuralamp::request_load_model (const std::string &fn) { CP
+size_t c_neuralamp::request_load_model (const std::string &fn) { CP
   const std::string load_fn = fn.empty () ? model_filename () : fn;
 
   if (load_fn.empty ()) {
     fprintf (stderr, "NeuralBlender: No model filename specified\n");
-    return false;
+    return NB_ERROR_FILE_NOTFOUND_NAM;
   }
 
   if (!is_supported_model_path (load_fn)) {
     fprintf (stderr, "NeuralBlender: Unsupported model file type: %s\n", load_fn.c_str ());
     unload_model ();
-    return false;
+    return NB_ERROR_FILE_FORMAT_NAM;
   }
 
   {
@@ -2134,14 +2135,14 @@ bool c_neuralamp::request_load_model (const std::string &fn) { CP
   ramp_len = xfade_samples_for_rate (samplerate);
   ramp.store (loaded () ? RAMP_START : RAMP_LOADING,
               std::memory_order_release);
-  return true;
+  return NB_ERROR_NONE;
 }
 
 bool c_neuralamp::ready_to_load () {
   return ramp.load (std::memory_order_acquire) == RAMP_LOADING;
 }
 
-bool c_neuralamp::load_model () { CP
+size_t c_neuralamp::load_model () { CP
   std::string load_fn;
   {
     std::lock_guard<std::mutex> lock (pending_mutex);
@@ -2152,22 +2153,22 @@ bool c_neuralamp::load_model () { CP
   return load_model_now (load_fn);
 }
 
-bool c_neuralamp::load_model_now (const std::string &load_fn) { CP
+size_t c_neuralamp::load_model_now (const std::string &load_fn) { CP
   if (load_fn.empty ()) {
     fprintf (stderr, "NeuralBlender: No model filename specified\n");
-    return false;
+    return NB_ERROR_FILE_NOTFOUND_NAM;
   }
 
   if (!is_supported_model_path (load_fn)) {
     fprintf (stderr, "NeuralBlender: Unsupported model file type: %s\n", load_fn.c_str ());
     unload_model ();
-    return false;
+    return NB_ERROR_FILENAME_NAM;
   }
 
   std::lock_guard<std::mutex> lock (model_mutex);
   m_loaded.store (false, std::memory_order_release);
 
-  bool ret = false;
+  size_t ret = NB_ERROR_NONE;
   if (ends_with (load_fn, ".nam")
 #ifdef HAVE_GZIP
       || ends_with (load_fn, ".nam.gz")
@@ -2186,12 +2187,12 @@ bool c_neuralamp::load_model_now (const std::string &load_fn) { CP
     if (blocksize > 0)
       m_convolver.set_blocksize (blocksize);
     ret = m_convolver.load_ir_from_file (load_fn.c_str (), 0);
-    if (ret)
+    if (ret == NB_ERROR_NONE)
       m_engine_mode = ENGINE_IR;
   } else
     ret = load_json (load_fn);
 
-  if (ret) {
+  if (ret == NB_ERROR_NONE) {
     filename = load_fn;
     m_loaded.store (true, std::memory_order_release);
     reset_unlocked ();
@@ -3051,7 +3052,8 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
 }
 
 bool c_neuralblender::set_state (const c_neuralblender_state &state) {
-  bool ret = true;
+  size_t ret = NB_ERROR_NONE;
+  bool ok = true;
 
   set_bypass (state.bypass);
   set_pedal_bypass (state.pedal_bypass);
@@ -3065,20 +3067,35 @@ bool c_neuralblender::set_state (const c_neuralblender_state &state) {
   tuner_base_freq = state.tuner_base_freq;
   calib_source = state.calib_source;
 
-  ret &= set_master_gain (state.master_gain_db);
-  ret &= set_presence (state.presence);
-  ret &= set_calib_target_db (state.calib_target_db);
+  const auto check_err = [this, &ret] (
+      size_t r, size_t bank = (size_t) -1, size_t lane = (size_t) -1) {
+    if (r == NB_ERROR_NONE)
+      return true;
+
+    if (ret == NB_ERROR_NONE)
+      ret = r;
+    //throw_error (r, bank, lane);
+    return false;
+  };
+  const auto check_err_bool = [&check_err] (
+      bool b, size_t bank = (size_t) -1, size_t lane = (size_t) -1) {
+    return check_err (b ? NB_ERROR_NONE : NB_ERROR_STATE, bank, lane);
+  };
+
+  ok &= set_master_gain (state.master_gain_db);
+  ok &= set_presence (state.presence);
+  ok &= set_calib_target_db (state.calib_target_db);
   noisegate.set_threshold (state.noisethresh);
   noisegate.set_attack (state.noiseattack);
   noisegate.set_hold (state.noisehold);
   noisegate.set_release (state.noiserelease);
 
-  const auto apply_eq = [this, &ret] (
+  const auto apply_eq = [this, &ok, &check_err_bool] (
       _lane_bank bank, const c_eq_state &eq_state) {
-    ret &= set_eq_bypass (bank, !eq_state.on);
-    ret &= set_eq_master_gain_db (bank, eq_state.master_gain_db);
-    for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
-      ret &= set_eq_band (
+    ok &= set_eq_bypass (bank, !eq_state.on);
+    ok &= set_eq_master_gain_db (bank, eq_state.master_gain_db);
+    for (size_t band = 0; band < EQ_NUM_BANDS; band++) {
+      ok &= check_err_bool (set_eq_band (
         bank,
         band,
         eq_state.enabled [band],
@@ -3086,7 +3103,7 @@ bool c_neuralblender::set_state (const c_neuralblender_state &state) {
         eq_state.slope [band],
         eq_state.freq [band],
         eq_state.gain_db [band],
-        eq_state.q [band]);
+        eq_state.q [band]));
     }
   };
   apply_eq (BANK_EQPRE, state.eqpre);
@@ -3098,33 +3115,45 @@ bool c_neuralblender::set_state (const c_neuralblender_state &state) {
   for (_lane_bank bank : model_banks) {
     const c_neuralblender_bank_state &bank_state = state.banks [bank];
     banks [bank].linked_calib = bank_state.linked_calib;
-    ret &= set_exclusive_lane (bank, bank_state.exclusive_lane);
+    ok &= set_exclusive_lane (bank, bank_state.exclusive_lane);
 
     for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
       const c_neuralblender_lane_state &lane_state = bank_state.lanes [lane];
-      ret &= set_gain_in (bank, lane, lane_state.gain_in);
-      ret &= set_gain_out (bank, lane, lane_state.gain_out);
-      ret &= set_dry_out (bank, lane, lane_state.dry_out);
-      ret &= dcflip (bank, lane, lane_state.dcflip);
-      ret &= calib_on (bank, lane, lane_state.do_calib);
+      ok &= check_err_bool (
+        set_gain_in (bank, lane, lane_state.gain_in), bank, lane);
+      ok &= check_err_bool (
+        set_gain_out (bank, lane, lane_state.gain_out), bank, lane);
+      ok &= check_err_bool (
+        set_dry_out (bank, lane, lane_state.dry_out), bank, lane);
+      ok &= check_err_bool (
+        dcflip (bank, lane, lane_state.dcflip), bank, lane);
+      ok &= check_err_bool (
+        calib_on (bank, lane, lane_state.do_calib), bank, lane);
 
       if (lane_state.filename.empty ()) {
         if (which_amp (bank, lane).loaded ())
-          ret &= unload_model (bank, lane);
+          ok &= unload_model (bank, lane);
       } else if (!which_amp (bank, lane).loaded () ||
                  which_amp (bank, lane).model_filename () != lane_state.filename) {
-        ret &= load_model (bank, lane, lane_state.filename.c_str ());
+        ok &= check_err (load_model (bank, lane, lane_state.filename.c_str ()),
+                         bank, lane);
       }
 
-      ret &= set_ir_pitch (bank, lane, lane_state.ir_pitch_semitones);
-      ret &= set_delay_ms (bank, lane, lane_state.delay_ms);
-      ret &= set_lane_mute (bank, lane, lane_state.lane_mute);
+      ok &= check_err_bool (
+        set_ir_pitch (bank, lane, lane_state.ir_pitch_semitones), bank, lane);
+      ok &= check_err_bool (
+        set_delay_ms (bank, lane, lane_state.delay_ms), bank, lane);
+      ok &= check_err_bool (
+        set_lane_mute (bank, lane, lane_state.lane_mute), bank, lane);
     }
   }
 
+  if (ret == NB_ERROR_NONE && !ok)
+    ret = NB_ERROR_INTERNAL;
+
   linked_calib = banks [BANK_AMP].linked_calib;
   update_effective_trim ();
-  return ret;
+  return ret == NB_ERROR_NONE && ok;
 }
 
 void c_neuralblender::update_mutes () {
@@ -3169,19 +3198,25 @@ bool c_neuralblender::set_calib_target_db (float f) { CP
   return ret;
 }
 
-bool c_neuralblender::load_model (_lane_bank bank, size_t which, const char *fn) { CP
+size_t c_neuralblender::load_model (_lane_bank bank, size_t which, const char *fn) { CP
   if (which >= NB_NUM_MODELS) {
     debug ("which >= %d", NB_NUM_MODELS);
-    return false;
+    return NB_ERROR_INTERNAL;
+  }
+  
+  if (bank != BANK_PEDAL && bank != BANK_AMP && bank != BANK_CAB) {
+    debug ("bank=%d out of range", (int) bank);
+    return NB_ERROR_INTERNAL;
   }
 
   c_neuralamp &amp = which_amp (bank, which);
   debug ("LOAD MODEL, block %ld", (long int) amp.block_counter);
 
-  const bool requested = amp.request_load_model (fn);
-  if (!requested) {
+  const size_t requested = amp.request_load_model (fn);
+  if (requested != NB_ERROR_NONE) {
     update_mutes ();
-    return false;
+    throw_error (requested, (size_t) bank, which, fn ? fn : "");
+    return requested;
   }
 
   int wait_ms = 0;
@@ -3193,7 +3228,7 @@ bool c_neuralblender::load_model (_lane_bank bank, size_t which, const char *fn)
   if (!amp.ready_to_load ())
     amp.ramp.store (RAMP_LOADING, std::memory_order_release);
 
-  const bool ret = amp.load_model ();
+  const size_t ret = amp.load_model ();
 
   int bf = 0;
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
@@ -3203,7 +3238,33 @@ bool c_neuralblender::load_model (_lane_bank bank, size_t which, const char *fn)
 
   debug ("mute bitfield 0x%02x", bf);
   update_mutes ();
+  if (ret != NB_ERROR_NONE) {
+    /*const std::string path = fn ? fn : "";
+    const size_t code = ends_with (path, ".wav") || ends_with (path, ".wav.gz")
+      ? NB_ERROR_FILENAME_WAV
+      : NB_ERROR_FILENAME_NAM;*/
+    throw_error (ret, (size_t) bank, which, fn ? fn : "");
+  }
   return ret;
+}
+
+void c_neuralblender::set_error_handler (t_error_handler handler) {
+  m_error_handler = std::move (handler);
+}
+
+void c_neuralblender::throw_error (
+    size_t code, size_t bank, size_t lane, const std::string &filename) {
+  if (code == NB_ERROR_NONE || bank >= BANK_COUNT || lane >= NB_NUM_MODELS)
+    return;
+
+  if (m_error_handler) {
+    t_neuralblender_error error;
+    error.code = code;
+    error.bank = bank;
+    error.lane = lane;
+    error.filename = filename;
+    m_error_handler (error);
+  }
 }
 
 bool c_neuralblender::unload_model (_lane_bank bank, size_t which) { CP

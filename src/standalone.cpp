@@ -29,6 +29,8 @@
 
 #ifdef HAVE_GUI
 #include <atomic>
+#include <deque>
+#include <mutex>
 #include <thread>
 #include "ui.h"
 #endif
@@ -139,8 +141,13 @@ public:
   void apply_effective_controls () override;
   bool set_dsp_state (const c_neuralblender_state &src) override;
   void get_dsp_state (c_neuralblender_state &dest) override;
+  void queue_error (const t_neuralblender_error &error);
   int idle () override;
   _lane_bank spectrum_bank = BANK_COUNT;
+
+private:
+  std::mutex pending_error_mutex;
+  std::deque<t_neuralblender_error> pending_errors;
 };
 
 static void refresh_bank_stats (c_neuralblender_ui *ui, _lane_bank bank);
@@ -154,14 +161,19 @@ bool c_standalone_ui::set_dsp_state (
   return blender && blender->set_state (src);
 }
 
+void c_standalone_ui::queue_error (const t_neuralblender_error &error) {
+  std::lock_guard<std::mutex> lock (pending_error_mutex);
+  pending_errors.push_back (error);
+}
+
 bool c_standalone_ui::load_model (
     _lane_bank bank, size_t which, const char *filename) {
   debug ("bank=%d, which=%d, filename='%s'",
          (int) bank, (int) which, filename);
-  if (bank < BANK_PEDAL || bank >= BANK_COUNT)
+  if (bank != BANK_PEDAL && bank != BANK_AMP && bank != BANK_CAB)
     bank = BANK_AMP;
 
-  const bool loaded = blender->load_model (bank, which, filename);
+  const bool loaded = (blender->load_model (bank, which, filename) == NB_ERROR_NONE);
   if (which < NB_NUM_MODELS) {
     state.banks [bank].lanes [which].loaded = loaded;
     state.banks [bank].lanes [which].filename =
@@ -485,6 +497,19 @@ void c_standalone_ui::apply_effective_controls () {
 }
 
 int c_standalone_ui::idle () {
+  t_neuralblender_error error;
+  bool have_error = false;
+  if (!nbtk_app.dialog_visible ()) {
+    std::lock_guard<std::mutex> lock (pending_error_mutex);
+    if (!pending_errors.empty ()) {
+      error = std::move (pending_errors.front ());
+      pending_errors.pop_front ();
+      have_error = true;
+    }
+  }
+  if (have_error)
+    handle_error (error);
+
   if (g_blender->tuner_on)
     g_blender->pitchtracker.analyze ();
 
@@ -593,6 +618,7 @@ static void ui_main () {
     usleep (16777);
   }
   CP
+  g_blender->set_error_handler ({});
   g_running = false;
   //exit (0);
 }
@@ -660,6 +686,11 @@ int main (int argc, char **argv) {
 
 #ifdef HAVE_GUI
   g_ui = new c_standalone_ui (g_blender);
+  g_blender->set_error_handler (
+    [] (const t_neuralblender_error &error) {
+      if (g_ui)
+        g_ui->queue_error (error);
+    });
 #endif
 
 #ifndef HAVE_GUI

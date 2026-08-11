@@ -414,6 +414,7 @@ public:
   void update_model_cwd (std::string path);
   void update_ir_cwd (std::string path);
   void update_preset_cwd (std::string path);
+  void handle_error (const t_neuralblender_error &error);
 
   void set_lane_mute (_lane_bank bank, size_t which, bool b);
   void set_lane_mute (size_t which, bool b);
@@ -496,8 +497,8 @@ public:
           void sync_page_visibility ()                                  ;
           void ensure_tuner_created ()                                  ;
           void sync_tuner_visibility ()                                 ;
-	          void sync_eq_graph_highlight ()                               ;
-	          void sync_eq_graph_highlight (nbtk::c_widget *hovered)        ;
+          void sync_eq_graph_highlight ()                               ;
+          void sync_eq_graph_highlight (nbtk::c_widget *hovered)        ;
   virtual void on_window_resize (int w, int h)                          ;
           void on_window_configured ()                                  ;
   virtual bool request_window_size (int w, int h)                       ;

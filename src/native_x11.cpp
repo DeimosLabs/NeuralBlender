@@ -319,6 +319,17 @@ public:
           CurrentTime);
   }
 
+  bool has_keyboard_focus (t_native_handle handle) const override {
+    nbtk::t_native_widget *widget = as_native_widget (handle);
+    if (!widget || !widget->app || !widget->app->dpy || !widget->widget)
+      return false;
+
+    Window focused = None;
+    int revert_to = RevertToNone;
+    XGetInputFocus (widget->app->dpy, &focused, &revert_to);
+    return focused == widget->widget;
+  }
+
   t_native_window root_window (t_native_handle handle, bool is_widget) const override {
     nbtk::t_native_widget *widget = as_native_widget (handle);
     if (!widget || !widget->app)

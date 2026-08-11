@@ -84,11 +84,11 @@ static bool is_supported_model_filename_lower (const std::string &lower) {
          filename_ends_with (lower, ".json.gz") ||
 #endif
          filename_ends_with (lower, ".aidax") ||
-         filename_ends_with (lower, ".wav");
 #ifdef HAVE_GZIP
-         filename_ends_with (lower, ".aidax") ||
-         filename_ends_with (lower, ".wav.gz");
+         filename_ends_with (lower, ".aidax.gz") ||
+         filename_ends_with (lower, ".wav.gz") ||
 #endif
+         filename_ends_with (lower, ".wav");
 }
 
 bool is_supported_model_filename (const std::string &path) {
@@ -108,6 +108,13 @@ static const char *ui_model_filter () {
 
 static const char *ui_wav_filter () {
   return UI_GZIP_SUFFIX ("*.wav");
+}
+
+static inline bool is_model_bank (size_t bank) {
+  if (bank == BANK_PEDAL || bank == BANK_AMP || bank == BANK_CAB)
+    return true;
+  
+  return false;
 }
 
 static bool parse_config_float (const std::string &s, float &value) {
@@ -599,7 +606,7 @@ void c_neuralblender_filepicker::on_file_select (
   if (!ui || filename.empty ())
     return;
 
-  const _lane_bank bank_ = bank < BANK_COUNT ? (_lane_bank) bank : BANK_AMP;
+  const _lane_bank bank_ = is_model_bank (bank) ? (_lane_bank) bank : BANK_AMP;
   if (lane >= NB_NUM_MODELS)
     return;
 
@@ -607,10 +614,11 @@ void c_neuralblender_filepicker::on_file_select (
   if (!current_dir.empty ())
     ui->configfile.set_item (cwd_config_key_for_bank_ui (bank_), current_dir);
 
-  ui->state.banks [bank_].lanes [lane].filename = filename;
-  ui->state.current_dir = current_dir;
   scan_current_dir ();
-  ui->load_model (bank_, lane, filename.c_str ());
+  if (ui->load_model (bank_, lane, filename.c_str ())) {
+    ui->state.banks [bank_].lanes [lane].filename = filename;
+    ui->state.current_dir = current_dir;
+  }
 
   nbtk::c_combobox *cb = &ui->lanes_for_bank (bank_) [lane].cb_list;
   cb->clear ();
@@ -750,8 +758,11 @@ void c_lane_widgets::on_action (nbtk::t_action_event &event) {
       fullpath += '/';
     fullpath += cb_list.items [x];
 
-    const _lane_bank bank = bank_id < BANK_COUNT ? (_lane_bank) bank_id : BANK_AMP;
-    ui->load_model (bank, lane_id, fullpath.c_str ());
+    const _lane_bank bank = is_model_bank (bank_id) ? (_lane_bank) bank_id : BANK_AMP;
+    if (!ui->load_model (bank, lane_id, fullpath.c_str ())) {
+      cb_list.clear ();
+      filepicker.add_files_from_dir (&cb_list);
+    }
   }
 }
 
@@ -2913,7 +2924,7 @@ void c_neuralblender_ui::on_command (nbtk::t_command_event &event) {
       event.handled = true;
       if (event.result == nbtk::_command_result::accepted &&
           event.source &&
-          event.source->bank < BANK_COUNT &&
+          is_model_bank (event.source->bank) &&
           event.source->lane < NB_NUM_MODELS) {
         const _lane_bank bank = (_lane_bank) event.source->bank;
         c_lane_widgets *lanes = lanes_for_bank (bank);
@@ -3414,6 +3425,122 @@ int c_neuralblender_ui::idle () {
   //fps.tick ();
 
   return 0;
+}
+
+void c_neuralblender_ui::handle_error (const t_neuralblender_error &error) {
+  size_t code = error.code;
+  const size_t bank = error.bank;
+  const size_t lane = error.lane;
+  debug ("code=%d, bank=%d, lane=%d", (int) code, (int) bank, (int) lane);
+  if (bank >= BANK_COUNT || lane >= NB_MAX_LANES || code == NB_ERROR_NONE)
+    return;
+  
+  std::string msg = "Unknown/internal error";
+  std::string bankname;
+  const std::string &filename = error.filename;
+  std::string lanename = "#" + std::to_string (lane + 1);
+  bool done = false;
+  
+  struct stat st;
+  if (stat (filename.c_str (), &st)) {
+    switch (errno) {
+      case ENOENT:
+        code = NB_ERROR_FILE_NOTFOUND;
+      break;
+
+      default:
+        code = NB_ERROR_FILE_OTHER;
+      break;
+    }
+  }
+  
+  switch (bank) {
+    case BANK_PEDAL: CP  bankname = "pedal ";    break;
+    case BANK_AMP:   CP  bankname = "amp ";      break;
+    case BANK_CAB:   CP  bankname = "cab ";      break;
+  }
+  
+  struct {
+    int64_t code;
+    std::string str;
+  } codetable [] = {
+    { NB_ERROR_INTERNAL,  "Internal error" },
+    { NB_ERROR_MEMORY,    "Memory error" },
+    { NB_ERROR_CONVOLVER, "Convolver error" },
+    { NB_ERROR_STATE,     "Error restoring state" },
+    { NB_ERROR_NONE,      "" }
+  };
+  CP
+  std::string info = " (" + bankname + lanename + ")\n" + filename;
+  
+  for (int i = 0; codetable [i].code != NB_ERROR_NONE; i++) {
+    if (code == codetable [i].code) {
+      msg = codetable [i].str;
+      done = true;
+    }
+  }
+  
+  if (!done) {
+    switch (code) {
+      case NB_ERROR_FILE_NOTFOUND:
+      case NB_ERROR_FILE_NOTFOUND_NAM:
+      case NB_ERROR_FILE_NOTFOUND_WAV:
+        msg = "Can't find file" + info;
+      break;
+      
+      case NB_ERROR_FILE_READ_NAM:
+      case NB_ERROR_FILE_READ_JSON:
+      case NB_ERROR_FILE_READ_WAV:
+      case NB_ERROR_FILE_READ_GZIP:
+        msg = "Can't read file" + info;
+      break;
+      
+      case NB_ERROR_FILENAME_WAV:
+      case NB_ERROR_FILENAME_NAM:
+      case NB_ERROR_FILENAME_GZIP:
+        msg = "Unsupported file type" + info;
+      break;
+      
+      case NB_ERROR_FILE_FORMAT_GZIP:
+        msg = "Can't unzip compressed file" + info;
+      break;
+      
+      case NB_ERROR_FILE_FORMAT_NAM:
+      case NB_ERROR_FILE_FORMAT_JSON:
+        msg = "Format error / invalid model file:" + info;
+      break;
+      
+      case NB_ERROR_FILE_FORMAT_WAV:
+        msg = "Format error / invald wav file:" + info;
+      break;
+      
+      case NB_ERROR_FILE_SUBFORMAT_NAM:
+        msg = "Unsupported NAM/JSON file type:" + info;
+      break;
+      
+      case NB_ERROR_FILE_SUBFORMAT_WAV:
+        msg = "Wav file has unsupported sample format:" + info;
+      break;
+      
+      case NB_ERROR_FILE_EMPTY:
+        msg = "Empty file:" + info;
+      break;
+      
+      case NB_ERROR_FILE_SIZE:
+        msg = "File too large, " + std::to_string (st.st_size) + " bytes" + info;
+      break;
+      
+      case NB_ERROR_FILE_OTHER:
+        msg = "Unknown file error, " + info;
+      break;
+      
+      default:
+        msg = "Unknown error %ld, bank=%d, lane=%d", code, (int) bank, (int) lane;
+      break;
+    }
+  }
+  
+  nbtk_app.show_message ("NeuralBlender error", msg);
 }
 
 void c_neuralblender_ui::draw () {

@@ -818,6 +818,7 @@ public:
   virtual void on_event (t_event &event);
   virtual void on_action (t_action_event &event);
   virtual void on_command (t_command_event &event);
+  virtual  bool dialog_visible ();
 
   template <class T>
   T *create_widget (
@@ -916,6 +917,7 @@ public:
   virtual void move_resize (t_native_handle widget, int x, int y, int w, int h) = 0;
   virtual void set_mouse_cursor (t_native_handle widget, _mouse_cursor cursor) = 0;
   virtual void set_keyboard_focus (t_native_handle widget) = 0;
+  virtual bool has_keyboard_focus (t_native_handle widget) const = 0;
   virtual t_native_window root_window (t_native_handle widget, bool is_widget) const = 0;
   virtual t_point root_to_screen (t_native_handle widget, t_point p) const = 0;
   virtual t_point screen_to_root (t_native_handle widget, t_point p) const = 0;
@@ -1328,6 +1330,8 @@ public:
   void set_icon_from_png (const unsigned char *png);
   bool request_size (int w, int h);
   bool is_created () const;
+  bool is_visible () const;
+  bool has_focus () const;
   nbtk::t_native_handle native_handle () const;
   bool get_metrics (int *w, int *h, bool *visible = nullptr) const;
   void force_draw ();
@@ -1420,7 +1424,30 @@ private:
   int buffer_surface_h = 0;
 };
 
-class c_askstring_dialog : public c_toplevelwindow {
+class c_ask_dialog : public c_toplevelwindow {
+public:
+  static constexpr size_t MAX_MESSAGE_LINES = 8;
+
+  bool create (
+      c_app *app,
+      t_native_window parent,
+      t_native_handle owner,
+      const char *title,
+      int height);
+  bool is_active () const;
+  void on_resize () override;
+
+protected:
+  void set_message (const std::string &message);
+  void layout_message (int x, int y, int w, int h);
+
+  c_frame frame;
+  c_label message_labels [MAX_MESSAGE_LINES];
+  size_t message_line_count = 0;
+  bool active = false;
+};
+
+class c_askstring_dialog : public c_ask_dialog {
 public:
   bool create (
       c_app *app,
@@ -1443,14 +1470,12 @@ private:
 
   c_widget *response_target = nullptr;
   int64_t response_command = NBTK_CMD_NONE;
-  c_frame frame;
-  c_label label_prompt;
   c_textbox textbox;
   c_button btn_ok;
   c_button btn_cancel;
 };
 
-class c_askyesno_dialog : public c_toplevelwindow {
+class c_askyesno_dialog : public c_ask_dialog {
 public:
   bool create (
       c_app *app,
@@ -1474,8 +1499,6 @@ private:
 
   c_widget *response_target = nullptr;
   int64_t response_command = NBTK_CMD_NONE;
-  c_frame frame;
-  c_label label_question;
   c_button btn_yes;
   c_button btn_no;
   c_button btn_cancel;
