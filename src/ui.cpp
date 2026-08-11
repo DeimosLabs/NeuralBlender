@@ -1621,7 +1621,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   menu_presets = menubar.add_menu ("Presets");
   menu_misc = menubar.add_menu ("Misc");
   menu_presets->add_item ("Load...", CMD_LOAD_PRESET);
-  menu_presets->add_item ("Save...", CMD_SAVE_PRESET);
+  menu_presets->add_item ("Save as...", CMD_SAVE_PRESET);
 #ifndef LV2
   menu_presets->add_item ("Quit", CMD_QUIT);
 #else

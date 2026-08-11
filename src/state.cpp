@@ -856,7 +856,7 @@ void c_neuralblender_state::to_strings (std::vector<std::string> &v) {
     add_string (name, std::to_string (value));
   };
 
-  add_string ("current_dir", current_dir);
+  //add_string ("current_dir", current_dir);
   add_bool ("bypass", bypass);
   add_bool ("pedal_bypass", pedal_bypass);
   add_bool ("eqpre_bypass", !eqpre.on);
