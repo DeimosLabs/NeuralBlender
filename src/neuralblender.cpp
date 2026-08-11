@@ -653,7 +653,7 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
   if (mode_ != EQ_KEEP)
     mode = std::clamp (mode_, EQ_OFF, EQ_LOWPASS);
   
-  freq = std::clamp (freq, 20.0f, samplerate * 0.45f);
+  freq = std::clamp (freq, NB_FREQ_MIN, samplerate * 0.45f);
   q = std::clamp (q, 0.05f, 100.0f);
   
   const float pi = 3.14159265358979323846f;
@@ -870,7 +870,7 @@ void c_eq::set_band (int band_,
   if (b < 0 || b >= EQ_NUM_BANDS)
     return;
   
-  const float next_freq = std::clamp (freq_, 20.0f, 20000.0f);
+  const float next_freq = std::clamp (freq_, NB_FREQ_MIN, NB_FREQ_MAX);
   const float next_gain_db = std::clamp (gain_db_, -36.0f, +36.0f);
   const float next_q = std::clamp (q_, 0.01f, 100.0f);
   const int next_slope = std::clamp (slope_, 1, EQ_SLOPE_MAX);

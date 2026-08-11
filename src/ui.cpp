@@ -1173,8 +1173,8 @@ void c_eqpage_widgets::create (
     bands [i].knob_freq.role = ROLE_EQ_FREQ;
     bands [i].knob_freq.bank = bank_id;
     bands [i].knob_freq.lane = i;
-    bands [i].knob_freq.set_min (20.0f);
-    bands [i].knob_freq.set_max (20000.0f);
+    bands [i].knob_freq.set_min (NB_FREQ_MIN);
+    bands [i].knob_freq.set_max (NB_FREQ_MAX);
     bands [i].knob_freq.set_step (1.0f);
     bands [i].knob_freq.log_taper = 51.5011f; // so that 1KHz == noon/middle
     //bands [i].knob_freq.log_taper = 60.0f;  // logarithmic mid point at noon
@@ -2691,8 +2691,8 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       case ROLE_EQ_FREQ:
         eq.freq [band] = std::clamp (
           static_cast<nbtk::c_knob *> (widget)->value,
-          20.0f,
-          20000.0f);
+          NB_FREQ_MIN,
+          NB_FREQ_MAX);
         changed_parameter = true;
       break;
 

@@ -6,8 +6,8 @@
 
 #pragma once
  
-#define SPECTRUM_MIN_HZ   20.0f
-#define SPECTRUM_MAX_HZ   20000.0f
+#define SPECTRUM_MIN_HZ   NB_FREQ_MIN
+#define SPECTRUM_MAX_HZ   NB_FREQ_MAX
 #define SPECTRUM_BINS     512
 #define SPECTRUM_FFT_SIZE 4096
 #define SPECTRUM_HOP_SIZE (SPECTRUM_FFT_SIZE / 2)

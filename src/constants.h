@@ -12,6 +12,8 @@
 #define NB_NUM_CABS              4
 #define NB_MAX_LANES             4
 #define NB_STATS_PER_LANE        3 // dsp->ui: delay frames, model type, trim
+#define NB_FREQ_MIN              20.0f
+#define NB_FREQ_MAX              20000.0f
 
 #define MAX_DELAY_MS             30
 #define MAX_DELAY_FRAMES         (MAX_DELAY_MS * 192)

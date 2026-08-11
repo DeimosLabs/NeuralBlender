@@ -55,8 +55,8 @@ public:
     float dt);
   
   bool always_show_handles = false;
-  float freq_min = 20.0f;     // NOTE TO SELF: check for hard coded <---
-  float freq_max = 20000.0f; 
+  float freq_min = NB_FREQ_MIN;     // NOTE TO SELF: check for hard coded <---
+  float freq_max = NB_FREQ_MAX; 
   float db_range = 36.0f;
   float handle_size = 12.0f;
   float spectrum_floor_db = -84.0f;

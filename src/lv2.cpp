@@ -1973,7 +1973,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             self->last_eq_freq [bank] [band],
             tmp)) {
         //CP
-        freq = std::clamp (tmp, 20.0f, 20000.0f);
+        freq = std::clamp (tmp, NB_FREQ_MIN, NB_FREQ_MAX);
         changed = true;
       }
 

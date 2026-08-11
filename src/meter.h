@@ -29,7 +29,7 @@
 #define VU_PEAK_HOLD        1000
 #define VU_CLIP_HOLD        300
 #define VU_XRUN_HOLD        1000
-#define VU_FALL_SPEED       0.020000000f
+#define VU_FALL_SPEED       0.02f
 
 typedef struct _cairo cairo_t;
 //struct cairo_t;
