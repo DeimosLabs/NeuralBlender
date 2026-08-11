@@ -110,7 +110,7 @@ enum _widget_role {
   ROLE_EQ_LOAD_PRESET,
   ROLE_EQ_SAVE_PRESET,
   ROLE_EQ_DELETE_PRESET,
-  ROLE_EQ_CLEARHOLD,
+  ROLE_EQ_GRAPHHOLD,
   ROLE_UNKNOWN
 };
 
@@ -327,7 +327,7 @@ public:
   nbtk::c_combobox    cb_presets;
   nbtk::c_button      btn_savepreset;
   nbtk::c_button      btn_deletepreset;
-  nbtk::c_button      btn_clearhold;
+  nbtk::c_button      btn_graphhold;
   c_gainknob          knob_gain;
   nbtk::c_frame       cont_bands;
   c_eqband_widgets    bands [EQ_NUM_BANDS];

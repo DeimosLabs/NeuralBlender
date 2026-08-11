@@ -46,7 +46,8 @@ public:
   void on_mouse_enter () override;
   void on_mouse_leave () override;
   inline int get_mouse_handle () const { return mouse_handle; }
-  void reset_hist ();
+  void reset_hold ();
+  void do_hold (bool b);
   void update_falling_curves (const float *input, const float *output);
   void update_one_falling_curve (
     const float *in,
@@ -111,7 +112,7 @@ private:
   std::array<float,  SPECTRUM_BINS> spectrum_frequencies {};
   std::array<float,  SPECTRUM_BINS> spectrum_input_db {};
   std::array<float,  SPECTRUM_BINS> spectrum_output_db {};
-  std::array<float,  SPECTRUM_BINS> spectrum_hist {};
+  std::array<float,  SPECTRUM_BINS> spectrum_hold {};
   std::array<float,  SPECTRUM_BINS> spectrum_input_hold {};
   std::array<float,  SPECTRUM_BINS> spectrum_output_hold {};
 
@@ -121,6 +122,7 @@ private:
 
   bool spectrum_valid = false;
   bool spectrum_surface_dirty = true;
+  bool m_hold = true;
 
   cairo_surface_t *spectrum_surface = NULL;
   cairo_t *spectrum_cr = NULL;

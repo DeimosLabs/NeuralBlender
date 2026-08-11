@@ -14,7 +14,7 @@
 c_eqgraph::c_eqgraph () { CP
   generate_spectrum_frequencies (
     spectrum_frequencies.data (), spectrum_frequencies.size ());
-  reset_hist ();
+  reset_hold ();
   spectrum_input_db.fill (spectrum_floor_db);
   spectrum_output_db.fill (spectrum_floor_db);
   spectrum_input_hold.fill (0.0f);
@@ -205,8 +205,10 @@ void c_eqgraph::draw_spectrum (cairo_t *cr) {
   cairo_set_line_cap (cr, CAIRO_LINE_CAP_ROUND);
   
   cairo_set_source_rgba (cr, 0.28f, 0.48f, 0.75f, 0.2f);
-  path_spectrum (cr, spectrum_hist.data (), spectrum_hist.size (), true);
-  cairo_fill (cr);
+  if (m_hold) {
+    path_spectrum (cr, spectrum_hold.data (), spectrum_hold.size (), true);
+    cairo_fill (cr);
+  }
   
   cairo_set_line_width (cr, 0.5f);
   cairo_set_source_rgba (cr, 0.28f, 0.48f, 0.95f, 0.75f);
@@ -341,8 +343,17 @@ void c_eqgraph::set_state (c_eq_state *state_) {
   state_changed ();
 }
 
-void c_eqgraph::reset_hist () {
-  spectrum_hist.fill (spectrum_floor_db);
+void c_eqgraph::do_hold (bool b) {
+  m_hold = b;
+  if (!b)
+    reset_hold ();
+  
+  spectrum_surface_dirty = true;
+  invalidate ();
+}
+
+void c_eqgraph::reset_hold () {
+  spectrum_hold.fill (spectrum_floor_db);
   spectrum_surface_dirty = true;
   invalidate ();
 }
@@ -386,7 +397,7 @@ void c_eqgraph::update_falling_curves (
     : 0.0f;
   
   spectrum_last_update_ms = now;
-  dt = std::clamp (dt, 0.0f, 0.1f);
+  //dt = std::clamp (dt, 0.0f, 0.1f);
   
   update_one_falling_curve (
     input_db,
@@ -410,7 +421,7 @@ void c_eqgraph::set_spectrum (
     const float db = std::isfinite (output_db [i])
       ? output_db [i]
       : spectrum_floor_db;
-    spectrum_hist [i] = std::max (spectrum_hist [i], db);
+    spectrum_hold [i] = std::max (spectrum_hold [i], db);
   }
 
   update_falling_curves (input_db, output_db);
@@ -1012,7 +1023,7 @@ bool c_eqgraph::on_mouse_down (int mouse_x, int mouse_y, int button) {
   nbtk::c_canvas::on_mouse_down (mouse_x, mouse_y, button);
   
   if (button == Button2 || button == Button3) {
-    reset_hist ();
+    reset_hold ();
     return true;
   }
 

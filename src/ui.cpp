@@ -1095,23 +1095,25 @@ void c_eqpage_widgets::create (
   cb_presets.create (&cont_bands, "", 0, 0, 256, 32);
   btn_savepreset.create (&cont_bands, "", 0, 0, 32, 32);
   btn_deletepreset.create (&cont_bands, "", 0, 0, 32, 32);
-  btn_clearhold.create (&cont_bands, "", 0, 0, 32, 32);
+  btn_graphhold.create (&cont_bands, "", 0, 0, 32, 32);
   btn_savepreset.set_image_default (data_icon_floppy_png);
   btn_deletepreset.set_image_default (data_icon_x_big_png);
-  btn_clearhold.set_image_default (data_icon_waveform_png);
+  btn_graphhold.set_image_default (data_icon_waveform_png);
   
   cb_presets.set_tooltip ("EQ presets");
   btn_savepreset.set_tooltip ("Save this preset...");
   btn_deletepreset.set_tooltip ("Delete this preset");
-  btn_clearhold.set_tooltip ("Clear graph hold (also middle click on graph)");
+  btn_graphhold.set_tooltip ("Graph hold (middle click on graph to clear)");
   cb_presets.role = ROLE_EQ_LOAD_PRESET;
   btn_savepreset.role = ROLE_EQ_SAVE_PRESET;
   btn_deletepreset.role = ROLE_EQ_DELETE_PRESET;
-  btn_clearhold.role = ROLE_EQ_CLEARHOLD;
+  btn_graphhold.role = ROLE_EQ_GRAPHHOLD;
+  btn_graphhold.is_toggle = true;
   cb_presets.bank = bank_id;
   btn_savepreset.bank = bank_id;
   btn_deletepreset.bank = bank_id;
-  btn_clearhold.bank = bank_id;
+  btn_graphhold.bank = bank_id;
+  btn_graphhold.value = true;
   
   knob_gain.text_size = 0.75;
   knob_gain.label_position = nbtk::LABEL_LEFT;
@@ -1265,7 +1267,7 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
   const int btn_left = cb_presets.x + cb_presets.w + 4;
   btn_savepreset.move_resize (btn_left, btn_top, btn_size, btn_size);
   btn_deletepreset.move_resize (btn_left + btn_size + 4, btn_top, btn_size, btn_size);
-  btn_clearhold.move_resize (btn_left + (btn_size + 4) * 2, btn_top, btn_size, btn_size);
+  btn_graphhold.move_resize (btn_left + (btn_size + 4) * 2, btn_top, btn_size, btn_size);
   
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     const int local_band_x = i * band_w;
@@ -1425,8 +1427,9 @@ bool c_eqpage_widgets::on_action (nbtk::t_action_event &event) {
         "Delete the selected EQ preset?");
     break;
     
-    case ROLE_EQ_CLEARHOLD:
-      graph.reset_hist ();
+    case ROLE_EQ_GRAPHHOLD:
+      graph.reset_hold ();
+      graph.do_hold (btn_graphhold.value);
     break;
     
     default:
