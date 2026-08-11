@@ -1759,7 +1759,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   knob_presence.role = ROLE_PRESENCE;
   knob_mastervolume.set_min (-40);
   knob_mastervolume.set_max (12);
-  knob_mastervolume.set_value (gain_to_db (state.master_gain));
+  knob_mastervolume.set_value (state.master_gain_db);
   knob_mastervolume.set_default (0);
   knob_mastervolume.set_step (0.1);
   knob_presence.set_min (0);
@@ -2780,7 +2780,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
     const float value = knob.value;
     switch (role) {
       case ROLE_MASTER:
-        state.master_gain = db_to_gain (value);
+        state.master_gain_db = value;
         on_master_gain (&knob, value);
       break;
 
@@ -3149,7 +3149,7 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
 
   btn_noisegate.set_value (state.noisegate_on);
   btn_other_noisegate.set_value (state.noisegate_on);
-  knob_mastervolume.set_value (gain_to_db (state.master_gain));
+  knob_mastervolume.set_value (state.master_gain_db);
   knob_presence.set_value (state.presence);
   knob_noisethresh.set_value (state.noisethresh);
   knob_noiseattack.set_value (state.noiseattack);
@@ -3540,7 +3540,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   
   btn_noisegate.set_value (state.noisegate_on);
   btn_other_noisegate.set_value (state.noisegate_on);
-  knob_mastervolume.set_value (gain_to_db (state.master_gain));
+  knob_mastervolume.set_value (state.master_gain_db);
   knob_presence.set_value (state.presence);
   knob_noisethresh.set_value (state.noisethresh);
   knob_noiseattack.set_value (state.noiseattack);

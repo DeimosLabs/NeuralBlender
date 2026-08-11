@@ -2547,9 +2547,12 @@ c_neuralblender::~c_neuralblender () { CP
 }
 
 bool c_neuralblender::set_master_gain (float db) {
+  if (!std::isfinite (db))
+    return false;
+
   float gain = db_to_gain (db);
-  if (gain > 10.0f) return false; // TODO: should we allow positive gain here?
-  if (gain <  0.0f) return false;
+  if (!std::isfinite (gain) || gain > 10.0f)
+    return false; // TODO: should we allow positive gain here?
   
   master_gain = gain;
   return true;
@@ -3012,7 +3015,7 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
   eq_to_state (eq_post, state.eqpost);
   state.do_vu           = do_vu;
   state.mute_all        = mute_all;
-  state.master_gain     = master_gain;
+  state.master_gain_db  = gain_to_db (master_gain);
   state.presence        = presence;
   state.tuner_on        = tuner_on;
   state.tuner_base_freq = tuner_base_freq;
@@ -3062,12 +3065,7 @@ bool c_neuralblender::set_state (const c_neuralblender_state &state) {
   tuner_base_freq = state.tuner_base_freq;
   calib_source = state.calib_source;
 
-  if (!std::isfinite (state.master_gain) ||
-      state.master_gain < 0.0f || state.master_gain > 10.0f) {
-    ret = false;
-  } else {
-    master_gain = state.master_gain;
-  }
+  ret &= set_master_gain (state.master_gain_db);
   ret &= set_presence (state.presence);
   ret &= set_calib_target_db (state.calib_target_db);
   noisegate.set_threshold (state.noisethresh);

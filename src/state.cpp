@@ -870,7 +870,7 @@ void c_neuralblender_state::to_strings (std::vector<std::string> &v) {
   add_bool ("do_excl", do_excl);
   add_bool ("do_vu", do_vu);
   add_bool ("showadvanced", showadvanced);
-  add_float ("master_gain", master_gain);
+  add_float ("master_gain_db", master_gain_db);
   add_float ("presence", presence);
   add_bool ("tuner_on", tuner_on);
   add_float ("tuner_base_freq", tuner_base_freq);
@@ -974,7 +974,7 @@ bool c_neuralblender_state::from_strings (std::vector<std::string> &v) {
   read_bool ("do_excl", parsed.do_excl);
   read_bool ("do_vu", parsed.do_vu);
   read_bool ("showadvanced", parsed.showadvanced);
-  read_float ("master_gain", parsed.master_gain);
+  read_float ("master_gain_db", parsed.master_gain_db);
   read_float ("presence", parsed.presence);
   read_bool ("tuner_on", parsed.tuner_on);
   read_float ("tuner_base_freq", parsed.tuner_base_freq);

@@ -332,7 +332,7 @@ void c_standalone_ui::on_calib_target_db (nbtk::c_widget *w, float value) {
 
 void c_standalone_ui::on_master_gain (nbtk::c_widget *w, float value) {
   (void) w;
-  state.master_gain = db_to_gain (value);
+  state.master_gain_db = value;
   g_blender->set_master_gain (value);
 }
 
@@ -648,8 +648,11 @@ int main (int argc, char **argv) {
   c_neuralblender_state nbstate;
   
   g_blender = new c_neuralblender;
-  
-  std::string nbstate_path = std::string (getenv ("HOME")) + CONFIG_STATE_NAME;
+
+  const char *home = getenv ("HOME");
+  const std::string nbstate_path = home && home [0]
+    ? std::string (home) + "/" + CONFIG_STATE_NAME
+    : CONFIG_STATE_NAME;
   const bool have_saved_state = nbstate.read_from (nbstate_path);
   if (have_saved_state) {
     debug ("loaded config state");
@@ -792,7 +795,9 @@ int main (int argc, char **argv) {
   
   // test serialize
   g_blender->get_state (nbstate);
-  nbstate.write_to (nbstate_path);
+  if (!nbstate.write_to (nbstate_path))
+    fprintf (stderr, "NeuralBlender: failed to save state to '%s'\n",
+             nbstate_path.c_str ());
   
   jack_client_close (jack_client);
   jack_client = nullptr;

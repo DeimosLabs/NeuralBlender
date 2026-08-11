@@ -235,7 +235,7 @@ bool c_lv2_ui::set_dsp_state (const c_neuralblender_state &src) {
   write_control (PORT_NOISEGATE_RELEASE, src.noiserelease);
   write_control (PORT_TUNER_ON, src.tuner_on ? 1.0f : 0.0f);
   write_control (PORT_TUNER_BASE_FREQ, src.tuner_base_freq);
-  write_control (PORT_MASTER_GAIN, gain_to_db (src.master_gain));
+  write_control (PORT_MASTER_GAIN, src.master_gain_db);
   write_control (PORT_PRESENCE, src.presence);
 
   write_control (
@@ -533,7 +533,7 @@ void c_lv2_ui::on_calib_target_db (nbtk::c_widget *w, float f) {
 
 void c_lv2_ui::on_master_gain (nbtk::c_widget *w, float f) {
   (void) w;
-  state.master_gain = db_to_gain (f);
+  state.master_gain_db = f;
   write_control (PORT_MASTER_GAIN, f);
 }
 
@@ -815,7 +815,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
   }
 
   if (port == PORT_MASTER_GAIN) {
-    state.master_gain = db_to_gain (value);
+    state.master_gain_db = value;
     knob_mastervolume.set_value (value);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;

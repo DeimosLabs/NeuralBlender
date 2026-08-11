@@ -204,7 +204,7 @@ struct c_neuralblender_state {
     do_vu = other.do_vu;
     showadvanced = other.showadvanced;
     mute_all = other.mute_all;
-    master_gain = other.master_gain;
+    master_gain_db = other.master_gain_db;
     presence = other.presence;
     tuner_on = other.tuner_on;
     tuner_base_freq = other.tuner_base_freq;
@@ -246,7 +246,7 @@ struct c_neuralblender_state {
   bool do_excl            = false;
   bool do_vu              = true;
   bool showadvanced       = false;
-  float master_gain       = 1.0f;
+  float master_gain_db    = 0.0f;
   float presence          = 0.0f;
   bool tuner_on           = false;
   float tuner_base_freq   = 440.0f;
