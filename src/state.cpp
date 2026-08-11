@@ -95,7 +95,7 @@ static bool write_lines (
 class c_config_write_lock {
 public:
   explicit c_config_write_lock (const std::string &path) {
-    fd = open ((path + ".lock").c_str (), O_CREAT | O_RDWR, 0600);
+    fd = open (path.c_str (), O_CREAT | O_RDWR, 0600);
     if (fd >= 0 && flock (fd, LOCK_EX) != 0) {
       close (fd);
       fd = -1;
