@@ -95,7 +95,7 @@ static bool write_lines (
 class c_config_write_lock {
 public:
   explicit c_config_write_lock (const std::string &path) {
-    fd = open (path.c_str (), O_CREAT | O_RDWR, 0600);
+    fd = open ((path + ".lock").c_str (), O_CREAT | O_RDWR, 0600);
     if (fd >= 0 && flock (fd, LOCK_EX) != 0) {
       close (fd);
       fd = -1;
@@ -274,9 +274,9 @@ void c_configfile::add_eq_preset (const c_eq_state &preset) {
 void c_configfile::reset_eq_presets () {
   static const char *builtin [] = {
     "eq=off;0.00;off:off:off:off:off:off:off:off;0:4:5:5:5:5:6:7;50.000:100.000:250.000:500.000:1000.000:2000.000:4000.000:8000.000;0.000:0.000:0.000:0.000:0.000:0.000:0.000:0.000;1.000:1.000:1.000:1.000:1.000:1.000:1.000:1.000;\"[Builtin] Flat\"",
-    "eq=off;0.00;on:on:off:on:on:off:on:off;1:4:5:5:5:5:6:7;90.000:336.807:250.000:556.271:1000.000:2000.000:4000.000:8000.000;0.000:-9.767:0.000:-11.442:12.000:0.000:-4.000:0.000;1.000:1.000:1.000:3.740:1.500:1.000:1.000:1.000;\"[Builtin] Pre-gain sharpness\"",
-    "eq=off;0.00;on:off:off:off:on:on:on:off;3:4:5:5:5:5:6:7;80.000:100.000:250.000:500.000:800.000:4700.000:3000.000:8000.000;0.000:0.000:0.000:0.000:-6.000:5.000:3.000:0.000;0.750:1.000:1.000:1.000:1.000:4.000:1.000:1.000;\"[Builtin] Slight midscoop\"",
-    "eq=off;0.00;off:off:on:off:off:off:off:off;0:4:5:5:5:5:6:7;50.000:100.000:60.000:500.000:1000.000:2000.000:4000.000:8000.000;0.000:0.000:-36.000:0.000:0.000:0.000:0.000:0.000;1.000:1.000:100.000:1.000:1.000:1.000:1.000:1.000;\"[Builtin] Notch out 60Hz hum\"",
+    "eq=on;0.00;on:on:off:on:on:off:on:off;1:4:5:5:5:5:6:7;90.000:336.807:250.000:556.271:1000.000:2000.000:4000.000:8000.000;0.000:-9.767:0.000:-11.442:12.000:0.000:-4.000:0.000;1.000:1.000:1.000:3.740:1.500:1.000:1.000:1.000;\"[Builtin] Pre-gain sharpness\"",
+    "eq=on;0.00;on:off:off:off:on:on:on:off;3:4:5:5:5:5:6:7;80.000:100.000:250.000:500.000:800.000:4700.000:3000.000:8000.000;0.000:0.000:0.000:0.000:-6.000:5.000:3.000:0.000;0.750:1.000:1.000:1.000:1.000:4.000:1.000:1.000;\"[Builtin] Slight midscoop\"",
+    "eq=on;0.00;off:off:on:off:off:off:off:off;0:4:5:5:5:5:6:7;50.000:100.000:60.000:500.000:1000.000:2000.000:4000.000:8000.000;0.000:0.000:-36.000:0.000:0.000:0.000:0.000:0.000;1.000:1.000:100.000:1.000:1.000:1.000:1.000:1.000;\"[Builtin] Notch out 60Hz hum\"",
 
     NULL
   };
@@ -870,7 +870,7 @@ void c_neuralblender_state::to_strings (std::vector<std::string> &v) {
   add_bool ("do_excl", do_excl);
   add_bool ("do_vu", do_vu);
   add_bool ("showadvanced", showadvanced);
-  add_float ("master_gain_db", master_gain_db);
+  add_float ("master_gain", master_gain);
   add_float ("presence", presence);
   add_bool ("tuner_on", tuner_on);
   add_float ("tuner_base_freq", tuner_base_freq);
@@ -974,7 +974,7 @@ bool c_neuralblender_state::from_strings (std::vector<std::string> &v) {
   read_bool ("do_excl", parsed.do_excl);
   read_bool ("do_vu", parsed.do_vu);
   read_bool ("showadvanced", parsed.showadvanced);
-  read_float ("master_gain_db", parsed.master_gain_db);
+  read_float ("master_gain", parsed.master_gain);
   read_float ("presence", parsed.presence);
   read_bool ("tuner_on", parsed.tuner_on);
   read_float ("tuner_base_freq", parsed.tuner_base_freq);
