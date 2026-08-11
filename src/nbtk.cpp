@@ -4635,7 +4635,8 @@ static bool switch_active_topmenu_at (
     c_app *app,
     c_widget *root,
     int x,
-    int y) {
+    int y,
+    bool toggle_open = false) {
 
   if (!app || !app->active_menu || !app->active_menu->visible)
     return false;
@@ -4644,7 +4645,9 @@ static bool switch_active_topmenu_at (
   if (!menu)
     return false;
 
-  if (!menu->menu_visible)
+  if (menu->menu_visible && toggle_open)
+    menu->hide_menu ();
+  else if (!menu->menu_visible)
     menu->show_menu ();
   return true;
 }
@@ -4653,7 +4656,8 @@ void c_app::dispatch_mouse_down (int x, int y, int button) {
   hide_tooltip ();
 
   if (active_menu && active_menu->visible) {
-    if (button == Button1 && switch_active_topmenu_at (this, root, x, y))
+    if (button == Button1 &&
+        switch_active_topmenu_at (this, root, x, y, true))
       return;
     close_active_menu (this);
     return;
@@ -5043,7 +5047,7 @@ void c_popupwindow::create_for_owner (
     c_app *app_,
     c_widget *owner_,
     int w_,
-    int h_) {
+    int h_) { CP
 
   owner = owner_;
   create (app_, 0, 0, w_, h_);
@@ -5054,7 +5058,7 @@ void c_popupwindow::create_native_for_owner (
     c_widget *owner_,
     t_native_handle native_owner_,
     int w_,
-    int h_) {
+    int h_) { CP
 
   create_for_owner (app_, owner_, w_, h_);
   nbtk::t_native_widget *native_owner = as_native_widget (native_owner_);
@@ -5089,16 +5093,16 @@ void c_popupwindow::create_native_for_owner (
   native_childlist_add_child (native_owner->childlist, w);
 }
 
-void c_popupwindow::show_at_screen_pos (int x_, int y_) {
+void c_popupwindow::show_at_screen_pos (int x_, int y_) { CP
   move_resize (x_, y_, w, h);
   show ();
 }
 
-void c_popupwindow::close () {
+void c_popupwindow::close () { CP
   hide ();
 }
 
-bool c_popupwindow::close_on_outside_click () const {
+bool c_popupwindow::close_on_outside_click () const { CP
   return true;
 }
 
@@ -5110,7 +5114,7 @@ bool c_popupwindow::pointer_grab_owner_events () const {
   return false;
 }
 
-bool c_popupwindow::on_mouse_up (int x_, int y_, int button) {
+bool c_popupwindow::on_mouse_up (int x_, int y_, int button) { CP
   if (c_combobox *combobox = dynamic_cast<c_combobox *> (owner)) {
     if (combobox->on_popup_mouse_up (this, x_, y_, button))
       return true;
@@ -5121,7 +5125,7 @@ bool c_popupwindow::on_mouse_up (int x_, int y_, int button) {
   return handled;
 }
 
-void c_popupwindow::on_action (t_action_event &event) {
+void c_popupwindow::on_action (t_action_event &event) { CP
   if (owner && !event.handled)
     owner->on_action (event);
 
@@ -5248,7 +5252,8 @@ void c_popupwindow::cb_button_press (
                 ? &self->app->active_toplevel->root_widget
                 : self->app->root,
               root.x,
-              root.y))
+              root.y,
+              true))
         return;
       close_active_menu (self->app);
       return;
@@ -5838,7 +5843,7 @@ int c_menu::next_selectable (int from, int direction) const {
   return -1;
 }
 
-void c_menu::show_submenu (int index) {
+void c_menu::show_submenu (int index) { CP
   c_menu *submenu = item_selectable (index) ? items [index].submenu : nullptr;
   if (open_submenu == submenu)
     return;
@@ -5859,7 +5864,7 @@ void c_menu::select_item (int index) {
   show_submenu (index);
 }
 
-void c_menu::activate_item (int index) {
+void c_menu::activate_item (int index) { CP
   if (!item_selectable (index))
     return;
 
@@ -5929,11 +5934,11 @@ c_menu *c_menu::menu_at_screen (t_point point) {
   return nullptr;
 }
 
-void c_menu::close_tree () {
+void c_menu::close_tree () { CP
   root_menu ()->hide ();
 }
 
-bool c_menu::on_key_down (int key) {
+bool c_menu::on_key_down (int key) { CP
   if (key == KEY_ESCAPE) {
     close_tree ();
     return true;
@@ -5941,7 +5946,7 @@ bool c_menu::on_key_down (int key) {
   return c_popupwindow::on_key_down (key);
 }
 
-bool c_menu::pointer_grab_owner_events () const {
+bool c_menu::pointer_grab_owner_events () const { CP
   return true;
 }
 
@@ -5949,7 +5954,7 @@ void c_menu::close () {
   close_tree ();
 }
 
-void c_menu::hide () {
+void c_menu::hide () { CP
   if (open_submenu) {
     c_menu *submenu = open_submenu;
     open_submenu = nullptr;
@@ -5997,14 +6002,14 @@ void c_topmenu::draw (cairo_t *cr) {
   cairo_show_text (cr, label.c_str ());
 }
 
-bool c_topmenu::on_mouse_down (int x_, int y_, int button) {
+bool c_topmenu::on_mouse_down (int x_, int y_, int button) { CP
   c_button::on_mouse_down (x_, y_, button);
   if (button == Button1)
     show_menu ();
   return true;
 }
 
-bool c_topmenu::on_mouse_up (int x_, int y_, int button) {
+bool c_topmenu::on_mouse_up (int x_, int y_, int button) { CP
   (void) x_;
   (void) y_;
   mouse_down_inside = false;
@@ -6019,7 +6024,7 @@ bool c_topmenu::on_key_down (int key) {
   return false;
 }
 
-void c_topmenu::on_mouse_enter () {
+void c_topmenu::on_mouse_enter () { CP
   c_button::on_mouse_enter ();
   if (c_menubar *bar = dynamic_cast<c_menubar *> (parent)) {
     if (bar->open_topmenu && bar->open_topmenu != this)
@@ -6052,7 +6057,7 @@ c_menu *c_topmenu::add_submenu (const std::string &label_, bool enabled) {
   return get_menu ()->add_submenu (label_, enabled);
 }
 
-void c_topmenu::show_menu () {
+void c_topmenu::show_menu () { CP 
   c_menu *menu = get_menu ();
   if (!menu || menu->items.empty ())
     return;
@@ -6065,14 +6070,14 @@ void c_topmenu::show_menu () {
   menu->show_below (this);
 }
 
-void c_topmenu::hide_menu () {
+void c_topmenu::hide_menu () { CP
   if (popup_menu)
     popup_menu->hide ();
   else
     menu_closed ();
 }
 
-void c_topmenu::menu_closed () {
+void c_topmenu::menu_closed () { CP
   if (!menu_visible)
     return;
   menu_visible = false;
@@ -6108,7 +6113,7 @@ void c_menubar::move_resize (int x_, int y_, int w_, int h_) {
   layout_menus ();
 }
 
-void c_menubar::open_menu (c_topmenu *menu) {
+void c_menubar::open_menu (c_topmenu *menu) { CP
   if (open_topmenu == menu)
     return;
   if (open_topmenu)
@@ -6116,7 +6121,7 @@ void c_menubar::open_menu (c_topmenu *menu) {
   open_topmenu = menu;
 }
 
-void c_menubar::menu_closed (c_topmenu *menu) {
+void c_menubar::menu_closed (c_topmenu *menu) { CP
   if (open_topmenu == menu)
     open_topmenu = nullptr;
 }
@@ -7544,7 +7549,7 @@ void c_toplevelwindow::cb_button_press (
     if (self->app->active_menu && self->app->active_menu->visible) {
       if (button == Button1 &&
           switch_active_topmenu_at (
-              self->app, &self->root_widget, rx, ry)) {
+              self->app, &self->root_widget, rx, ry, true)) {
         self->save_state ();
         native_widget_invalidate (w);
         return;
