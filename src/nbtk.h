@@ -31,6 +31,7 @@
 #define NBTK_SCROLLBAR_RADIUS   8.0
 #define NBTK_POPUP_MAX_WIDTH    640
 #define NBTK_DOUBLECLICK_MS     300
+#define NBTK_TOOLTIP_DELAY      400
 #define NBTK_MOUSEWHEEL_ROWS    2
 #define NBTK_AUTOSCROLL_MS      20
 
@@ -875,7 +876,7 @@ public:
   uint64_t tooltip_pending_since = 0;
   int tooltip_root_x = 0;
   int tooltip_root_y = 0;
-  uint64_t tooltip_delay = 400;
+  uint64_t tooltip_delay = NBTK_TOOLTIP_DELAY;
   bool mouse_captured = false;
   bool key_shift = false;
   bool key_ctrl = false;
