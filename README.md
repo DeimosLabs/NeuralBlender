@@ -47,12 +47,12 @@ Compiles and installs with cmake. Required libs / utilities to build:
   - lv2 (for LV2 plugin)
   - jack (for standalone app)
   - cairo/x11 (for GUI)
-  - libsoundfile, libsamplerate (for IR support)
+  - libsoundfile (for IR support)
   - xxd utility, for inline data
   
 On debian/ubuntu/mint, just run:
 ```bash
-sudo apt install git cmake libeigen3-dev libfftw3-dev lv2-dev libjack-dev libcairo2-dev libsndfile1-dev libsamplerate0-dev xxd
+sudo apt install git cmake libeigen3-dev libfftw3-dev lv2-dev libjack-dev libcairo2-dev libsndfile1-dev xxd
 ```
 On other distributions, the package names (and package system) are probably different, but still available.
 
