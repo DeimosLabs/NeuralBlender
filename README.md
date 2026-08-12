@@ -27,9 +27,9 @@ Features:
     - optional DC flip for more phasing effects
     - optional level calibration to target dB
 
-On my Intel Core7 ultra, it loads 5 or 6 models in the middle of a busy live session, 64 sample buffers / 3 periods, and DSP load typically stays below 50%, no xruns. (with DSP threads pinned to p-cores)
+On my Intel Core7 ultra, it loads 5 or 6 models in the middle of a busy live session, 64 sample buffers / 3 periods, and DSP load typically stays below 40%, no xruns. (with DSP threads pinned to p-cores)
 
-Features considered for future versions: VST plugin, series mode(s), optionally more than 4 lanes per model bank, lane groups, DSP load-splitting/balancing etc...
+Features considered for future versions: VST plugin, stereo routing, series mode(s), optionally more than 4 lanes per model bank, lane groups, DSP load-splitting/balancing etc...
 
 Demo: https://soundcloud.com/delt01/snakeskin All the guitars and bass in this track are straight DI's processed through NeuralBlender with a bit of reverb, and flanger at one spot. The wah effect was achieved by automating one of the pre-EQ bands. NAM models used are available on https://tone3000.com
 
