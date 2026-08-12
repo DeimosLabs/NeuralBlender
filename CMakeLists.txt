@@ -27,6 +27,15 @@ pkg_check_modules(FFTW3F REQUIRED IMPORTED_TARGET fftw3f)
 pkg_check_modules(SNDFILE REQUIRED IMPORTED_TARGET sndfile)
 #pkg_check_modules(SAMPLERATE REQUIRED IMPORTED_TARGET samplerate)
 
+find_library(FFTW3F_STATIC_LIBRARY
+  NAMES libfftw3f.a
+  HINTS ${FFTW3F_LIBRARY_DIRS}
+)
+
+if (NOT FFTW3F_STATIC_LIBRARY)
+  message(FATAL_ERROR "Static FFTW3F library not found")
+endif()
+
 if (GZIP_SUPPORT)
   find_package(ZLIB)
   if (NOT ZLIB_FOUND)
@@ -239,7 +248,8 @@ target_compile_definitions(neuralblender_meter_data PRIVATE
 
 target_link_libraries(neuralblender_core PUBLIC
   Eigen3::Eigen
-  PkgConfig::FFTW3F
+#  PkgConfig::FFTW3F
+  ${FFTW3F_STATIC_LIBRARY}
   PkgConfig::SNDFILE
 #  PkgConfig::SAMPLERATE
   neuralblender_config
