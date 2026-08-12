@@ -49,7 +49,7 @@ inline float db_to_gain (float db) {
 inline float gain_to_db (float gain) {
   if (gain <= 0.0f)
     return -120;
-
+  
   return 20.0f * log10f(gain);
 }
 
@@ -71,7 +71,7 @@ public:
   void set_clip_hold (size_t ms);
   void set_xrun_hold (size_t ms);
   void set_clip_threshold (float db);
-
+  
   float l () const;
   float r () const;
   float peak_l () const;
@@ -86,7 +86,7 @@ public:
   float linear_peak_l () const { return m_peak_l.load (); }
   float linear_peak_r () const { return m_peak_r.load (); }
   void acknowledge ();
-
+  
   std::atomic<bool> needs_redraw { false };
   std::atomic<bool> clip_l { false };
   std::atomic<bool> clip_r { false };
@@ -99,14 +99,14 @@ public:
   size_t clip_hold_ms = VU_CLIP_HOLD;
   size_t peak_hold_ms = VU_PEAK_HOLD;
   size_t xrun_hold_ms = VU_XRUN_HOLD;
-  
+
 private:
   static float clamp01 (float f);
   static void atomic_max (std::atomic<float> &dst, float value);
   static void atomic_min (std::atomic<float> &dst, float value);
   float db_scaled (float f) const;
   float display_to_linear (float f) const;
-
+  
   std::atomic<float> m_l { 0.0f };
   std::atomic<float> m_r { 0.0f };
   std::atomic<float> m_display_l { 0.0f };
@@ -142,13 +142,13 @@ public:
   void create (nbtk::c_widget *parent,
                const char *label,
                int x, int y, int w, int h);
-
+  
   //void show ();
   //void hide ();
   //void move_resize (int x, int y, int w, int h) override;
   //void move (int x, int y) override;
   //void resize (int w, int h) override;
-
+  
   void set_db_scale (float f);
   void set_vudata (c_vudata *v);
   c_vudata *get_vudata ();
@@ -160,13 +160,13 @@ public:
   void set_peak_hold (size_t ms);
   void set_clip_hold (size_t ms);
   void set_xrun_hold (size_t ms);
-
+  
   void set_stereo (bool b);
   void set_l (float level, float hold, bool clip = false, bool xrun = false);
   void set_r (float level, float hold, bool clip = false, bool xrun = false);
   void set_compression_gain (float gain);
   void set_compression_db (float db);
-
+  
   bool created = false;
   bool vertical = false;
   int width = 0;
@@ -191,7 +191,7 @@ private:
   void draw_warning_text (cairo_t *cr, const char *text, double x, double y,
                           double w, double h);
   void update_geometry ();
-
+  
   float compressor_gain = 1.0f;
   bool stereo = true;
   int met_len = -1;

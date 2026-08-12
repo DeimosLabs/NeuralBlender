@@ -114,7 +114,7 @@ struct t_rect {
   int y = 0;
   int w = 0;
   int h = 0;
-
+  
   bool contains (int px, int py) const;
 };
 
@@ -165,14 +165,14 @@ struct t_event {
   uint64_t source_id = 0;
   int source_index = -1;
   bool handled = false;
-
+  
   virtual ~t_event () = default;
 };
 
 struct t_action_event : public t_event {
   int mouse_button = 0;
   bool value = false;
-
+  
   t_action_event ();
 };
 
@@ -180,7 +180,7 @@ struct t_command_event : public t_action_event {
   int64_t command = 0;
   _command_result result = _command_result::none;
   std::string text;
-
+  
   t_command_event ();
 };
 
@@ -211,7 +211,7 @@ enum e_key_mod {
 class c_widget {
 public:
   virtual ~c_widget () = default;
-
+  
   virtual void create (
       c_widget *parent,
       const char *label,
@@ -219,7 +219,7 @@ public:
       int y,
       int w,
       int h);
-
+  
   virtual void draw (cairo_t *cr);
   virtual bool on_mouse_down (int x, int y, int button);
   virtual bool on_mouse_up (int x, int y, int button);
@@ -239,18 +239,18 @@ public:
       bool value = false,
       int source_index = -1,
       const std::string &text = "");
-
+  
   void draw_tree (cairo_t *cr);
   bool mouse_down_tree (int x, int y, int button);
   bool mouse_up_tree (int x, int y, int button);
   bool mouse_move_tree (int x, int y);
   bool update_hover_tree (int x, int y);
   void clear_hover_tree ();
-
+  
   t_point local_to_root (t_point p) const;
   t_point root_to_local (t_point p) const;
   t_point local_to_screen (t_point p) const;
-
+  
   t_rect rect () const;
   bool contains_local (int px, int py) const;
   float font_multiplier () const;
@@ -319,16 +319,16 @@ public:
 class c_frame : public c_widget {
 public:
   c_frame ();
-
+  
   void draw (cairo_t *cr) override;
-
+  
   _widget_state state = WSTATE_NORMAL;
 };
 
 class c_valuewidget : public c_widget {
 public:
   ~c_valuewidget () override;
-
+  
   virtual bool set_value (float value, bool notify = false);
   virtual void set_range (float min, float max);
   virtual void set_min (float min);
@@ -347,7 +347,7 @@ public:
   virtual t_rect value_label_rect () const;
   virtual void draw_value_label (cairo_t *cr);
   void on_command (t_command_event &event) override;
-
+  
   float min = 0.0f;
   float max = 1.0f;
   float value = 0.0f;
@@ -379,7 +379,7 @@ public:
   void clear_hover () override;
   _mouse_cursor mouse_cursor () const override;
   bool highlighted () const override;
-
+  
   bool link = false;
 };
 
@@ -387,7 +387,7 @@ class c_button : public c_widget {
 public:
   c_button ();
   ~c_button () override;
-
+  
   void draw (cairo_t *cr) override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
@@ -399,7 +399,7 @@ public:
   bool highlighted () const override;
   bool set_value (bool value);
   void set_image (const unsigned char *png, _widget_state which = WSTATE_ALL);
-
+  
   inline void set_image_on (const unsigned char *png)
     { set_image (png, WSTATE_ON); }
   inline void set_image_off (const unsigned char *png)
@@ -416,7 +416,7 @@ public:
     { set_image (png, WSTATE_DEFAULT); }
   inline void set_image_all (const unsigned char *png)
     { set_image (png, WSTATE_ALL); }
-
+  
   bool is_toggle = false;
   bool value = false;
   bool mouse_down_inside = false;
@@ -427,7 +427,7 @@ protected:
 
 private:
   void destroy_images ();
-
+  
   cairo_surface_t *img_off          = nullptr;
   cairo_surface_t *img_on           = nullptr;
   cairo_surface_t *img_hover        = nullptr;
@@ -441,16 +441,16 @@ private:
 class c_imagebutton : public c_button {
 public:
   c_imagebutton ();
-
+  
   void draw (cairo_t *cr) override;
-
+  
   bool draw_frame = false;
 };
 
 class c_checkbox : public c_button {
 public:
   c_checkbox ();
-
+  
   void draw (cairo_t *cr) override;
   void shrinkwrap (
       int padding_x = 16,
@@ -473,14 +473,14 @@ struct t_listrow {
 class c_scrollbar : public c_valuewidget {
 public:
   c_scrollbar ();
-
+  
   void draw (cairo_t *cr) override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
   bool on_mouse_move (int x, int y) override;
   void on_mouse_leave () override;
   bool highlighted () const override;
-
+  
   bool set_value (float value, bool notify = false) override;
   void set_page_size (float value);
   void set_step (float value) override;
@@ -489,7 +489,7 @@ public:
   virtual t_rect track_rect () const;
   virtual t_rect thumb_rect () const;
   void emit_action () override;
-
+  
   float page_size = 0.1f;
   _scrollbar_orientation orientation = SCROLLBAR_VERTICAL;
   c_container *container = nullptr;
@@ -505,7 +505,7 @@ protected:
 class c_slider : public c_scrollbar {
 public:
   c_slider ();
-
+  
   void draw (cairo_t *cr) override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
@@ -523,7 +523,7 @@ public:
   virtual t_rect slider_control_rect () const;
   t_rect track_rect () const override;
   virtual t_rect thumb_rect () const;
-
+  
   float slider_value = 0.0f;
   float slider_step = 0.05f;
   int track_size = 0;
@@ -539,7 +539,7 @@ private:
 class c_container : public c_widget {
 public:
   c_container ();
-
+  
   void draw (cairo_t *cr) override;
   void set_scrollbar (c_scrollbar *scrollbar);
   void set_vscrollbar (c_scrollbar *scrollbar);
@@ -555,7 +555,7 @@ public:
   virtual float vscroll_step () const;
   virtual float hscroll_step () const;
   void on_action (t_action_event &event) override;
-
+  
   c_scrollbar *vscrollbar = nullptr;
   c_scrollbar *hscrollbar = nullptr;
 };
@@ -563,14 +563,14 @@ public:
 class c_listbox : public c_container {
 public:
   c_listbox ();
-
+  
   void draw (cairo_t *cr) override;
   void resize (int w, int h) override;
   bool highlighted () const override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
   bool on_key_down (int key) override;
-
+  
   void clear ();
   void add (const std::string &text);
   void set_items (const std::vector<std::string> &items);
@@ -589,10 +589,10 @@ public:
   int visible_rows () const;
   void emit_action (bool activated);
   void emit_action (bool activated, int index);
-
+  
   virtual void on_select (int index);
   virtual void on_activate (int index);
-
+  
   std::vector<t_listrow> rows;
   int selected = -1;
   int first_visible = 0;
@@ -611,7 +611,7 @@ class c_combobox : public c_widget {
 public:
   c_combobox ();
   ~c_combobox () override;
-
+  
   void create (
       c_widget *parent,
       const char *label,
@@ -619,14 +619,14 @@ public:
       int y,
       int w,
       int h) override;
-
+  
   void draw (cairo_t *cr) override;
   bool highlighted () const override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
   bool on_key_down (int key) override;
   void on_action (t_action_event &event) override;
-
+  
   void clear ();
   void add (const std::string &text);
   void set_items (const std::vector<std::string> &items);
@@ -644,10 +644,10 @@ public:
   bool on_popup_mouse_move (c_popupwindow *popup, int x, int y);
   bool on_popup_mouse_up (c_popupwindow *popup, int x, int y, int button);
   void tick_drag ();
-
+  
   virtual void on_change (int index);
   void update_widget ();
-
+  
   std::vector<std::string> items;
   int selected = -1;
   int visible_rows_max = 8;
@@ -683,7 +683,7 @@ public:
   bool on_key_down (int key) override;
   void on_mouse_leave () override;
   bool highlighted () const override;
-
+  
   bool set_value (float value, bool notify = false) override;
   float normalized_value () const override;
   float value_from_normalized (float normalized) const override;
@@ -698,7 +698,7 @@ public:
       int padding_y = -1,
       bool center_x = false,
       bool center_y = true) override;
-
+  
   float drag_sensitivity = 0.005f;
   float log_taper = 1.0f;
   bool show_value = true;
@@ -721,7 +721,7 @@ public:
 class c_textbox : public c_widget {
 public:
   c_textbox ();
-
+  
   void draw (cairo_t *cr) override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
@@ -729,10 +729,10 @@ public:
   bool on_key_down (int key) override;
   bool on_text_input (const char *text) override;
   bool highlighted () const override;
-
+  
   bool set_text (const char *text);
   const std::string &text () const;
-
+  
   std::string value;
   std::string accepted_chars;
   size_t cursor = 0;
@@ -752,7 +752,7 @@ private:
   size_t cursor_from_x (cairo_t *cr, double text_x) const;
   double text_width_to (cairo_t *cr, size_t pos) const;
   void scroll_cursor_into_view (cairo_t *cr, double clip_w);
-
+  
   bool selecting = false;
   bool selecting_words = false;
   size_t word_drag_start = 0;
@@ -765,7 +765,7 @@ private:
 class c_staticimage : public c_widget {
 public:
   ~c_staticimage () override;
-
+  
   void set_png (const unsigned char *png);
   void draw (cairo_t *cr) override;
 
@@ -776,7 +776,7 @@ private:
 class c_app {
 public:
   virtual ~c_app ();
-
+  
   virtual void create (int w, int h);
   virtual void draw ();
   virtual void dispatch_mouse_down (int x, int y, int button);
@@ -808,9 +808,9 @@ public:
       const std::string &cancel_text = "",
       const std::string &no_text = "No",
       const std::string &yes_text = "Yes");
-
+  
   virtual void show_message (const std::string title, const std::string msg);
-
+  
   virtual std::unique_ptr<c_popupwindow> create_popup (c_widget *owner);
   virtual std::unique_ptr<c_tooltip> create_tooltip (c_widget *owner);
   virtual t_point root_to_screen (t_point p) const;
@@ -820,7 +820,7 @@ public:
   virtual void on_action (t_action_event &event);
   virtual void on_command (t_command_event &event);
   virtual  bool dialog_visible ();
-
+  
   template <class T>
   T *create_widget (
       c_widget *parent,
@@ -829,14 +829,14 @@ public:
       int y,
       int w,
       int h) {
-
+    
     auto ptr = std::make_unique<T> ();
     T *ret = ptr.get ();
     ret->create (parent, label, x, y, w, h);
     widgets.push_back (std::move (ptr));
     return ret;
   }
-
+  
   template <class T>
   T *create_root (int w, int h) {
     auto ptr = std::make_unique<T> ();
@@ -851,7 +851,7 @@ public:
     widgets.push_back (std::move (ptr));
     return ret;
   }
-
+  
   cairo_t *cr = nullptr;
   std::unique_ptr<c_native_backend> backend;
   t_native_app *native_app = nullptr;
@@ -888,7 +888,7 @@ public:
 class c_native_backend {
 public:
   virtual ~c_native_backend () = default;
-
+  
   virtual void init_app (t_native_app *app) = 0;
   virtual void shutdown_app (t_native_app *app) = 0;
   virtual void run_events (t_native_app *app) = 0;
@@ -930,13 +930,13 @@ std::unique_ptr<c_native_backend> create_native_backend ();
 class c_nativewindow {
 public:
   virtual ~c_nativewindow () = default;
-
+  
   virtual void create (c_app *app, int x, int y, int w, int h);
   virtual void show ();
   virtual void hide ();
   virtual void move_resize (int x, int y, int w, int h);
   virtual void invalidate_rect (int x, int y, int w, int h);
-
+  
   virtual cairo_t *begin_paint ();
   virtual void end_paint ();
   virtual void on_paint (cairo_t *cr);
@@ -947,10 +947,10 @@ public:
   virtual bool on_mouse_up (int x, int y, int button);
   virtual bool on_mouse_move (int x, int y);
   virtual void on_action (t_action_event &event);
-
+  
   virtual t_point local_to_screen (t_point p) const;
   virtual t_point screen_to_local (t_point p) const;
-
+  
   c_app *app = nullptr;
   c_widget root;
   c_widget *focused_widget = NULL;
@@ -983,14 +983,14 @@ public:
   void move_resize (int x, int y, int w, int h) override;
   void show () override;
   void hide () override;
-
+  
   static void cb_expose (void *w, void *user_data);
   static void cb_button_press (void *w, void *event, void *user_data);
   static void cb_button_release (void *w, void *event, void *user_data);
   static void cb_motion (void *w, void *event, void *user_data);
   static void cb_key_press (void *w, void *event, void *user_data);
   static void cb_key_release (void *w, void *event, void *user_data);
-
+  
   c_widget *owner = nullptr;
   t_native_handle widget = nullptr;
   bool pointer_grabbed = false;
@@ -1020,14 +1020,14 @@ public:
   bool on_key_down (int key) override;
   void on_select (int index) override;
   void on_activate (int index) override;
-
+  
   c_menu *menu = nullptr;
 };
 
 class c_menu : public c_popupwindow {
 public:
   ~c_menu () override;
-
+  
   void configure (c_app *app, c_widget *command_target, c_menu *parent = nullptr);
   int add_item (
       const std::string &label,
@@ -1050,7 +1050,7 @@ public:
   bool pointer_grab_owner_events () const override;
   void close () override;
   void hide () override;
-
+  
   std::vector<t_menuitem> items;
   c_menulistbox listbox;
   c_widget *command_target = nullptr;
@@ -1066,7 +1066,7 @@ private:
   void sync_geometry (int max_height);
   void show_submenu (int index);
   c_menu *root_menu ();
-
+  
   std::vector<std::unique_ptr<c_menu>> owned_submenus;
 };
 
@@ -1074,7 +1074,7 @@ class c_topmenu : public c_button {
 public:
   c_topmenu ();
   ~c_topmenu () override;
-
+  
   void draw (cairo_t *cr) override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
@@ -1092,7 +1092,7 @@ public:
   void show_menu ();
   void hide_menu ();
   void menu_closed ();
-
+  
   bool menu_visible = false;
 
 private:
@@ -1102,14 +1102,14 @@ private:
 class c_menubar : public c_container {
 public:
   ~c_menubar () override;
-
+  
   c_topmenu *add_menu (const std::string &label);
   void layout_menus ();
   void move_resize (int x, int y, int w, int h) override;
   void open_menu (c_topmenu *menu);
   void menu_closed (c_topmenu *menu);
   void close_menus ();
-
+  
   int item_padding = 20;
   int item_gap = 0;
   c_topmenu *open_topmenu = nullptr;
@@ -1125,7 +1125,7 @@ public:
   void commit ();
   bool on_key_down (int key) override;
   void on_action (t_action_event &event) override;
-
+  
   c_valuewidget *value_widget = nullptr;
   c_textbox textbox;
   bool ignore_next_mouse_up = false;
@@ -1137,7 +1137,7 @@ public:
   bool takes_focus () const override;
   void show () override;
   void set_text (const char *text);
-
+  
   c_frame frame;
   c_label label;
 };
@@ -1145,7 +1145,7 @@ public:
 class c_canvas : public c_widget {
 public:
   c_canvas ();
-
+  
   void draw (cairo_t *cr) override;
   bool on_mouse_down (int x, int y, int button) override;
   bool on_mouse_up (int x, int y, int button) override;
@@ -1169,7 +1169,7 @@ public:
   
   virtual void hide () { c_widget::hide (); }
   virtual void show () { c_widget::show (); }
-  
+
 protected:
   virtual void render_base (cairo_t *cr);
   virtual void render_overlay (cairo_t *cr);
@@ -1246,10 +1246,10 @@ typedef struct {
   t_gradientcolors text_fg;
   t_gradientcolors text_disabled;
   t_gradientcolors link_fg;
-
+  
   t_controlcolors button;
   t_controlcolors radio;
-
+  
   t_statecolors frame_normal;
   t_statecolors frame_selected;
   t_statecolors frame_disabled;
@@ -1275,12 +1275,12 @@ struct c_printfps {
   std::string m_str;
   uint64_t count = 0;
   uint64_t last = now_ms ();
-
+  
   c_printfps (std::string str) : m_str (std::move (str)) { }
-
+  
   inline void tick () {
     count++;
-
+    
     uint64_t now = now_ms ();
     if (now - last >= 1000) {
       std::cout << m_str << count << "\n";
@@ -1312,14 +1312,14 @@ void tk_set_gradient (cairo_t *cr, double h, const t_gradientcolors &colors);
 class c_native_toplevelwindow {
 public:
   virtual ~c_native_toplevelwindow () = default;
-
+  
   bool create (
       c_app *app,
       nbtk::t_native_window parent,
       const char *title,
       int x, int y, int w, int h,
       nbtk::t_native_handle owner = nullptr);
-
+  
   void set_min_size_to_current ();
   virtual void set_min_size (int w, int h);
   void center_over (nbtk::t_native_handle owner);
@@ -1369,7 +1369,7 @@ public:
 class c_toplevelwindow : public c_native_toplevelwindow {
 public:
   ~c_toplevelwindow ();
-
+  
   bool create (
       c_app *app,
       nbtk::t_native_window parent,
@@ -1396,7 +1396,7 @@ public:
   void save_state ();
   void auto_hide_on_close (bool b = true);
   void auto_quit_on_close (bool b = true);
-
+  
   static void cb_button_press (void *w, void *event, void *user_data);
   static void cb_button_release (void *w, void *event, void *user_data);
   static void cb_motion (void *w, void *event, void *user_data);
@@ -1404,7 +1404,7 @@ public:
   static void cb_leave (void *w, void *user_data);
   static void cb_key_press (void *w, void *event, void *user_data);
   static void cb_key_release (void *w, void *event, void *user_data);
-
+  
   c_app *app = NULL;
   nbtk::c_widget root_widget;
   nbtk::c_widget *focused_widget = NULL;
@@ -1418,7 +1418,7 @@ public:
 private:
   void clear_buffer ();
   bool ensure_buffer (int w, int h);
-
+  
   cairo_surface_t *buffer_surface = NULL;
   cairo_t *buffer_cr = NULL;
   int buffer_surface_w = 0;
@@ -1428,7 +1428,7 @@ private:
 class c_ask_dialog : public c_toplevelwindow {
 public:
   static constexpr size_t MAX_MESSAGE_LINES = 8;
-
+  
   bool create (
       c_app *app,
       t_native_window parent,
@@ -1441,7 +1441,7 @@ public:
 protected:
   void set_message (const std::string &message);
   void layout_message (int x, int y, int w, int h);
-
+  
   c_frame frame;
   c_label message_labels [MAX_MESSAGE_LINES];
   size_t message_line_count = 0;
@@ -1468,7 +1468,7 @@ public:
 
 private:
   void finish (_command_result result);
-
+  
   c_widget *response_target = nullptr;
   int64_t response_command = NBTK_CMD_NONE;
   c_textbox textbox;
@@ -1497,7 +1497,7 @@ public:
 
 private:
   void finish (_command_result result);
-
+  
   c_widget *response_target = nullptr;
   int64_t response_command = NBTK_CMD_NONE;
   c_button btn_yes;
@@ -1510,27 +1510,27 @@ public:
   class c_path_textbox : public c_textbox {
   public:
     bool on_tab (bool shift) override;
-
+    
     c_filepicker *filepicker = nullptr;
   };
-
+  
   void create (
       c_app *app,
       t_native_window parent,
       t_native_handle owner,
       const char *title);
-
+  
   virtual void show ();
-
+  
   void show_open (
       c_widget *response_target,
       int64_t command);
-
+  
   void show_save_as (
       c_widget *response_target,
       int64_t command,
       const std::string &filename = "");
-
+  
   void show_save_as (const std::string &filename = "");
   void set_save_as (bool enabled, const std::string &filename = "");
   void set_save_suffix (std::string suffix);
@@ -1540,7 +1540,7 @@ public:
   void on_command (t_command_event &event) override;
   bool on_key_down (int key) override;
   void on_close () override;
-
+  
   void scan_current_dir ();
   bool complete_path_from_textbox ();
   virtual void add_files_from_dir (
@@ -1553,9 +1553,9 @@ public:
   virtual void set_current_dir (std::string str);
   bool is_visible () const;
   std::string selected_path () const;
-
+  
   virtual void on_file_select (const std::string &filename);
-
+  
   c_frame frame;
   //c_label label_path;
   c_path_textbox text_path;
@@ -1567,7 +1567,7 @@ public:
   c_checkbox btn_show_hidden;
   c_button btn_ok;
   c_button btn_cancel;
-
+  
   std::string title;
   std::string current_dir;
   std::string combo_dir;
@@ -1592,7 +1592,7 @@ private:
       _command_result result,
       const std::string &path = "");
   void accept_path (const std::string &path);
-
+  
   c_widget *response_target = nullptr;
   int64_t response_command = NBTK_CMD_NONE;
 };

@@ -77,12 +77,12 @@ struct c_printfps {
   std::string m_str;
   uint64_t count = 0;
   uint64_t last = now_ms ();
-
+  
   c_printfps (std::string str) : m_str (std::move (str)) { }
-
+  
   inline void tick () {
     count++;
-
+    
     uint64_t now = now_ms ();
     if (now - last >= 1000) {
       std::cout << m_str << count << "\n";
@@ -113,7 +113,7 @@ extern const char *g_build_timestamp;
 static inline float gain_to_db (float gain) {
   if (gain <= 0.0f)
     return DB_SILENCE;
-
+  
   return 20.0f * log10f(gain);
 }*/
 
@@ -132,14 +132,14 @@ public:
   ~c_spectrum_analyzer ();
   c_spectrum_analyzer &operator= (const c_spectrum_analyzer &) = delete;
   c_spectrum_analyzer (const c_spectrum_analyzer &) = delete;
-
+  
   void set_samplerate (int samplerate);
   void process_block (const float *in, size_t count);
-
+  
   // Called outside the audio thread.
   bool analyze ();
   bool copy_bins (float *out, size_t count) const;
-
+  
   // On EQ graph show/hide.
   void start ();
   void stop ();
@@ -148,7 +148,7 @@ private:
   void publish_snapshot ();
   bool copy_latest_snapshot (float *out, uint64_t &sequence) const;
   void publish_magnitudes (const float *values);
-
+  
   int samplerate = 0;
   size_t write_pos = 0;
   uint64_t total_samples = 0;
@@ -159,22 +159,22 @@ private:
   std::atomic<uint64_t> published_sequence { 0 };
   uint64_t snapshot_sequences [3] = { 0 };
   uint64_t analyzed_sequence = 0;
-
+  
   std::array<float, SPECTRUM_FFT_SIZE> ring {};
   std::array<float, SPECTRUM_FFT_SIZE> snapshots [3] {};
   std::array<float, SPECTRUM_FFT_SIZE> fft_input {};
   std::array<fftwf_complex, SPECTRUM_FFT_SIZE / 2 + 1> fft_output {};
-
+  
   std::array<float, SPECTRUM_BINS> frequencies {};
   std::array<float, SPECTRUM_BINS> magnitude_work {};
   std::array<float, SPECTRUM_BINS> magnitude_buffers [3] {};
   int write_magnitudes = 0;
   std::atomic<int> published_magnitudes { -1 };
   mutable std::atomic<int> reading_magnitudes { -1 };
-
+  
   std::array<float, SPECTRUM_FFT_SIZE> window {};
   float window_sum = 0.0f;
-
+  
   fftwf_plan fft_plan = nullptr;
   std::atomic<bool> enabled { false };
   bool capture_active = false;
@@ -201,23 +201,23 @@ public:
   void set_peak (float sr, float freq, float gain_db, float q,
                  _eq_band_mode = EQ_KEEP);
   void disable ();
-
+  
   inline float process (float x) {
     const int n =
       (mode == EQ_HIPASS || mode == EQ_LOWPASS)
         ? std::clamp (slope, 1, 4)
         : 1;
-
+    
     for (int i = 0; i < n; i++) {
       const float y = b0 * x + z1 [i];
       z1 [i] = b1 * x - a1 * y + z2 [i];
       z2 [i] = b2 * x - a2 * y;
       x = y;
     }
-
+    
     return x;
   }
-
+  
   /* old version w/o slope
   inline float process (float x) {
     const float y = b0 * x + z1;
@@ -271,13 +271,13 @@ public:
   c_biquad old_bands  [EQ_NUM_BANDS];
   uint32_t coeff_xfade_pos [EQ_NUM_BANDS] = { 0 };
   uint32_t coeff_xfade_len [EQ_NUM_BANDS] = { 0 };
-
+  
   inline bool analyze_spectra () {
     const bool input_changed  = m_spectrum_input.analyze ();
     const bool output_changed = m_spectrum_output.analyze ();
     return input_changed || output_changed;
   }
-
+  
   inline void start_spectra () {
     m_spectrum_input.start ();
     m_spectrum_output.start ();
@@ -317,7 +317,7 @@ public:
 
 private:
   void update_coeffs ();
-
+  
   float samplerate = 48000.0f;
   float env = 0.0f;
   float gain = 1.0f;
@@ -327,9 +327,9 @@ private:
   float attack_coeff = 0.0f;
   int hold_coeff = 0.0f;
   float release_coeff = 0.0f;
-
+  
   bool coeffs_dirty = true;
-
+  
   std::atomic<float> display_gain = 0.0f;
 };
 
@@ -342,7 +342,7 @@ public:
   bool set_frames (uint32_t f);
   uint32_t frames () const;
   void clear ();
-
+  
   uint32_t m_delay_frames = 0;
 private:
   std::vector<float> m_buffer;
@@ -369,7 +369,7 @@ public:
   void set_samplerate (uint32_t samplerate);
   void set_blocksize (uint32_t nframes);
   size_t set_pitch_semitones (float semitones);
-  
+
 private:
   bool rebuild_for_blocksize (uint32_t nframes);
   bool rebuild_resampled_ir ();
@@ -385,11 +385,11 @@ private:
   std::vector<float> m_direct_history;
   std::vector<float> m_variable_input;
   std::vector<float> m_fft_sync_out;
-
+  
   std::vector<cpx> m_fft_out;
   std::vector<std::vector<cpx>> m_ir_fft;
   std::vector<std::vector<cpx>> m_accum_fft;
-
+  
   bool               m_loaded           = false;
   bool               m_ready            = false;
   float              m_pitch_semitones  = 0.0f;
@@ -420,7 +420,7 @@ class c_convolver {
 public:
   c_convolver () { }
   ~c_convolver () { }
-
+  
   size_t load_ir (const float *, uint32_t, uint32_t = 0) { return NB_ERROR_INTERNAL; }
   size_t load_ir_from_file (const char *, int = 0) { return NB_ERROR_INTERNAL; }
   void clear () { }
@@ -448,23 +448,23 @@ public:
   void set_samplerate (uint32_t sr);
   void set_blocksize (uint32_t bs);
   bool set_ir_pitch (float semitones);
-
+  
   size_t request_load_model (const std::string &filename = "");
   size_t load_model ();
   void unload_model ();
   void reset ();
   float calibrate (float *data, size_t sz);
   _engine_mode engine () const { return m_engine_mode; }
-
+  
   //float process_sample (float x);
   void process_block (float *in, float *out, uint32_t nframes);
-
+  
   bool ready_to_load ();
   bool loaded () const;
   std::string model_filename () const;
   std::atomic<float> trim { 1.0f };
   std::atomic<float> effective_trim { 1.0f };
-
+  
   size_t      bank            = -1;
   size_t      lane            = -1;
   std::string filename        = "";
@@ -503,21 +503,21 @@ private:
   mutable std::mutex pending_mutex;
   std::string pending_filename;
   std::atomic<bool> m_loaded { false };
-
+  
   _engine_mode m_engine_mode = ENGINE_NONE;
 };
 
 struct c_model_bank {
   size_t num_lanes = NB_NUM_MODELS;
   c_neuralamp lanes [NB_NUM_MODELS];
-
+  
   c_vudata *meter_in = nullptr;
   c_vudata *meters_out [NB_NUM_MODELS] = {};
-
+  
   std::atomic<bool> lane_mute [NB_NUM_MODELS] = {};
   int exclusive_lane = 0;       // 0 off, 1..N selected
   bool linked_calib = false;
-
+  
   uint32_t active_mask = 0;
 };
 
@@ -526,7 +526,7 @@ class c_neuralblender {
 public:
   using t_error_handler =
     std::function<void (const t_neuralblender_error &)>;
-
+  
   c_neuralblender ();
   ~c_neuralblender ();
   void set_samplerate (uint32_t sr);
@@ -648,13 +648,13 @@ private:
   std::atomic<uint32_t> pending_lane_mask { 0 };
   std::atomic<uint32_t> loaded_lane_mask  { 0 };
   t_error_handler m_error_handler;
-
+  
   bool xfade_active = false;
   uint32_t xfade_old_mask = 0;
   uint32_t xfade_new_mask = 0;
   uint32_t xfade_pos = 0;
   uint32_t xfade_len = 0;
-
+  
   bool       m_ready = false;
   uint32_t   m_samplerate = 0;
   uint32_t   m_blocksize = 0;

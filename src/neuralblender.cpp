@@ -77,9 +77,9 @@ static void clear_cpx_vector (std::vector<cpx> &v) {
 static void fade_block_in_out (float *f, size_t nframes) {
   if (!f || nframes < 3)
     return;
-
+  
   const float mid = (float) (nframes - 1) * 0.5f;
-
+  
   for (size_t i = 0; i < nframes; ++i) {
     float g = fabsf ((float) i - mid) / mid;
     f [i] *= g;
@@ -89,7 +89,7 @@ static void fade_block_in_out (float *f, size_t nframes) {
 static void fade_block_in (float *f, size_t nframes) {
   if (!f || nframes < 2)
     return;
-
+  
   const float denom = (float) (nframes - 1);
   for (size_t i = 0; i < nframes; ++i) {
     f [i] *= (float) i / denom;
@@ -99,7 +99,7 @@ static void fade_block_in (float *f, size_t nframes) {
 static void fade_block_out (float *f, size_t nframes) {
   if (!f || nframes < 2)
     return;
-
+  
   const float denom = (float) (nframes - 1);
   for (size_t i = 0; i < nframes; ++i) {
     f [i] *= 1.0f - ((float) i / denom);
@@ -130,7 +130,7 @@ static void fade_block_in (float *f, uint32_t nframes,
                            uint32_t pos, uint32_t len) {
   if (!f)
     return;
-
+  
   for (uint32_t i = 0; i < nframes; ++i)
     f [i] *= xfade_in_gain (pos + i, len);
 }
@@ -139,7 +139,7 @@ static void fade_block_out (float *f, uint32_t nframes,
                             uint32_t pos, uint32_t len) {
   if (!f)
     return;
-
+  
   for (uint32_t i = 0; i < nframes; ++i)
     f [i] *= xfade_out_gain (pos + i, len);
 }
@@ -148,11 +148,11 @@ static bool ends_with (const std::string &a, const std::string &b, bool casesens
   bool ret = true;
   size_t len_a = a.length ();
   size_t len_b = b.length ();
-
+  
   if (len_a < len_b)
     return false;
   size_t startpos = len_a - len_b;
-
+  
   for (size_t i = 0; i < len_b; i++) {
     unsigned char ca = a [startpos + i];
     unsigned char cb = b [i];
@@ -165,7 +165,7 @@ static bool ends_with (const std::string &a, const std::string &b, bool casesens
       break;
     }
   }
-
+  
   return ret;
 }
 
@@ -189,13 +189,13 @@ static bool is_supported_model_path (const std::string &path) {
 static bool parse_float (const std::string &s, float &value) {
   if (s.empty ())
     return false;
-
+  
   char *end = NULL;
   errno = 0;
   const float parsed = std::strtof (s.c_str (), &end);
   if (errno || end == s.c_str () || *end != '\0' || !std::isfinite (parsed))
     return false;
-
+  
   value = parsed;
   return true;
 }
@@ -203,44 +203,44 @@ static bool parse_float (const std::string &s, float &value) {
 static float clamp_gain_multiplier (float gain) {
   if (!std::isfinite (gain))
     return 1.0f;
-
+  
   return std::clamp (gain, db_to_gain (GAIN_DB_MIN), db_to_gain (GAIN_DB_MAX));
 }
 
 static float clamp_dry_multiplier (float gain) {
   if (!std::isfinite (gain))
     return 0.0f;
-
+  
   return std::clamp (gain, 0.0f, db_to_gain (12.0f));
 }
 
 static float clamp_calib_target_db (float db) {
   if (!std::isfinite (db))
     return DB_CALIB_TARGET_DEFAULT;
-
+  
   return std::clamp (db, CALIB_TARGET_DB_MIN, CALIB_TARGET_DB_MAX);
 }
 
 bool read_file_to_mem (const char *filename,
                        std::vector<unsigned char> &out) {
   out.clear ();
-
+  
   std::ifstream f (filename, std::ios::binary | std::ios::ate);
   if (!f)
     return false;
-
+  
   std::streamsize size = f.tellg ();
   if (size < 0)
     return false;
-
+  
   f.seekg (0, std::ios::beg);
   out.resize ((size_t) size);
-
+  
   if (size > 0 && !f.read ((char *) out.data (), size)) {
     out.clear ();
     return false;
   }
-
+  
   return true;
 }
 
@@ -248,12 +248,12 @@ bool read_file_to_mem (const char *filename,
 static bool file_is_gzipped (const char *filename) {
   if (!filename || !filename [0])
     return false;
-
+  
   unsigned char magic [2] = {};
   std::ifstream f (filename, std::ios::binary);
   if (!f.read ((char *) magic, sizeof (magic)))
     return false;
-
+  
   return magic [0] == 0x1f && magic [1] == 0x8b;
 }
 
@@ -262,16 +262,16 @@ static bool read_gzipped_json_file (
   std::vector<unsigned char> filedata;
   if (!read_file_to_mem (filename.c_str (), filedata))
     return false;
-
+  
   if (!c_gzip::memory_block_is_gzipped (filedata.data (), filedata.size ()))
     return false;
-
+  
   size_t json_size = 0;
   unsigned char *json_data = c_gzip::gunzip_memory_block (
       filedata.data (), filedata.size (), &json_size);
   if (!json_data)
     return false;
-
+  
   try {
     json = nlohmann::json::parse (json_data, json_data + json_size);
     free (json_data);
@@ -287,34 +287,34 @@ static bool gunzip_file_to_temp (
     const char *suffix,
     std::string &temp_filename) {
   temp_filename.clear ();
-
+  
   std::vector<unsigned char> filedata;
   if (!read_file_to_mem (filename.c_str (), filedata))
     return false;
-
+  
   if (!c_gzip::memory_block_is_gzipped (filedata.data (), filedata.size ()))
     return false;
-
+  
   size_t data_size = 0;
   unsigned char *data = c_gzip::gunzip_memory_block (
       filedata.data (), filedata.size (), &data_size);
   if (!data)
     return false;
-
+  
   std::string tmpl = "/tmp/neuralblender_XXXXXX";
   if (suffix)
     tmpl += suffix;
-
+  
   std::vector<char> path (tmpl.begin (), tmpl.end ());
   path.push_back ('\0');
-
+  
   const int suffix_len = suffix ? (int) strlen (suffix) : 0;
   int fd = mkstemps (path.data (), suffix_len);
   if (fd < 0) {
     free (data);
     return false;
   }
-
+  
   bool ok = true;
   size_t written = 0;
   while (written < data_size) {
@@ -325,15 +325,15 @@ static bool gunzip_file_to_temp (
     }
     written += (size_t) n;
   }
-
+  
   close (fd);
   free (data);
-
+  
   if (!ok) {
     unlink (path.data ());
     return false;
   }
-
+  
   temp_filename = path.data ();
   return true;
 }
@@ -356,7 +356,7 @@ static sf_count_t sndfile_mem_seek (
   t_sndfile_mem *m = (t_sndfile_mem *) user_data;
   if (!m)
     return -1;
-
+  
   sf_count_t newpos = 0;
   switch (whence) {
     case SEEK_SET:
@@ -371,12 +371,12 @@ static sf_count_t sndfile_mem_seek (
     default:
       return -1;
   }
-
+  
   if (newpos < 0)
     return -1;
   if (newpos > m->size)
     newpos = m->size;
-
+  
   m->pos = newpos;
   return m->pos;
 }
@@ -386,12 +386,12 @@ static sf_count_t sndfile_mem_read (
   t_sndfile_mem *m = (t_sndfile_mem *) user_data;
   if (!m || !ptr || count <= 0)
     return 0;
-
+  
   const sf_count_t remaining = m->size - m->pos;
   const sf_count_t nread = std::min (count, remaining);
   if (nread <= 0)
     return 0;
-
+  
   memcpy (ptr, m->data + m->pos, (size_t) nread);
   m->pos += nread;
   return nread;
@@ -420,15 +420,15 @@ static std::mutex g_fftw_planner_mutex;
 
 c_spectrum_analyzer::c_spectrum_analyzer () { CP
   constexpr float two_pi = M_PI * 2.0f;
-
+  
   for (size_t i = 0; i < window.size (); ++i) {
     const float phase =
       two_pi * (float) i / (float) (window.size () - 1);
-
+    
     window [i] = 0.5f - 0.5f * cosf (phase);
     window_sum += window [i];
   }
-
+  
   {
     std::lock_guard<std::mutex> lock (g_fftw_planner_mutex);
     fft_plan = fftwf_plan_dft_r2c_1d (
@@ -455,7 +455,7 @@ void c_spectrum_analyzer::set_samplerate (int sr) {
 void c_spectrum_analyzer::publish_snapshot () {
   float *dst = snapshots [write_snapshot].data ();
   const size_t front = SPECTRUM_FFT_SIZE - write_pos;
-
+  
   memcpy (dst, ring.data () + write_pos, front * sizeof (float));
   if (write_pos > 0) {
     memcpy (
@@ -463,13 +463,13 @@ void c_spectrum_analyzer::publish_snapshot () {
       ring.data (),
       write_pos * sizeof (float));
   }
-
+  
   const uint64_t sequence =
     published_sequence.load (std::memory_order_relaxed) + 1;
   snapshot_sequences [write_snapshot] = sequence;
   published_sequence.store (sequence, std::memory_order_release);
   published_snapshot.store (write_snapshot, std::memory_order_release);
-
+  
   const int reader = reading_snapshot.load (std::memory_order_acquire);
   for (int i = 1; i < 3; ++i) {
     const int candidate = (write_snapshot + i) % 3;
@@ -484,18 +484,18 @@ bool c_spectrum_analyzer::copy_latest_snapshot (
     float *out, uint64_t &sequence) const {
   if (!out)
     return false;
-
+  
   for (;;) {
     const int index = published_snapshot.load (std::memory_order_acquire);
     if (index < 0)
       return false;
-
+    
     reading_snapshot.store (index, std::memory_order_release);
     if (published_snapshot.load (std::memory_order_acquire) != index) {
       reading_snapshot.store (-1, std::memory_order_release);
       continue;
     }
-
+    
     memcpy (out, snapshots [index].data (), SPECTRUM_FFT_SIZE * sizeof (float));
     sequence = snapshot_sequences [index];
     reading_snapshot.store (-1, std::memory_order_release);
@@ -506,14 +506,14 @@ bool c_spectrum_analyzer::copy_latest_snapshot (
 void c_spectrum_analyzer::publish_magnitudes (const float *values) {
   if (!values)
     return;
-
+  
   memcpy (
     magnitude_buffers [write_magnitudes].data (),
     values,
     SPECTRUM_BINS * sizeof (float));
-
+  
   published_magnitudes.store (write_magnitudes, std::memory_order_release);
-
+  
   const int reader = reading_magnitudes.load (std::memory_order_acquire);
   for (int i = 1; i < 3; ++i) {
     const int candidate = (write_magnitudes + i) % 3;
@@ -536,23 +536,23 @@ void c_spectrum_analyzer::process_block (const float *buf, size_t count) {
       published_snapshot.store (-1, std::memory_order_release);
     }
   }
-
+  
   if (!capture_active || !buf || count == 0)
     return;
-
+  
   while (count > 0) {
     const size_t until_wrap = SPECTRUM_FFT_SIZE - write_pos;
     const uint64_t until_snapshot = next_snapshot_at - total_samples;
     const size_t chunk = std::min (
       count,
       std::min (until_wrap, (size_t) until_snapshot));
-
+    
     memcpy (ring.data () + write_pos, buf, chunk * sizeof (float));
     write_pos = (write_pos + chunk) % SPECTRUM_FFT_SIZE;
     total_samples += chunk;
     buf += chunk;
     count -= chunk;
-
+    
     if (total_samples == next_snapshot_at) {
       publish_snapshot ();
       next_snapshot_at += SPECTRUM_HOP_SIZE;
@@ -564,46 +564,46 @@ bool c_spectrum_analyzer::analyze () {
   if (!enabled.load (std::memory_order_acquire) ||
       !fft_plan || samplerate <= 0 || window_sum <= 0.0f)
     return false;
-
+  
   uint64_t sequence = 0;
   if (!copy_latest_snapshot (fft_input.data (), sequence) ||
       sequence == analyzed_sequence)
     return false;
-
+  
   for (size_t i = 0; i < fft_input.size (); ++i)
     fft_input [i] *= window [i];
-
+  
   fftwf_execute (fft_plan);
-
+  
   const float fft_bin_hz = (float) samplerate / (float) SPECTRUM_FFT_SIZE;
   const float magnitude_scale = 2.0f / window_sum;
   const int last_fft_bin = SPECTRUM_FFT_SIZE / 2;
-
+  
   auto fft_magnitude = [&] (int bin) {
     const float re = fft_output [bin] [0];
     const float im = fft_output [bin] [1];
     return sqrtf (re * re + im * im) * magnitude_scale;
   };
-
+  
   for (size_t i = 0; i < frequencies.size (); ++i) {
     const float fft_position = frequencies [i] / fft_bin_hz;
     if (fft_position < 0.0f || fft_position >= (float) last_fft_bin) {
       magnitude_work [i] = -120.0f;
       continue;
     }
-
+    
     const int bin0 = (int) floorf (fft_position);
     const int bin1 = std::min (bin0 + 1, last_fft_bin);
     const float fraction = fft_position - (float) bin0;
     const float magnitude =
       fft_magnitude (bin0) +
       (fft_magnitude (bin1) - fft_magnitude (bin0)) * fraction;
-
+    
     magnitude_work [i] = std::max (
       -120.0f,
       20.0f * log10f (std::max (magnitude, 1.0e-6f)));
   }
-
+  
   publish_magnitudes (magnitude_work.data ());
   analyzed_sequence = sequence;
   return true;
@@ -612,18 +612,18 @@ bool c_spectrum_analyzer::analyze () {
 bool c_spectrum_analyzer::copy_bins (float *out, size_t count) const {
   if (!out || count == 0)
     return false;
-
+  
   for (;;) {
     const int index = published_magnitudes.load (std::memory_order_acquire);
     if (index < 0)
       return false;
-
+    
     reading_magnitudes.store (index, std::memory_order_release);
     if (published_magnitudes.load (std::memory_order_acquire) != index) {
       reading_magnitudes.store (-1, std::memory_order_release);
       continue;
     }
-
+    
     const size_t copy_count = std::min (count, (size_t) SPECTRUM_BINS);
     memcpy (out, magnitude_buffers [index].data (), copy_count * sizeof (float));
     reading_magnitudes.store (-1, std::memory_order_release);
@@ -675,7 +675,7 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
       a0_ =  1.0f + alpha / a;
       a1_ = -2.0f * cw;
       a2_ =  1.0f - alpha / a;
-
+      
       inv_a0 = 1.0f / a0_;
     break;
     
@@ -686,10 +686,10 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
       a0_ =  1.0f + alpha;
       a1_ = -2.0f * cw;
       a2_ =  1.0f - alpha;
-
+      
       inv_a0 = 1.0f / a0_;
     break;
-
+    
     case EQ_HIPASS:
       b0_ =  (1.0f + cw) * 0.5f;
       b1_ = -(1.0f + cw);
@@ -697,56 +697,56 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
       a0_ =   1.0f + alpha;
       a1_ =  -2.0f * cw;
       a2_ =   1.0f - alpha;
-
+      
       inv_a0 = 1.0f / a0_;
     break;
-
+    
     case EQ_LOWSHELF: {
-
+    
       float A = powf (10.0f, gain_db / 40.0f);
       float sqrtA = sqrtf (A);
-
+      
       // shelf slope version
       float S = std::clamp (q, 0.01f, 1.0f);
       float shelf_alpha = sw * 0.5f *
         sqrtf (std::max (0.0f, (A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f));
-
+      
       b0_ =        A * ((A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha);
       b1_ = 2.0f * A * ((A - 1.0f) - (A + 1.0f) * cw);
       b2_ =        A * ((A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha);
       a0_ =             (A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha;
       a1_ = -2.0f *    ((A - 1.0f) + (A + 1.0f) * cw);
       a2_ =             (A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha;
-
+      
       inv_a0 = 1.0f / a0_;
     }
     break;
-
+    
     case EQ_HISHELF: {
-
+    
       float A = powf (10.0f, gain_db / 40.0f);
       float sqrtA = sqrtf (A);
-
+      
       float S = std::clamp (q, 0.01f, 1.0f);
       float shelf_alpha = sw * 0.5f *
         sqrtf (std::max (0.0f, (A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f));
-
+      
       b0_ =         A * ((A + 1.0f) + (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha);
       b1_ = -2.0f * A * ((A - 1.0f) + (A + 1.0f) * cw);
       b2_ =         A * ((A + 1.0f) + (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha);
       a0_ =              (A + 1.0f) - (A - 1.0f) * cw + 2.0f * sqrtA * shelf_alpha;
       a1_ =      2.0f * ((A - 1.0f) - (A + 1.0f) * cw);
       a2_ =              (A + 1.0f) - (A - 1.0f) * cw - 2.0f * sqrtA * shelf_alpha;
-
+      
       inv_a0 = 1.0f / a0_;
     }
     break;
-
+    
     case EQ_KEEP: // ...default to off?
       disable ();
       return;
   }
-
+  
   b0 = b0_ * inv_a0;
   b1 = b1_ * inv_a0;
   b2 = b2_ * inv_a0;
@@ -773,7 +773,7 @@ float g_defaultfreqs [] = {   50.0f,   100.0f,   250.0f,   500.0f,
 static uint32_t eq_param_xfade_samples_for_rate (int samplerate) {
   if (samplerate <= 0)
     return 1;
-
+  
   return std::max (
     1u,
     (uint32_t) lrintf ((float) samplerate * EQ_PARAM_XFADE_MS * 0.001f));
@@ -783,13 +783,13 @@ void c_eq::set_samplerate (int sr) {
   samplerate = sr;
   m_spectrum_input.set_samplerate (sr);
   m_spectrum_output.set_samplerate (sr);
-
+  
   if (samplerate <= 0) {
     for (int i = 0; i < EQ_NUM_BANDS; i++)
       bands [i].disable ();
     return;
   }
-
+  
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     old_bands [i].mode = EQ_OFF;
     coeff_xfade_pos [i] = 0;
@@ -807,19 +807,19 @@ void c_eq::set_samplerate (int sr) {
 float c_biquad::response_db (float freq, float samplerate) const {
   if (mode == EQ_OFF || samplerate <= 0.0f)
     return 0.0f;
-
+  
   const float w0 = 2.0f * M_PI * freq / samplerate;
-
+  
   const float c1 = cosf (w0);
   const float s1 = sinf (w0);
   const float c2 = cosf (2.0f * w0);
   const float s2 = sinf (2.0f * w0);
-
+  
   const float nr =   b0 + b1 * c1 + b2 * c2;
   const float ni =      - b1 * s1 - b2 * s2;
   const float dr = 1.0f + a1 * c1 + a2 * c2;
   const float di =      - a1 * s1 - a2 * s2;
-
+  
   const float n2 = nr * nr + ni * ni;
   const float d2 = std::max (dr * dr + di * di, 1.0e-20f);
   const float mag = sqrtf (n2 / d2);
@@ -827,7 +827,7 @@ float c_biquad::response_db (float freq, float samplerate) const {
   float slope_factor = 1.0f;
   if (mode == EQ_HIPASS || mode == EQ_LOWPASS)
     slope_factor = (float) std::clamp (slope, 1, 4);
-    
+  
   return 20.0f * log10f (std::max (mag, 1.0e-20f)) * slope_factor;
 }
 
@@ -836,7 +836,7 @@ c_eq::c_eq () {
 }
 
 void c_eq::reset () {
-  
+
   master_gain_db = 0.0f;
   for (int i = 0; i < EQ_NUM_BANDS; i++) {
     enabled [i] = false;
@@ -864,7 +864,7 @@ void c_eq::set_band (int band_,
                      _eq_band_mode mode_,
                      int slope_) {
   const int b = band_;
-
+  
   if (b < 0 || b >= EQ_NUM_BANDS)
     return;
   
@@ -878,14 +878,14 @@ void c_eq::set_band (int band_,
   } else if (next_mode == EQ_OFF) {
     next_mode = EQ_BELL;
   }
-
+  
   const bool changed =
     freq [b] != next_freq ||
     gain_db [b] != next_gain_db ||
     q [b] != next_q ||
     slope [b] != next_slope ||
     mode [b] != next_mode;
-
+  
   const bool start_xfade =
     changed &&
     on &&
@@ -893,7 +893,7 @@ void c_eq::set_band (int band_,
     samplerate > 0 &&
     bands [b].mode != EQ_OFF &&
     next_mode != EQ_OFF;
-
+  
   if (start_xfade) {
     old_bands [b] = bands [b];
     coeff_xfade_pos [b] = 0;
@@ -903,13 +903,13 @@ void c_eq::set_band (int band_,
     coeff_xfade_pos [b] = 0;
     coeff_xfade_len [b] = 0;
   }
-
+  
   freq [b] = next_freq;
   gain_db [b] = next_gain_db;
   q [b] = next_q;
   slope [b] = next_slope;
   mode [b] = next_mode;
-
+  
   if (samplerate <= 0) {
     bands [band_].disable ();
     return;
@@ -941,7 +941,7 @@ void c_eq::process_block (float *buf, uint32_t nframes) {
       c_biquad &band = bands [b];
       if (!enabled [b] || band.mode == EQ_OFF)
         continue;
-
+      
       if (coeff_xfade_len [b] > 0 &&
           coeff_xfade_pos [b] < coeff_xfade_len [b]) {
         c_biquad &old_band = old_bands [b];
@@ -950,7 +950,7 @@ void c_eq::process_block (float *buf, uint32_t nframes) {
             buf [i] = band.process (buf [i]);
             continue;
           }
-
+          
           const float x = buf [i];
           const float y_old = old_band.process (x);
           const float y_new = band.process (x);
@@ -959,7 +959,7 @@ void c_eq::process_block (float *buf, uint32_t nframes) {
           buf [i] = y_old + (y_new - y_old) * t;
           coeff_xfade_pos [b]++;
         }
-
+        
         if (coeff_xfade_pos [b] >= coeff_xfade_len [b]) {
           old_bands [b].mode = EQ_OFF;
           coeff_xfade_pos [b] = 0;
@@ -970,7 +970,7 @@ void c_eq::process_block (float *buf, uint32_t nframes) {
           buf [i] = band.process (buf [i]);
       }
     }
-
+    
     const float master_gain = db_to_gain (master_gain_db);
     if (fabsf (master_gain - 1.0f) > 0.000001f) {
       for (uint32_t i = 0; i < nframes; ++i)
@@ -987,7 +987,7 @@ bool c_eq::set_enabled (int band_, bool enabled_) {
   const int b = band_;
   if (b < 0 || b >= EQ_NUM_BANDS)
     return false;
-
+  
   enabled [b] = enabled_;
   if (!enabled_) {
     old_bands [b].mode = EQ_OFF;
@@ -1000,7 +1000,7 @@ bool c_eq::set_enabled (int band_, bool enabled_) {
 static void eq_to_state (const c_eq &eq, c_eq_state &state) {
   state.on = eq.on;
   state.master_gain_db = eq.master_gain_db;
-
+  
   for (int i = 0; i < EQ_NUM_BANDS; ++i) {
     state.enabled [i] = eq.enabled [i];
     state.mode [i] = eq.mode [i];
@@ -1083,7 +1083,7 @@ void c_noisegate::process_block (float *in, float *out, uint32_t nframes) {
   
   for (uint32_t i = 0; i < nframes; ++i) {
     float x = fabsf (in [i]);
-
+    
     float coeff = (x > env) ? attack_coeff : release_coeff;
     env = coeff * env + (1.0f - coeff) * x;
     
@@ -1119,7 +1119,7 @@ bool c_delayline::set_frames (uint32_t frames) {
   debug ("frames=%d", (int) frames);
   if (frames >= m_buffer.size ())
     return false;
-
+  
   m_delay_frames = frames;
   return true;
 }
@@ -1135,17 +1135,17 @@ void c_delayline::clear () { CP
 
 void c_delayline::process_block (float *in, float *out, uint32_t nframes) {
   if (!nframes) return;
-
+  
   const uint32_t size = (uint32_t) m_buffer.size ();
-
+  
   for (uint32_t i = 0; i < nframes; ++i) {
     m_buffer [m_writepos] = in [i];
-
+    
     uint32_t readpos =
       (m_writepos + size - m_delay_frames) % size;
-
+    
     out [i] = m_buffer [readpos];
-
+    
     m_writepos++;
     if (m_writepos >= size)
       m_writepos = 0;
@@ -1165,7 +1165,7 @@ static size_t read_wav (const char *filename, std::vector<float> &v, int channel
   debug ("start");
   
   v.clear ();
-
+  
   SF_INFO info { };
   SNDFILE *f = NULL;
 #ifdef HAVE_GZIP
@@ -1174,20 +1174,20 @@ static size_t read_wav (const char *filename, std::vector<float> &v, int channel
   const unsigned char *actualdata = NULL;
   size_t actualsize = 0;
   t_sndfile_mem memfile {};
-
+  
   if (file_is_gzipped (filename)) {
     if (!read_file_to_mem (filename, filedata)) {
       std::cerr << "NeuralBlender: Error: failed to read gzipped WAV file: " << filename << "\n";
       return NB_ERROR_FILE_READ_GZIP;
     }
-
+    
     gzip_data = c_gzip::gunzip_memory_block (
         filedata.data (), filedata.size (), &actualsize);
     if (!gzip_data) {
       std::cerr << "NeuralBlender: Error: failed to decompress WAV file: " << filename << "\n";
       return NB_ERROR_FILE_FORMAT_GZIP;
     }
-
+    
     actualdata = gzip_data;
     memfile.data = actualdata;
     memfile.size = (sf_count_t) actualsize;
@@ -1199,11 +1199,11 @@ static size_t read_wav (const char *filename, std::vector<float> &v, int channel
       return NB_ERROR_FILE_FORMAT_GZIP;
     }
   }
-
+  
   if (!f)
 #endif
     f = sf_open (filename, SFM_READ, &info);
-
+  
   if (!f) {
     std::cerr << "NeuralBlender: Error: failed to open WAV file: " << filename << "\n";
     return NB_ERROR_FILE_FORMAT_WAV;
@@ -1212,7 +1212,7 @@ static size_t read_wav (const char *filename, std::vector<float> &v, int channel
   if (sr) *sr = info.samplerate;
   int chans = info.channels;
   sf_count_t frames = info.frames;
-
+  
   if (frames <= 0 || chans <= 0) {
     std::cerr << "NeuralBlender: Error: invalid WAV format in " << filename << "\n";
     sf_close (f);
@@ -1222,7 +1222,7 @@ static size_t read_wav (const char *filename, std::vector<float> &v, int channel
 #endif
     return NB_ERROR_FILE_SUBFORMAT_WAV;
   }
-
+  
   if (channel < 0 || channel >= chans) {
     std::cerr << "NeuralBlender: Error: " << filename << " does not have channel " << channel << "\n";
     sf_close (f);
@@ -1232,7 +1232,7 @@ static size_t read_wav (const char *filename, std::vector<float> &v, int channel
 #endif
     return NB_ERROR_FILE_SUBFORMAT_WAV;
   }
-
+  
   const double seconds =
       info.samplerate > 0 ? (double) frames / (double) info.samplerate : 0.0;
   if (seconds > MAX_IR_SECONDS) {
@@ -1258,7 +1258,7 @@ static size_t read_wav (const char *filename, std::vector<float> &v, int channel
 #endif
     return NB_ERROR_MEMORY;
   }
-
+  
   std::vector<float> buf;
   try {
     buf.resize ((size_t) WAV_READ_CHUNK_FRAMES * (size_t) chans);
@@ -1271,7 +1271,7 @@ static size_t read_wav (const char *filename, std::vector<float> &v, int channel
 #endif
     return NB_ERROR_MEMORY;
   }
-
+  
   sf_count_t readframes = 0;
   while (readframes < frames) {
     const sf_count_t want =
@@ -1279,7 +1279,7 @@ static size_t read_wav (const char *filename, std::vector<float> &v, int channel
     const sf_count_t got = sf_readf_float (f, buf.data (), want);
     if (got <= 0)
       break;
-
+    
     try {
       for (sf_count_t i = 0; i < got; ++i)
         v.push_back (buf [(size_t) chans * (size_t) i + (size_t) channel]);
@@ -1293,10 +1293,10 @@ static size_t read_wav (const char *filename, std::vector<float> &v, int channel
       v.clear ();
       return NB_ERROR_MEMORY;
     }
-
+    
     readframes += got;
   }
-
+  
   sf_close (f);
 #ifdef HAVE_GZIP
   if (gzip_data)
@@ -1329,18 +1329,18 @@ c_convolver::~c_convolver () { CP
 static uint32_t ceil_div_u32 (size_t a, uint32_t b) {
   if (!b)
     return 0;
-
+  
   return (uint32_t) ((a + (size_t) b - 1) / (size_t) b);
 }
 
 static void convolver_remove_dc (std::vector<float> &v) {
   if (v.empty ())
     return;
-
+  
   double sum = 0.0;
   for (float f : v)
     sum += (double) f;
-
+  
   const float dc = (float) (sum / (double) v.size ());
   for (float &f : v)
     f -= dc;
@@ -1352,7 +1352,7 @@ static void convolver_trim_trailing_silence (
     float threshold) {
   
   size_t n = v.size ();
-
+  
   while (n > 0 && fabsf (v [n - 1]) <= threshold)
     n--;
   
@@ -1362,33 +1362,33 @@ static void convolver_trim_trailing_silence (
 /* WINDOWED-SINC / HANN RESAMPLING FUNCTIONS
 
   Conceptually, for each output sample:
-
+  
   const double source_pos = output_index * input_rate / output_rate;
   const int center = floor(source_pos);
   const double fraction = source_pos - center;
-
+  
   output[output_index] =
     sum(input[center + tap] * windowed_sinc(tap - fraction));
-
+  
   The important downsampling detail is:
-
+  
   cutoff = std::min(1.0, output_rate / input_rate);
 */
 
 static double sinc (double x) {
   if (std::abs (x) < 1.0e-12)
     return 1.0;
-
+  
   const double pix = M_PI * x;
   return std::sin (pix) / pix;
 }
 
 static double hann_window (double x, int half_taps) {
   const double distance = std::abs (x);
-
+  
   if (distance > (double) half_taps)
     return 0.0;
-
+  
   return 0.5 +
          0.5 * std::cos (M_PI * distance / (double) half_taps);
 }
@@ -1407,62 +1407,62 @@ static bool resample_audio (
     std::vector<float> &out,
     double ratio) {
   CP
-
+  
   if (in.empty () || !std::isfinite (ratio) || ratio <= 0.0) {
     out.clear ();
     return false;
   }
-
+  
   if (std::abs (ratio - 1.0) < 1.0e-12) {
     out = in;
     return true;
   }
-
+  
   const size_t out_count = (size_t) std::llround (
     (double) in.size () * ratio);
-
+  
   if (out_count == 0) {
     out.clear ();
     return false;
   }
-
+  
   constexpr int half_taps = 32;
-
+  
   const double source_step = 1.0 / ratio;
-
+  
   // Leave a transition band below the destination Nyquist frequency.
   const double cutoff =
     0.95 * std::min (1.0, ratio);
-
+  
   out.resize (out_count);
-
+  
   for (size_t i = 0; i < out_count; ++i) {
     const double source_pos = (double) i * source_step;
     const int center = (int) std::floor (source_pos);
     const double fraction = source_pos - (double) center;
-
+    
     double sum = 0.0;
     double coefficient_sum = 0.0;
-
+    
     for (int tap = -half_taps; tap <= half_taps; ++tap) {
       const int input_index = center + tap;
       const double distance = (double) tap - fraction;
       const double coefficient =
         windowed_sinc (distance, cutoff, half_taps);
-
+      
       if (input_index >= 0 &&
           input_index < (int) in.size ()) {
         sum += (double) in [input_index] * coefficient;
         coefficient_sum += coefficient;
       }
     }
-
+    
     if (std::abs (coefficient_sum) > 1.0e-12)
       sum /= coefficient_sum;
-
+    
     out [i] = (float) sum;
   }
-
+  
   return true;
 }
 
@@ -1472,20 +1472,20 @@ static bool convolver_resample_ir (
     uint32_t src_samplerate,
     uint32_t dst_samplerate,
     float semitones) {
-
+  
   if (src.empty () || !src_samplerate || !dst_samplerate) {
     dst.clear ();
     return false;
   }
-
+  
   semitones = std::clamp (semitones, -12.0f, 12.0f);
-
+  
   const double pitch_ratio =
     std::pow (2.0, (double) semitones / 12.0);
-
+  
   const double samplerate_ratio =
     (double) dst_samplerate / (double) src_samplerate;
-
+  
   const double resample_ratio =
     samplerate_ratio / pitch_ratio;
 
@@ -1497,7 +1497,7 @@ static bool convolver_resample_ir (
   data.data_out = dst.data ();
   data.output_frames = (long) dst.size ();
   data.src_ratio = resample_ratio;
-
+  
   const int err = src_simple (&data, SRC_SINC_MEDIUM_QUALITY, 1);
   if (!err && data.output_frames_gen > 0) {
     dst.resize ((size_t) data.output_frames_gen);
@@ -1510,44 +1510,44 @@ static bool convolver_resample_ir (
     dst.clear ();
     return false;
   }
-
+  
   if (!resample_audio (src, dst, resample_ratio))
     return false;
-
+  
   convolver_trim_trailing_silence (dst);
   return !dst.empty ();
 }
-  
+
 size_t c_convolver::load_ir (
     const float *ir,
     uint32_t nframes,
     uint32_t samplerate) { CP
-
+  
   if (!ir || nframes == 0)
     return NB_ERROR_FILE_FORMAT_WAV;
-
+  
   // keep canonical copy for pitch/blocksize rebuilds
   m_ir_source.assign (ir, ir + nframes);
   m_ir_samplerate = samplerate;
-
+  
   // cleanup
   convolver_remove_dc (m_ir_source);
   convolver_trim_trailing_silence (m_ir_source);
   // TODO: maybe normalize m_ir_source level?
-
+  
   if (m_ir_source.empty ()) {
     clear ();
     return NB_ERROR_FILE_EMPTY;
   }
-
+  
   if (!rebuild_resampled_ir ()) {
     clear ();
     return NB_ERROR_CONVOLVER;
   }
-
+  
   m_loaded = true;
   m_ready = false;
-
+  
   // if block size is already known, build realtime FFT state
   if (m_blocksize > 0) {
     if (!rebuild_for_blocksize (m_blocksize)) {
@@ -1555,21 +1555,21 @@ size_t c_convolver::load_ir (
       return NB_ERROR_CONVOLVER;
     }
   }
-
+  
   return NB_ERROR_NONE;
 }
 
 size_t c_convolver::load_ir_from_file (const char *filename, int channel) {
   if (!filename || !filename [0])
     return NB_ERROR_FILE_NOTFOUND_WAV;
-
+  
   std::vector<float> ir;
   int sr = 0;
-
+  
   size_t ret = read_wav (filename, ir, channel, &sr);
   if (ret != NB_ERROR_NONE)
     return ret;
-
+  
   return load_ir (ir.data (), (uint32_t) ir.size (), (uint32_t) sr);
 }
 
@@ -1586,10 +1586,10 @@ void c_convolver::reset () {
   std::fill (m_direct_history.begin (), m_direct_history.end (), 0.0f);
   m_direct_pos = 0;
   m_variable_input.clear ();
-
+  
   for (std::vector<cpx> &slot : m_accum_fft)
     clear_cpx_vector (slot);
-
+  
   std::fill (m_overlap.begin (), m_overlap.end (), 0.0f);
   m_accum_pos = 0;
 }
@@ -1605,16 +1605,16 @@ bool c_convolver::ready () const {
 void c_convolver::set_samplerate (uint32_t samplerate) {
   if (!samplerate || samplerate == m_samplerate)
     return;
-
+  
   m_samplerate = samplerate;
   if (!m_loaded)
     return;
-
+  
   if (!rebuild_resampled_ir ()) {
     m_ready = false;
     return;
   }
-
+  
   if (m_blocksize > 0)
     rebuild_for_blocksize (m_blocksize);
 }
@@ -1622,9 +1622,9 @@ void c_convolver::set_samplerate (uint32_t samplerate) {
 void c_convolver::set_blocksize (uint32_t nframes) {
   if (nframes == m_blocksize && (!m_loaded || m_ready))
     return;
-
+  
   m_blocksize = nframes;
-
+  
   if (m_loaded && m_blocksize > 0)
     rebuild_for_blocksize (m_blocksize);
 }
@@ -1633,17 +1633,17 @@ size_t c_convolver::set_pitch_semitones (float semitones) {
   semitones = std::clamp (semitones, -12.0f, 12.0f);
   if (semitones == m_pitch_semitones)
     return NB_ERROR_NONE;
-
+  
   m_pitch_semitones = semitones;
   if (!m_loaded)
     return NB_ERROR_NONE;
-
+  
   if (!rebuild_resampled_ir ())
     return NB_ERROR_CONVOLVER;
-
+  
   if (m_blocksize > 0)
     return rebuild_for_blocksize (m_blocksize) ? NB_ERROR_NONE : NB_ERROR_CONVOLVER;
-
+  
   m_ready = false;
   return NB_ERROR_NONE;
 }
@@ -1785,7 +1785,7 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
         m_fftw_time_in,
         m_fftw_freq_out,
         FFTW_ESTIMATE);
-
+    
     m_inverse_plan =
       fftwf_plan_dft_c2r_1d (
         (int) m_fft_size,
@@ -1802,9 +1802,9 @@ bool c_convolver::rebuild_for_blocksize (uint32_t blocksize) {
   // pre-transform each IR partition
   for (uint32_t p = 0; p < m_num_partitions; ++p) {
     std::fill (m_fftw_time_in, m_fftw_time_in + m_fft_size, 0.0f);
-
+    
     const size_t ir_offset = (size_t) p * (size_t) m_partition_size;
-
+    
     for (uint32_t j = 0; j < m_partition_size; ++j) {
       if (ir_offset + j < m_ir.size ())
         m_fftw_time_in [j] = m_ir [ir_offset + j];
@@ -1846,7 +1846,7 @@ void c_convolver::process_fft_block (const float *in, float *out) {
   //    add each result into a future accumulation slot.
   for (uint32_t p = 0; p < m_num_partitions; ++p) {
     const uint32_t slot = (m_accum_pos + p) % m_num_partitions;
-
+    
     for (uint32_t bin = 0; bin < m_freq_bins; ++bin)
       cpx_add (
         m_accum_fft [slot] [bin],
@@ -1879,7 +1879,7 @@ void c_convolver::process_fft_block (const float *in, float *out) {
 void c_convolver::update_direct_history (const float *in, uint32_t nframes) {
   if (!in || nframes == 0 || m_direct_history.empty ())
     return;
-
+  
   const uint32_t hist_size = (uint32_t) m_direct_history.size ();
   uint32_t pos = m_direct_pos;
   for (uint32_t i = 0; i < nframes; ++i) {
@@ -1900,7 +1900,7 @@ void c_convolver::process_direct_block (
   
   if (!in || !out || nframes == 0)
     return;
-
+  
   const uint32_t hist_size = (uint32_t) m_direct_history.size ();
   if (hist_size == 0) {
     if (in != out) {
@@ -1909,27 +1909,27 @@ void c_convolver::process_direct_block (
     }
     return;
   }
-
+  
   const float *ir = m_ir.data ();
   float *history = m_direct_history.data ();
   uint32_t pos = m_direct_pos;
-
+  
   for (uint32_t i = 0; i < nframes; ++i) {
     history [pos] = in [i];
-
+    
     float y = 0.0f;
     uint32_t h = pos;
     for (uint32_t k = 0; k < hist_size; ++k) {
       y += ir [k] * history [h];
       h = h == 0 ? hist_size - 1 : h - 1;
     }
-
+    
     out [i] = y;
     pos++;
     if (pos >= hist_size)
       pos = 0;
   }
-
+  
   m_direct_pos = pos;
 }
 
@@ -1937,10 +1937,10 @@ void c_convolver::process_block (
     const float *in,
     float *out,
     uint32_t nframes) {
-
+  
   if (!in || !out || !nframes)
     return;
-
+  
   if (!m_ready || m_blocksize == 0) {
     if (in != out) {
       for (uint32_t i = 0; i < nframes; ++i)
@@ -1948,18 +1948,18 @@ void c_convolver::process_block (
     }
     return;
   }
-
+  
   if (nframes == m_blocksize && m_variable_input.empty ()) {
     update_direct_history (in, nframes);
     process_fft_block (in, out);
     return;
   }
   
-  debug ("nframes=%d, m_blocksize=%d", (int) nframes, (int) m_blocksize);
-
+  //debug ("nframes=%d, m_blocksize=%d", (int) nframes, (int) m_blocksize);
+  
   m_variable_input.insert (m_variable_input.end (), in, in + nframes);
   process_direct_block (in, out, nframes);
-
+  
   while (m_variable_input.size () >= m_blocksize) {
     process_fft_block (m_variable_input.data (), m_fft_sync_out.data ());
     m_variable_input.erase (
@@ -1981,12 +1981,12 @@ static int nam_version_major_minor (const std::string &filename) {
       nlohmann::json j;
       if (!read_gzipped_json_file (filename, j))
         return -1;
-
+      
       std::string version = j.value ("version", "");
       int major = 0, minor = 0;
       if (sscanf (version.c_str (), "%d.%d", &major, &minor) != 2)
         return -1;
-
+      
       return major * 1000 + minor;
     } catch (...) {
       return -1;
@@ -1997,32 +1997,32 @@ static int nam_version_major_minor (const std::string &filename) {
   std::ifstream f (filename, std::ios::binary);
   if (!f)
     return -1;
-
+  
   std::string head (8192, '\0');
   f.read (head.data (), head.size ());
   head.resize ((size_t) f.gcount ());
-
+  
   size_t pos = head.find("\"version\"");
   if (pos == std::string::npos)
     return -1;
-
+  
   pos = head.find (':', pos);
   if (pos == std::string::npos)
     return -1;
-
+  
   pos = head.find ('"', pos);
   if (pos == std::string::npos)
     return -1;
-
+  
   size_t end = head.find ('"', pos + 1);
   if (end == std::string::npos)
     return -1;
-
+  
   int major = 0, minor = 0;
   if (sscanf (head.substr (pos + 1, end - pos - 1).c_str (),
              "%d.%d", &major, &minor) != 2)
     return -1;
-
+  
   return major * 1000 + minor;
 }
 
@@ -2040,7 +2040,7 @@ c_neuralamp::~c_neuralamp () { CP
 void c_neuralamp::set_samplerate (uint32_t sr) { CP
   if (samplerate == sr)
     return;
-
+  
   samplerate = sr;
   m_convolver.set_samplerate (sr);
   reset ();
@@ -2050,12 +2050,12 @@ void c_neuralamp::set_blocksize (uint32_t bs) { CP
   if (blocksize == bs &&
       !(m_engine_mode == ENGINE_IR && m_convolver.loaded () && !m_convolver.ready ()))
     return;
-
+  
   std::lock_guard<std::mutex> lock (model_mutex);
   if (blocksize == bs &&
       !(m_engine_mode == ENGINE_IR && m_convolver.loaded () && !m_convolver.ready ()))
     return;
-
+  
   blocksize = bs;
   if (m_convolver.loaded ())
     m_convolver.set_blocksize (bs);
@@ -2063,13 +2063,13 @@ void c_neuralamp::set_blocksize (uint32_t bs) { CP
 
 bool c_neuralamp::set_ir_pitch (float semitones) {
   semitones = std::clamp (semitones, -12.0f, 12.0f);
-
+  
   std::lock_guard<std::mutex> lock (model_mutex);
   ir_pitch_semitones = semitones;
-
+  
   if (m_engine_mode != ENGINE_IR)
     return true;
-
+  
   const bool ret = (m_convolver.set_pitch_semitones (ir_pitch_semitones) == NB_ERROR_NONE);
   if (ret) {
     reset_unlocked ();
@@ -2077,7 +2077,7 @@ bool c_neuralamp::set_ir_pitch (float semitones) {
     ramp_len = xfade_samples_for_rate (samplerate);
     ramp.store (RAMP_END, std::memory_order_release);
   }
-
+  
   return ret;
 }
 
@@ -2113,7 +2113,7 @@ size_t c_neuralamp::load_nam (const std::string &fn) { CP
         fprintf (stderr, "NeuralBlender: Failed to decompress NAM model: %s\n", fn.c_str ());
         return NB_ERROR_FILE_READ_GZIP;
       }
-
+      
       try {
         new_model = nam::get_dsp (std::filesystem::path (temp_fn));
         std::filesystem::remove (temp_fn);
@@ -2124,7 +2124,7 @@ size_t c_neuralamp::load_nam (const std::string &fn) { CP
     } else
 #endif
       new_model = nam::get_dsp (std::filesystem::path (fn));
-
+    
     if (!new_model)
     {
       fprintf (stderr,
@@ -2132,11 +2132,11 @@ size_t c_neuralamp::load_nam (const std::string &fn) { CP
               fn.c_str ());
       return NB_ERROR_FILE_READ_NAM;
     }
-
+    
     new_model->Reset (static_cast<double> (samplerate), MAX_BLOCK_SIZE); // revisit later
-
+    
     m_nam_model = std::move (new_model);
-
+    
     fprintf (stderr,
             "NeuralBlender: Loaded NAM model: %s\n",
             fn.c_str ());
@@ -2152,7 +2152,7 @@ size_t c_neuralamp::load_nam (const std::string &fn) { CP
             "NeuralBlender: NAM load failed for %s: %s\n",
             fn.c_str (),
             e.what ());
-
+    
     return NB_ERROR_FILE_READ_NAM;
   }
 }
@@ -2167,7 +2167,7 @@ size_t c_neuralamp::load_json (const std::string &fn) { CP
         fprintf (stderr, "NeuralBlender: Failed to decompress model file: %s\n", fn.c_str ());
         return NB_ERROR_FILE_READ_GZIP;
       }
-
+      
       new_model = RTNeural::json_parser::parseJson<float>(model_json);
     } else
 #endif
@@ -2177,20 +2177,20 @@ size_t c_neuralamp::load_json (const std::string &fn) { CP
         fprintf (stderr, "NeuralBlender: Could not open model file: %s\n", fn.c_str ());
         return NB_ERROR_FILE_READ_JSON;
       }
-
+      
       new_model = RTNeural::json_parser::parseJson<float>(file);
     }
-
+    
     if (!new_model) {
       fprintf (stderr, "NeuralBlender: RTNeural parser returned null: %s\n", fn.c_str ());
       return NB_ERROR_FILE_FORMAT_JSON;
     }
-
+    
     new_model->reset ();
     m_nam_model.reset ();
     m_rtneural_model = std::move (new_model);
     m_engine_mode = ENGINE_JSON;
-
+    
     fprintf (stderr, "NeuralBlender: Loaded model: %s\n", fn.c_str ());
     return NB_ERROR_NONE;
   }
@@ -2203,23 +2203,23 @@ size_t c_neuralamp::load_json (const std::string &fn) { CP
 
 size_t c_neuralamp::request_load_model (const std::string &fn) { CP
   const std::string load_fn = fn.empty () ? model_filename () : fn;
-
+  
   if (load_fn.empty ()) {
     fprintf (stderr, "NeuralBlender: No model filename specified\n");
     return NB_ERROR_FILE_NOTFOUND_NAM;
   }
-
+  
   if (!is_supported_model_path (load_fn)) {
     fprintf (stderr, "NeuralBlender: Unsupported model file type: %s\n", load_fn.c_str ());
     unload_model ();
     return NB_ERROR_FILE_FORMAT_NAM;
   }
-
+  
   {
     std::lock_guard<std::mutex> lock (pending_mutex);
     pending_filename = load_fn;
   }
-
+  
   ramp_pos = 0;
   ramp_len = xfade_samples_for_rate (samplerate);
   ramp.store (loaded () ? RAMP_START : RAMP_LOADING,
@@ -2238,7 +2238,7 @@ size_t c_neuralamp::load_model () { CP
     load_fn = pending_filename.empty () ? filename : pending_filename;
     pending_filename.clear ();
   }
-
+  
   return load_model_now (load_fn);
 }
 
@@ -2247,16 +2247,16 @@ size_t c_neuralamp::load_model_now (const std::string &load_fn) { CP
     fprintf (stderr, "NeuralBlender: No model filename specified\n");
     return NB_ERROR_FILE_NOTFOUND_NAM;
   }
-
+  
   if (!is_supported_model_path (load_fn)) {
     fprintf (stderr, "NeuralBlender: Unsupported model file type: %s\n", load_fn.c_str ());
     unload_model ();
     return NB_ERROR_FILENAME_NAM;
   }
-
+  
   std::lock_guard<std::mutex> lock (model_mutex);
   m_loaded.store (false, std::memory_order_release);
-
+  
   size_t ret = NB_ERROR_NONE;
   if (ends_with (load_fn, ".nam")
 #ifdef HAVE_GZIP
@@ -2280,7 +2280,7 @@ size_t c_neuralamp::load_model_now (const std::string &load_fn) { CP
       m_engine_mode = ENGINE_IR;
   } else
     ret = load_json (load_fn);
-
+  
   if (ret == NB_ERROR_NONE) {
     filename = load_fn;
     m_loaded.store (true, std::memory_order_release);
@@ -2300,26 +2300,26 @@ size_t c_neuralamp::load_model_now (const std::string &load_fn) { CP
     ramp_len = xfade_samples_for_rate (samplerate);
     ramp.store (RAMP_END, std::memory_order_release);
   }
-
+  
   return ret;
 }
 
 float c_neuralamp::get_block_rms (float *data, size_t nframes) {
   if (!data || nframes == 0)
     return 0.0f;
-
+  
   double sum = 0.0;
-
+  
   switch (m_engine_mode) {
     case ENGINE_NONE:
       return 0.0f;
     break;
-
+    
     case ENGINE_JSON:
       if (!m_rtneural_model) {
         return 1.0f;
       }
-
+      
       for (uint32_t i = 0; i < nframes; ++i) {
         float input [1] = { data [i] };
         float y = m_rtneural_model->forward (input);
@@ -2327,20 +2327,20 @@ float c_neuralamp::get_block_rms (float *data, size_t nframes) {
       }
       return (float) sqrt (sum / (double) nframes);
     break;
-
+    
     case ENGINE_NAM_A1:
     case ENGINE_NAM_A2:
       if (!m_nam_model) {
         return 0.0f;
       }
-
+      
       {
         std::vector<float> buf (nframes);
         NAM_SAMPLE *inputs [1]  = { data };
         NAM_SAMPLE *outputs [1] = { buf.data () };
-
+        
         m_nam_model->process (inputs, outputs, (int) nframes);
-
+        
         for (uint32_t i = 0; i < nframes; ++i) {
           const float y = buf [i];
           sum += (double) y * (double) y;
@@ -2348,16 +2348,16 @@ float c_neuralamp::get_block_rms (float *data, size_t nframes) {
       }
       return (float) sqrt (sum / (double) nframes);
     break;
-
+    
     case ENGINE_IR:
       if (!m_convolver.ready ()) {
         return 0.0f;
       }
-
+      
       {
         std::vector<float> buf (nframes);
         m_convolver.process_block (data, buf.data (), (uint32_t) nframes);
-
+        
         for (uint32_t i = 0; i < nframes; ++i) {
           const float y = buf [i];
           sum += (double) y * (double) y;
@@ -2377,7 +2377,7 @@ float c_neuralamp::calibrate (float *data, size_t size) {
   float ret = 0.0f;
   
   calib_target_db = clamp_calib_target_db (calib_target_db);
-
+  
   size_t i;
   //size_t blocksize = 128;
   // nope, we need same blocksize that the amp is using, or else calibration of
@@ -2393,7 +2393,7 @@ float c_neuralamp::calibrate (float *data, size_t size) {
         ret = std::max (ret, get_block_rms (&data[i], blocksize));
       //debug ("max %f", ret);
     }
-
+    
     const size_t left = size - i;
     if (left > 0) {
       ret = std::max (ret, get_block_rms (&data[i], left));
@@ -2463,7 +2463,7 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
     memset (out, 0, nframes * sizeof (float));
     return;
   }
-
+  
   // releases when it goes out of scope
   std::lock_guard<std::mutex> lock (model_mutex, std::adopt_lock);
   
@@ -2471,13 +2471,13 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
     case ENGINE_NONE:
       copy_with_gain (in, out, nframes, input_gain * output_gain);
       break;
-
+    
     case ENGINE_JSON:
       if (!m_rtneural_model) {
         copy_with_gain (in, out, nframes, input_gain * output_gain);
         break;
       }
-
+      
       {
         const float out_gain = output_gain * effective_trim;
         for (uint32_t i = 0; i < nframes; ++i) {
@@ -2491,25 +2491,25 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
       }
       //return;
     break;
-
+    
     case ENGINE_NAM_A1:
     case ENGINE_NAM_A2:
       if (!m_nam_model) {
         copy_with_gain (in, out, nframes, input_gain * output_gain);
         break;
       }
-
+      
       {
         NAM_SAMPLE *inputs [1]  = { in };
         NAM_SAMPLE *outputs [1] = { out };
-
+        
         if (input_gain != 1.0f) {
           for (uint32_t i = 0; i < nframes; ++i)
             in[i] *= input_gain;
         }
-
+        
         m_nam_model->process (inputs, outputs, (int) nframes);
-
+        
         const float out_gain = output_gain * effective_trim;
         for (uint32_t i = 0; i < nframes; ++i)
           if (dcflip)
@@ -2519,21 +2519,21 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
       }
       //return;
     break;
-
+    
     case ENGINE_IR:
       if (!m_convolver.ready ()) {
         copy_with_gain (in, out, nframes, input_gain * output_gain);
         break;
       }
-
+      
       {
         if (input_gain != 1.0f) {
           for (uint32_t i = 0; i < nframes; ++i)
             in [i] *= input_gain;
         }
-
+        
         m_convolver.process_block (in, out, nframes);
-
+        
         const float out_gain = output_gain * effective_trim;
         for (uint32_t i = 0; i < nframes; ++i)
           if (dcflip)
@@ -2543,7 +2543,7 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
       }
     break;
   }
-
+  
   switch (ramp.load (std::memory_order_acquire)) {
     case RAMP_START:
       //debug ("%d (%ld) RAMP_START block %ld", (int) which, (long int) this, (long int) block_counter);
@@ -2555,12 +2555,12 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
         ramp_pos += nframes;
       }
       break;
-
+    
     case RAMP_LOADING:
       //debug ("%d (%ld) RAMP_LOADING block %ld", (int) which, (long int) this, (long int) block_counter);
       memset(out, 0, nframes * sizeof(float));
       break;
-
+    
     case RAMP_WARMUP:
       //debug ("%d (%ld) RAMP_WARMUP block %ld", (int) which, (long int) this, (long int) block_counter);
       memset(out, 0, nframes * sizeof(float));
@@ -2572,7 +2572,7 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
         ramp.store (RAMP_END, std::memory_order_release);
       }
       break;
-
+    
     case RAMP_END:
       //debug ("%d (%ld) RAMP_END block %ld", (int) which, (long int) this, (long int) block_counter);
       fade_block_in (out, nframes, ramp_pos, ramp_len);
@@ -2584,7 +2584,7 @@ void c_neuralamp::process_block (float *in, float *out, uint32_t nframes) {
         ramp_pos += nframes;
       }
       break;
-
+    
     case RAMP_PLAYING:
     default:
       //debug ("%d (%ld) RAMP_PLAYING block %ld", (int) which, (long int) this, (long int) block_counter);
@@ -2601,7 +2601,7 @@ c_neuralblender::c_neuralblender () { CP
   banks [BANK_AMP].meter_in = NULL;
   banks [BANK_EQPOST].meter_in = NULL;
   banks [BANK_CAB].meter_in = NULL;
-
+  
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     banks [bank].num_lanes = NB_NUM_MODELS;
     for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
@@ -2612,7 +2612,7 @@ c_neuralblender::c_neuralblender () { CP
       banks [bank].lanes [i].dcflip = false;
     }
   }
-
+  
   c_configfile configfile;
   if (configfile.read_file ()) {
     float calib_target_db = DB_CALIB_TARGET_DEFAULT;
@@ -2639,7 +2639,7 @@ c_neuralblender::~c_neuralblender () { CP
 bool c_neuralblender::set_master_gain (float db) {
   if (!std::isfinite (db))
     return false;
-
+  
   float gain = db_to_gain (db);
   if (!std::isfinite (gain) || gain > 10.0f)
     return false; // TODO: should we allow positive gain here?
@@ -2714,7 +2714,7 @@ bool c_neuralblender::calibrate (_lane_bank bank, size_t which, bool bass) {
   debug ("bass=%d", (int) bass);
   if (which >= NB_NUM_MODELS)
     return false;
-    
+  
   float *data = (float *) data_calib_f32;
   size_t samples = data_calib_f32_len / sizeof (float);
   
@@ -2740,12 +2740,12 @@ bool c_neuralblender::calibrate_linked (_lane_bank bank, bool bass) {
   bool any_linked = false;
   float *data = (float *) data_calib_f32;
   size_t samples = data_calib_f32_len / sizeof (float);
-
+  
   if (bass) {
     data = (float *) data_calib_bass_f32;
     samples = data_calib_bass_f32_len / sizeof (float);
   }
-
+  
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     c_neuralamp &amp = which_amp (bank, i);
     if (amp.do_calib && amp.loaded ()) {
@@ -2759,10 +2759,10 @@ bool c_neuralblender::calibrate_linked (_lane_bank bank, bool bass) {
       amp.calibrate (NULL, 0);
     }
   }
-
+  
   if (!any_linked)
     return true;
-
+  
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     c_neuralamp &amp = which_amp (bank, i);
     if (amp.do_calib && amp.loaded ())
@@ -2775,30 +2775,30 @@ bool c_neuralblender::calibrate_linked (_lane_bank bank, bool bass) {
 
 void c_neuralblender::update_effective_trim () {
   size_t active_calibrated_banks = 0;
-
+  
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     const uint32_t active_mask = make_active_lane_mask ((_lane_bank) bank);
     if (!active_mask)
       continue;
-
+    
     bool bank_has_calib = false;
     for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
       if (!(active_mask & (1u << lane)))
         continue;
-
+      
       if (banks [bank].lanes [lane].do_calib) {
         bank_has_calib = true;
         break;
       }
     }
-
+    
     if (bank_has_calib)
       ++active_calibrated_banks;
   }
-
+  
   const float divisor = active_calibrated_banks > 0 ?
     (float) active_calibrated_banks : 1.0f;
-
+  
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
       c_neuralamp &amp = banks [bank].lanes [lane];
@@ -2807,7 +2807,7 @@ void c_neuralblender::update_effective_trim () {
         amp.effective_trim.store (1.0f, std::memory_order_release);
         continue;
       }
-
+      
       amp.effective_trim.store (
         db_to_gain (gain_to_db (trim) / divisor),
         std::memory_order_release);
@@ -2824,7 +2824,7 @@ void c_neuralblender::set_samplerate (uint32_t sr) { CP
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     if (banks [bank].meter_in)
       banks [bank].meter_in->samplerate = (int) sr;
-
+    
     for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
       banks [bank].lanes [i].set_samplerate (sr);
       if (banks [bank].meters_out [i])
@@ -2837,23 +2837,23 @@ void c_neuralblender::set_samplerate (uint32_t sr) { CP
     meter_masterout->samplerate = (int) sr;
   
   m_conv_presence.set_samplerate (sr);
-
+  
   eq_pre.set_samplerate (sr);
   eq_post.set_samplerate (sr);
-
+  
   debug ("end");
 }
 
 void c_neuralblender::set_blocksize (uint32_t bs) { CP
   if (m_blocksize == bs)
     return;
-
+  
   m_blocksize = bs;
-
+  
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     if (banks [bank].meter_in)
       banks [bank].meter_in->bufsize = (int) bs;
-
+    
     for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
       banks [bank].lanes [i].set_blocksize (bs);
       if (banks [bank].meters_out [i])
@@ -2864,7 +2864,7 @@ void c_neuralblender::set_blocksize (uint32_t bs) { CP
     meter_masterin->bufsize = (int) bs;
   if (meter_masterout)
     meter_masterout->bufsize = (int) bs;
-
+  
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     m_delay_bufs [i].resize (MAX_BLOCK_SIZE);
     m_model_bufs [i].resize (MAX_BLOCK_SIZE);
@@ -2907,7 +2907,7 @@ bool c_neuralblender::set_delay_frames (_lane_bank bank, size_t which, uint32_t 
 bool c_neuralblender::set_gain_in (_lane_bank bank, size_t which, float g) {
   if (which >= NB_NUM_MODELS)
     return false;
-
+  
   which_amp (bank, which).gain_in = clamp_gain_multiplier (g);
   return true;
 }
@@ -2915,14 +2915,14 @@ bool c_neuralblender::set_gain_in (_lane_bank bank, size_t which, float g) {
 bool c_neuralblender::set_ir_pitch (_lane_bank bank, size_t which, float semitones) {
   if (which >= NB_NUM_MODELS)
     return false;
-
+  
   return which_amp (bank, which).set_ir_pitch (semitones);
 }
 
 bool c_neuralblender::set_gain_out (_lane_bank bank, size_t which, float g) {
   if (which >= NB_NUM_MODELS)
     return false;
-
+  
   which_amp (bank, which).gain_out = clamp_gain_multiplier (g);
   return true;
 }
@@ -2930,7 +2930,7 @@ bool c_neuralblender::set_gain_out (_lane_bank bank, size_t which, float g) {
 bool c_neuralblender::set_dry_out (_lane_bank bank, size_t which, float g) {
   if (which >= NB_NUM_MODELS)
     return false;
-
+  
   which_amp (bank, which).dry_out = clamp_dry_multiplier (g);
   return true;
 }
@@ -2938,7 +2938,7 @@ bool c_neuralblender::set_dry_out (_lane_bank bank, size_t which, float g) {
 bool c_neuralblender::set_lane_mute (_lane_bank bank, size_t which, bool muted) {
   if (which >= NB_NUM_MODELS)
     return false;
-
+  
   which_bank (bank).lane_mute [which].store (
     muted, std::memory_order_relaxed);
   request_mix_update ();
@@ -2950,7 +2950,7 @@ bool c_neuralblender::set_exclusive_lane (_lane_bank bank, int lane) {
     lane = 0;
   if (lane > (int) NB_NUM_MODELS)
     lane = (int) NB_NUM_MODELS;
-
+  
   which_bank (bank).exclusive_lane = lane;
   request_mix_update ();
   return true;
@@ -2979,14 +2979,14 @@ void c_neuralblender::set_cab_bypass (bool b) {
 static c_eq *eq_for_bank (c_neuralblender *blender, _lane_bank bank) {
   if (!blender)
     return nullptr;
-
+  
   switch (bank) {
     case BANK_EQPRE:
       return &blender->eq_pre;
-
+    
     case BANK_EQPOST:
       return &blender->eq_post;
-
+    
     default:
       return nullptr;
   }
@@ -2996,7 +2996,7 @@ bool c_neuralblender::set_eq_bypass (_lane_bank bank, bool bypass) {
   c_eq *eq = eq_for_bank (this, bank);
   if (!eq)
     return false;
-
+  
   eq->on = !bypass;
   request_mix_update ();
   return true;
@@ -3006,7 +3006,7 @@ bool c_neuralblender::set_eq_master_gain_db (_lane_bank bank, float db) {
   c_eq *eq = eq_for_bank (this, bank);
   if (!eq)
     return false;
-
+  
   eq->set_master_gain_db (std::clamp (db, -36.0f, 36.0f));
   return true;
 }
@@ -3020,11 +3020,11 @@ bool c_neuralblender::set_eq_band (
     float freq,
     float gain_db,
     float q) {
-
+  
   c_eq *eq = eq_for_bank (this, bank);
   if (!eq || band >= EQ_NUM_BANDS)
     return false;
-
+  
   eq->set_enabled ((int) band, enabled);
   eq->set_band ((int) band, freq, gain_db, q, mode, slope);
   return true;
@@ -3033,7 +3033,7 @@ bool c_neuralblender::set_eq_band (
 bool c_neuralblender::lane_mute (_lane_bank bank, size_t which) const {
   if (which >= NB_NUM_MODELS)
     return false;
-
+  
   return which_bank (bank).lane_mute [which].load (
     std::memory_order_relaxed);
 }
@@ -3057,7 +3057,7 @@ bool c_neuralblender::cab_bypass () const {
 float c_neuralblender::delay_ms (_lane_bank bank, size_t which) const {
   if (which >= NB_NUM_MODELS || !m_samplerate)
     return 0.0f;
-
+  
   return (float) which_amp (bank, which).delay.frames () *
     1000.0f / (float) m_samplerate;
 }
@@ -3070,27 +3070,27 @@ float c_neuralblender::delay_ms (size_t which) const {
 // enabled to that state
 bool c_neuralblender::consistent_calib_state (bool &enabled,
     c_neuralblender_state &state) const {
-
+  
   get_state (state);
-
+  
   bool all_on = true;
   bool all_off = true;
-
+  
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     all_on  &= state.lanes[i].do_calib;
     all_off &= !state.lanes[i].do_calib;
   }
-
+  
   if (all_on) {
     enabled = true;
     return true;
   }
-
+  
   if (all_off) {
     enabled = false;
     return true;
   }
-
+  
   return false;
 }
 
@@ -3120,7 +3120,7 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     state.banks [bank].exclusive_lane = banks [bank].exclusive_lane;
     state.banks [bank].linked_calib = banks [bank].linked_calib;
-
+    
     for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
       const c_neuralamp &amp = banks [bank].lanes [i];
       c_neuralblender_lane_state &lane = state.banks [bank].lanes [i];
@@ -3143,24 +3143,24 @@ void c_neuralblender::get_state (c_neuralblender_state &state) const {
 bool c_neuralblender::set_state (const c_neuralblender_state &state) {
   size_t ret = NB_ERROR_NONE;
   bool ok = true;
-
+  
   set_bypass (state.bypass);
   set_pedal_bypass (state.pedal_bypass);
   set_amp_bypass (state.amp_bypass);
   set_cab_bypass (state.cab_bypass);
-
+  
   do_vu = state.do_vu;
   mute_all = state.mute_all;
   noisegate_on = state.noisegate_on;
   tuner_on = state.tuner_on;
   tuner_base_freq = state.tuner_base_freq;
   calib_source = state.calib_source;
-
+  
   const auto check_err = [this, &ret] (
       size_t r, size_t bank = (size_t) -1, size_t lane = (size_t) -1) {
     if (r == NB_ERROR_NONE)
       return true;
-
+    
     if (ret == NB_ERROR_NONE)
       ret = r;
     //throw_error (r, bank, lane);
@@ -3170,7 +3170,7 @@ bool c_neuralblender::set_state (const c_neuralblender_state &state) {
       bool b, size_t bank = (size_t) -1, size_t lane = (size_t) -1) {
     return check_err (b ? NB_ERROR_NONE : NB_ERROR_STATE, bank, lane);
   };
-
+  
   ok &= set_master_gain (state.master_gain_db);
   ok &= set_presence (state.presence);
   ok &= set_calib_target_db (state.calib_target_db);
@@ -3178,7 +3178,7 @@ bool c_neuralblender::set_state (const c_neuralblender_state &state) {
   noisegate.set_attack (state.noiseattack);
   noisegate.set_hold (state.noisehold);
   noisegate.set_release (state.noiserelease);
-
+  
   const auto apply_eq = [this, &ok, &check_err_bool] (
       _lane_bank bank, const c_eq_state &eq_state) {
     ok &= set_eq_bypass (bank, !eq_state.on);
@@ -3197,7 +3197,7 @@ bool c_neuralblender::set_state (const c_neuralblender_state &state) {
   };
   apply_eq (BANK_EQPRE, state.eqpre);
   apply_eq (BANK_EQPOST, state.eqpost);
-
+  
   static constexpr _lane_bank model_banks [] = {
     BANK_PEDAL, BANK_AMP, BANK_CAB
   };
@@ -3205,7 +3205,7 @@ bool c_neuralblender::set_state (const c_neuralblender_state &state) {
     const c_neuralblender_bank_state &bank_state = state.banks [bank];
     banks [bank].linked_calib = bank_state.linked_calib;
     ok &= set_exclusive_lane (bank, bank_state.exclusive_lane);
-
+    
     for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
       const c_neuralblender_lane_state &lane_state = bank_state.lanes [lane];
       ok &= check_err_bool (
@@ -3218,7 +3218,7 @@ bool c_neuralblender::set_state (const c_neuralblender_state &state) {
         dcflip (bank, lane, lane_state.dcflip), bank, lane);
       ok &= check_err_bool (
         calib_on (bank, lane, lane_state.do_calib), bank, lane);
-
+      
       if (lane_state.filename.empty ()) {
         if (which_amp (bank, lane).loaded ())
           ok &= unload_model (bank, lane);
@@ -3227,7 +3227,7 @@ bool c_neuralblender::set_state (const c_neuralblender_state &state) {
         ok &= check_err (load_model (bank, lane, lane_state.filename.c_str ()),
                          bank, lane);
       }
-
+      
       ok &= check_err_bool (
         set_ir_pitch (bank, lane, lane_state.ir_pitch_semitones), bank, lane);
       ok &= check_err_bool (
@@ -3236,10 +3236,10 @@ bool c_neuralblender::set_state (const c_neuralblender_state &state) {
         set_lane_mute (bank, lane, lane_state.lane_mute), bank, lane);
     }
   }
-
+  
   if (ret == NB_ERROR_NONE && !ok)
     ret = NB_ERROR_INTERNAL;
-
+  
   linked_calib = banks [BANK_AMP].linked_calib;
   update_effective_trim ();
   return ret == NB_ERROR_NONE && ok;
@@ -3248,7 +3248,7 @@ bool c_neuralblender::set_state (const c_neuralblender_state &state) {
 void c_neuralblender::update_mutes () {
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; bank++) {
     uint32_t loaded_mask = 0;
-
+    
     for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
       const bool loaded = banks [bank].lanes [i].loaded ();
       banks [bank].lanes [i].mute = !loaded;
@@ -3259,16 +3259,16 @@ void c_neuralblender::update_mutes () {
         if (v) v->set_l (0.0f, 0.0f);
       }
     }
-
+    
     if (!loaded_mask)
       banks [bank].lanes [0].mute = false;
-
+    
     banks [bank].active_mask = loaded_mask;
   }
-
+  
   loaded_lane_mask.store (
     banks [BANK_AMP].active_mask, std::memory_order_release);
-
+  
   request_mix_update ();
 }
 
@@ -3277,7 +3277,7 @@ bool c_neuralblender::set_calib_target_db (float f) { CP
   
   if (!std::isfinite (f))
     return false;
-    
+  
   f = clamp_calib_target_db (f);
   
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
@@ -3297,34 +3297,34 @@ size_t c_neuralblender::load_model (_lane_bank bank, size_t which, const char *f
     debug ("bank=%d out of range", (int) bank);
     return NB_ERROR_INTERNAL;
   }
-
+  
   c_neuralamp &amp = which_amp (bank, which);
   debug ("LOAD MODEL, block %ld", (long int) amp.block_counter);
-
+  
   const size_t requested = amp.request_load_model (fn);
   if (requested != NB_ERROR_NONE) {
     update_mutes ();
     throw_error (requested, (size_t) bank, which, fn ? fn : "");
     return requested;
   }
-
+  
   int wait_ms = 0;
   while (!amp.ready_to_load () && wait_ms < 250) {
     std::this_thread::sleep_for (std::chrono::milliseconds (1));
     wait_ms++;
   }
-
+  
   if (!amp.ready_to_load ())
     amp.ramp.store (RAMP_LOADING, std::memory_order_release);
-
+  
   const size_t ret = amp.load_model ();
-
+  
   int bf = 0;
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     if (banks [bank].lanes [i].loaded ())
       bf |= (1 << i);
   }
-
+  
   debug ("mute bitfield 0x%02x", bf);
   update_mutes ();
   if (ret != NB_ERROR_NONE) {
@@ -3345,7 +3345,7 @@ void c_neuralblender::throw_error (
     size_t code, size_t bank, size_t lane, const std::string &filename) {
   if (code == NB_ERROR_NONE || bank >= BANK_COUNT || lane >= NB_NUM_MODELS)
     return;
-
+  
   if (m_error_handler) {
     t_neuralblender_error error;
     error.code = code;
@@ -3359,7 +3359,7 @@ void c_neuralblender::throw_error (
 bool c_neuralblender::unload_model (_lane_bank bank, size_t which) { CP
   if (which >= NB_NUM_MODELS)
     return false;
-
+  
   banks [bank].lanes [which].unload_model ();
   if (banks [bank].meters_out [which])
     banks [bank].meters_out [which]->update ();
@@ -3370,14 +3370,14 @@ bool c_neuralblender::unload_model (_lane_bank bank, size_t which) { CP
 bool c_neuralblender::set_delay_ms (_lane_bank bank, size_t which, float ms) {
   const uint32_t frames =
     (uint32_t) ((ms * m_samplerate) / 1000.0f + 0.5f); // round to nearest int
-
+  
   return set_delay_frames (bank, which, frames);
 }
 
 void c_neuralblender::update_loaded_output_meters (_lane_bank bank) {
   if (!do_vu)
     return;
-
+  
   for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
     if (which_amp (bank, lane).loaded () && which_bank (bank).meters_out [lane])
       which_bank (bank).meters_out [lane]->update ();
@@ -3387,7 +3387,7 @@ void c_neuralblender::update_loaded_output_meters (_lane_bank bank) {
 int c_neuralblender::tuner_freq () {
   if (!pitchtracker.analyze ())
     return 0;
-
+  
   return (int) lrintf (
     pitchtracker.detected_freq.load (std::memory_order_acquire));
 }
@@ -3410,7 +3410,7 @@ static void overlay_lane (float *dst, const float *src, uint32_t n) {
 static void overlay_lane_xfade_in (
     float *dst, const float *src, uint32_t n,
     uint32_t xfade_pos, uint32_t xfade_len) {
-
+  
   for (uint32_t i = 0; i < n; ++i)
     dst [i] += src [i] * xfade_in_gain (xfade_pos + i, xfade_len);
 }
@@ -3418,7 +3418,7 @@ static void overlay_lane_xfade_in (
 static void overlay_lane_xfade_out (
     float *dst, const float *src, uint32_t n,
     uint32_t xfade_pos, uint32_t xfade_len) {
-
+  
   for (uint32_t i = 0; i < n; ++i)
     dst [i] += src [i] * xfade_out_gain (xfade_pos + i, xfade_len);
 }
@@ -3426,7 +3426,7 @@ static void overlay_lane_xfade_out (
 static bool bank_exclusive_empty (const c_model_bank &bank) {
   if (bank.exclusive_lane <= 0)
     return false;
-
+  
   const size_t lane = (size_t) (bank.exclusive_lane - 1);
   return lane >= NB_NUM_MODELS || !bank.lanes [lane].loaded ();
 }
@@ -3434,7 +3434,7 @@ static bool bank_exclusive_empty (const c_model_bank &bank) {
 static void final_clamp (float *out, uint32_t n, float master_gain) {
   if (!out)
     return;
-
+  
   for (uint32_t i = 0; i < n; ++i)
     out [i] = std::clamp (out [i] * master_gain, -1.0f, 1.0f);
 }
@@ -3442,7 +3442,7 @@ static void final_clamp (float *out, uint32_t n, float master_gain) {
 static bool bank_is_bypassed (
     const c_neuralblender &blender,
     _lane_bank bank) {
-
+  
   switch (bank) {
     case BANK_PEDAL:
       return blender.pedal_bypass ();
@@ -3458,50 +3458,50 @@ static bool bank_is_bypassed (
 uint32_t c_neuralblender::make_active_lane_mask (_lane_bank bank) const {
   if (m_bypass.load (std::memory_order_relaxed))
     return 0;
-
+  
   if (mute_all)
     return 0;
   
   if (bank == BANK_PEDAL &&
       m_pedal_bypass.load (std::memory_order_relaxed))
     return 0;
-    
+  
   if (bank == BANK_AMP &&
       m_amp_bypass.load (std::memory_order_relaxed))
     return 0;
-    
+  
   if (bank == BANK_CAB &&
       m_cab_bypass.load (std::memory_order_relaxed))
     return 0;
-    
+  
   const c_model_bank &b = which_bank (bank);
   if (b.exclusive_lane > 0) {
     const size_t lane = (size_t) (b.exclusive_lane - 1);
     if (lane >= NB_NUM_MODELS)
       return 0;
-
+    
     if (!b.lanes [lane].loaded ())
       return 0;
-
+    
     if (b.lanes [lane].mute.load ())
       return 0;
-
+    
     return 1u << lane;
   }
-
+  
   uint32_t mask = 0;
-
+  
   for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
     if (!b.lanes [lane].loaded ())
       continue;
-
+    
     if (b.lanes [lane].mute.load () ||
         b.lane_mute [lane].load (std::memory_order_relaxed))
       continue;
-
+    
     mask |= 1u << lane;
   }
-
+  
   return mask;
 }
 
@@ -3527,13 +3527,13 @@ float *c_neuralblender::prepare_input_buffer (
       noisegate.process_block (in, m_input_buf.data (), nframes);
       return m_input_buf.data ();
     }
-
+    
     return in;
   }
   
   if (m_input_buf.size () < nframes)
     m_input_buf.resize (nframes);
-
+  
   if (noisegate_on) {
     noisegate.process_block (in, m_input_buf.data (), nframes);
     //CP
@@ -3548,7 +3548,7 @@ float *c_neuralblender::prepare_input_buffer (
 static void update_meter_data (c_vudata *meter, const float *in, uint32_t nframes) {
   if (!meter || !in)
     return;
-
+  
   for (uint32_t i = 0; i < nframes; i++)
     meter->sample (in [i], 0.0f);
   meter->update ();
@@ -3564,23 +3564,23 @@ void c_neuralblender::update_input_meter (_lane_bank bank, float *in, uint32_t n
     case BANK_CAB:   meter = banks [BANK_CAB].meter_in;   break;
     default:         meter = nullptr;         break;
   }
-
+  
   if (do_vu)
     update_meter_data (meter, in, nframes);
 }
 
 void c_neuralblender::render_lane (_lane_bank bank,
     size_t lane, float *in, uint32_t nframes) {
-
+  
   if (lane >= NB_NUM_MODELS)
     return;
-
+  
   if (m_delay_bufs [lane].size () < nframes)
     m_delay_bufs [lane].resize (nframes);
-
+  
   if (m_model_bufs [lane].size () < nframes)
     m_model_bufs [lane].resize (nframes);
-
+  
   banks [bank].lanes [lane].delay.process_block (in, m_delay_bufs [lane].data (), nframes);
   banks [bank].lanes [lane].process_block (m_delay_bufs [lane].data (),
                              m_model_bufs [lane].data (),
@@ -3590,11 +3590,11 @@ void c_neuralblender::render_lane (_lane_bank bank,
   if (dry_gain > 0.0f) {
     const float *dry = m_delay_bufs [lane].data ();
     float *dst = m_model_bufs [lane].data ();
-
+    
     for (uint32_t i = 0; i < nframes; i++)
       dst [i] += dry [i] * dry_gain;
   }
-
+  
   if (banks [bank].meters_out [lane] && do_vu) {
     for (uint32_t i = 0; i < nframes; ++i)
       banks [bank].meters_out [lane]->sample (m_model_bufs [lane] [i], 0.0f);
@@ -3607,22 +3607,22 @@ void c_neuralblender::render_mix (float *in, float *out, uint32_t nframes,
                                   uint32_t old_mask, uint32_t new_mask,
                                   uint32_t xfade_pos, uint32_t xfade_len) {
   const uint32_t relevant = old_mask | new_mask;
-
+  
   for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
     const uint32_t bit = 1u << lane;
-
+    
     if (!(relevant & bit)) {
       if (banks [bank].meters_out [lane] && do_vu)
         banks [bank].meters_out [lane]->update ();
-
+      
       continue;
     }
-
+    
     render_lane (bank, lane, in, nframes);
-
+    
     const bool was = old_mask & bit;
     const bool now = new_mask & bit;
-
+    
     if (was && now)
       overlay_lane (out, m_model_bufs [lane].data (), nframes);
     else if (was && !now)
@@ -3643,27 +3643,27 @@ void c_neuralblender::render_bank (
     uint32_t new_mask,
     uint32_t xfade_pos,
     uint32_t xfade_len) {
-
+  
   if (!in || !out || !nframes)
     return;
-
+  
   update_input_meter (bank, in, nframes);
   std::fill (out, out + nframes, 0.0f);
-
+  
   if (bank_is_bypassed (*this, bank)) {
     if (in != out)
       memcpy (out, in, nframes * sizeof (float));
     update_loaded_output_meters (bank);
     return;
   }
-
+  
   if (!banks [bank].active_mask) {
     if (in != out)
       memcpy (out, in, nframes * sizeof (float));
     update_loaded_output_meters (bank);
     return;
   }
-
+  
   if (!(old_mask | new_mask)) {
     if (bank_exclusive_empty (banks [bank])) {
       if (in != out)
@@ -3671,11 +3671,11 @@ void c_neuralblender::render_bank (
       update_loaded_output_meters (bank);
       return;
     }
-
+    
     update_loaded_output_meters (bank);
     return;
   }
-
+  
   render_mix (
     in,
     out,
@@ -3685,7 +3685,7 @@ void c_neuralblender::render_bank (
     new_mask,
     xfade_pos,
     xfade_len);
-
+  
   if (!new_mask && old_mask && bank_exclusive_empty (banks [bank]))
     overlay_lane_xfade_in (out, in, nframes, xfade_pos, xfade_len);
 }
@@ -3693,30 +3693,30 @@ void c_neuralblender::render_bank (
 void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
   if (!in || !out || !nframes)
     return;
-
+  
   if (do_vu)
     update_meter_data (meter_masterin, in, nframes);
   
   if (tuner_on) {
     pitchtracker.process_block (in, nframes);
   }
-
+  
   float *process_in = prepare_input_buffer (in, out, nframes);
   bool do_presence = true;
-
+  
   uint32_t new_mask =
     pending_lane_mask.load (std::memory_order_acquire);
   
   // cross fade
   const bool requested_transition =
     xfade_pending.exchange (false, std::memory_order_acq_rel);
-
+  
   if (requested_transition) {
     const uint32_t old_mask =
       xfade_active
         ? xfade_new_mask
         : active_lane_mask.load (std::memory_order_acquire);
-
+    
     if (new_mask != old_mask) {
       xfade_old_mask = old_mask;
       xfade_new_mask = new_mask;
@@ -3736,9 +3736,9 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
       xfade_active = true;
     }
   }
-
+  
   std::fill (out, out + nframes, 0.0f);
-
+  
   if (m_bypass.load (std::memory_order_relaxed)) {
     update_input_meter (BANK_PEDAL, process_in, nframes);
     update_input_meter (BANK_EQPRE, process_in, nframes);
@@ -3762,47 +3762,47 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
     m_stage_buf_b.resize (nframes);
   if (m_presence_buf.size () < nframes)
     m_presence_buf.resize (nframes);
-
+  
   if (!xfade_active) {
     const uint32_t mask = active_lane_mask.load (std::memory_order_acquire);
     const uint32_t pedal_mask = make_active_lane_mask (BANK_PEDAL);
     const uint32_t cab_mask = make_active_lane_mask (BANK_CAB);
-
+    
     render_bank (
       BANK_PEDAL, process_in, m_stage_buf_a.data (), nframes,
       pedal_mask, pedal_mask, 0, 1);
-
+    
     update_input_meter (BANK_EQPRE, m_stage_buf_a.data (), nframes);
     eq_pre.process_block (m_stage_buf_a.data (), nframes);
-
+    
     render_bank (
       BANK_AMP, m_stage_buf_a.data (), m_stage_buf_b.data (), nframes,
       mask, mask, 0, 1);
-
+    
     update_input_meter (BANK_EQPOST, m_stage_buf_b.data (), nframes);
     eq_post.process_block (m_stage_buf_b.data (), nframes);
-
+    
     render_bank (
       BANK_CAB, m_stage_buf_b.data (), out, nframes,
       cab_mask, cab_mask, 0, 1);
   } else {
     const uint32_t pedal_mask = make_active_lane_mask (BANK_PEDAL);
     const uint32_t cab_mask = make_active_lane_mask (BANK_CAB);
-
+    
     render_bank (
       BANK_PEDAL, process_in, m_stage_buf_a.data (), nframes,
       pedal_mask, pedal_mask, 0, 1);
-
+    
     update_input_meter (BANK_EQPRE, m_stage_buf_a.data (), nframes);
     eq_pre.process_block (m_stage_buf_a.data (), nframes);
-
+    
     render_bank (
       BANK_AMP, m_stage_buf_a.data (), m_stage_buf_b.data (), nframes,
       xfade_old_mask, xfade_new_mask, xfade_pos, xfade_len);
-
+    
     update_input_meter (BANK_EQPOST, m_stage_buf_b.data (), nframes);
     eq_post.process_block (m_stage_buf_b.data (), nframes);
-
+    
     render_bank (
       BANK_CAB, m_stage_buf_b.data (), out, nframes,
       cab_mask, cab_mask, 0, 1);
@@ -3815,21 +3815,21 @@ void c_neuralblender::process_block (float *in, float *out, uint32_t nframes) {
       xfade_pos += nframes;
     }
   }
-
+  
   const float presence_mix = std::clamp (presence, 0.0f, 1.0f);
   if (presence_mix > 0.0f && do_presence && m_conv_presence.ready ()) {
     m_conv_presence.process_block (out, m_presence_buf.data (), nframes);
-
+    
     constexpr float half_pi = 1.57079632679489661923f;
     const float angle = presence_mix * half_pi;
     const float dry_gain = cosf (angle);
     const float wet_gain = sinf (angle);
-
+    
     for (uint32_t i = 0; i < nframes; i++) {
       out [i] = out [i] * dry_gain + m_presence_buf [i] * wet_gain;
     }
   }
-
+  
   final_clamp (out, nframes, master_gain);
   if (do_vu)
     update_meter_data (meter_masterout, out, nframes);

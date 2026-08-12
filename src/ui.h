@@ -163,7 +163,7 @@ public:
   void get_prefs_from (t_prefs &prefs);
   void set_prefs_to   (t_prefs &prefs);
   void load_defaults ();
-
+  
   c_neuralblender_ui *ui = NULL;
   nbtk::c_frame frame1;
   nbtk::c_button btn_cancel;
@@ -212,7 +212,7 @@ public:
       const char *title,
       int x, int y, int w, int h,
       nbtk::t_native_handle owner = nullptr);
-
+  
   void show ();
   void show_children ();
   void on_expose () override;
@@ -237,14 +237,14 @@ public:
       size_t lane,
       uint64_t bank,
       const char *title);
-
+  
   void show () override;
   void set_current_dir (std::string str) override;
   void add_files_from_dir (
       nbtk::c_combobox *cb,
       const std::string &selected_file = "") override;
   void on_file_select (const std::string &filename) override;
-
+  
   size_t lane = (size_t) -1;
   uint64_t bank = (uint64_t) -1;
   c_neuralblender_ui *ui = NULL;
@@ -255,7 +255,7 @@ public:
   c_freqknob () {
     show_value = false;
   }
-
+  
   std::string get_label_string () const override {
     return nbtk::c_knob::get_value_string () + "Hz";
   }
@@ -266,7 +266,7 @@ public:
   c_qknob () {
     show_value = false;
   }
-
+  
   std::string get_label_string () const override {
     return "Q=" + nbtk::c_knob::get_value_string ();
   }
@@ -277,7 +277,7 @@ public:
   c_gainknob () {
     show_value = false;
   }
-
+  
   std::string get_label_string () const override {
     return /*"Gain: " + */nbtk::c_knob::get_value_string () + "dB";
   }
@@ -340,7 +340,7 @@ class c_lane_widgets {
 public:
   //c_lane_widgets ();
   //~c_lane_widgets ();
-
+  
   void create (
       c_neuralblender_ui *ui,
       nbtk::c_widget *parent,
@@ -348,7 +348,7 @@ public:
       size_t bank_id,
       size_t lane_id,
       int x, int y, int w, int h);
-	      
+  
   void move_resize (int x, int y, int w, int h);
   void set_state (nbtk::_widget_state state);
   
@@ -391,7 +391,7 @@ public:
   //c_meterwidget meter_in; // we only have one input
   c_meterwidget meter_out;
   c_vudata vudata_out;
-
+  
   void on_action (nbtk::t_action_event &event);
   
   int last_x = 0;
@@ -415,7 +415,7 @@ public:
   void update_ir_cwd (std::string path);
   void update_preset_cwd (std::string path);
   void handle_error (const t_neuralblender_error &error);
-
+  
   void set_lane_mute (_lane_bank bank, size_t which, bool b);
   void set_lane_mute (size_t which, bool b);
   void vu_on (bool b = true);
@@ -453,7 +453,7 @@ public:
   bool delete_selected_eq_preset (size_t bank_id);
   void load_preset_file (std::string name);
   void save_preset_file (std::string name);
-
+  
   bool load_model (size_t which, const char *filename);
   virtual bool load_model (_lane_bank bank, size_t which, const char *filename) = 0;
   virtual void on_gain_in (nbtk::c_widget *w, float f)               = 0;
@@ -508,7 +508,7 @@ public:
   virtual void apply_prefs (t_prefs &p)                                 ;
   virtual void write_prefs_to (t_prefs &p)                              ;
           void apply_ui_prefs (t_prefs &p)                              ;
-	
+  
   int samplerate = 0;
   nbtk::t_native_display display = NULL;
   nbtk::t_native_window window;

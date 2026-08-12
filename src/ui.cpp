@@ -95,7 +95,7 @@ bool is_supported_model_filename (const std::string &path) {
   std::string lower = path;
   std::transform (lower.begin (), lower.end (), lower.begin (),
                   [] (unsigned char c) { return (char) std::tolower (c); });
-
+  
   return is_supported_model_filename_lower (lower);
 }
 
@@ -120,13 +120,13 @@ static inline bool is_model_bank (size_t bank) {
 static bool parse_config_float (const std::string &s, float &value) {
   if (s.empty ())
     return false;
-
+  
   char *end = NULL;
   errno = 0;
   const float parsed = std::strtof (s.c_str (), &end);
   if (errno || end == s.c_str () || *end != '\0' || !std::isfinite (parsed))
     return false;
-
+  
   value = parsed;
   return true;
 }
@@ -146,7 +146,7 @@ bool read_prefs_from_config (c_configfile &configfile, t_prefs &prefs) {
       vu_scale_db) &&
       vu_scale_db <= 0.0f)
     prefs.vu_scale_db = vu_scale_db;
-
+  
   float vu_headroom_db = prefs.vu_headroom_db;
   if (parse_config_float (
       configfile.get_item (CONFIG_KEY_NAME_VU_HEADROOM),
@@ -154,23 +154,23 @@ bool read_prefs_from_config (c_configfile &configfile, t_prefs &prefs) {
       vu_headroom_db >= 0.0f &&
       vu_headroom_db <= 12.0f)
     prefs.vu_headroom_db = vu_headroom_db;
-
+  
   std::string str = configfile.get_item (CONFIG_KEY_NAME_BYP_DCLICK);
   if (!str.empty ())
     prefs.bypass_doubleclick = c_configfile::istrue (str);
-
+  
   str = configfile.get_item (CONFIG_KEY_NAME_BYP_RCLICK);
   if (!str.empty ())
     prefs.bypass_rightclick = c_configfile::istrue (str);
-
+  
   str = configfile.get_item (CONFIG_KEY_NAME_CALIB);
   if (!str.empty ())
     prefs.calib_default = c_configfile::istrue (str);
-
+  
   str = configfile.get_item (CONFIG_KEY_NAME_TOOLTIPS);
   if (!str.empty ())
     prefs.show_tooltips = c_configfile::istrue (str);
-
+  
   return true;
 }
 
@@ -178,10 +178,10 @@ bool write_prefs_to_config (c_configfile &configfile, const t_prefs &prefs) {
   char buf [128];
   snprintf (buf, sizeof (buf), "%.6g", prefs.vu_scale_db);
   configfile.set_item (CONFIG_KEY_NAME_VU_SCALE, buf);
-
+  
   snprintf (buf, sizeof (buf), "%.6g", prefs.vu_headroom_db);
   configfile.set_item (CONFIG_KEY_NAME_VU_HEADROOM, buf);
-
+  
   configfile.set_item (
     CONFIG_KEY_NAME_BYP_DCLICK, prefs.bypass_doubleclick ? "1" : "0");
   configfile.set_item (
@@ -190,7 +190,7 @@ bool write_prefs_to_config (c_configfile &configfile, const t_prefs &prefs) {
     CONFIG_KEY_NAME_CALIB, prefs.calib_default ? "1" : "0");
   configfile.set_item (
     CONFIG_KEY_NAME_TOOLTIPS, prefs.show_tooltips ? "1" : "0");
-
+  
   return configfile.write_file ();
 }
 
@@ -203,11 +203,11 @@ bool c_neuralblendermainwindow::create (
     const char *title_,
     int x, int y, int w, int h,
     nbtk::t_native_handle owner) {
-
+  
   ui = ui_;
   if (!c_toplevelwindow::create (&ui_->nbtk_app, parent_, title_, x, y, w, h, owner))
     return false;
-
+  
   auto_close (false);
   auto_hide_on_close (false);
   auto_quit_on_close (true);
@@ -218,7 +218,7 @@ bool c_neuralblendermainwindow::create (
 void c_neuralblendermainwindow::show () {
   if (!widget)
     return;
-
+  
   children_mapped = false;
   nbtk::c_toplevelwindow::show ();
 }
@@ -226,7 +226,7 @@ void c_neuralblendermainwindow::show () {
 void c_neuralblendermainwindow::show_children () {
   if (!widget || children_mapped)
     return;
-
+  
   children_mapped = true;
   if (ui)
     ui->sync_page_visibility ();
@@ -235,7 +235,7 @@ void c_neuralblendermainwindow::show_children () {
 void c_neuralblendermainwindow::on_expose () {
   if (!widget)
     return;
-
+  
   nbtk::c_toplevelwindow::on_expose ();
   show_children ();
 }
@@ -243,13 +243,13 @@ void c_neuralblendermainwindow::on_expose () {
 void c_neuralblendermainwindow::on_resize () { CP
   if (!widget || !ui)
     return;
-
+  
   int width = 0;
   int height = 0;
   bool visible = false;
   if (!get_metrics (&width, &height, &visible) || !visible)
     return;
-
+  
   debug ("mainwindow resize: metrics=%d,%d init=%d,%d",
          width, height,
          widget->scale.init_width, widget->scale.init_height);
@@ -260,7 +260,7 @@ void c_neuralblendermainwindow::on_resize () { CP
 void c_neuralblendermainwindow::on_configure_notify () {
   if (!ui)
     return;
-
+  
   nbtk::c_toplevelwindow::on_configure_notify ();
   ui->on_window_configured ();
 }
@@ -305,9 +305,9 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
       ui->mainwindow.native_handle ()))
     return;
   set_min_size_to_current ();
-
+  
   frame1.create (&root_widget, "", 12, 12, w () - 24, h () - 80);
-
+  
   label_vuscale.create (&frame1, "VU meter scale dB:", 16, 32, 180, 32);
   label_vuscale.align = nbtk::TEXT_LEFT;
   label_vuheadroom.create (&frame1, "VU meter headroom dB:", 16, 72, 180, 32);
@@ -315,7 +315,7 @@ void c_prefswindow::create (c_neuralblender_ui *ui_) { CP
   label_spacer1.create (&frame1, "", 16, 112, 12, 12);
   text_vuscale.create (&frame1, "", 220, 28, 120, 36);
   text_vuheadroom.create (&frame1, "", 220, 68, 120, 36);
-
+  
   btn_calib_default.create (
     &frame1, "Calibrate default on", 16, 152, 320, 32);
   btn_calib_default.align = nbtk::TEXT_LEFT;
@@ -359,14 +359,14 @@ bool c_prefswindow::on_key_down (int key) {
     hide ();
     return true;
   }
-
+  
   return nbtk::c_toplevelwindow::on_key_down (key);
 }
 
 void c_prefswindow::on_action (nbtk::t_action_event &event) {
   if (event.mouse_button != 0 && event.mouse_button != Button1)
     return;
-
+  
   if (event.source_id == btn_defaults.id) {
     load_defaults ();
     event.handled = true;
@@ -406,11 +406,11 @@ void c_prefswindow::load_defaults () {
 void c_prefswindow::get_prefs_from (t_prefs &prefs) { CP
   if (!widget)
     create (ui);
-
+  
   char buf [128];
   format_db_text (buf, sizeof (buf), prefs.vu_scale_db);
   text_vuscale.set_text (buf);
-
+  
   format_db_text (buf, sizeof (buf), prefs.vu_headroom_db);
   text_vuheadroom.set_text (buf);
   
@@ -425,7 +425,7 @@ void c_prefswindow::set_prefs_to (t_prefs &prefs) {
   if (parse_config_float (text_vuscale.value, vu_scale_db) &&
       vu_scale_db <= 0.0f)
     prefs.vu_scale_db = vu_scale_db;
-
+  
   float vu_headroom_db = 0.0f;
   if (parse_config_float (text_vuheadroom.value, vu_headroom_db) &&
       vu_headroom_db >= 0.0f &&
@@ -459,12 +459,12 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   ui = ui_;
   if (!ui || !ui->ui_ready || widget)
     return;
-
+  
   nbtk::t_native_window native_root =
       ui->nbtk_app.backend
         ? ui->nbtk_app.backend->root_window (ui->mainwindow.native_handle (), false)
         : 0;
-
+  
   if (!c_toplevelwindow::create (
       &ui->nbtk_app,
       native_root,
@@ -472,7 +472,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
       0, 0, 450, 500,
       ui->mainwindow.native_handle ()))
     return;
-
+  
   set_min_size_to_current ();
   nbtk::c_widget *root = &root_widget;
   const int panel_x = 12;
@@ -480,18 +480,18 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   const int panel_w = 424;
   
   frame_main.create (root, "", panel_x, panel_y, panel_w, 420);
-
+  
   image_toplogo.create (&frame_main, "", 85, 12, 256, 32);
   image_toplogo.set_png (data_textlogo_1024x128_png);
-
+  
   image_logo.create (&frame_main, "", 133, 64, 160, 160);
   image_logo.set_png (data_neuralblender_logo_160_png);
-
+  
   for (int i = 0; g_about_text [i]; i++) {
     label_text [i].create (
       &frame_main, g_about_text [i], 0, 240 + i * 24, panel_w, 24);
   }
-
+  
   /*label_link.create (
     &frame_main, "http://deimos.ca/neuralblender", 0, 336, panel_w, 24);
   label_link.link = true;*/
@@ -502,7 +502,7 @@ void c_aboutwindow::create (c_neuralblender_ui *ui_) { CP
   snprintf (buf, sizeof (buf), "Build timestamp: %s", g_build_timestamp);
   label_build.create (&frame_main, buf, 0, 390, panel_w, 20);
   label_build.text_size = nbtk::TEXTSIZE_MINI;
-
+  
   btn_ok.create (root, "OK", 310, 424, 128, 40);
   btn_ok.set_image_default (data_icon_xputty_approved_png);
 }
@@ -512,7 +512,7 @@ void c_aboutwindow::show () { CP
     create (ui);
   if (!widget)
     return;
-
+  
   center_over_transient_owner ();
   nbtk::c_toplevelwindow::show ();
 }
@@ -520,7 +520,7 @@ void c_aboutwindow::show () { CP
 void c_aboutwindow::hide () { CP
   if (!widget)
     return;
-
+  
   nbtk::c_toplevelwindow::hide ();
 }
 
@@ -535,7 +535,7 @@ bool c_aboutwindow::on_key_down (int key) {
     hide ();
     return true;
   }
-
+  
   return nbtk::c_toplevelwindow::on_key_down (key);
 }
 
@@ -554,9 +554,9 @@ static bool path_exists (std::string path) {
   struct stat st;
   if (stat (path.c_str (), &st))
     return false;
-    
-  return true;
   
+  return true;
+
 }
 
 void c_neuralblender_filepicker::create (
@@ -567,7 +567,7 @@ void c_neuralblender_filepicker::create (
     size_t lane_,
     uint64_t bank_,
     const char *title_) {
-
+  
   ui = ui_;
   nbtk::c_filepicker::create (nbtk_app, parent, owner, title_);
   lane = lane_;
@@ -585,7 +585,7 @@ void c_neuralblender_filepicker::show () {
     //current_dir = CONFIG_DEFAULT_DIR;
     current_dir = std::string (getenv ("HOME"));
   }
-
+  
   nbtk::c_filepicker::show ();
 }
 
@@ -602,36 +602,36 @@ void c_neuralblender_filepicker::set_current_dir (std::string str) {
 void c_neuralblender_filepicker::add_files_from_dir (
     nbtk::c_combobox *cb,
     const std::string &selected_file_) {
-
+  
   std::string selected_file = selected_file_;
   if (selected_file.empty () && ui && lane < NB_NUM_MODELS) {
     const _lane_bank bank_ = bank < BANK_COUNT ? (_lane_bank) bank : BANK_AMP;
     selected_file = ui->state.banks [bank_].lanes [lane].filename;
   }
-
+  
   nbtk::c_filepicker::add_files_from_dir (cb, selected_file);
 }
 
 void c_neuralblender_filepicker::on_file_select (
     const std::string &filename) {
-
+  
   if (!ui || filename.empty ())
     return;
-
+  
   const _lane_bank bank_ = is_model_bank (bank) ? (_lane_bank) bank : BANK_AMP;
   if (lane >= NB_NUM_MODELS)
     return;
-
+  
   current_dir = nbtk::path_dirname (filename);
   if (!current_dir.empty ())
     ui->configfile.set_item (cwd_config_key_for_bank_ui (bank_), current_dir);
-
+  
   scan_current_dir ();
   if (ui->load_model (bank_, lane, filename.c_str ())) {
     ui->state.banks [bank_].lanes [lane].filename = filename;
     ui->state.current_dir = current_dir;
   }
-
+  
   nbtk::c_combobox *cb = &ui->lanes_for_bank (bank_) [lane].cb_list;
   cb->clear ();
   add_files_from_dir (cb);
@@ -645,15 +645,15 @@ void c_neuralblender_filepicker::on_file_select (
 void c_lane_widgets::on_action (nbtk::t_action_event &event) {
   if (!ui || ui->updating_from_state)
     return;
-
+  
   c_neuralblender_lane_state *lane_state =
     bank_id < BANK_COUNT && lane_id < NB_NUM_MODELS ?
       &ui->state.banks [bank_id].lanes [lane_id] : NULL;
-
+  
   auto handle_knob = [&] (nbtk::c_knob &knob, _widget_role role) {
     if (event.source_id != knob.id)
       return false;
-
+    
     const float value = knob.value;
     const float g = db_to_gain (value);
     switch (role) {
@@ -662,52 +662,52 @@ void c_lane_widgets::on_action (nbtk::t_action_event &event) {
           lane_state->gain_in = g;
         ui->on_gain_in (&knob, g);
       break;
-
+      
       case ROLE_IR_PITCH:
         if (lane_state)
           lane_state->ir_pitch_semitones = value;
         ui->on_ir_pitch (&knob, value);
       break;
-
+      
       case ROLE_GAIN_OUT:
         if (lane_state)
           lane_state->gain_out = g;
         ui->on_gain_out (&knob, g);
       break;
-
+      
       case ROLE_DRY_OUT:
         if (lane_state)
           lane_state->dry_out = value <= DB_SILENCE ? 0.0f : g;
         ui->on_dry_out (&knob, g);
       break;
-
+      
       case ROLE_DELAY:
         if (lane_state)
           lane_state->delay_ms = value;
         ui->on_delay (&knob, value);
       break;
-
+      
       default:
       break;
     }
     event.handled = true;
     return true;
   };
-
+  
   if (handle_knob (knob_gain_in, ROLE_GAIN_IN) ||
       handle_knob (knob_ir_pitch, ROLE_IR_PITCH) ||
       handle_knob (knob_gain_out, ROLE_GAIN_OUT) ||
       handle_knob (knob_dry_out, ROLE_DRY_OUT) ||
       handle_knob (knob_delay, ROLE_DELAY))
     return;
-
+  
   auto handle_button = [&] (nbtk::c_button &button, _widget_role role) {
     if (event.source_id != button.id)
       return false;
-
+    
     event.handled = true;
     const bool value = button.value;
-
+    
     switch (role) {
       case ROLE_MUTE:
         ui->on_mute (&button, value);
@@ -715,40 +715,40 @@ void c_lane_widgets::on_action (nbtk::t_action_event &event) {
           lane_state->lane_mute = value;
         ui->sync_widgets_from_state (ui->state);
       break;
-
+      
       case ROLE_EXCL_USE:
         ui->on_excl_use (&button, value);
         ui->sync_widgets_from_state (ui->state);
       break;
-
+      
       case ROLE_BROWSE:
         ui->on_filebrowse (&button);
         filepicker.show_open (&btn_browse, CMD_MODEL_FILE_SELECTED);
       break;
-
+      
       case ROLE_CLEAR:
         ui->on_fileclear (&button);
       break;
-
+      
       case ROLE_DCFLIP:
         if (lane_state)
           lane_state->dcflip = value;
         ui->on_dcflip (&button, value);
       break;
-
+      
       case ROLE_CALIBRATE:
         if (lane_state)
           lane_state->do_calib = value;
         ui->on_calibrate (&button, value);
       break;
-
+      
       default:
       break;
     }
-
+    
     return true;
   };
-
+  
   if (handle_button (btn_mute, ROLE_MUTE) ||
       handle_button (btn_excl, ROLE_EXCL_USE) ||
       handle_button (btn_browse, ROLE_BROWSE) ||
@@ -756,20 +756,20 @@ void c_lane_widgets::on_action (nbtk::t_action_event &event) {
       handle_button (btn_flip, ROLE_DCFLIP) ||
       handle_button (btn_calib, ROLE_CALIBRATE))
     return;
-
+  
   if (event.source_id == cb_list.id) {
     event.handled = true;
     const int x = cb_list.get_selection ();
     if (x < 0 || x >= (int) cb_list.items.size ())
       return;
-
+    
     std::string dir = filepicker.combo_dir.empty () ?
       filepicker.current_dir : filepicker.combo_dir;
     std::string fullpath = dir;
     if (!fullpath.empty () && fullpath.back () != '/')
       fullpath += '/';
     fullpath += cb_list.items [x];
-
+    
     const _lane_bank bank = is_model_bank (bank_id) ? (_lane_bank) bank_id : BANK_AMP;
     if (!ui->load_model (bank, lane_id, fullpath.c_str ())) {
       cb_list.clear ();
@@ -793,7 +793,7 @@ void c_lane_widgets::create (
   lane_id = lane_id_;
   bank_id = bank_id_;
   native_owner = native_owner_;
-
+  
   char label [64];
   const char *bank_name = "Amp";
   switch (bank_id) {
@@ -822,13 +822,13 @@ void c_lane_widgets::create (
   knob_delay.set_default (0);
   knob_delay.set_value (0);
   knob_delay.set_step (0.01);
-
+  
   cb_list.create (&lane_frame, "", 0, 0, 320, 32);
   cb_list.role = ROLE_LOADFILE;
   cb_list.bank = bank_id;
   cb_list.lane = lane_id;
   cb_list.wheel_selects_item = true;
-
+  
   meter_out.create (&lane_root, "", 0, 0, METER_WIDTH, 120);
   meter_out.set_vudata (&vudata_out);
   meter_out.set_stereo (false);
@@ -890,7 +890,7 @@ void c_lane_widgets::create (
   btn_mute.set_value (false);
   btn_mute.set_image (data_icon_speaker_off_big_png, nbtk::WSTATE_ON);
   btn_mute.set_image (data_icon_speaker_on_big_png, nbtk::WSTATE_OFF);
-
+  
   btn_browse.set_image_default (data_icon_folder_big_png);
   btn_clear.set_image_default (data_icon_x_big_png);
   btn_calib.set_image_default (data_icon_calib_big_png);
@@ -910,7 +910,7 @@ void c_lane_widgets::create (
   knob_gain_in.set_default (0);
   knob_gain_in.set_value (0);
   knob_gain_in.set_step (0.1);
-
+  
   knob_ir_pitch.set_min (-12.0);
   knob_ir_pitch.set_max (12.0);
   knob_ir_pitch.set_default (0);
@@ -983,7 +983,7 @@ void c_lane_widgets::move_resize (
   
   if (!main_widget)
     return;
-    
+  
   if (x == last_x && y == last_y && w == last_w && h == last_h)
     return;
   
@@ -991,12 +991,12 @@ void c_lane_widgets::move_resize (
   last_y = y;
   last_w = w;
   last_h = h;
-
+  
   const int meter_x = w + 5;
   const int host_w = std::max (w, meter_x + METER_WIDTH);
   lane_root.move_resize (x, y, host_w, h);
   lane_frame.move_resize (0, 0, w, h);
-
+  
   int button_padding = 4;
   
   //const int knob_size = 64;//std::max (64, h / 2);
@@ -1013,7 +1013,7 @@ void c_lane_widgets::move_resize (
   int button_width = std::clamp (std::min (h - 68, w / 10), 24, 96);
   
   knob_delay.move_resize (12, knob_top, knob_size, knob_size + 16);
-
+  
   btn_browse.move_resize (button_left, button_top, button_width, button_width);
   btn_clear.move_resize (btn_browse.x + btn_browse.w + button_padding,
                          button_top, button_width, button_width);
@@ -1021,7 +1021,7 @@ void c_lane_widgets::move_resize (
                          button_top, button_width, button_width);
   btn_flip.move_resize (btn_calib.x + btn_browse.w + button_padding,
                          button_top, button_width, button_width);
-                         
+  
   int mute_x = btn_flip.x + btn_calib.w + button_padding;
   int mute_width = std::max (24, cb_list.x + cb_list.w - mute_x);
   btn_mute.move_resize (mute_x,
@@ -1056,14 +1056,14 @@ void c_lane_widgets::move_resize (
   label_engine.move_resize (knob_gain_in.x, h - 20, knob_gain_in.w, 16);
   label_trim.move_resize (knob_dry_out.x, h - 20, knob_dry_out.w +
                           knob_dry_out.w, 16);
-                          
+  
   //move_resize (x, y, w, h);
 }
 
 void c_lane_widgets::set_state (nbtk::_widget_state state) {
   if (lane_state == state)
     return;
-
+  
   lane_state = state;
   lane_frame.state = lane_state;
   lane_frame.invalidate ();
@@ -1193,7 +1193,7 @@ void c_eqpage_widgets::create (
     bands [i].cb_mode.text_size = 0.75;
     snprintf (buf, 127, "Band %d filtering mode", i + 1);
     bands [i].cb_mode.set_tooltip (buf);
-
+    
     bands [i].knob_freq.create (&cont_bands, "Freq", 0, 300, 36, 50);
     bands [i].knob_freq.role = ROLE_EQ_FREQ;
     bands [i].knob_freq.bank = bank_id;
@@ -1221,7 +1221,7 @@ void c_eqpage_widgets::create (
     bands [i].knob_q.text_size = 0.75;
     snprintf (buf, 127, "Q/width for band %d (higher Q = narrower band)", i + 1);
     bands [i].knob_q.set_tooltip (buf);
-    
+  
   }
   if (ui) {
     if (bank_id == BANK_EQPRE) {
@@ -1297,7 +1297,7 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
     const int local_center_x = local_band_x + band_w / 2;
     const int band_x = inner_x + local_band_x;
     const int center_x = band_x + band_w / 2;
-
+    
     bands [i].slider_gain.move_resize (
       local_center_x - slider_widget_w / 2, 0, slider_widget_w, slider_h);
     bands [i].btn_on.move_resize (
@@ -1313,7 +1313,7 @@ void c_eqpage_widgets::move_resize (int x, int y, int w, int h) {
 
 void c_eqpage_widgets::sync_from_state (const c_eq_state &eq_state) {
   knob_gain.set_value (eq_state.master_gain_db);
-
+  
   for (int i = 0; i < EQ_NUM_BANDS; ++i)
     sync_band_from_state (eq_state, (size_t) i);
   graph.state_changed ();
@@ -1322,10 +1322,10 @@ void c_eqpage_widgets::sync_from_state (const c_eq_state &eq_state) {
 void c_eqpage_widgets::sync_band_from_state (
     const c_eq_state &eq_state,
     size_t band) {
-
+  
   if (band >= EQ_NUM_BANDS)
     return;
-
+  
   bands [band].btn_on.set_value (eq_state.enabled [band]);
   int mode_index = UI_EQ_BELL;
   for (int i = UI_EQ_HIPASS1; i <= UI_EQ_LOWPASS4; ++i) {
@@ -1350,7 +1350,7 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
            role == ROLE_EQ_GAIN ||
            role == ROLE_EQ_Q;
   };
-
+  
   auto is_descendant_of = [] (
       nbtk::c_widget *root,
       nbtk::c_widget *widget) {
@@ -1373,9 +1373,9 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
     for (int i = 0; i < EQ_NUM_BANDS; ++i)
       set_band_external_highlight (i, i == highlighted);
   };
-
+  
   int highlighted = -1;
-
+  
   for (nbtk::c_widget *w = hovered; w; w = w->parent) {
     if (w->bank == graph.bank &&
         w->lane < EQ_NUM_BANDS &&
@@ -1384,7 +1384,7 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
       break;
     }
   }
-
+  
   if (highlighted < 0) {
     for (int i = 0; i < EQ_NUM_BANDS; ++i) {
       if (is_descendant_of (&bands [i].slider_gain, hovered) ||
@@ -1397,7 +1397,7 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
       }
     }
   }
-
+  
   if (highlighted < 0) {
     for (int i = 0; i < EQ_NUM_BANDS; ++i) {
       if (bands [i].slider_gain.mouse_inside ||
@@ -1410,15 +1410,15 @@ void c_eqpage_widgets::sync_highlight_from_hover (nbtk::c_widget *hovered) {
       }
     }
   }
-
+  
   if (highlighted < 0 &&
       (hovered == &graph || is_descendant_of (&graph, hovered))) {
     highlighted = graph.get_mouse_handle ();
   }
-
+  
   if (highlighted >= 0 && !bands [highlighted].btn_on.value)
     highlighted = -1;
-
+  
   graph.set_highlighted_band (highlighted);
   apply_external_highlight (highlighted);
 }
@@ -1427,7 +1427,7 @@ bool c_eqpage_widgets::on_action (nbtk::t_action_event &event) {
   nbtk::c_widget *widget = event.source;
   if (!widget || widget->bank != graph.bank)
     return false;
-
+  
   switch ((_widget_role) widget->role) {
     case ROLE_EQ_LOAD_PRESET:
       ui->load_eq_preset (bank_id, cb_presets.selected_text ());
@@ -1471,11 +1471,11 @@ bool c_eqpage_widgets::on_command (nbtk::t_command_event &event) {
     case CMD_EQ_SAVE_PRESET: {
       if (event.result != nbtk::_command_result::accepted)
         break;
-
+      
       const std::string name = sanitize_eq_preset_name (event.text);
       if (name.empty ())
         break;
-
+      
       const auto existing = std::find_if (
         ui->configfile.eq_presets.begin (),
         ui->configfile.eq_presets.end (),
@@ -1495,7 +1495,7 @@ bool c_eqpage_widgets::on_command (nbtk::t_command_event &event) {
           "A preset with this name already exists. Replace it?");
       }
     } break;
-
+    
     case CMD_EQ_REPLACE_PRESET: {
       const std::string name = pending_preset_name;
       pending_preset_name.clear ();
@@ -1547,7 +1547,7 @@ c_neuralblender_ui::~c_neuralblender_ui () { CP
 void c_neuralblender_ui::set_samplerate (int samplerate_) {
   if (samplerate_ <= 0)
     return;
-
+  
   samplerate = samplerate_;
   eqpage_pre.graph.set_samplerate (samplerate);
   eqpage_post.graph.set_samplerate (samplerate);
@@ -1574,12 +1574,12 @@ void c_neuralblender_ui::update_preset_cwd (std::string path) {
 bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   size_t i;
   destroy ();
-
+  
   if (!nbtk_app.backend)
     nbtk_app.backend = nbtk::create_native_backend ();
   if (!nbtk_app.backend)
     return false;
-
+  
   nbtk_app.backend->init_app (&app);
   nbtk_app.native_app = &app;
   /*app.small_font = 12 * app.hdpi;
@@ -1595,7 +1595,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
     CP
     state.showadvanced = true;
   }
-
+  
   if (prefs.calib_default) {
     calib_default = true;
     for (_lane_bank bank_id : MODEL_BANKS) {
@@ -1604,11 +1604,11 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
         state.banks [bank].lanes [i].do_calib = true;
     }
   }
-
+  
   parent = parent_;
   if (!parent)
     parent = nbtk_app.backend->default_root_window (display);
-
+  
   int initial_w = DEFAULT_WINDOW_WIDTH;
   int initial_h = DEFAULT_WINDOW_HEIGHT;
   if (parent_) {
@@ -1634,7 +1634,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   
   //mainwindow.hide ();
   mainwindow.set_icon_from_png (data_neuralblender_logo_512_png);
-
+  
   cont_toparea.create (&mainwindow.root_widget, "", 0, 0, 640, 50);
   cont_pedals.create (&mainwindow.root_widget, "", 0, 120, 640, 480);
   cont_eqpre.create (&mainwindow.root_widget, "", 0, 120, 640, 480);
@@ -1761,7 +1761,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   meter_eqout [1].create (&cont_eqpost, "", 6, 70, METER_WIDTH, 520);
   meter_in [PAGE_OTHER].create (&cont_other, "", 6, 70, METER_WIDTH, 520);
   meter_masterout.create (&cont_other, "", 6, 70, METER_WIDTH, 520);
-
+  
   for (i = 0; i < BANK_COUNT; i++) {
     meter_in [i].set_vudata (&vudata_in [i]);
     meter_in [i].set_stereo (false);
@@ -1801,7 +1801,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_other_noisegate.role = ROLE_NOISEGATE;
   btn_other_noisegate.is_toggle = true;
   btn_other_noisegate.set_image_default (data_icon_noisegate_png);
-
+  
   knob_noisethresh.create (&frame_other_noisegate,  "Thresh",   90, 36, 64, 72);
   knob_noisethresh.role = ROLE_NOISETHRESH;
   knob_noiseattack.create (&frame_other_noisegate,  "Attack",  150, 36, 64, 72);
@@ -1815,25 +1815,25 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   knob_noisethresh.set_value (state.noisethresh);
   knob_noisethresh.set_default (-60);
   knob_noisethresh.set_step (0.1);
-
+  
   knob_noiseattack.set_min (0);
   knob_noiseattack.set_max (200);
   knob_noiseattack.set_value (state.noiseattack);
   knob_noiseattack.set_default (2);
   knob_noiseattack.set_step (0.1);
-
+  
   knob_noisehold.set_min (0);
   knob_noisehold.set_max (200);
   knob_noisehold.set_value (state.noisehold);
   knob_noisehold.set_default (10);
   knob_noisehold.set_step (0.1);
-
+  
   knob_noiserelease.set_min (0);
   knob_noiserelease.set_max (500);
   knob_noiserelease.set_value (state.noiserelease);
   knob_noiserelease.set_default (20);
   knob_noiserelease.set_step (0.1);
-
+  
   frame_other_linkexcl.create (&cont_other, "", 16, 16, 512, 128);
   const int x0 = 16, x1 = 156, x2 = 246, x3 = 336, x4 = 426, x5 = 516;
   const int y0 = 16, y1 = 56, y2 = 96, chkw = 80;
@@ -1915,7 +1915,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   if (blender)
     tuner.set_pitchtracker (&blender->pitchtracker);
   tuner.hide ();
-
+  
   if (blender) {
     for (i = 0; i < NB_NUM_MODELS; i++) {
       blender->banks [BANK_PEDAL].meters_out [i] = &lanes_pedals [i].vudata_out;
@@ -1930,7 +1930,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
     blender->meter_masterin              = &vudata_masterin;
     blender->meter_masterout             = &vudata_masterout;
   }
-
+  
   apply_ui_prefs (prefs);
   
   //if (state.showadvanced) {
@@ -2004,7 +2004,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     
     int window_width = std::max (MIN_WINDOW_WIDTH, mainwindow.w ());
     int window_height = std::max (MIN_WINDOW_HEIGHT, mainwindow.h ());
-
+    
     debug ("move_resize: snap=%d visible=%d main=%d,%d metrics=%d,%d",
            (int) snap_to_default, (int) metrics_visible,
            mainwindow.w (), mainwindow.h (),
@@ -2016,7 +2016,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     
     //if (do_set_min_size)
     mainwindow.set_min_size (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
-
+    
     int menuheight = 24;
     int toparea = std::max (window_height / 5, 116);
     if (toparea < 32) toparea = 32;
@@ -2030,7 +2030,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     cont_eqpost.move_resize (0, page_y, window_width, page_h);
     cont_cabs.move_resize   (0, page_y, window_width, page_h);
     cont_other.move_resize  (0, page_y, window_width, page_h);
-
+    
     int lane_width = window_width - 32;
     const int lane_top = 0;
     const int lane_gap = 12;
@@ -2081,7 +2081,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
       int meter_top = 0;
       int meter_bottom = 0;
       bool have_meter = false;
-
+      
       for (int i = 0; i < count; ++i) {
         const int y0 = lanes [i].lane_root.y + lanes [i].meter_out.y;
         const int y1 = y0 + lanes [i].meter_out.h;
@@ -2094,18 +2094,18 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
           meter_bottom = std::max (meter_bottom, y1);
         }
       }
-
+      
       *top = meter_top;
       *height = std::max (1, meter_bottom - meter_top);
     };
     int meter_top = 0;
     int meter_h = std::max (1, page_h);
-      
+    
     const int lane_stack_h = std::max (
       1, lane_height * lane_count + total_gap);
     eqpage_pre.move_resize (16, lane_top, lane_width, lane_stack_h);
     eqpage_post.move_resize (16, lane_top, lane_width, lane_stack_h);
-
+    
     auto layout_bank_lanes = [&] (_lane_bank bank_id) {
       c_lane_widgets *bank_lanes = lanes_for_bank (bank_id);
       for (int i = 0; i < NB_NUM_MODELS; i++) {
@@ -2116,10 +2116,10 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
           lane_height);
       }
     };
-
+    
     for (_lane_bank bank_id : MODEL_BANKS)
       layout_bank_lanes (bank_id);
-
+    
     if (visible_page == PAGE_EQPRE || visible_page == PAGE_EQPOST) {
       const int eq_meter = visible_page == PAGE_EQPRE ? 0 : 1;
       const _lane_bank eq_bank = bank_for_page (visible_page);
@@ -2138,7 +2138,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
     } else if (visible_page == PAGE_OTHER) {
       c_lane_widgets *meter_ref_lanes = lanes_for_bank (visible_bank);
       lane_meter_span (meter_ref_lanes, NB_NUM_MODELS, &meter_top, &meter_h);
-
+      
       meter_in [PAGE_OTHER].move_resize (5, meter_top, METER_WIDTH, meter_h);
       meter_masterout.move_resize (
         window_width - 5 - METER_WIDTH, meter_top, METER_WIDTH, meter_h);
@@ -2154,7 +2154,7 @@ void c_neuralblender_ui::move_resize (bool snap_to_default) {
       btn_other_prefs.move (frame_other_misc.w - 280, about_y);
       btn_other_about.move (frame_other_misc.w - 140, about_y);
     }
-
+    
     sync_page_visibility ();
     
     ui_resize_lock = false;
@@ -2165,7 +2165,7 @@ void c_neuralblender_ui::destroy () { CP
   if (ui_ready)
     if (nbtk_app.backend)
       nbtk_app.backend->shutdown_app (&app);
-
+  
   memset (&app, 0, sizeof (app));
   display = NULL;
   nbtk_app.native_app = NULL;
@@ -2210,14 +2210,14 @@ static bool meter_dirty (c_meterwidget &meter) {
   c_vudata *data = meter.get_vudata ();
   if (!meter.visible || !data)
     return false;
-
+  
   return data->needs_redraw.exchange (false, std::memory_order_acq_rel);
 }
 
 void c_neuralblender_ui::redraw_visible_meters () {
   if (!state.do_vu)
     return;
-
+  
   auto redraw_meter = [&] (c_meterwidget &meter) {
     if (meter_dirty (meter)) {
       mainwindow.redraw_child (meter);
@@ -2225,7 +2225,7 @@ void c_neuralblender_ui::redraw_visible_meters () {
     }
     return false;
   };
-
+  
   if (visible_page == PAGE_OTHER) {
     redraw_meter (meter_in [PAGE_OTHER]);
     redraw_meter (meter_masterout);
@@ -2278,7 +2278,7 @@ void c_neuralblender_ui::on_bank_switch (nbtk::c_widget *w, int n) { CP
     if (visible_page != PAGE_OTHER)
       visible_bank = bank_for_page (visible_page);
   }
-
+  
   move_resize ();
   sync_widgets_from_state (state);
 }
@@ -2297,39 +2297,39 @@ void c_neuralblender_ui::sync_page_visibility () {
     cont_pedals.show ();
   else
     cont_pedals.hide ();
-
+  
   if (visible_page == PAGE_EQPRE)
     cont_eqpre.show ();
   else
     cont_eqpre.hide ();
-
+  
   if (visible_page == PAGE_AMP)
     cont_models.show ();
   else
     cont_models.hide ();
-
+  
   if (visible_page == PAGE_EQPOST)
     cont_eqpost.show ();
   else
     cont_eqpost.hide ();
-
+  
   if (visible_page == PAGE_CAB)
     cont_cabs.show ();
   else
     cont_cabs.hide ();
-
+  
   if (visible_page == PAGE_OTHER)
     cont_other.show ();
   else
     cont_other.hide ();
-
+  
   btn_tab_pedals.set_value (visible_page == PAGE_PEDAL);
   btn_tab_eqpre.set_value (visible_page == PAGE_EQPRE);
   btn_tab_models.set_value (visible_page == PAGE_AMP);
   btn_tab_eqpost.set_value (visible_page == PAGE_EQPOST);
   btn_tab_cabs.set_value (visible_page == PAGE_CAB);
   btn_tab_other.set_value (visible_page == PAGE_OTHER);
-
+  
   sync_bank_tab_icon (btn_tab_pedals, state, BANK_PEDAL);
   sync_bank_tab_icon (btn_tab_eqpre, state, BANK_EQPRE);
   sync_bank_tab_icon (btn_tab_models, state, BANK_AMP);
@@ -2340,7 +2340,7 @@ void c_neuralblender_ui::sync_page_visibility () {
 void c_neuralblender_ui::ensure_tuner_created () {
   if (tuner.created || !mainwindow.is_created ())
     return;
-
+  
   int metrics_w = 0;
   mainwindow.get_metrics (&metrics_w, NULL);
   const int w = std::max (1, metrics_w - 8);
@@ -2367,7 +2367,7 @@ void c_neuralblender_ui::sync_eq_graph_highlight () {
   nbtk::c_widget *hovered = mainwindow.hovered_widget;
   if (nbtk_app.active_toplevel == &mainwindow)
     hovered = nbtk_app.hovered_widget;
-
+  
   sync_eq_graph_highlight (hovered);
 }
 
@@ -2418,7 +2418,7 @@ static const char *cwd_config_key_for_bank_ui (_lane_bank bank) {
 static bool bank_bypass_for_state (
     const c_neuralblender_state &state,
     _lane_bank bank) {
-
+  
   switch (bank) {
     case BANK_PEDAL: return state.pedal_bypass;
     case BANK_EQPRE: return state.eqpre_bypass;
@@ -2433,24 +2433,24 @@ static void set_bank_bypass_for_state (
     c_neuralblender_state &state,
     _lane_bank bank,
     bool bypass) {
-
+  
   switch (bank) {
     case BANK_PEDAL:
       state.pedal_bypass = bypass;
     break;
-
+    
     case BANK_EQPRE:
       state.eqpre_bypass = bypass;
     break;
-
+    
     case BANK_CAB:
       state.cab_bypass = bypass;
     break;
-
+    
     case BANK_EQPOST:
       state.eqpost_bypass = bypass;
     break;
-
+    
     case BANK_AMP:
     default:
       state.amp_bypass = bypass;
@@ -2462,7 +2462,7 @@ static void sync_bank_tab_icon (
     nbtk::c_button &button,
     const c_neuralblender_state &state,
     _lane_bank bank) {
-
+  
   button.set_image_default (
     bank_bypass_for_state (state, bank)
       ? data_icon_power_grey_png
@@ -2472,30 +2472,30 @@ static void sync_bank_tab_icon (
 void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
   if (updating_from_state)
     return;
-
+  
   for (_lane_bank bank_id : MODEL_BANKS) {
     if (event.handled)
       break;
-
+    
     c_lane_widgets *bank_lanes = lanes_for_bank (bank_id);
     for (size_t i = 0; i < NB_NUM_MODELS && !event.handled; ++i)
       bank_lanes [i].on_action (event);
   }
   if (event.handled)
     return;
-
+  
   auto finish = [&] () {
     event.handled = true;
     sync_widgets_from_state (state);
   };
-
+  
   auto handle_bank_switch = [&] (
       nbtk::c_button &button,
       _ui_page page,
       _lane_bank bank) {
     if (event.source_id != button.id)
       return false;
-
+    
     const bool right_click = event.mouse_button == Button3;
     bool switched_page = false;
     if (page == PAGE_OTHER) {
@@ -2524,7 +2524,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       on_bank_switch (&button, page);
       switched_page = true;
     }
-
+    
     if (switched_page)
       event.handled = true;
     else
@@ -2535,7 +2535,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
   if (eqpage_pre.on_action (event) ||
     eqpage_post.on_action (event))
   return;
-
+  
   if (handle_bank_switch (btn_tab_pedals, PAGE_PEDAL, BANK_PEDAL) ||
       handle_bank_switch (btn_tab_eqpre, PAGE_EQPRE, BANK_EQPRE) ||
       handle_bank_switch (btn_tab_models, PAGE_AMP, BANK_AMP) ||
@@ -2543,35 +2543,35 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       handle_bank_switch (btn_tab_cabs, PAGE_CAB, BANK_CAB) ||
       handle_bank_switch (btn_tab_other, PAGE_OTHER, BANK_AMP))
     return;
-
+  
   auto handle_button = [&] (nbtk::c_button &button, _widget_role role, uint64_t bank) {
     if (event.source_id != button.id)
       return false;
-
+    
     const bool value = button.value;
-
+    
     switch (role) {
       case ROLE_BYPASS:
         state.bypass = !value;
         on_bypass (&button, value);
       break;
-
+      
       case ROLE_MUTEALL:
         state.mute_all = value;
         on_muteall (&button, value);
       break;
-
+      
       case ROLE_NOISEGATE:
         state.noisegate_on = value;
         on_noisegate (&button, value);
       break;
-
+      
       case ROLE_TUNER:
         state.tuner_on = &button == &img_logo ? true : value;
         on_tuner (&button, state.tuner_on);
         sync_tuner_visibility ();
       break;
-
+      
       case ROLE_BANK_BYPASS:
         if (bank < BANK_COUNT) {
           const _lane_bank b = (_lane_bank) bank;
@@ -2579,7 +2579,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
           on_bank_bypass (&button, b, value);
         }
       break;
-
+      
       case ROLE_LINKED_CALIB:
         if (bank < BANK_COUNT)
           visible_bank = (_lane_bank) bank;
@@ -2589,7 +2589,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
           on_linked_calib (&button, value);
         }
       break;
-
+      
       case ROLE_EXCL_TOGGLE:
         if (bank < BANK_COUNT)
           visible_bank = (_lane_bank) bank;
@@ -2600,40 +2600,40 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
           on_excl (&button, 0);
         }
       break;
-
+      
       case ROLE_CALIBBASS:
         state.calib_source = value ? 1 : 0;
         on_calib_bass (&button, value);
       break;
-
+      
       case ROLE_VUTOGGLE:
         state.do_vu = value;
         vu_on (value);
         on_vu (&button, value);
       break;
-
+      
       case ROLE_PREFS:
         write_prefs_to (prefs);
         prefswindow.get_prefs_from (prefs);
         prefswindow.show ();
         on_prefs ();
       break;
-
+      
       case ROLE_ABOUT:
         aboutwindow.show ();
         on_about ();
       break;
-
+      
       case ROLE_TUNER_UP:
         state.tuner_base_freq *= SEMITONE_MULTIPLIER;
         on_tuner_base_freq (&button, state.tuner_base_freq);
       break;
-
+      
       case ROLE_TUNER_DOWN:
         state.tuner_base_freq /= SEMITONE_MULTIPLIER;
         on_tuner_base_freq (&button, state.tuner_base_freq);
       break;
-
+      
       case ROLE_TUNER_DEFAULT:
         state.tuner_base_freq = 440.0f;
         on_tuner_base_freq (&button, state.tuner_base_freq);
@@ -2642,11 +2642,11 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       default:
       break;
     }
-
+    
     finish ();
     return true;
   };
-
+  
   if (handle_button (btn_enable, ROLE_BYPASS, visible_bank) ||
       handle_button (btn_muteall, ROLE_MUTEALL, visible_bank) ||
       handle_button (btn_noisegate, ROLE_NOISEGATE, visible_bank) ||
@@ -2672,7 +2672,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       handle_button (btn_other_tuner_up, ROLE_TUNER_UP, visible_bank) ||
       handle_button (btn_other_tuner_default, ROLE_TUNER_DEFAULT, visible_bank))
     return;
-
+  
   if (event.source_id == tuner.id) {
     state.tuner_on = false;
     on_tuner (&tuner, false);
@@ -2680,40 +2680,40 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
     finish ();
     return;
   }
-
+  
   auto handle_eq_widget = [&] (nbtk::c_widget *widget) {
     if (!widget || event.source_id != widget->id ||
         widget->bank >= BANK_COUNT ||
         widget->lane >= EQ_NUM_BANDS)
       return false;
-
+    
     const _lane_bank bank = (_lane_bank) widget->bank;
     if (bank != BANK_EQPRE && bank != BANK_EQPOST)
       return false;
-
+    
     c_eq_state &eq = ui_eq_state_for_bank (bank);
     const size_t band = widget->lane;
     bool changed_parameter = false;
     const bool changed_enabled =
       (_widget_role) widget->role == ROLE_EQ_ENABLED;
-
+    
     switch ((_widget_role) widget->role) {
       case ROLE_EQ_ENABLED:
         eq.enabled [band] = static_cast<nbtk::c_button *> (widget)->value;
       break;
-
+      
       case ROLE_EQ_MODE: {
         _ui_eq_band_mode ui_mode = (_ui_eq_band_mode) std::clamp (
           static_cast<nbtk::c_combobox *> (widget)->selected,
           (int) UI_EQ_HIPASS1,
           (int) UI_EQ_LOWPASS4);
-          
+        
         eq.mode [band] = g_eq_mode_choices [ui_mode].mode;
         eq.slope [band] = g_eq_mode_choices [ui_mode].slope;
         changed_parameter = true;
       }
       break;
-
+      
       case ROLE_EQ_FREQ:
         eq.freq [band] = std::clamp (
           static_cast<nbtk::c_knob *> (widget)->value,
@@ -2721,7 +2721,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
           NB_FREQ_MAX);
         changed_parameter = true;
       break;
-
+      
       case ROLE_EQ_GAIN:
         eq.gain_db [band] = std::clamp (
           static_cast<nbtk::c_slider *> (widget)->real_value (),
@@ -2729,7 +2729,7 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
           36.0f);
         changed_parameter = true;
       break;
-
+      
       case ROLE_EQ_Q:
         eq.q [band] = std::clamp (
           static_cast<nbtk::c_knob *> (widget)->value,
@@ -2737,46 +2737,46 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
           100.0f);
         changed_parameter = true;
       break;
-
+      
       case ROLE_EQ_GRAPH:
         changed_parameter = true;
       break;
-
+      
       default:
         return false;
     }
-
+    
     eq.preset_name.clear ();
-
+    
     if (eq_auto_enable && changed_parameter) {
       eq.enabled [band] = true;
       c_eqpage_widgets &eqpage =
         bank == BANK_EQPOST ? eqpage_post : eqpage_pre;
       eqpage.bands [band].btn_on.set_value (true);
     }
-
+    
     if (bank == BANK_EQPOST)
       state.eqpost = eq;
     else
       state.eqpre = eq;
-
+    
     c_eqpage_widgets &eqpage =
       bank == BANK_EQPOST ? eqpage_post : eqpage_pre;
     if ((_widget_role) widget->role == ROLE_EQ_GRAPH)
       eqpage.sync_band_from_state (eq, band);
     else
       eqpage.graph.state_changed (false);
-
+    
     on_eq_band (widget, bank, band);
     event.handled = true;
     if (changed_enabled)
       sync_eq_graph_highlight (event.source);
     return true;
   };
-
+  
   if (handle_eq_widget (event.source))
     return;
-
+  
   if (event.source &&
       event.source->role == ROLE_EQ_MASTER_GAIN &&
       (event.source->bank == BANK_EQPRE || event.source->bank == BANK_EQPOST)) {
@@ -2798,50 +2798,50 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
     event.handled = true;
     return;
   }
-
+  
   auto handle_knob = [&] (nbtk::c_knob &knob, _widget_role role) {
     if (event.source_id != knob.id)
       return false;
-
+    
     const float value = knob.value;
     switch (role) {
       case ROLE_MASTER:
         state.master_gain_db = value;
         on_master_gain (&knob, value);
       break;
-
+      
       case ROLE_PRESENCE:
         state.presence = value;
         on_presence (&knob, value);
       break;
-
+      
       case ROLE_NOISETHRESH:
         state.noisethresh = value;
         on_noisethresh (&knob, value);
       break;
-
+      
       case ROLE_NOISEATTACK:
         state.noiseattack = value;
         on_noiseattack (&knob, value);
       break;
-
+      
       case ROLE_NOISEHOLD:
         state.noisehold = value;
         on_noisehold (&knob, value);
       break;
-
+      
       case ROLE_NOISERELEASE:
         state.noiserelease = value;
         on_noiserelease (&knob, value);
       break;
-
+      
       default:
       break;
     }
     finish ();
     return true;
   };
-
+  
   if (handle_knob (knob_mastervolume, ROLE_MASTER) ||
       handle_knob (knob_presence, ROLE_PRESENCE) ||
       handle_knob (knob_noisethresh, ROLE_NOISETHRESH) ||
@@ -2849,11 +2849,11 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
       handle_knob (knob_noisehold, ROLE_NOISEHOLD) ||
       handle_knob (knob_noiserelease, ROLE_NOISERELEASE))
     return;
-
+  
   auto handle_textbox = [&] (nbtk::c_textbox &textbox, _widget_role role) {
     if (event.source_id != textbox.id)
       return false;
-
+    
     char *end = NULL;
     const float value = std::strtof (textbox.text ().c_str (), &end);
     if (end && end != textbox.text ().c_str ()) {
@@ -2864,11 +2864,11 @@ void c_neuralblender_ui::on_action (nbtk::t_action_event &event) {
           &textbox,
           std::clamp (value, CALIB_TARGET_DB_MIN, CALIB_TARGET_DB_MAX));
     }
-
+    
     finish ();
     return true;
   };
-
+  
   if (handle_textbox (text_other_tuner, ROLE_TUNER_BASE_FREQ) ||
       handle_textbox (text_other_calib, ROLE_CALIB_TARGET_DB))
     return;
@@ -2878,7 +2878,7 @@ void c_neuralblender_ui::on_command (nbtk::t_command_event &event) {
   if (eqpage_pre.on_command (event) ||
       eqpage_post.on_command (event))
     return;
-    
+  
   switch (event.command) {
     case CMD_LOAD_PRESET: CP
       // ...
@@ -2886,7 +2886,7 @@ void c_neuralblender_ui::on_command (nbtk::t_command_event &event) {
       filepicker.show_open (event.source, CMD_LOAD_PRESET_CB);
       event.handled = true;
     break;
-
+    
     case CMD_SAVE_PRESET: CP
       filepicker.set_title ("Save NeuralBlender preset as");
       filepicker.show_save_as (event.source, CMD_SAVE_PRESET_CB);
@@ -2900,14 +2900,14 @@ void c_neuralblender_ui::on_command (nbtk::t_command_event &event) {
         load_preset_file (event.text);
       }
     break;
-
+    
     case CMD_SAVE_PRESET_CB:
       event.handled = true;
       if (event.result == nbtk::_command_result::accepted) {
         save_preset_file (event.text);
       }
     break;
-      
+    
     case CMD_PREFS:
       write_prefs_to (prefs);
       prefswindow.get_prefs_from (prefs);
@@ -2915,13 +2915,13 @@ void c_neuralblender_ui::on_command (nbtk::t_command_event &event) {
       on_prefs ();
       event.handled = true;
     break;
-
+    
     case CMD_ABOUT:
       aboutwindow.show ();
       on_about ();
       event.handled = true;
     break;
-
+    
     case CMD_QUIT:
       mainwindow.on_close ();
       event.handled = true;
@@ -2931,7 +2931,7 @@ void c_neuralblender_ui::on_command (nbtk::t_command_event &event) {
       mainwindow.hide ();
       event.handled = true;
     break;
-
+    
     case CMD_MODEL_FILE_SELECTED:
       event.handled = true;
       if (event.result == nbtk::_command_result::accepted &&
@@ -2952,12 +2952,12 @@ void c_neuralblender_ui::load_eq_preset (size_t bank_id, std::string name) { CP
     debug ("empty preset name");
     return;
   }
-
+  
   if (bank_id != BANK_EQPRE && bank_id != BANK_EQPOST) {
     debug ("invalid EQ bank ID %d", (int) bank_id);
     return;
   }
-
+  
   const auto preset = std::find_if (
     configfile.eq_presets.begin (),
     configfile.eq_presets.end (),
@@ -2968,21 +2968,21 @@ void c_neuralblender_ui::load_eq_preset (size_t bank_id, std::string name) { CP
     debug ("EQ preset '%s' not found", name.c_str ());
     return;
   }
-
+  
   const _lane_bank bank = (_lane_bank) bank_id;
   c_eq_state loaded = *preset;
   loaded.which = bank == BANK_EQPOST ? EQ_POST : EQ_PRE;
-
+  
   c_eq_state &ui_eq = ui_eq_state_for_bank (bank);
   c_eq_state &state_eq = bank == BANK_EQPOST ? state.eqpost : state.eqpre;
   c_eqpage_widgets &eqpage =
     bank == BANK_EQPOST ? eqpage_post : eqpage_pre;
-
+  
   ui_eq = loaded;
   state_eq = loaded;
   const bool bypass = !loaded.on;
   set_bank_bypass_for_state (state, bank, bypass);
-
+  
   on_bank_bypass (nullptr, bank, bypass);
   on_eq_master_gain (&eqpage.knob_gain, bank, loaded.master_gain_db);
   for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
@@ -2992,7 +2992,7 @@ void c_neuralblender_ui::load_eq_preset (size_t bank_id, std::string name) { CP
     on_eq_band (&eqpage.bands [band].knob_freq, bank, band);
     on_eq_band (&eqpage.bands [band].knob_q, bank, band);
   }
-
+  
   sync_widgets_from_state (state);
   const int selected = (int) std::distance (
     configfile.eq_presets.begin (), preset);
@@ -3032,7 +3032,7 @@ void c_neuralblender_ui::save_eq_preset (size_t bank_id, std::string name) { CP
   newpreset.on = !bank_bypass_for_state (state, (_lane_bank) bank_id);
   newpreset.preset_name = name;
   newpreset.builtin = false;
-
+  
   preset->preset_name = name;
   if (bank_id == BANK_EQPOST)
     state.eqpost.preset_name = name;
@@ -3075,17 +3075,17 @@ bool c_neuralblender_ui::delete_selected_eq_preset (size_t bank_id) {
 
 void c_neuralblender_ui::load_preset_file (std::string filename) {
   c_neuralblender_state loaded;
-
+  
   if (!loaded.read_from (filename)) {
     debug ("failed to load preset: %s", filename.c_str ());
     return;
   }
-
+  
   if (!set_dsp_state (loaded)) {
     debug ("failed to apply preset: %s", filename.c_str ());
     return;
   }
-
+  
   update_preset_cwd (filename);
   state = loaded;
   sync_widgets_from_state (state, true);
@@ -3094,12 +3094,12 @@ void c_neuralblender_ui::load_preset_file (std::string filename) {
 void c_neuralblender_ui::save_preset_file (std::string filename) {
   c_neuralblender_state snapshot;
   get_dsp_state (snapshot);
-
+  
   if (!snapshot.write_to (filename)) {
     debug ("failed to save preset: %s", filename.c_str ());
     return;
   }
-
+  
   update_preset_cwd (filename);
 }
 
@@ -3128,11 +3128,11 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
   const size_t peak_hold_ms = 1000;
   const size_t clip_hold_ms = 200;
   const size_t xrun_hold_ms = 1000;
-
+  
   nbtk_app.show_tooltips = p.show_tooltips;
   if (!nbtk_app.show_tooltips)
     nbtk_app.hide_tooltip ();
-
+  
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     meter_in [bank].set_db_scale (scale_db);
     meter_in [bank].set_headroom (headroom_db);
@@ -3157,7 +3157,7 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
   meter_masterout.set_peak_hold (peak_hold_ms);
   meter_masterout.set_clip_hold (clip_hold_ms);
   meter_masterout.set_xrun_hold (xrun_hold_ms);
-
+  
   for (_lane_bank bank_id : MODEL_BANKS) {
     c_lane_widgets *bank_lanes = lanes_for_bank (bank_id);
     for (size_t i = 0; i < NB_NUM_MODELS; i++) {
@@ -3168,11 +3168,11 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
       bank_lanes [i].meter_out.set_xrun_hold (xrun_hold_ms);
     }
   }
-
+  
   btn_other_bass.set_value (state.calib_source == 1);
-
+  
   vu_on (state.do_vu);
-
+  
   btn_noisegate.set_value (state.noisegate_on);
   btn_other_noisegate.set_value (state.noisegate_on);
   knob_mastervolume.set_value (state.master_gain_db);
@@ -3181,12 +3181,12 @@ void c_neuralblender_ui::apply_ui_prefs (t_prefs &p) { CP
   knob_noiseattack.set_value (state.noiseattack);
   knob_noisehold.set_value (state.noisehold);
   knob_noiserelease.set_value (state.noiserelease);
-
+  
   format_freq_text (buf, sizeof (buf), state.tuner_base_freq);
   text_other_tuner.set_text (buf);
   format_db_text (buf, sizeof (buf), state.calib_target_db);
   text_other_calib.set_text (buf);
-
+  
   sync_tuner_visibility ();
 }
 
@@ -3216,7 +3216,7 @@ void c_neuralblender_ui::update_stats () {
   for (_lane_bank bank_id : MODEL_BANKS) {
     const size_t bank = (size_t) bank_id;
     c_lane_widgets *bank_lanes = lanes_for_bank (bank_id);
-
+    
     for (size_t i = 0; i < NB_NUM_MODELS; i++) {
       const size_t n = i * UI_STATS_PER_LANE;
       int nframes = stats [bank] [n];
@@ -3230,7 +3230,7 @@ void c_neuralblender_ui::update_stats () {
         state.banks [bank].lanes [i].loaded;
       const bool show_ir_pitch =
         eng == ENGINE_IR || (bank == BANK_CAB && !lane_loaded);
-
+      
       if (show_ir_pitch) {
         bank_lanes [i].knob_gain_in.hide ();
         bank_lanes [i].knob_ir_pitch.show ();
@@ -3238,7 +3238,7 @@ void c_neuralblender_ui::update_stats () {
         bank_lanes [i].knob_ir_pitch.hide ();
         bank_lanes [i].knob_gain_in.show ();
       }
-
+      
       snprintf (buf, 127, "%d frames", nframes);
       bank_lanes [i].label_frames.set_label (buf);
       if (trim == 1.00) {
@@ -3267,9 +3267,9 @@ void c_neuralblender_ui::vu_on (bool b) { CP
     vu_off ();
     return;
   }
-
+  
   state.do_vu = true;
-
+  
   for (_lane_bank bank_id : MODEL_BANKS) {
     const size_t bank = (size_t) bank_id;
     meter_in [bank].show ();
@@ -3288,7 +3288,7 @@ void c_neuralblender_ui::vu_on (bool b) { CP
 
 void c_neuralblender_ui::vu_off () { CP
   state.do_vu = false;
-
+  
   for (_lane_bank bank_id : MODEL_BANKS) {
     const size_t bank = (size_t) bank_id;
     meter_in [bank].hide ();
@@ -3307,40 +3307,40 @@ void c_neuralblender_ui::vu_off () { CP
 
 size_t c_neuralblender_ui::choose_exclusive_lane () const {
   const c_neuralblender_bank_state &bank_state = state.banks [visible_bank];
-
+  
   const int current_exclusive = exclusive_lane_for_bank (visible_bank);
   if (current_exclusive > 0 &&
       current_exclusive <= (int) NB_NUM_MODELS)
     return (size_t) current_exclusive;
-
+  
   if (last_exclusive_lane [visible_bank] > 0 &&
       last_exclusive_lane [visible_bank] <= NB_NUM_MODELS)
     return last_exclusive_lane [visible_bank];
-
+  
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     if (!bank_state.lanes [i].filename.empty () &&
         !bank_state.lanes [i].lane_mute)
       return i + 1;
   }
-
+  
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     //if (!filepickers [i].selected_file.empty ())
     if (!bank_state.lanes [i].filename.empty ())
       return i + 1;
   }
-
+  
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     if (!bank_state.lanes [i].lane_mute)
       return i + 1;
   }
-
+  
   return 1;
 }
 
 void c_neuralblender_ui::on_window_resize (int w, int h) {
   if (!ui_ready || ui_resize_lock)
     return;
-
+  
   debug ("on_window_resize: %d,%d", w, h);
   move_resize ();
   mainwindow.show_children ();
@@ -3357,12 +3357,12 @@ bool c_neuralblender_ui::request_window_size (int w, int h) {
 void c_neuralblender_ui::on_excl (nbtk::c_widget *w, int n) {
   const _lane_bank bank =
     w && w->bank < BANK_COUNT ? (_lane_bank) w->bank : visible_bank;
-
+  
   debug ("n=%d", n);
   set_exclusive_lane_for_bank (bank, n);
   if (n > 0 && n <= (int) NB_NUM_MODELS)
     last_exclusive_lane [bank] = (size_t) n;
-
+  
   switch (bank) {
     case BANK_PEDAL:
       btn_other_excl_pedal.set_value (exclusive_lane_for_bank (BANK_PEDAL) != 0);
@@ -3383,9 +3383,9 @@ void c_neuralblender_ui::on_excl_use (nbtk::c_widget *w, bool b) {
   (void) b;
   if (!w)
     return;
-
+  
   debug ("lane %d, value=%d", (int) w->lane + 1, (int) b);
-
+  
   on_excl (w, (int) w->lane + 1);
 }
 
@@ -3413,29 +3413,29 @@ int c_neuralblender_ui::idle () {
     CP
     return 0;
   }
-
+  
   if (nbtk_app.backend)
     nbtk_app.backend->run_events (&app);
-
+  
   refresh_config_if_needed ();
-
+  
   eqpage_pre.graph.tick ();
   eqpage_post.graph.tick ();
-
+  
   sync_eq_graph_highlight ();
-
+  
   nbtk_app.tick ();
-
+  
   redraw_visible_meters ();
   
   redraw_tuner_if_needed ();
-
+  
   if (nbtk_app.backend)
     nbtk_app.backend->flush_dirty (&app);
-
+  
   //static c_printfps fps ("UI idle: ");
   //fps.tick ();
-
+  
   return 0;
 }
 
@@ -3459,7 +3459,7 @@ void c_neuralblender_ui::handle_error (const t_neuralblender_error &error) {
       case ENOENT:
         code = NB_ERROR_FILE_NOTFOUND;
       break;
-
+      
       default:
         code = NB_ERROR_FILE_OTHER;
       break;
@@ -3558,7 +3558,7 @@ void c_neuralblender_ui::handle_error (const t_neuralblender_error &error) {
 void c_neuralblender_ui::draw () {
   if (!mainwindow.is_created ())
     return;
-
+  
   mainwindow.force_draw ();
 }
 
@@ -3569,11 +3569,11 @@ bool c_neuralblender_ui::load_model (size_t which, const char *filename) {
 void c_neuralblender_ui::clear_lane_model_ui (_lane_bank bank, size_t which) {
   if (which >= NB_NUM_MODELS)
     return;
-
+  
   //filepickers [which].selected_file.clear ();
   if (bank < BANK_PEDAL || bank >= BANK_COUNT)
     bank = BANK_AMP;
-
+  
   state.banks [bank].lanes [which].filename.clear ();
   lanes_for_bank (bank) [which].cb_list.clear ();
 }
@@ -3586,17 +3586,17 @@ void c_neuralblender_ui::set_lane_mute (_lane_bank bank, size_t which, bool b) {
   debug ("which=%d, b=%d", (int) which, (int) b);
   if (which >= NB_NUM_MODELS)
     return;
-
+  
   if (bank < BANK_PEDAL || bank >= BANK_COUNT)
     bank = BANK_AMP;
-
+  
   const bool old_updating = updating_from_state;
   updating_from_state = true;
-
+  
   c_lane_widgets *lanes = lanes_for_bank (bank);
   lanes [which].btn_mute.value = b;
   lanes [which].btn_mute.set_value (b);
-
+  
   updating_from_state = old_updating;
 }
 
@@ -3613,15 +3613,15 @@ void c_neuralblender_ui::write_calib_state_if_consistent () {
   bool all_on = true;
   bool all_off = true;
   const c_neuralblender_bank_state &bank_state = state.banks [visible_bank];
-
+  
   for (size_t i = 0; i < NB_NUM_MODELS && i < NB_NUM_MODELS; ++i) {
     all_on  &= bank_state.lanes [i].do_calib;
     all_off &= !bank_state.lanes [i].do_calib;
   }
-
+  
   if (!all_on && !all_off)
     return;
-
+  
   configfile.set_item (CONFIG_KEY_NAME_CALIB, all_on ? "1" : "0");
 }
 
@@ -3632,13 +3632,13 @@ void c_neuralblender_ui::sync_eq_presets () {
   int selected_post = -1;
   bool exact_pre = false;
   bool exact_post = false;
-
+  
   for (int i = 0; i < configfile.eq_presets.size (); i++) {
     const c_eq_state &preset = configfile.eq_presets [i];
     const std::string &name = preset.preset_name;
     eqpage_pre.cb_presets.add (name);
     eqpage_post.cb_presets.add (name);
-
+    
     if (!ui_eqpre.preset_name.empty () &&
         ui_eqpre.preset_name == preset.preset_name) {
       selected_pre = i;
@@ -3647,7 +3647,7 @@ void c_neuralblender_ui::sync_eq_presets () {
                same_eq_settings (ui_eqpre, preset)) {
       selected_pre = i;
     }
-
+    
     if (!ui_eqpost.preset_name.empty () &&
         ui_eqpost.preset_name == preset.preset_name) {
       selected_post = i;
@@ -3657,7 +3657,7 @@ void c_neuralblender_ui::sync_eq_presets () {
       selected_post = i;
     }
   }
-
+  
   eqpage_pre.cb_presets.set_selected (selected_pre);
   eqpage_post.cb_presets.set_selected (selected_post);
 }
@@ -3675,7 +3675,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     if (n > 0 && n <= (int) NB_NUM_MODELS)
       last_exclusive_lane [bank] = (size_t) n;
   }
-
+  
   updating_from_state = true;
   
   sync_page_visibility ();
@@ -3697,15 +3697,15 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     knob_noisethresh.show ();
   else
     knob_noisethresh.hide ();*/
-
+  
   for (_lane_bank bank_id : MODEL_BANKS) {
     const size_t bank = (size_t) bank_id;
     c_lane_widgets *bank_lanes = lanes_for_bank (bank_id);
     const c_neuralblender_bank_state &bank_state = state.banks [bank];
-
+    
     for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
       const c_neuralblender_lane_state &lane = bank_state.lanes [i];
-
+      
       bank_lanes [i].knob_gain_in.set_value (gain_to_db (lane.gain_in));
       bank_lanes [i].knob_ir_pitch.set_value (lane.ir_pitch_semitones);
       bank_lanes [i].knob_gain_out.set_value (gain_to_db (lane.gain_out));
@@ -3714,7 +3714,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
       bank_lanes [i].knob_delay.set_value (lane.delay_ms);
       bank_lanes [i].btn_flip.set_value (lane.dcflip);
       bank_lanes [i].btn_calib.set_value (lane.do_calib);
-
+      
       //filepickers [i].selected_file = lane.filename;
       if (scan_dirs) {
         if (lane.filename.empty ()) {
@@ -3741,10 +3741,10 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
   
   sync_tuner_visibility ();
   //btn_enable.set_label (enabled ? "Enabled" : " Bypass ");
-
+  
   /*btn_advanced.set_value (state.showadvanced);
   show_advanced_settings (state.showadvanced);*/
-
+  
   btn_other_bass.set_value (state.calib_source == 1);
   btn_other_byp_pedal.set_value (state.pedal_bypass);
   btn_other_byp_eq1.set_value (state.eqpre_bypass);
@@ -3788,19 +3788,19 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     meter_in [PAGE_OTHER].hide ();
     meter_masterout.hide ();
   }
-
+  
   const int visible_exclusive_lane = exclusive_lane_for_bank (visible_bank);
   btn_other_excl_pedal.set_value (exclusive_lane_for_bank (BANK_PEDAL) > 0);
   btn_other_excl_amp.set_value (exclusive_lane_for_bank (BANK_AMP) > 0);
   btn_other_excl_cab.set_value (exclusive_lane_for_bank (BANK_CAB) > 0);
   
   sync_eq_presets ();
-
+  
   if (!page_has_bank (visible_page)) {
     updating_from_state = false;
     return;
   }
-
+  
   c_lane_widgets *visible_lanes = lanes_for_bank (visible_bank);
   const c_neuralblender_bank_state &visible_bank_state = state.banks [visible_bank];
   const bool exclusive_on = visible_exclusive_lane > 0;
@@ -3808,19 +3808,19 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     bank_bypass_for_state (state, visible_bank);
   const bool exclusive_active =
     exclusive_on && !state.mute_all && enabled && !visible_bank_bypassed;
-
+  
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     const c_neuralblender_lane_state &lane = visible_bank_state.lanes [i];
     const bool selected =
       exclusive_on && visible_exclusive_lane == (int) i + 1;
-
+    
     visible_lanes [i].btn_mute.set_value (lane.lane_mute);
     visible_lanes [i].btn_excl.set_value (selected);
-
+    
     if (exclusive_on) {
       visible_lanes [i].btn_mute.hide ();
       visible_lanes [i].btn_excl.show ();
-
+      
       visible_lanes [i].set_state (
         selected && exclusive_active ?
           nbtk::WSTATE_SELECTED :
@@ -3828,7 +3828,7 @@ void c_neuralblender_ui::sync_widgets_from_state (const c_neuralblender_state &s
     } else { CP
       visible_lanes [i].btn_mute.show ();
       visible_lanes [i].btn_excl.hide ();
-
+      
       visible_lanes [i].set_state (
         lane.lane_mute || state.mute_all || !enabled || visible_bank_bypassed ?
           nbtk::WSTATE_DISABLED :

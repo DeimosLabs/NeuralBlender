@@ -46,7 +46,7 @@ static inline int eq_mode_to_type (_eq_band_mode mode, int slope) {
     slope = 1;
   else if (slope > EQ_SLOPE_MAX)
     slope = EQ_SLOPE_MAX;
-
+  
   switch (mode) {
     case EQ_HIPASS:   return slope - 1;
     case EQ_LOWSHELF: return 4;
@@ -63,7 +63,7 @@ static inline void eq_type_to_mode (
     type = 0;
   else if (type > 10)
     type = 10;
-
+  
   slope = 1;
   if (type <= 3) {
     mode = EQ_HIPASS;
@@ -144,7 +144,7 @@ struct c_neuralblender_lane_state {
   bool loaded = false;
   bool dcflip = false;
   bool do_calib = false;
-
+  
   void to_strings (_lane_bank bank, int lane, std::vector<std::string> &v);
   t_parse_result from_strings (_lane_bank bank, int lane, std::vector<std::string> &v);
 };
@@ -175,7 +175,7 @@ struct c_eq_state {
   bool on = false;
   float master_gain_db = 0.0f;
   _eq_which which = EQ_PRESET;
-
+  
   bool enabled [EQ_NUM_BANDS]        = { false, false, false, false, false, false, false, false };
   _eq_band_mode mode [EQ_NUM_BANDS]  = { EQ_HIPASS, EQ_LOWSHELF, EQ_BELL, EQ_BELL, 
                                          EQ_BELL, EQ_BELL, EQ_HISHELF, EQ_LOWPASS };
@@ -197,7 +197,7 @@ struct c_neuralblender_state {
   c_neuralblender_state &operator= (const c_neuralblender_state &other) {
     if (this == &other)
       return *this;
-
+    
     current_dir = other.current_dir;
     bypass = other.bypass;
     do_excl = other.do_excl;
@@ -215,7 +215,7 @@ struct c_neuralblender_state {
     noiserelease = other.noiserelease;
     calib_target_db = other.calib_target_db;
     calib_source = other.calib_source;
-
+    
     pedal_bypass = other.pedal_bypass;
     eqpre_bypass = other.eqpre_bypass;
     amp_bypass   = other.amp_bypass;
@@ -223,18 +223,18 @@ struct c_neuralblender_state {
     cab_bypass   = other.cab_bypass;
     eqpre = other.eqpre;
     eqpost = other.eqpost;
-
+    
     for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank)
       banks [bank] = other.banks [bank];
-
+    
     return *this;
   }
-
+  
   void to_strings (std::vector<std::string> &v);
   bool from_strings (std::vector<std::string> &v);
   bool read_from (const std::string &filename);
   bool write_to (const std::string &filename);
-
+  
   std::string current_dir;
   bool bypass             = false;
   bool pedal_bypass       = false;
@@ -257,7 +257,7 @@ struct c_neuralblender_state {
   float noiserelease      = 20.0f;
   float calib_target_db   = DB_CALIB_TARGET_DEFAULT;
   int calib_source        = 0; // 0=guitar, 1=bass
-
+  
   c_neuralblender_bank_state banks [BANK_COUNT];
   c_eq_state eqpre;
   c_eq_state eqpost;
@@ -271,7 +271,7 @@ std::string sanitize_eq_preset_name (std::string name);
 bool same_eq_preset (const c_eq_state &a, const c_eq_state &b);
 // same as above but doesn't compare name
 bool same_eq_settings (const c_eq_state &a, const c_eq_state &b);
-  
+
 class c_configfile {
 public:
   c_configfile ();

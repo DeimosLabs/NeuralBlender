@@ -48,7 +48,7 @@ static c_neuralblender *g_blender = nullptr;
 /******************************************************************************
  * JACK stuff
  */
- 
+
 static jack_client_t *jack_client = nullptr;
 static jack_port_t *jack_in = nullptr;
 static jack_port_t *jack_out = nullptr;
@@ -57,7 +57,7 @@ static volatile bool g_running = true;
 static int jack_process (jack_nframes_t nframes, void *) {
   float *in = (float *) jack_port_get_buffer (jack_in, nframes);
   float *out = (float *) jack_port_get_buffer (jack_out, nframes);
-
+  
   g_blender->process_block (in, out, nframes);
   return 0;
 }
@@ -84,7 +84,7 @@ static void apply_eq_state (
     c_eq &eq, const c_eq_state &state, bool bypass) {
   eq.on = !bypass;
   eq.set_master_gain_db (state.master_gain_db);
-
+  
   for (int i = 0; i < EQ_NUM_BANDS; ++i) {
     eq.set_enabled (i, state.enabled [i]);
     eq.set_band (
@@ -172,7 +172,7 @@ bool c_standalone_ui::load_model (
          (int) bank, (int) which, filename);
   if (bank != BANK_PEDAL && bank != BANK_AMP && bank != BANK_CAB)
     bank = BANK_AMP;
-
+  
   const bool loaded = (blender->load_model (bank, which, filename) == NB_ERROR_NONE);
   if (which < NB_NUM_MODELS) {
     state.banks [bank].lanes [which].loaded = loaded;
@@ -258,7 +258,7 @@ void c_standalone_ui::on_dcflip (nbtk::c_widget *w, bool b) {
 void c_standalone_ui::on_calibrate (nbtk::c_widget *w, bool b) { CP
   if (!w)
     return;
-    
+  
   size_t which = w->lane;
   
   if (w->bank < BANK_COUNT && which < NB_NUM_MODELS)
@@ -359,10 +359,10 @@ void c_standalone_ui::on_eq_band (
   (void) w;
   if (!blender || band >= EQ_NUM_BANDS)
     return;
-
+  
   if (bank != BANK_EQPRE && bank != BANK_EQPOST)
     return;
-
+  
   const c_eq_state &eq_state = ui_eq_state_for_bank (bank);
   blender->set_eq_band (
     bank,
@@ -380,7 +380,7 @@ void c_standalone_ui::on_eq_master_gain (
   (void) w;
   if (bank != BANK_EQPRE && bank != BANK_EQPOST)
     return;
-
+  
   if (blender)
     blender->set_eq_master_gain_db (bank, value);
 }
@@ -419,24 +419,24 @@ void c_standalone_ui::on_bank_bypass (nbtk::c_widget *w, _lane_bank bank, bool b
   (void) w;
   if (!blender)
     return;
-
+  
   switch (bank) {
     case BANK_PEDAL:
       blender->set_pedal_bypass (b);
     break;
-
+    
     case BANK_EQPRE:
       blender->set_eq_bypass (bank, b);
     break;
-
+    
     case BANK_CAB:
       blender->set_cab_bypass (b);
     break;
-
+    
     case BANK_EQPOST:
       blender->set_eq_bypass (bank, b);
     break;
-
+    
     case BANK_AMP:
     default:
       blender->set_amp_bypass (b);
@@ -460,13 +460,13 @@ void c_standalone_ui::write_prefs_to (t_prefs &p) {
 void c_standalone_ui::apply_effective_controls () {
   if (!blender)
     return;
-
+  
   for (_lane_bank b : STANDALONE_MODEL_BANKS) {
     const size_t bank = (size_t) b;
     c_neuralblender_bank_state &bank_state = state.banks [bank];
     blender->banks [bank].linked_calib = bank_state.linked_calib;
     blender->set_exclusive_lane (b, bank_state.exclusive_lane);
-
+    
     const int exclusive_lane = exclusive_lane_for_bank (b);
     const bool exclusive_on = exclusive_lane > 0;
     const size_t excl = exclusive_on ? (size_t) (exclusive_lane - 1) : 0;
@@ -475,7 +475,7 @@ void c_standalone_ui::apply_effective_controls () {
       (excl >= NB_NUM_MODELS ||
        (!bank_state.lanes [excl].loaded &&
         bank_state.lanes [excl].filename.empty ()));
-
+    
     for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
       const bool mute =
         exclusive_on && !exclusive_empty
@@ -486,7 +486,7 @@ void c_standalone_ui::apply_effective_controls () {
       blender->calib_on (b, i, bank_state.lanes [i].do_calib);
     }
   }
-
+  
   blender->linked_calib = blender->banks [BANK_AMP].linked_calib;
   blender->set_bypass (state.bypass);
   blender->set_pedal_bypass (state.pedal_bypass);
@@ -509,16 +509,16 @@ int c_standalone_ui::idle () {
   }
   if (have_error)
     handle_error (error);
-
+  
   if (g_blender->tuner_on)
     g_blender->pitchtracker.analyze ();
-
+  
   _lane_bank next_spectrum_bank = BANK_COUNT;
   if (visible_page == PAGE_EQPRE)
     next_spectrum_bank = BANK_EQPRE;
   else if (visible_page == PAGE_EQPOST)
     next_spectrum_bank = BANK_EQPOST;
-
+  
   auto spectrum_eq = [&] (_lane_bank bank) -> c_eq * {
     if (bank == BANK_EQPRE)
       return &g_blender->eq_pre;
@@ -526,7 +526,7 @@ int c_standalone_ui::idle () {
       return &g_blender->eq_post;
     return NULL;
   };
-
+  
   if (next_spectrum_bank != spectrum_bank) {
     if (c_eq *eq = spectrum_eq (spectrum_bank))
       eq->stop_spectra ();
@@ -534,7 +534,7 @@ int c_standalone_ui::idle () {
       eq->start_spectra ();
     spectrum_bank = next_spectrum_bank;
   }
-
+  
   if (c_eq *eq = spectrum_eq (spectrum_bank)) {
     if (eq->analyze_spectra ()) {
       float input_db [SPECTRUM_BINS];
@@ -550,13 +550,13 @@ int c_standalone_ui::idle () {
       }
     }
   }
-
+  
   const float gain = g_blender->noisegate_on
     ? g_blender->noisegate.get_current_gain ()
     : 1.0f;
-
+  
   set_threshgain (gain);
-
+  
   return c_neuralblender_ui::idle ();
 }
 
@@ -568,7 +568,7 @@ static c_standalone_ui *g_ui = nullptr;
 static void save_standalone_config () {
   if (!g_ui || !g_ui->ui_ready)
     return;
-
+  
   g_ui->write_prefs_to (g_ui->prefs);
   g_ui->write_calib_state_if_consistent ();
   write_prefs_to_config (g_ui->configfile, g_ui->prefs);
@@ -579,7 +579,7 @@ static void refresh_bank_stats (c_neuralblender_ui *ui, _lane_bank bank) {
     return;
   if (bank < BANK_PEDAL || bank >= BANK_COUNT)
     bank = BANK_AMP;
-
+  
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     const size_t n = i * UI_STATS_PER_LANE;
     c_neuralamp &amp = ui->blender->banks [bank].lanes [i];
@@ -624,11 +624,11 @@ static void ui_main () {
 }
 
 #endif
- 
+
 /******************************************************************************
  * args, main etc
  */
- 
+
 void do_usage (int argc, char **argv) {
   if (argc < 1)
     return;
@@ -636,7 +636,7 @@ void do_usage (int argc, char **argv) {
   
   //while (*c == '.' || *c == '/')
   //  c++;
-    
+  
   printf ("NeuralBlender (%s) build timestamp %s\n", c, g_build_timestamp);
 }
 
@@ -674,7 +674,7 @@ int main (int argc, char **argv) {
   c_neuralblender_state nbstate;
   
   g_blender = new c_neuralblender;
-
+  
   const char *home = getenv ("HOME");
   const std::string nbstate_path = home && home [0]
     ? std::string (home) + "/" + CONFIG_STATE_NAME
@@ -720,7 +720,7 @@ int main (int argc, char **argv) {
   teststate.on = true;
   teststate.master_gain_db = 9.5f;
   teststate.which = EQ_PRE;
-
+  
   std::string s;
   teststate.to_string (s);
   teststate.from_string (s);
@@ -732,10 +732,10 @@ int main (int argc, char **argv) {
     fprintf (stderr, "could not open JACK client\n");
     return 1;
   }
-
+  
   jack_set_process_callback (jack_client, jack_process, g_blender);
   jack_on_shutdown (jack_client, jack_shutdown, g_blender);
-
+  
   jack_in = jack_port_register (
     jack_client,
     "in",
@@ -743,7 +743,7 @@ int main (int argc, char **argv) {
     JackPortIsInput,
     0
   );
-
+  
   jack_out = jack_port_register (
     jack_client,
     "out",
@@ -751,7 +751,7 @@ int main (int argc, char **argv) {
     JackPortIsOutput,
     0
   );
-
+  
   if (!jack_in || !jack_out) {
     fprintf (stderr, "could not register JACK ports\n");
     jack_client_close (jack_client);
@@ -765,10 +765,10 @@ int main (int argc, char **argv) {
     g_ui->set_samplerate (samplerate);
 #endif
   g_blender->set_blocksize (jack_get_buffer_size (jack_client));
-
+  
   if (have_saved_state && !g_blender->set_state (nbstate))
     fprintf (stderr, "NeuralBlender: some saved state values could not be restored\n");
-
+  
   std::string state_models [2] = {
     g_blender->banks [BANK_AMP].lanes [0].filename,
     g_blender->banks [BANK_AMP].lanes [1].filename
@@ -786,7 +786,7 @@ int main (int argc, char **argv) {
     if (!filename.empty () && filename != state_models [lane])
       g_blender->load_model (BANK_AMP, lane, filename.c_str ());
   }
-  
+
 #ifdef HAVE_GUI
   ui_thread = std::thread (ui_main);
   while (g_running && !ui_started.load (std::memory_order_acquire))
@@ -804,7 +804,7 @@ int main (int argc, char **argv) {
 #endif
     return 0;
   }
-
+  
   if (jack_activate (jack_client)) {
     fprintf (stderr, "could not activate JACK client\n");
     jack_client_close (jack_client);
@@ -816,7 +816,7 @@ int main (int argc, char **argv) {
 #endif
     return 1;
   }
-  
+
 #ifndef HAVE_GUI
   fprintf(stderr, "NeuralBlender running. Connect ports manually. Press ctrl+C to quit.\n");
 #endif

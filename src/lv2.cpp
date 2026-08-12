@@ -132,7 +132,7 @@ struct Plugin : public c_lv2_urids {
   float last_bank_bypass [BANK_COUNT] = { 0.0 };
   bool base_lane_mute [BANK_COUNT] [NB_NUM_MODELS] = {};
   bool host_bypass = false;
-
+  
   // dsp
   c_neuralblender blender;
   double samplerate            = 48000;
@@ -186,14 +186,14 @@ struct Plugin : public c_lv2_urids {
   std::atomic<uint32_t> pending_error_read { 0 };
   std::atomic<uint32_t> pending_error_write { 0 };
   std::atomic<bool> ui_state_requested { false };
-  
+
 };
 
 static void queue_error (
     Plugin *self, const t_neuralblender_error &error) {
   if (!self || error.code == NB_ERROR_NONE)
     return;
-
+  
   const uint32_t write =
     self->pending_error_write.load (std::memory_order_relaxed);
   const uint32_t next = (write + 1) % LV2_ERROR_QUEUE_SIZE;
@@ -202,7 +202,7 @@ static void queue_error (
              error.code);
     return;
   }
-
+  
   t_lv2_error_message &dest = self->pending_errors [write];
   dest.code = (int32_t) error.code;
   dest.bank = (int32_t) error.bank;
@@ -222,14 +222,14 @@ static bool lv2_is_bank (_lane_bank bank) {
 static c_eq *lv2_eq_for_bank (Plugin *self, _lane_bank bank) {
   if (!self)
     return NULL;
-
+  
   switch (bank) {
     case BANK_EQPRE:
       return &self->blender.eq_pre;
-
+    
     case BANK_EQPOST:
       return &self->blender.eq_post;
-
+    
     default:
       return NULL;
   }
@@ -248,18 +248,18 @@ static c_eq *lv2_eq_for_spectrum (Plugin *self, int selection) {
 static void select_spectrum (Plugin *self, int selection) {
   if (!self)
     return;
-
+  
   selection = std::clamp (
     selection, (int) LV2_SPECTRUM_OFF, (int) LV2_SPECTRUM_POST);
   const int old = self->spectrum_select.load (std::memory_order_acquire);
   if (selection == old)
     return;
-
+  
   if (c_eq *eq = lv2_eq_for_spectrum (self, old))
     eq->stop_spectra ();
   if (c_eq *eq = lv2_eq_for_spectrum (self, selection))
     eq->start_spectra ();
-
+  
   self->spectrum_dirty.store (false, std::memory_order_release);
   self->spectrum_select.store (selection, std::memory_order_release);
   self->loader_cv.notify_one ();
@@ -268,11 +268,11 @@ static void select_spectrum (Plugin *self, int selection) {
 static bool read_changed (const float *port, float &last, float &value) {
   if (!port)
     return false;
-
+  
   value = *port;
   if (value == last)
     return false;
-
+  
   last = value;
   return true;
 }
@@ -281,7 +281,7 @@ static bool read_changed_bool (const float *port, float &last, bool &value) {
   float f = 0.0f;
   if (!read_changed (port, last, f))
     return false;
-
+  
   value = f >= 0.5f;
   return true;
 }
@@ -291,19 +291,19 @@ static bool calib_enabled_for_lane (
   if (!self || !lv2_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return false;
-
+  
   if (self->calibrate [bank] [which])
     return *self->calibrate [bank] [which] >= 0.5f;
-
+  
   return self->blender.banks [bank].lanes [which].do_calib;
 }
 
 static void apply_effective_controls (Plugin *self) {
   if (!self)
     return;
-
+  
   self->blender.set_bypass (self->host_bypass);
-
+  
   for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
     const size_t bank = (size_t) b;
     const int exclusive_lane = (int) lrintf (self->last_exclusive_lane [bank]);
@@ -314,7 +314,7 @@ static void apply_effective_controls (Plugin *self) {
     const size_t excl = exclusive_on ? (size_t) (exclusive_lane - 1) : 0;
     const bool exclusive_empty =
       exclusive_on && !self->blender.banks [bank].lanes [excl].loaded ();
-
+    
     for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
       const bool mute =
         exclusive_on && !exclusive_empty ? i != excl : self->base_lane_mute [bank] [i];
@@ -328,21 +328,21 @@ static void run_calibration (
   if (!self || !lv2_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return;
-
+  
   self->blender.calib_on (bank, which, enabled);
-
+  
   if (self->blender.banks [bank].linked_calib)
     self->blender.calibrate_linked (bank, self->blender.calib_source == 1);
   else
     self->blender.calibrate (bank, which, self->blender.calib_source == 1);
-
+  
   self->stats_dirty.store (true, std::memory_order_release);
 }
 
 static void run_linked_calibration (Plugin *self, _lane_bank bank) {
   if (!self || !lv2_is_model_bank (bank))
     return;
-
+  
   self->blender.calibrate_linked (bank, self->blender.calib_source == 1);
   self->stats_dirty.store (true, std::memory_order_release);
 }
@@ -364,7 +364,7 @@ static void loader_main (Plugin *self) { CP
     std::string path;
     { // scope: only hold this lock while moving pending jobs into locals
       std::unique_lock<std::mutex> lock (self->loader_mutex);
-
+      
       self->loader_cv.wait_for(lock, std::chrono::milliseconds (50), [&] {
         if (self->restore_in_progress.load (std::memory_order_acquire))
           return false;
@@ -380,12 +380,12 @@ static void loader_main (Plugin *self) { CP
         }
         return !self->loader_running;
       });
-
+      
       if (!self->loader_running)
         break;
       if (self->restore_in_progress.load (std::memory_order_acquire))
         continue;
-
+      
       for (_lane_bank bank_id : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
         if (do_load)
           break;
@@ -401,7 +401,7 @@ static void loader_main (Plugin *self) { CP
           }
         }
       }
-
+      
       if (!do_load) {
         for (_lane_bank bank_id : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
           const size_t b = (size_t) bank_id;
@@ -413,7 +413,7 @@ static void loader_main (Plugin *self) { CP
           }
         }
       }
-
+      
       if (!do_load && !do_calib_all) {
         for (_lane_bank bank_id : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
           if (do_calib)
@@ -433,7 +433,7 @@ static void loader_main (Plugin *self) { CP
           }
         }
       }
-
+      
       if (!do_load && !do_calib_all && !do_calib) {
         for (_lane_bank bank_id : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
           if (do_ir_pitch)
@@ -451,21 +451,21 @@ static void loader_main (Plugin *self) { CP
           }
         }
       }
-
+      
       if (!do_load && !do_calib_all && !do_calib && !do_ir_pitch)
         do_tuner = self->tuner_enabled.load (std::memory_order_acquire);
       spectrum_select =
         self->spectrum_select.load (std::memory_order_acquire);
     } // unlocks here
-
+    
     if (do_load) {
       fprintf (stderr, "NeuralBlender: loader: load_model(%d, %zu, \"%s\")\n",
                (int) bank, which, path.c_str ());
       self->load_requested = false;
-
+      
       fprintf (stderr, "NeuralBlender: loading model %d:%zu: %s\n",
                (int) bank, which, path.c_str ());
-
+      
       if (self->blender.load_model (bank, which, path.c_str ()) == NB_ERROR_NONE) {
         self->current_model [bank] [which] = path;
         self->notify_path [bank] [which] = true;
@@ -473,7 +473,7 @@ static void loader_main (Plugin *self) { CP
         self->current_model [bank] [which].clear ();
         self->notify_path [bank] [which] = true;
       }
-
+      
       bool calib_after_load =
         calib_enabled_for_lane (self, bank, which);
       self->pending_calib_enabled [bank] [which].store (
@@ -482,7 +482,7 @@ static void loader_main (Plugin *self) { CP
         std::lock_guard<std::mutex> lock (self->loader_mutex);
         self->pending_calibrate [bank] [which] = false;
       }
-
+      
       run_calibration (self, bank, which, calib_after_load);
       self->controls_dirty.store (true, std::memory_order_release);
     }
@@ -492,12 +492,12 @@ static void loader_main (Plugin *self) { CP
       run_calibration (self, bank, which, calib_enabled);
       self->controls_dirty.store (true, std::memory_order_release);
     }
-
+    
     if (do_calib_all) {
       run_linked_calibration (self, bank);
       self->controls_dirty.store (true, std::memory_order_release);
     }
-
+    
     if (do_ir_pitch) {
       self->blender.set_ir_pitch (bank, which, ir_pitch_value);
       if (self->blender.banks [bank].lanes [which].do_calib)
@@ -505,7 +505,7 @@ static void loader_main (Plugin *self) { CP
       self->stats_dirty.store (true, std::memory_order_release);
       self->controls_dirty.store (true, std::memory_order_release);
     }
-
+    
     if (do_tuner) {
       self->blender.pitchtracker.analyze ();
       self->detected_tuner_freq.store (
@@ -518,7 +518,7 @@ static void loader_main (Plugin *self) { CP
         self->blender.pitchtracker.detected_cents.load (std::memory_order_acquire),
         std::memory_order_release);
     }
-
+    
     if (c_eq *eq = lv2_eq_for_spectrum (self, spectrum_select)) {
       if (eq->analyze_spectra ())
         self->spectrum_dirty.store (true, std::memory_order_release);
@@ -532,17 +532,17 @@ static void request_load (
   if (!self || !path || !path [0] || !lv2_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return;
-    
+  
   std::lock_guard<std::mutex> lock (self->loader_mutex);
   
   
   /* TODO: check this
   if (which == 0 && self->current_model_a == path)
     return;
-
+  
   if (which == 1 && self->current_model_b == path)
     return;*/
-
+  
   self->pending_load [bank] [which] = true;
   self->pending_path [bank] [which] = path;
   self->pending_calibrate_all [bank] = false;
@@ -557,7 +557,7 @@ static void request_ir_pitch (
   if (!self || !lv2_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return;
-
+  
   std::lock_guard<std::mutex> lock (self->loader_mutex);
   self->pending_ir_pitch [bank] [which] = true;
   self->pending_ir_pitch_value [bank] [which] =
@@ -570,7 +570,7 @@ static void clear_model_slot (
   if (!self || !lv2_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return;
-
+  
   { // scope
     std::lock_guard<std::mutex> lock (self->loader_mutex);
     self->pending_load [bank] [which] = false;
@@ -578,7 +578,7 @@ static void clear_model_slot (
     self->pending_calibrate [bank] [which] = false;
     self->pending_calibrate_all [bank] = false;
   }
-
+  
   self->blender.unload_model (bank, which);
   self->current_model [bank] [which].clear ();
   self->notify_path [bank] [which] = notify;
@@ -596,7 +596,7 @@ static void get_state_path_features (
     *map_path = NULL;
   if (free_path)
     *free_path = NULL;
-
+  
   for (int i = 0; features && features [i]; ++i) {
     if (map_path && !strcmp (features [i]->URI, LV2_STATE__mapPath))
       *map_path = (LV2_State_Map_Path *) features [i]->data;
@@ -610,7 +610,7 @@ static void request_calibrate (
   if (!self || !lv2_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return;
-
+  
   {
     // scope
     std::lock_guard<std::mutex> lock (self->loader_mutex);
@@ -618,34 +618,34 @@ static void request_calibrate (
     self->pending_calib_enabled [bank] [which].store (
       enabled, std::memory_order_release);
   }
-
+  
   self->loader_cv.notify_one ();
 }
 
 static void request_calibrate_linked (Plugin *self, _lane_bank bank) {
   if (!self || !lv2_is_model_bank (bank))
     return;
-
+  
   {
     std::lock_guard<std::mutex> lock (self->loader_mutex);
     self->pending_calibrate_all [bank] = true;
   }
-
+  
   self->loader_cv.notify_one ();
 }
 
 static void set_calib_target_db (Plugin *self, float db) {
   if (!self)
     return;
-
+  
   const float old_db = self->blender.banks [BANK_AMP].lanes [0].calib_target_db;
   self->blender.set_calib_target_db (db);
   const bool changed = self->blender.banks [BANK_AMP].lanes [0].calib_target_db != old_db;
   if (!changed)
     return;
-
+  
   self->last_calib_target_db = self->blender.banks [BANK_AMP].lanes [0].calib_target_db;
-
+  
   for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
     const size_t bank = (size_t) b;
     if (self->blender.banks [bank].linked_calib) {
@@ -662,20 +662,20 @@ static void set_calib_target_db (Plugin *self, float db) {
 static bool get_bank_bypass (Plugin *self, _lane_bank bank) {
   if (!self)
     return false;
-
+  
   switch (bank) {
     case BANK_PEDAL:
       return self->blender.pedal_bypass ();
-
+    
     case BANK_EQPRE:
       return !self->blender.eq_pre.on;
-
+    
     case BANK_CAB:
       return self->blender.cab_bypass ();
-
+    
     case BANK_EQPOST:
       return !self->blender.eq_post.on;
-
+    
     case BANK_AMP:
     default:
       return self->blender.amp_bypass ();
@@ -685,26 +685,26 @@ static bool get_bank_bypass (Plugin *self, _lane_bank bank) {
 static void set_bank_bypass (Plugin *self, _lane_bank bank, bool bypass) {
   if (!self || !lv2_is_bank (bank))
     return;
-
+  
   self->last_bank_bypass [bank] = bypass ? 1.0f : 0.0f;
-
+  
   switch (bank) {
     case BANK_PEDAL:
       self->blender.set_pedal_bypass (bypass);
     break;
-
+    
     case BANK_EQPRE:
       self->blender.set_eq_bypass (bank, bypass);
     break;
-
+    
     case BANK_CAB:
       self->blender.set_cab_bypass (bypass);
     break;
-
+    
     case BANK_EQPOST:
       self->blender.set_eq_bypass (bank, bypass);
     break;
-
+    
     case BANK_AMP:
     default:
       self->blender.set_amp_bypass (bypass);
@@ -720,7 +720,7 @@ static void sync_last_eq_from_ports (
     Plugin *self, _lane_bank bank_id, size_t band, const c_eq &eq) {
   if (!self || band >= EQ_NUM_BANDS)
     return;
-
+  
   const size_t bank = (size_t) bank_id;
   self->last_eq_enabled [bank] [band] =
     current_port_value (
@@ -744,7 +744,7 @@ static void sync_last_eq_master_from_port (
     Plugin *self, _lane_bank bank_id, const c_eq &eq) {
   if (!self)
     return;
-
+  
   const size_t bank = (size_t) bank_id;
   self->last_eq_master_gain [bank] =
     current_port_value (
@@ -754,7 +754,7 @@ static void sync_last_eq_master_from_port (
 static void notify_eq_band (Plugin *self, _lane_bank bank_id, size_t band) {
   if (!self || band >= EQ_NUM_BANDS)
     return;
-
+  
   const size_t bank = (size_t) bank_id;
   for (uint32_t param = 0; param < NB_LV2_EQ_PORT_COUNT; ++param)
     self->notify_eq_param [bank] [band] [param] = true;
@@ -769,7 +769,7 @@ static void store_eq_band_state (
     const c_eq &eq) {
   if (!self || !store || band >= EQ_NUM_BANDS)
     return;
-
+  
   const size_t bank = (size_t) bank_id;
   const int32_t enabled = eq.enabled [band] ? 1 : 0;
   const int32_t mode =
@@ -777,7 +777,7 @@ static void store_eq_band_state (
   const float freq = eq.freq [band];
   const float gain = eq.gain_db [band];
   const float q = eq.q [band];
-
+  
   store (handle,
          self->urid_eq_param [bank] [band] [NB_LV2_EQ_ENABLED],
          &enabled,
@@ -818,7 +818,7 @@ static void store_eq_master_state (
     const c_eq &eq) {
   if (!self || !store)
     return;
-
+  
   const size_t bank = (size_t) bank_id;
   const float value = eq.master_gain_db;
   store (handle,
@@ -850,17 +850,17 @@ static LV2_State_Status save (
              self->urid_atom_Int,
              LV2_STATE_IS_POD);
     }
-
+    
     for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
       c_eq *eq = lv2_eq_for_bank (self, b);
       if (!eq)
         continue;
-
+      
       store_eq_master_state (self, store, handle, b, *eq);
       for (size_t band = 0; band < EQ_NUM_BANDS; ++band)
         store_eq_band_state (self, store, handle, b, band, *eq);
     }
-
+    
     for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
       const size_t bank = (size_t) b;
       for (int i = 0; i < NB_NUM_MODELS; i++) {
@@ -874,19 +874,19 @@ static LV2_State_Status save (
             map_path->abstract_path (map_path->handle, filename.c_str ());
         if (abstract_path)
           stored_path = abstract_path;
-
+      
       store (handle,
              self->urid_bank_model [bank] [i],
              stored_path,
              strlen (stored_path) + 1,
              empty ? self->urid_atom_String : self->urid_atom_Path,
              LV2_STATE_IS_POD);
-
+      
       if (abstract_path && free_path && free_path->free_path)
         free_path->free_path (free_path->handle, abstract_path);
       }
     }
-
+    
     return LV2_STATE_SUCCESS;
 }
 
@@ -909,10 +909,10 @@ static bool retrieve_eq_int (
       &size,
       &type,
       &valflags);
-
+  
   if (!p || type != self->urid_atom_Int || size < sizeof (int32_t))
     return false;
-
+  
   value = *(const int32_t *) p;
   return true;
 }
@@ -936,10 +936,10 @@ static bool retrieve_eq_float (
       &size,
       &type,
       &valflags);
-
+  
   if (!p || type != self->urid_atom_Float || size < sizeof (float))
     return false;
-
+  
   value = *(const float *) p;
   return true;
 }
@@ -961,10 +961,10 @@ static bool retrieve_eq_master_float (
       &size,
       &type,
       &valflags);
-
+  
   if (!p || type != self->urid_atom_Float || size < sizeof (float))
     return false;
-
+  
   value = *(const float *) p;
   return true;
 }
@@ -975,64 +975,64 @@ static void restore_eq_state (
     LV2_State_Handle handle) {
   if (!self || !retrieve)
     return;
-
+  
   for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
     c_eq *eq = lv2_eq_for_bank (self, b);
     if (!eq)
       continue;
-
+    
     float master_gain = 0.0f;
     if (retrieve_eq_master_float (self, retrieve, handle, b, master_gain)) {
       self->blender.set_eq_master_gain_db (b, master_gain);
       sync_last_eq_master_from_port (self, b, *eq);
       self->notify_eq_master_gain [(size_t) b] = true;
     }
-
+    
     for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
       bool found = false;
       int32_t i = 0;
       float f = 0.0f;
-
+      
       bool enabled = eq->enabled [band];
       _eq_band_mode mode = eq->mode [band];
       int slope = eq->slope [band];
       float freq = eq->freq [band];
       float gain = eq->gain_db [band];
       float q = eq->q [band];
-
+      
       if (retrieve_eq_int (
             self, retrieve, handle, b, band, NB_LV2_EQ_ENABLED, i)) {
         enabled = i != 0;
         found = true;
       }
-
+      
       if (retrieve_eq_int (
             self, retrieve, handle, b, band, NB_LV2_EQ_MODE, i)) {
         nb_lv2_decode_eq_mode ((int) i, &mode, &slope);
         found = true;
       }
-
+      
       if (retrieve_eq_float (
             self, retrieve, handle, b, band, NB_LV2_EQ_FREQ, f)) {
         freq = f;
         found = true;
       }
-
+      
       if (retrieve_eq_float (
             self, retrieve, handle, b, band, NB_LV2_EQ_GAIN, f)) {
         gain = f;
         found = true;
       }
-
+      
       if (retrieve_eq_float (
             self, retrieve, handle, b, band, NB_LV2_EQ_Q, f)) {
         q = f;
         found = true;
       }
-
+      
       if (!found)
         continue;
-
+      
       self->blender.set_eq_band (b, band, enabled, mode, slope, freq, gain, q);
       sync_last_eq_from_ports (self, b, band, *eq);
       notify_eq_band (self, b, band);
@@ -1052,11 +1052,11 @@ static LV2_State_Status restore (
   LV2_State_Map_Path *map_path = NULL;
   LV2_State_Free_Path *free_path = NULL;
   get_state_path_features (features, &map_path, &free_path);
-
+  
   size_t size;
   uint32_t type;
   uint32_t valflags;
-
+  
   const void *calib_bass =
     retrieve (handle,
               self->urid_calib_bass,
@@ -1066,7 +1066,7 @@ static LV2_State_Status restore (
   if (calib_bass && type == self->urid_atom_Int && size >= sizeof (int32_t))
     self->blender.calib_source = (*(const int32_t *) calib_bass) != 0 ? 1 : 0;
   self->restored_from_state = true;
-
+  
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     const void *bank_bypass_value =
       retrieve (handle,
@@ -1074,7 +1074,7 @@ static LV2_State_Status restore (
                 &size,
                 &type,
                 &valflags);
-
+    
     if (bank_bypass_value &&
         type == self->urid_atom_Int &&
         size >= sizeof (int32_t)) {
@@ -1085,9 +1085,9 @@ static LV2_State_Status restore (
       self->notify_bank_bypass [bank] = true;
     }
   }
-
+  
   restore_eq_state (self, retrieve, handle);
-
+  
   for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
     const size_t bank = (size_t) b;
     for (int i = 0; i < NB_NUM_MODELS; i++) {
@@ -1097,18 +1097,18 @@ static LV2_State_Status restore (
                 &size,
                 &type,
                 &valflags);
-
+      
       if (p && type == self->urid_atom_Path && size > 1) {
         const char *path = (const char *) p;
         char *absolute_path = NULL;
         if (map_path && map_path->absolute_path)
           absolute_path =
             map_path->absolute_path (map_path->handle, path);
-
+        
         clear_model_slot (self, (_lane_bank) bank, i, false);
         request_load (self, (_lane_bank) bank, i,
                       absolute_path ? absolute_path : path);
-
+        
         if (absolute_path && free_path && free_path->free_path)
           free_path->free_path (free_path->handle, absolute_path);
       } else {
@@ -1116,10 +1116,10 @@ static LV2_State_Status restore (
       }
     }
   }
-
+  
   self->restore_in_progress.store (false, std::memory_order_release);
   self->loader_cv.notify_one ();
-
+  
   return LV2_STATE_SUCCESS;
 }
 
@@ -1129,56 +1129,56 @@ static void forge_model_path_notify (Plugin *self,
   
   debug ("path=%s", path);
   LV2_Atom_Forge_Frame frame;
-
+  
   lv2_atom_forge_frame_time (&self->forge, 0);
-
+  
   lv2_atom_forge_object (&self->forge,
                          &frame,
                          0,
                          self->urid_patch_Set);
-
+  
   lv2_atom_forge_key (&self->forge, self->urid_patch_property);
   lv2_atom_forge_urid (&self->forge, property);
-
+  
   lv2_atom_forge_key (&self->forge, self->urid_patch_value);
   lv2_atom_forge_path (&self->forge, path, strlen(path) + 1);
-
+  
   lv2_atom_forge_pop (&self->forge, &frame);
 }
 
 static void forge_int_notify (Plugin *self, LV2_URID property, int32_t value) {
   LV2_Atom_Forge_Frame frame;
-
+  
   lv2_atom_forge_frame_time (&self->forge, 0);
   lv2_atom_forge_object (&self->forge,
                          &frame,
                          0,
                          self->urid_patch_Set);
-
+  
   lv2_atom_forge_key (&self->forge, self->urid_patch_property);
   lv2_atom_forge_urid (&self->forge, property);
-
+  
   lv2_atom_forge_key (&self->forge, self->urid_patch_value);
   lv2_atom_forge_int (&self->forge, value);
-
+  
   lv2_atom_forge_pop (&self->forge, &frame);
 }
 
 static void forge_float_notify (Plugin *self, LV2_URID property, float value) {
   LV2_Atom_Forge_Frame frame;
-
+  
   lv2_atom_forge_frame_time (&self->forge, 0);
   lv2_atom_forge_object (&self->forge,
                          &frame,
                          0,
                          self->urid_patch_Set);
-
+  
   lv2_atom_forge_key (&self->forge, self->urid_patch_property);
   lv2_atom_forge_urid (&self->forge, property);
-
+  
   lv2_atom_forge_key (&self->forge, self->urid_patch_value);
   lv2_atom_forge_float (&self->forge, value);
-
+  
   lv2_atom_forge_pop (&self->forge, &frame);
 }
 
@@ -1186,7 +1186,7 @@ static void forge_error_notify (
     Plugin *self, const t_lv2_error_message &error) {
   LV2_Atom_Forge_Frame frame;
   LV2_Atom_Forge_Frame error_frame;
-
+  
   lv2_atom_forge_frame_time (&self->forge, 0);
   lv2_atom_forge_object (
     &self->forge, &frame, 0, self->urid_patch_Set);
@@ -1214,12 +1214,12 @@ static void forge_error_notify (
 static bool forge_next_eq_notify (Plugin *self) {
   if (!self)
     return false;
-
+  
   for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
     c_eq *eq = lv2_eq_for_bank (self, b);
     if (!eq)
       continue;
-
+    
     const size_t bank = (size_t) b;
     if (self->notify_eq_master_gain [bank]) {
       self->notify_eq_master_gain [bank] = false;
@@ -1227,21 +1227,21 @@ static bool forge_next_eq_notify (Plugin *self) {
         self, self->urid_eq_master_gain [bank], eq->master_gain_db);
       return true;
     }
-
+    
     for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
       for (uint32_t param = 0; param < NB_LV2_EQ_PORT_COUNT; ++param) {
         if (!self->notify_eq_param [bank] [band] [param])
           continue;
-
+        
         self->notify_eq_param [bank] [band] [param] = false;
         const LV2_URID property = self->urid_eq_param [bank] [band] [param];
-
+        
         switch (param) {
           case NB_LV2_EQ_ENABLED:
             forge_int_notify (
               self, property, eq->enabled [band] ? 1 : 0);
             return true;
-
+          
           case NB_LV2_EQ_MODE:
             forge_int_notify (
               self,
@@ -1249,15 +1249,15 @@ static bool forge_next_eq_notify (Plugin *self) {
               (int32_t) nb_lv2_encode_eq_mode (
                 eq->mode [band], eq->slope [band]));
             return true;
-
+          
           case NB_LV2_EQ_FREQ:
             forge_float_notify (self, property, eq->freq [band]);
             return true;
-
+          
           case NB_LV2_EQ_GAIN:
             forge_float_notify (self, property, eq->gain_db [band]);
             return true;
-
+          
           case NB_LV2_EQ_Q:
             forge_float_notify (self, property, eq->q [band]);
             return true;
@@ -1265,7 +1265,7 @@ static bool forge_next_eq_notify (Plugin *self) {
       }
     }
   }
-
+  
   return false;
 }
 
@@ -1278,34 +1278,34 @@ static void forge_meter_notify (Plugin *self) {
     values [n++] =
       meter.linear_l () >= meter.clip_threshold_gain () ? 1.0f : 0.0f;
   };
-
+  
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     write_meter (self->meter_in [bank]);
-
+    
     for (int i = 0; i < NB_NUM_MODELS; i++) {
       write_meter (self->meters_out [bank] [i]);
     }
   }
   write_meter (self->meter_masterin);
   write_meter (self->meter_masterout);
-
+  
   LV2_Atom_Forge_Frame frame;
   lv2_atom_forge_frame_time (&self->forge, 0);
   lv2_atom_forge_object (&self->forge,
                          &frame,
                          0,
                          self->urid_patch_Set);
-
+  
   lv2_atom_forge_key (&self->forge, self->urid_patch_property);
   lv2_atom_forge_urid (&self->forge, self->urid_meters);
-
+  
   lv2_atom_forge_key (&self->forge, self->urid_patch_value);
   lv2_atom_forge_vector (&self->forge,
                          sizeof (float),
                          self->urid_atom_Float,
                          n,
                          values);
-
+  
   lv2_atom_forge_pop (&self->forge, &frame);
 }
 
@@ -1313,18 +1313,18 @@ static bool forge_spectrum_notify (Plugin *self, int selection) {
   c_eq *eq = lv2_eq_for_spectrum (self, selection);
   if (!eq)
     return false;
-
+  
   float values [SPECTRUM_BINS * 2];
   if (!eq->copy_spectrum_input_bins (values, SPECTRUM_BINS) ||
       !eq->copy_spectrum_output_bins (
         values + SPECTRUM_BINS, SPECTRUM_BINS))
     return false;
-
+  
   const LV2_URID property =
     selection == LV2_SPECTRUM_PRE
       ? self->urid_spectrum_pre
       : self->urid_spectrum_post;
-
+  
   LV2_Atom_Forge_Frame frame;
   lv2_atom_forge_frame_time (&self->forge, 0);
   lv2_atom_forge_object (
@@ -1345,7 +1345,7 @@ static bool forge_spectrum_notify (Plugin *self, int selection) {
 static void forge_stats_notify (Plugin *self) {
   float values [BANK_COUNT * NB_NUM_MODELS * NB_STATS_PER_LANE];
   size_t n = 0;
-
+  
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     for (size_t i = 0; i < NB_NUM_MODELS; i++) {
       c_neuralamp &lane = self->blender.banks [bank].lanes [i];
@@ -1354,24 +1354,24 @@ static void forge_stats_notify (Plugin *self) {
       values [n++] = (float) lane.engine ();
     }
   }
-
+  
   LV2_Atom_Forge_Frame frame;
   lv2_atom_forge_frame_time (&self->forge, 0);
   lv2_atom_forge_object (&self->forge,
                          &frame,
                          0,
                          self->urid_patch_Set);
-
+  
   lv2_atom_forge_key (&self->forge, self->urid_patch_property);
   lv2_atom_forge_urid (&self->forge, self->urid_stats);
-
+  
   lv2_atom_forge_key (&self->forge, self->urid_patch_value);
   lv2_atom_forge_vector (&self->forge,
                          sizeof (float),
                          self->urid_atom_Float,
                          n,
                          values);
-
+  
   lv2_atom_forge_pop (&self->forge, &frame);
 }
 
@@ -1425,7 +1425,7 @@ static LV2_Handle instantiate (const LV2_Descriptor *descriptor,
     delete self;
     return NULL;
   }
-
+  
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     self->blender.banks [bank].meter_in = &self->meter_in [bank];
     for (int i = 0; i < NB_NUM_MODELS; i++)
@@ -1459,38 +1459,38 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
       case NB_LV2_LANE_GAIN_IN:
         self->gain_in_db [bank] [lane] = (const float *) data;
       break;
-
+      
       case NB_LV2_LANE_IR_PITCH:
         self->ir_pitch [bank] [lane] = (const float *) data;
       break;
-
+      
       case NB_LV2_LANE_GAIN_OUT:
         self->gain_out_db [bank] [lane] = (const float *) data;
       break;
-
+      
       case NB_LV2_LANE_DRY_OUT:
         self->dry_out_db [bank] [lane] = (const float *) data;
       break;
-
+      
       case NB_LV2_LANE_DELAY:
         self->delay [bank] [lane] = (const float *) data;
       break;
-
+      
       case NB_LV2_LANE_MUTE:
         self->lane_mute [bank] [lane] = (const float *) data;
       break;
-
+      
       case NB_LV2_LANE_DCFLIP:
         self->dcflip [bank] [lane] = (const float *) data;
       break;
-
+      
       case NB_LV2_LANE_CALIBRATE:
         self->calibrate [bank] [lane] = (const float *) data;
       break;
     }
     return;
   }
-
+  
   size_t eq_band = 0;
   uint32_t eq_param = 0;
   if (nb_lv2_decode_eq_port (port, &bank, &eq_band, &eq_param)) {
@@ -1498,49 +1498,49 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
       case NB_LV2_EQ_ENABLED:
         self->eq_enabled [bank] [eq_band] = (const float *) data;
       break;
-
+      
       case NB_LV2_EQ_MODE:
         self->eq_mode [bank] [eq_band] = (const float *) data;
       break;
-
+      
       case NB_LV2_EQ_FREQ:
         self->eq_freq [bank] [eq_band] = (const float *) data;
       break;
-
+      
       case NB_LV2_EQ_GAIN:
         self->eq_gain [bank] [eq_band] = (const float *) data;
       break;
-
+      
       case NB_LV2_EQ_Q:
         self->eq_q [bank] [eq_band] = (const float *) data;
       break;
     }
     return;
   }
-
+  
   if (port == PORT_EQPRE_MASTER_GAIN) {
     self->eq_master_gain [BANK_EQPRE] = (const float *) data;
     return;
   }
-
+  
   if (port == PORT_EQPOST_MASTER_GAIN) {
     self->eq_master_gain [BANK_EQPOST] = (const float *) data;
     return;
   }
-
+  
   switch (port) {
     case PORT_AUDIO_IN:
       self->audio_in = (const float *) data;
     break;
-
+    
     case PORT_AUDIO_OUT:
       self->audio_out = (float *) data;
     break;
-
+    
     case PORT_BYPASS:
       self->bypass = (const float *) data;
     break;
-
+    
     case PORT_CONTROL:
       self->control = (const LV2_Atom_Sequence *) data;
     break;
@@ -1552,115 +1552,115 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
     case PORT_VU_ENABLE:
       self->vu_enable = (const float *) data;
     break;
-
+    
     case PORT_MUTE_ALL:
       self->mute_all = (const float *) data;
     break;
-
+    
     case PORT_EXCLUSIVE_LANE_PEDAL:
       self->exclusive_lane [BANK_PEDAL] = (const float *) data;
     break;
-
+    
     case PORT_EXCLUSIVE_LANE_AMP:
       self->exclusive_lane [BANK_AMP] = (const float *) data;
     break;
-
+    
     case PORT_EXCLUSIVE_LANE_CAB:
       self->exclusive_lane [BANK_CAB] = (const float *) data;
     break;
-
+    
     case PORT_LINKED_CALIB_PEDAL:
       self->linked_calib [BANK_PEDAL] = (const float *) data;
     break;
-
+    
     case PORT_LINKED_CALIB_AMP:
       self->linked_calib [BANK_AMP] = (const float *) data;
     break;
-
+    
     case PORT_LINKED_CALIB_CAB:
       self->linked_calib [BANK_CAB] = (const float *) data;
     break;
-
+    
     case PORT_CALIB_SOURCE:
       self->calib_source = (const float *) data;
     break;
-
+    
     case PORT_CALIB_TARGET_DB:
       self->calib_target_db = (const float *) data;
     break;
-
+    
     case PORT_NOISEGATE_ENABLED:
       self->noisegate_enabled = (const float *) data;
     break;
-
+    
     case PORT_NOISEGATE_THRESHOLD:
       self->noisegate_threshold = (const float *) data;
     break;
-
+    
     case PORT_NOISEGATE_ATTACK:
       self->noisegate_attack = (const float *) data;
     break;
-
+    
     case PORT_NOISEGATE_HOLD:
       self->noisegate_hold = (const float *) data;
     break;
-
+    
     case PORT_NOISEGATE_RELEASE:
       self->noisegate_release = (const float *) data;
     break;
-
+    
     case PORT_TUNER_ON:
       self->tuner_on = (const float *) data;
     break;
-
+    
     case PORT_TUNER_BASE_FREQ:
       self->tuner_base_freq = (const float *) data;
     break;
-
+    
     case PORT_MASTER_GAIN:
       self->master_gain = (const float *) data;
     break;
-
+    
     case PORT_PRESENCE:
       self->presence = (const float *) data;
     break;
-
+    
     case PORT_ACTIVE_PAGE:
       self->active_page = (const float *) data;
     break;
-
+    
     case PORT_PEDAL_BYPASS:
       self->bank_bypass [BANK_PEDAL] = (const float *) data;
     break;
-
+    
     case PORT_EQPRE_BYPASS:
       self->bank_bypass [BANK_EQPRE] = (const float *) data;
     break;
-
+    
     case PORT_AMP_BYPASS:
       self->bank_bypass [BANK_AMP] = (const float *) data;
     break;
-
+    
     case PORT_EQPOST_BYPASS:
       self->bank_bypass [BANK_EQPOST] = (const float *) data;
     break;
-
+    
     case PORT_CAB_BYPASS:
       self->bank_bypass [BANK_CAB] = (const float *) data;
     break;
-
+    
     case PORT_NOISEGATE_GAIN:
       self->noisegate_gain = (float *) data;
     break;
-
+    
     case PORT_TUNER_NOTE:
       self->tuner_note = (float *) data;
     break;
-
+    
     case PORT_TUNER_CENTS_OFF:
       self->tuner_cents_off = (float *) data;
     break;
-
+    
     case PORT_TUNER_FREQ:
       self->tuner_freq = (float *) data;
     break;
@@ -1669,7 +1669,7 @@ static void connect_port (LV2_Handle instance, uint32_t port, void* data) {
 
 static void activate (LV2_Handle instance) {
   Plugin *self = (Plugin *) instance;
-
+  
   for (size_t i = 0; i < NB_NUM_MODELS; ++i) {
     self->blender.banks [BANK_AMP].lanes [i].reset();
   }
@@ -1679,7 +1679,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   int i;
   Plugin *self = (Plugin *) instance;
   if (!self) return;
-
+  
   if (self->blocksize == 0 || nframes > self->blocksize) {
     self->blocksize = nframes;
     self->blender.set_blocksize (nframes);
@@ -1687,14 +1687,14 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   
   if (self->notify) {
     LV2_Atom_Forge_Frame frame;
-
+    
     lv2_atom_forge_set_buffer (
       &self->forge,
       (uint8_t *) self->notify,
       self->notify->atom.size);
-
+    
     lv2_atom_forge_sequence_head (&self->forge, &frame, 0);
-
+    
     const uint32_t error_read =
       self->pending_error_read.load (std::memory_order_relaxed);
     const bool sent_error =
@@ -1720,7 +1720,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
             self,
             self->urid_bank_model [bank] [i],
             self->current_model [bank] [i].c_str());
-
+          
           self->notify_path [bank] [i] = false;
           sent_path_notify = true;
           break; // throttle to 1 per cycle
@@ -1729,7 +1729,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       if (sent_path_notify)
         break;
     }
-
+    
     bool sent_bank_bypass_notify = false;
     if (!sent_error && !sent_path_notify) {
       for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
@@ -1744,13 +1744,13 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         }
       }
     }
-
+    
     const bool sent_eq_notify =
       !sent_error &&
       !sent_path_notify &&
       !sent_bank_bypass_notify &&
       forge_next_eq_notify (self);
-
+    
     const bool sent_samplerate_notify =
       !sent_error &&
       !sent_path_notify &&
@@ -1762,7 +1762,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         self, self->urid_samplerate, (float) self->samplerate);
       self->notify_samplerate = false;
     }
-
+    
     const bool sent_stats_notify =
       !sent_error &&
       !sent_path_notify &&
@@ -1772,7 +1772,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       self->stats_dirty.exchange (false, std::memory_order_acq_rel);
     if (sent_stats_notify)
       forge_stats_notify (self);
-
+    
     bool sent_spectrum_notify = false;
     if (!sent_error && !sent_path_notify && !sent_bank_bypass_notify && !sent_eq_notify &&
         !sent_samplerate_notify && !sent_stats_notify &&
@@ -1783,7 +1783,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       if (!sent_spectrum_notify && selection != LV2_SPECTRUM_OFF)
         self->spectrum_dirty.store (true, std::memory_order_release);
     }
-
+    
     const uint32_t meter_interval =
       (uint32_t) (self->samplerate > 0.0
         ? self->samplerate / LV2_METER_FPS
@@ -1795,7 +1795,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       forge_meter_notify (self);
       self->meter_notify_samples = 0;
     }
-
+    
     lv2_atom_forge_pop (&self->forge, &frame);
   }
   
@@ -1803,7 +1803,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   if (self->control) {
     LV2_ATOM_SEQUENCE_FOREACH (self->control, ev) {
       const LV2_Atom_Object *obj = (const LV2_Atom_Object *)&ev->body;
-      
+
 	      if (obj->body.otype == self->urid_patch_Get) {
 	        self->ui_state_requested.store (true, std::memory_order_release);
 	        for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
@@ -1821,28 +1821,28 @@ static void run (LV2_Handle instance, uint32_t nframes) {
           self->notify_samplerate = true;
 	        self->restored_from_state = false;
 	        self->stats_dirty.store (true, std::memory_order_release);
-	
+
 	        continue;
       }
-
+      
       if (obj->body.otype != self->urid_patch_Set)
         continue;
-
+      
       const LV2_Atom *property = NULL;
       const LV2_Atom *value = NULL;
-
+      
       lv2_atom_object_get (
         obj,
         self->urid_patch_property, &property,
         self->urid_patch_value, &value,
         0);
-
+      
       if (!property || !value)
         continue;
-
+      
       if (property->type != self->urid_atom_URID)
         continue;
-
+      
       LV2_URID prop =
         ((const LV2_Atom_URID *) property)->body;
 
@@ -1891,34 +1891,34 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     self->meter_masterin.bufsize = (int) nframes;
     self->meter_masterout.bufsize = (int) nframes;
   }
-
+  
   float v = 0.0f;
   bool b = false;
-
+  
   if (read_changed (self->bypass, self->last_bypass, v)) { CP
     self->host_bypass = v < 0.5f;
     apply_effective_controls (self);
   }
-
+  
   if (read_changed_bool (self->vu_enable, self->last_vu_enable, b)) { CP
     self->blender.do_vu = b;
   }
-
+  
   if (read_changed_bool (self->mute_all, self->last_mute_all, b)) { CP
     self->blender.mute_all = b;
   }
-
+  
   if (read_changed (self->active_page, self->last_active_page, v)) { CP
     (void) v;
   }
-
+  
   for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
     if (read_changed_bool (
           self->bank_bypass [bank], self->last_bank_bypass [bank], b)) { CP
       set_bank_bypass (self, (_lane_bank) bank, b);
     }
   }
-
+  
   for (_lane_bank bnk : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
     const size_t bank = (size_t) bnk;
     if (read_changed (
@@ -1928,7 +1928,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         apply_effective_controls (self);
     }
   }
-
+  
   for (_lane_bank bank_id : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
     const size_t bank = (size_t) bank_id;
     if (read_changed_bool (
@@ -1936,7 +1936,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       self->blender.banks [bank].linked_calib = b;
       self->blender.linked_calib =
         self->blender.banks [BANK_AMP].linked_calib;
-
+      
       if (self->blender.banks [bank].linked_calib) {
         request_calibrate_linked (self, bank_id);
       } else {
@@ -2018,7 +2018,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
     c_eq *eq = lv2_eq_for_bank (self, bnk);
     if (!eq)
       continue;
-
+    
     const size_t bank = (size_t) bnk;
     if (read_changed (
           self->eq_master_gain [bank],
@@ -2027,7 +2027,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       //CP
       self->blender.set_eq_master_gain_db (bnk, v);
     }
-
+    
     for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
       bool changed = false;
       float tmp = 0.0f;
@@ -2037,7 +2037,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       float freq = eq->freq [band];
       float gain_db = eq->gain_db [band];
       float q = eq->q [band];
-
+      
       if (read_changed_bool (
             self->eq_enabled [bank] [band],
             self->last_eq_enabled [bank] [band],
@@ -2045,7 +2045,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         //CP
         changed = true;
       }
-
+      
       if (read_changed (
             self->eq_mode [bank] [band],
             self->last_eq_mode [bank] [band],
@@ -2055,7 +2055,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
           (int) lrintf (tmp), &mode, &slope);
         changed = true;
       }
-
+      
       if (read_changed (
             self->eq_freq [bank] [band],
             self->last_eq_freq [bank] [band],
@@ -2064,7 +2064,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         freq = std::clamp (tmp, NB_FREQ_MIN, NB_FREQ_MAX);
         changed = true;
       }
-
+      
       if (read_changed (
             self->eq_gain [bank] [band],
             self->last_eq_gain [bank] [band],
@@ -2073,7 +2073,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         gain_db = std::clamp (tmp, -36.0f, 36.0f);
         changed = true;
       }
-
+      
       if (read_changed (
             self->eq_q [bank] [band],
             self->last_eq_q [bank] [band],
@@ -2082,7 +2082,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         q = std::clamp (tmp, 0.01f, 100.0f);
         changed = true;
       }
-
+      
       if (changed) {
         self->blender.set_eq_band (
           bnk,
@@ -2096,11 +2096,11 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       }
     }
   }
-	  
+  
   // check all lane parameters
   for (_lane_bank bnk : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
     const size_t bank = (size_t) bnk;
-
+    
     for (i = 0; i < NB_NUM_MODELS; i++) {
       if (read_changed (
           self->gain_in_db [bank] [i],
@@ -2108,21 +2108,21 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         //CP
         self->blender.set_gain_in (bnk, i, db_to_gain (v));
       }
-
+      
       if (read_changed (
           self->ir_pitch [bank] [i],
           self->last_ir_pitch [bank] [i], v)) {
         //CP
         request_ir_pitch (self, bnk, i, v);
       }
-
+      
       if (read_changed (
           self->gain_out_db [bank] [i],
           self->last_gain_out_db [bank] [i], v)) {
         //CP
         self->blender.set_gain_out (bnk, i, db_to_gain (v));
       }
-
+      
       if (read_changed (
           self->dry_out_db [bank] [i],
           self->last_dry_out_db [bank] [i], v)) {
@@ -2130,7 +2130,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         self->blender.set_dry_out (
           bnk, i, v <= DB_SILENCE ? 0.0f : db_to_gain (v));
       }
-
+      
       if (read_changed (
           self->delay [bank] [i],
           self->last_delay [bank] [i], v)) {
@@ -2138,7 +2138,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         self->blender.set_delay_ms (bnk, i, v);
         self->stats_dirty.store (true, std::memory_order_release);
       }
-
+      
       if (read_changed_bool (
           self->lane_mute [bank] [i],
           self->last_lane_mute [bank] [i], b)) {
@@ -2146,14 +2146,14 @@ static void run (LV2_Handle instance, uint32_t nframes) {
         self->base_lane_mute [bank] [i] = b;
         apply_effective_controls (self);
       }
-
+      
       if (read_changed_bool (
           self->dcflip [bank] [i],
           self->last_dcflip [bank] [i], b)) {
         //CP
         self->blender.dcflip (bnk, i, b);
       }
-
+      
       if (self->calibrate [bank] [i]) {
         const float v = *self->calibrate [bank] [i];
         const bool enabled = v >= 0.5f;
@@ -2166,15 +2166,15 @@ static void run (LV2_Handle instance, uint32_t nframes) {
       }
     }
   }
-
+  
   if (self->controls_dirty.exchange (false, std::memory_order_acq_rel))
     apply_effective_controls (self);
-
+  
   // actual DSP
   if (self->audio_in && self->audio_out) {
     self->blender.process_block ((float *) self->audio_in, self->audio_out, nframes);
   }
-
+  
   if (self->noisegate_gain)
     *self->noisegate_gain = self->blender.noisegate_on
       ? self->blender.noisegate.get_current_gain ()
@@ -2188,7 +2188,7 @@ static void run (LV2_Handle instance, uint32_t nframes) {
   if (self->tuner_freq)
     *self->tuner_freq =
       self->detected_tuner_freq.load (std::memory_order_acquire);
-
+  
   self->meter_notify_samples += nframes;
 }
 
@@ -2199,19 +2199,19 @@ static void cleanup (LV2_Handle instance) {
   Plugin *self = (Plugin *) instance;
   if (!self)
     return;
-
+  
   // scope again: release asap
   {
     std::lock_guard<std::mutex> lock(self->loader_mutex);
     self->loader_running = false;
     self->load_requested = false;
   }
-
+  
   self->loader_cv.notify_one();
-
+  
   if (self->loader_thread.joinable())
     self->loader_thread.join();
-
+  
   delete self;
 }
 
@@ -2223,7 +2223,7 @@ static const LV2_State_Interface state_interface = {
 static const void* extension_data (const char* uri) {
   if (!strcmp (uri, LV2_STATE__interface))
     return &state_interface;
-
+  
   return NULL;  return NULL;
 }
 

@@ -50,7 +50,7 @@ void c_vudata::atomic_min (std::atomic<float> &dst, float value) {
 static float linear_to_db_meter (float f) {
   if (f <= 0.0000000001f)
     return -200.0f;
-
+  
   return 20.0f * log10f (f);
 }
 
@@ -75,7 +75,7 @@ void c_vudata::set_clip_threshold (float db) {
 /*float c_vudata::db_scaled (float f) const {
   const float scale = m_db_scale.load ();
   float ret = 0.0f;
-
+  
   if (scale == 0.0f) {
     ret = f;
   } else if (scale > 0.0f) {
@@ -85,21 +85,21 @@ void c_vudata::set_clip_threshold (float db) {
     db += scale;
     ret = 2.0f - (db / scale);
   }
-
+  
   return clamp01 (ret);
 }*/
 
 // new version: takes m_headroom_db into account
 float c_vudata::db_scaled (float f) const {
   const float min_db = m_db_scale.load ();
-
+  
   if (min_db >= 0.0f)
     return clamp01 (f);
-
+  
   const float max_db = m_headroom_db.load ();
   if (max_db <= min_db)
     return clamp01 (f);
-
+  
   const float db = linear_to_db_meter (f);
   return clamp01 ((db - min_db) / (max_db - min_db));
 }
@@ -108,17 +108,17 @@ float c_vudata::db_scaled (float f) const {
 float c_vudata::display_to_linear (float f) const {
   const float min_db = m_db_scale.load ();
   f = clamp01 (f);
-
+  
   if (f <= 0.0f)
     return 0.0f;
-
+  
   if (min_db >= 0.0f)
     return f;
-
+  
   const float max_db = m_headroom_db.load ();
   if (max_db <= min_db)
     return f;
-
+  
   const float db = min_db + f * (max_db - min_db);
   return powf (10.0f, db / 20.0f);
 }
@@ -128,12 +128,12 @@ bool c_vudata::sample (float l, float r) {
   const float old_minus_l = m_minus_l.load ();
   const float old_plus_r = m_plus_r.load ();
   const float old_minus_r = m_minus_r.load ();
-
+  
   atomic_max (m_plus_l, l);
   atomic_min (m_minus_l, l);
   atomic_max (m_plus_r, r);
   atomic_min (m_minus_r, r);
-
+  
   return l > old_plus_l || l < old_minus_l ||
          r > old_plus_r || r < old_minus_r;
 }
@@ -141,15 +141,15 @@ bool c_vudata::sample (float l, float r) {
 bool c_vudata::update () {
   if (bufsize <= 0)
     return false;
-
+  
   int bufs_sec = samplerate / bufsize;
   if (bufs_sec < 1)
     bufs_sec = 1;
-
+  
   int redraw_every = (int) (redraw_interval * bufs_sec);
   if (redraw_every < 1)
     redraw_every = 1;
-
+  
   bool changed = false;
   if (m_bufcount % (size_t) redraw_every == 0) {
     const size_t now = m_bufcount / (size_t) redraw_every;
@@ -163,14 +163,14 @@ bool c_vudata::update () {
     const size_t peak_hold_frames = hold_frames (peak_hold_ms);
     const size_t clip_hold_frames = hold_frames (clip_hold_ms);
     const size_t xrun_hold_frames = hold_frames (xrun_hold_ms);
-
+    
     const float plus_l = m_plus_l.exchange (0.0f);
     const float minus_l = m_minus_l.exchange (0.0f);
     const float plus_r = m_plus_r.exchange (0.0f);
     const float minus_r = m_minus_r.exchange (0.0f);
     const float abs_l = std::max (std::fabs (plus_l), std::fabs (minus_l));
     const float abs_r = std::max (std::fabs (plus_r), std::fabs (minus_r));
-
+    
     const float old_l = m_display_l.load ();
     const float old_r = m_display_r.load ();
     const float shown_l = old_l;
@@ -183,20 +183,20 @@ bool c_vudata::update () {
     const float next_r = target_r >= shown_r
       ? target_r
       : std::max (target_r, shown_r - VU_FALL_SPEED);
-
+    
     if (next_l != old_l || next_r != old_r)
       changed = true;
-
+    
     m_l.store (abs_l);
     m_r.store (abs_r);
     m_display_l.store (next_l);
     m_display_r.store (next_r);
-
+    
     if (now - m_timestamp_hold_l > peak_hold_frames)
       m_peak_l.store (0.0f);
     if (now - m_timestamp_hold_r > peak_hold_frames)
       m_peak_r.store (0.0f);
-
+    
     if (abs_l > m_peak_l.load ()) {
       m_peak_l.store (abs_l);
       m_timestamp_hold_l = now;
@@ -207,7 +207,7 @@ bool c_vudata::update () {
       m_timestamp_hold_r = now;
       changed = true;
     }
-
+    
     const float clip_threshold = clip_threshold_gain ();
     if (abs_l >= clip_threshold)
       m_timestamp_clip_l = now;
@@ -217,28 +217,28 @@ bool c_vudata::update () {
       m_timestamp_xrun_l = now;
     if (xrun_r.load ())
       m_timestamp_xrun_r = now;
-
+    
     const bool held_clip_l = m_timestamp_clip_l && now - m_timestamp_clip_l < clip_hold_frames;
     const bool held_clip_r = m_timestamp_clip_r && now - m_timestamp_clip_r < clip_hold_frames;
     const bool held_xrun_l = m_timestamp_xrun_l && now - m_timestamp_xrun_l < xrun_hold_frames;
     const bool held_xrun_r = m_timestamp_xrun_r && now - m_timestamp_xrun_r < xrun_hold_frames;
-
+    
     if (held_clip_l != clip_l.load () ||
         held_clip_r != clip_r.load () ||
         held_xrun_l != xrun_l.load () ||
         held_xrun_r != xrun_r.load ())
       changed = true;
-
+    
     clip_l.store (held_clip_l);
     clip_r.store (held_clip_r);
     xrun_l.store (held_xrun_l);
     xrun_r.store (held_xrun_r);
   }
-
+  
   ++m_bufcount;
   if (changed)
     needs_redraw.store (true);
-
+  
   return changed;
 }
 
@@ -289,7 +289,7 @@ void c_vudata::set_l_smooth (float level, float hold, bool clip, bool xrun) {
   const float next = target >= old
     ? target
     : std::max (target, old - VU_FALL_SPEED);
-
+  
   m_l.store (linear);
   m_display_l.store (next);
   m_peak_l.store (std::max (0.0f, hold));
@@ -314,7 +314,7 @@ void c_vudata::set_r_smooth (float level, float hold, bool clip, bool xrun) {
   const float next = target >= old
     ? target
     : std::max (target, old - VU_FALL_SPEED);
-
+  
   m_r.store (linear);
   m_display_r.store (next);
   m_peak_r.store (std::max (0.0f, hold));
@@ -508,7 +508,7 @@ static void print_vu_meter (float level, float hold, bool clip, bool xrun) {
       colors [holdpos] = (holdpos == right - 1) ? 9 : 16;
     }
   }
-
+  
   
   // lazyyyyyy... who cares
   if (xrun) {
@@ -537,7 +537,7 @@ static void print_vu_meter (float level, float hold, bool clip, bool xrun) {
     colors [right + 3] = 9;
     colors [right + 4] = 9;
   }
-
+  
   buf [0] = '[';
   buf [right] = ']';
   colors [0] = 16;
@@ -556,7 +556,7 @@ static void print_vu_meter (float level, float hold, bool clip, bool xrun) {
   }
   
   output += ANSI_RESET;
-    
+  
   //printf ("%s", buf);
   std::cout << output << " \n" << std::flush;
 }
@@ -705,14 +705,14 @@ void c_meterwidget::on_resize (int w, int h) {
 void c_meterwidget::update_geometry () {
   if (width <= 0 || height <= 0)
     return;
-
+  
   vertical = width < height;
   ln = vertical ? height : width;
   th = vertical ? width : height;
   met_len = ln - clip_size - rec_size;
   if (met_len < 1)
     met_len = 1;
-
+  
   if (stereo) {
     t1 = 0;
     int gap = th / 50;
@@ -735,12 +735,12 @@ void c_meterwidget::update_geometry () {
 
 void c_meterwidget::render_base (cairo_t *cr) {
   update_geometry ();
-
+  
   cairo_set_line_cap (cr, CAIRO_LINE_CAP_SQUARE);
   
   cairo_set_source_rgb (cr, 0.05, 0.05, 0.05);
   cairo_paint (cr);
-
+  
   cairo_set_source_rgb (cr, 0.0, 0.0, 0.0);
   if (vertical) {
     cairo_rectangle (cr, t1, clip_size, t2 - t1, met_len);
@@ -752,7 +752,7 @@ void c_meterwidget::render_base (cairo_t *cr) {
       cairo_rectangle (cr, rec_size, t3, met_len, t4 - t3);
   }
   cairo_fill (cr);
-
+  
   struct meter_line {
     float pos;
     double r;
@@ -760,14 +760,14 @@ void c_meterwidget::render_base (cairo_t *cr) {
     double b;
     double a;
   };
-
+  
   /*const meter_line lines [] = {
     { 0.5f,   0.0, 1.0, 0.0, 0.25 },
     { 0.75f,  1.0, 1.0, 0.0, 0.25 },
     { 0.875f, 1.0, 0.5, 0.0, 0.25 },
     { 1.0f,   1.0, 0.0, 0.0, 0.25 },
   };*/
-
+  
   const meter_line lines [] = {
     { -96.0f,  0.0, 1.0, 0.0, 0.25 },
     { -48.0f,   0.0, 1.0, 0.0, 0.25 },
@@ -780,7 +780,7 @@ void c_meterwidget::render_base (cairo_t *cr) {
   };
   
   int ppos_last = -1;
-
+  
   cairo_set_line_width (cr, 1.0);
   for (const auto &line : lines) {
     const float range_db = headroom - db_scale;
@@ -839,7 +839,7 @@ void c_meterwidget::draw_bar (
   int w = 0;
   int h = 0;
   int bar_len = (int) (met_len * level);
-
+  
   if (bar_len > 0) {
     if (vertical) {
       const int meter_bottom = height - rec_size;
@@ -865,7 +865,7 @@ void c_meterwidget::draw_bar (
           gradient = cairo_pattern_create_linear (0, height - rec_size, 0, clip_size);
         else
           gradient = cairo_pattern_create_linear (rec_size, 0, width - clip_size, 0);
-
+        
         //constexpr float gradient_yellow_db = -12.0f;
         //constexpr float gradient_red_db = 3.0f;
         const float range_db = headroom - db_scale;
@@ -876,7 +876,7 @@ void c_meterwidget::draw_bar (
         };
         const float yellow_pos = gradient_pos (VU_YELLOW_DB);
         const float red_pos = gradient_pos (VU_RED_DB);
-
+        
         cairo_pattern_add_color_stop_rgb (gradient, 0.0,        0.0, 0.9, 0.0);
         cairo_pattern_add_color_stop_rgb (gradient, yellow_pos, 1.0, 1.0, 0.0);
         cairo_pattern_add_color_stop_rgb (gradient, red_pos,    1.0, 0.0, 0.0);
@@ -894,7 +894,7 @@ void c_meterwidget::draw_bar (
     int my = 0;
     int mw = 0;
     int mh = 0;
-
+    
     if (vertical) {
       mx = at + tp;
       my = clip_size + tp;
@@ -906,10 +906,10 @@ void c_meterwidget::draw_bar (
       mw = met_len - (tp * 2);
       mh = bar_th - (tp * 2);
     }
-
+    
     if (mw <= 0 || mh <= 0)
       return;
-
+    
     cairo_set_source_rgba (cr, 1.0, 1.0, 1.0, 0.2);
     cairo_set_line_width (cr, 1.0);
     if (vertical) {
@@ -922,12 +922,12 @@ void c_meterwidget::draw_bar (
     cairo_fill_preserve (cr);
     cairo_stroke (cr);
   }
-
+  
   //const int holdpos = (int) (hold * met_len);
   if (hold > 0) {
     int holdpos = (int) (hold * met_len);
     holdpos = std::clamp(holdpos, 1, met_len);
-
+    
     cairo_set_source_rgba (cr, 1.0, 1.0, 1.0, 0.75);
     cairo_set_line_width (cr, 2.0);
     if (vertical) {
@@ -949,7 +949,7 @@ void c_meterwidget::draw_warning_text (cairo_t *cr, const char *text,
   cairo_save (cr);
   cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
   cairo_set_font_size (cr, std::max (8.0, h * 0.55));
-
+  
   cairo_text_extents_t extents;
   cairo_text_extents (cr, text, &extents);
   cairo_set_source_rgb (cr, 0.9, 0.0, 0.0);
@@ -963,7 +963,7 @@ void c_meterwidget::draw_warning_text (cairo_t *cr, const char *text,
 void c_meterwidget::on_paint (cairo_t *cr) {
   if (!data)
     return;
-
+  
   const bool clip_l = data->clip_l.load ();
   const bool clip_r = data->clip_r.load ();
   if (stereo) {
@@ -973,10 +973,10 @@ void c_meterwidget::on_paint (cairo_t *cr) {
     draw_bar (cr, t1, t2 - t1, data->l (), data->peak_l (),
               clip_l || clip_r);
   }
-
+  
   const bool clipped = clip_l || clip_r;
   const bool xruns = data->xrun_l.load () || data->xrun_r.load ();
-
+  
   if (clipped) {
     cairo_set_source_rgb (cr, 0.9, 0.0, 0.0);
     if (clip_size > 0) {
@@ -989,10 +989,10 @@ void c_meterwidget::on_paint (cairo_t *cr) {
       //draw_warning_text (cr, "CLIP", width * 0.72, 0, width * 0.28, height);
     }
   }
-
+  
   if (xruns)
     draw_warning_text (cr, "XRUN", width * 0.36, 0, width * 0.28, height);
-
+  
   if (rec_enabled) {
     cairo_set_source_rgb (cr, 0.9, 0.0, 0.0);
     if (rec_size > 0) {
@@ -1008,7 +1008,7 @@ void c_meterwidget::on_paint (cairo_t *cr) {
       draw_warning_text (cr, "REC", 0, 0, width * 0.22, height);
     }
   }
-
+  
   data->acknowledge ();
 }
 
@@ -1020,79 +1020,79 @@ void c_meterwidget::on_paint (cairo_t *cr) {
 
 • Normally: an LV2 atom output port from DSP to UI, same general mechanism you’re already using for model path
   notifications.
-
+  
   Typical pattern:
-
+  
   1. DSP computes cheap meter values in run()
      Peak/RMS values are accumulated per audio block or over a small interval.
-
+  
   2. DSP periodically writes a small atom message to an output atom:AtomPort
      Usually not every sample and often not every block. Something like 20-60 Hz is enough.
-
+  
   3. UI receives it in port_event()
      The UI decodes the atom and updates meter state.
-
+  
   For meters, you generally do not use normal LV2 control ports, because those are plugin parameters and hosts may
   automate/store/display them. Meter values are transient telemetry.
-
+  
   A common message shape is patch:Set with a custom property:
-
+  
   nb:MeterA
       a lv2:Parameter ;
       rdfs:range atom:Vector .
-
+  
   Then DSP sends maybe four floats:
-
+  
   [l_peak, r_peak, l_hold, r_hold]
-
+  
   or for your lanes:
-
+  
   [lane_index, in_peak, out_peak, clip]
-
+  
   In C terms, from run() you’d forge something like:
-
+  
   lv2_atom_forge_frame_time(&forge, 0);
   lv2_atom_forge_object(&forge, &frame, 0, urid_patch_Set);
-
+  
   lv2_atom_forge_key(&forge, urid_patch_property);
   lv2_atom_forge_urid(&forge, urid_meter);
-
+  
   lv2_atom_forge_key(&forge, urid_patch_value);
   lv2_atom_forge_vector(&forge, sizeof(float), urid_atom_Float, n_values, values);
-
+  
   lv2_atom_forge_pop(&forge, &frame);
-
+  
   Then in the UI:
-
+  
   if (property == urid_meter && value->type == urid_atom_Vector) {
     const LV2_Atom_Vector *vec = (const LV2_Atom_Vector *) value;
     const float *f = (const float *) LV2_ATOM_BODY(&vec->body);
     meter_data.set_l(f[0], f[1], ...);
   }
-
+  
   Practical rules:
-
+  
   - Send meters at a throttled rate, e.g. every 1024-4096 samples, not every block if block size is tiny.
   - Keep messages tiny and fixed-layout.
   - If the atom forge write fails, just drop that meter frame.
   - Never block, allocate, or lock for meter reporting.
   - Don’t send peak data while UI is closed unless needed; although in LV2, often the host just ignores/discards UI
     notification data if no UI is listening.
-
+  
   For NeuralBlender, I’d probably add a second custom atom notification property for all meter data, separate from
   model path messages, and send one compact vector:
-
+  
   master_in_l, master_in_r,
   lane0_out_l, lane0_out_r,
   lane1_out_l, lane1_out_r,
   lane2_out_l, lane2_out_r,
   lane3_out_l, lane3_out_r,
   master_out_l, master_out_r
-
+  
   Or start simpler:
-
+  
   input_peak, output_peak
-
+  
   Then expand once the drawing is stable.
 
 
@@ -1104,9 +1104,9 @@ void c_meterwidget::on_paint (cairo_t *cr) {
 
   If you send them as atom messages on an atom:AtomPort, they are just runtime events. The host does not treat those
   as saved state unless you explicitly model them as state/parameters and store them.
-
+  
   For .ttl, the transient-ish part is usually implied by structure:
-
+  
   [
       a lv2:OutputPort , atom:AtomPort ;
       atom:bufferType atom:Sequence ;
@@ -1115,75 +1115,75 @@ void c_meterwidget::on_paint (cairo_t *cr) {
       lv2:symbol "NOTIFY" ;
       lv2:name "Notify"
   ]
-
+  
   That port is an event stream, not a parameter. Ardour/jalv won’t save “last atom message” as plugin state.
-
+  
   What becomes state/parameter-like is:
-
+  
   - lv2:ControlPort with lv2:InputPort
   - things declared as lv2:Parameter and used with patch:Set for persistent properties
   - values your save() callback stores via LV2_State_Store_Function
-
+  
   Your model paths are state because you explicitly store them in save():
-
+  
   store(handle, self->urid_model[i], stored_path, ...);
-
+  
   A meter atom property would not be saved unless you add it there.
-
+  
   There is also a port property for meters:
-
+  
   lv2:portProperty lv2:reportsLatency
-
+  
   No, wrong one for meters. For control ports, plugins often use:
-
+  
   lv2:portProperty lv2:notOnGUI
-
+  
   or plugin-specific conventions, but that’s for hiding/display hints, not persistence.
-
+  
   For an LV2 meter as a control output, you might see:
-
+  
   a lv2:OutputPort , lv2:ControlPort ;
   lv2:portProperty lv2:connectionOptional ;
-
+  
   Some ecosystems also use pprops:notOnGUI, lv2:designation, units, etc. But output control ports are still
   “reported values”, not usually saved state. The host may display them generically though, which you probably don’t
   want for a bunch of fast meter values.
-
+  
   So for your case: if the meters go over the existing NOTIFY atom output port, and you do not include them in
   save(), they are transient runtime telemetry.
-
-
+  
+  
   STANDALONE VERSION:
   
   For standalone, the simplest path is:
-
+  
   - DSP thread owns/updates a c_vudata or one per meter.
   - UI thread calls meter.on_ui_timer() from c_neuralblender_ui::idle().
   - c_vudata uses atomics, so the UI can read without locks.
-
+  
   Something like:
-
+  
   // standalone UI class members
   c_vudata input_vu;
   c_meterwidget input_meter;
-
+  
   Create:
-
+  
   input_meter.create(main_widget, "Input", 20, 600, 600, 18);
   input_meter.set_vudata(&input_vu);
-
+  
   DSP callback:
-
+  
   for (uint32_t i = 0; i < nframes; ++i)
     input_vu.sample(input[i], input[i]);
-
+  
   input_vu.update();
-
+  
   UI idle:
-
+  
   c_neuralblender_ui::idle();
   input_meter.on_ui_timer();
-
+  
   That gives you the full meter pipeline without involving LV2 atoms yet. Once it looks right, the LV2 version is
   just replacing the shared c_vudata * with decoded atom messages into UI-owned c_vudata.
 

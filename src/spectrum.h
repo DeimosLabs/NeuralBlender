@@ -5,7 +5,7 @@
  */
 
 #pragma once
- 
+
 #define SPECTRUM_MIN_HZ   NB_FREQ_MIN
 #define SPECTRUM_MAX_HZ   NB_FREQ_MAX
 #define SPECTRUM_BINS     512
@@ -17,22 +17,22 @@ inline void generate_spectrum_frequencies (
     size_t count,
     float min_hz = SPECTRUM_MIN_HZ,
     float max_hz = SPECTRUM_MAX_HZ) {
-
+  
   if (!frequencies || count == 0)
     return;
-
+  
   if (count == 1) {
     frequencies [0] = min_hz;
     return;
   }
-
+  
   const float log_range = logf (max_hz / min_hz);
-
+  
   for (size_t i = 0; i < count; i++) {
     const float normalized = (float) i / (float) (count - 1);
     frequencies [i] = min_hz * expf (log_range * normalized);
   }
-
+  
   frequencies [0] = min_hz;
   frequencies [count - 1] = max_hz;
 }

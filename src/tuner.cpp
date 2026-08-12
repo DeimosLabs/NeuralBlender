@@ -40,7 +40,7 @@ c_pitchtracker::~c_pitchtracker () { CP }
 void c_pitchtracker::set_samplerate (int sr) { CP
   if (sr < 8000 || sr > 192000)
     return;
-
+  
   samplerate = sr;
   set_block_size (samplerate / 10);
 }
@@ -86,14 +86,14 @@ int c_pitchtracker::get_best_lag (const std::vector<float> &buf, int step,
   
   if (buf.size () < 2 || step <= 0)
     return 0;
-
+  
   const int start_lag = samplerate / max_freq;
   const int end_lag =
     std::min ((int) (samplerate / min_freq), (int) (buf.size () - 1));
   
   if (start_lag >= end_lag)
     return 0;
-
+  
   // this should only resize vectors on samplerate change
   if (lag_scores.size () != (size_t) end_lag + 1)
     lag_scores.resize ((size_t) end_lag + 1);
@@ -114,10 +114,10 @@ int c_pitchtracker::get_best_lag (const std::vector<float> &buf, int step,
       best_lag = lag;
     }
   }
-
+  
   const float score_average = score_sum / (float) score_count;
   const float acceptable_score = score_average * first_valley_threshold;
-
+  
   // Period multiples can have a slightly lower absolute score than the
   // fundamental due to integer sample alignment. Prefer the first strong
   // local minimum instead of the global minimum in that case.
@@ -131,7 +131,7 @@ int c_pitchtracker::get_best_lag (const std::vector<float> &buf, int step,
       break;
     }
   }
-
+  
   if (r_score)
     *r_score = best_score;
   
@@ -142,9 +142,9 @@ bool c_pitchtracker::analyze () {
   const int idx = published_snapshot.load (std::memory_order_acquire);
   if (idx < 0 || idx >= 3)
     return false;
-
+  
   analysis = snapshots [idx];
-
+  
   if (block_rms (analysis) < tuner_db_to_gain (TUNER_THRESH_DB)) {
     update_note_from_freq (0.0f);
     return false;
@@ -160,7 +160,7 @@ bool c_pitchtracker::analyze () {
     update_note_from_freq (0.0f);
     return false;
   }
-
+  
   // "parabolic" interpolation
   
   l = get_lag_score (analysis, lag - 1);
@@ -171,10 +171,10 @@ bool c_pitchtracker::analyze () {
     offset = 0.5f * (l - r) / denom;
   offset = std::clamp(offset, -0.5f, 0.5f);
   float refined_lag = lag + offset;
-
+  
   const float freq = (float) samplerate / (float) refined_lag;
   update_note_from_freq (freq);
-
+  
   //detected_freq.store (freq, std::memory_order_release);
   return true;
 }
@@ -183,16 +183,16 @@ int freq_to_midi_note (float freq, float *r_cents, float basefreq = 440) {
   const float midi_f =
     69.0f + 12.0f * log2f (freq / (float) basefreq);
   const int midinote = (int) lroundf (midi_f);
-
+  
   const float note_freq =
     (float) basefreq * powf (2.0f, ((float) midinote - 69.0f) / 12.0f);
-
+  
   const float cents =
     1200.0f * log2f (freq / note_freq);
   
   if (r_cents)
     *r_cents = cents;
-    
+  
   return midinote;
 }
 
@@ -209,7 +209,7 @@ void c_pitchtracker::update_note_from_freq (float freq) {
   float cents;
   int midi = freq_to_midi_note (freq, &cents, (float) basefreq);
   //debug ("freq=%f, midi=%d, cents=%f", freq, midi, cents);
-
+  
   const float old_freq = detected_freq.exchange (freq, std::memory_order_release);
   const float old_note = detected_note.exchange ((float) midi, std::memory_order_release);
   const float old_cents = detected_cents.exchange (cents, std::memory_order_release);
@@ -221,40 +221,40 @@ void c_pitchtracker::publish_snapshot () {
   const size_t n = ring.size ();
   if (n == 0)
     return;
-
+  
   const size_t first = count % n;
-
+  
   float *dst = snapshots [write_snapshot].data ();
-
+  
   const size_t front = n - first;
   memcpy (dst, &ring [first], front * sizeof (float));
   if (first)
     memcpy (dst + front, &ring [0], first * sizeof (float));
-
+  
   published_snapshot.store (write_snapshot, std::memory_order_release);
   published_seq.fetch_add (1, std::memory_order_release);
-
+  
   write_snapshot++;
   write_snapshot %= 3;
 }
 
 void c_pitchtracker::process_block (float *in, int nframes_) {
   size_t bs = ring.size ();
-
+  
   if (bs <= 0 || !in || nframes_ <= 0)
     return;
-
+  
   const size_t nframes = (size_t) nframes_;
   const size_t pos = count % bs;
   const size_t front = std::min<size_t> (nframes, bs - pos);
   const size_t back = nframes - front;
-
+  
   memcpy (&ring [pos], in, front * sizeof (float));
   if (back)
     memcpy (&ring [0], in + front, back * sizeof (float));
-
+  
   count += nframes;
-
+  
   if (count >= bs)
     publish_snapshot ();
 }
@@ -270,13 +270,13 @@ void c_pitchtracker::set_block_size (size_t sz) { CP
   
   for (int i = 0; i < 3; i++)
     snapshots [i].resize (sz);
-    
+  
   analysis.resize (sz);
   count = 0;
   write_snapshot = 0;
   published_snapshot.store (-1, std::memory_order_release);
   published_seq.store (0, std::memory_order_release);
-
+  
   std::fill (ring.begin (), ring.end (), 0.0f);
   for (int i = 0; i < 3; i++)
     std::fill (snapshots [i].begin (), snapshots [i].end (), 0.0f);
@@ -286,11 +286,11 @@ void c_pitchtracker::set_block_size (size_t sz) { CP
 void c_pitchtracker::dump () {
   for (size_t i = 0; i < ring.size (); i++)
     printf ("sample %d=%f\n", (int) i, sample_at (i));
-
+  
   debug ("lag score (63) = %f", get_lag_score (ring, 63));
   debug ("lag score (64) = %f", get_lag_score (ring, 64));
   debug ("lag score (65) = %f", get_lag_score (ring, 65));
-
+  
   debug ("get_best_lag (1) = %d", get_best_lag (ring, 1));
   debug ("analyze () returned %d", analyze ());
 }
@@ -340,7 +340,7 @@ void c_tunerwidget::set_pitchtracker (c_pitchtracker *p) {
 void c_tunerwidget::set_pitch (float freq, float note, float cents) {
   if (freq == current_freq && note == current_note && cents == current_cents)
     return;
-
+  
   current_freq = freq;
   current_note = note;
   current_cents = cents;
@@ -359,10 +359,10 @@ void c_tunerwidget::on_mouseup_left () {
 bool c_tunerwidget::on_ui_timer () {
   if (!created || !visible)
     return false;
-
+  
   bool dirty =
     ui_needs_redraw.exchange (false, std::memory_order_acq_rel);
-
+  
   if (pitchtracker &&
       pitchtracker->needs_redraw.exchange (false, std::memory_order_acq_rel)) {
     current_freq =
@@ -373,7 +373,7 @@ bool c_tunerwidget::on_ui_timer () {
       pitchtracker->detected_cents.load (std::memory_order_acquire);
     dirty = true;
   }
-
+  
   return dirty;
 }
 
@@ -382,13 +382,13 @@ bool c_tunerwidget::needs_redraw () {
     ui_needs_redraw.exchange (false, std::memory_order_acq_rel);
   const bool tracker_dirty =
     pitchtracker && pitchtracker->needs_redraw.exchange (false);
-
+  
   return ui_dirty || tracker_dirty;
 }
 
 void c_tunerwidget::render_base (cairo_t *cr) {
   cairo_set_line_width (cr, height / 50);
-
+  
   cairo_set_source_rgba (cr, 0.5, 0.5, 1.0, 0.3);
   for (int i = 0; i < 5; i++) {
     int w = std::clamp ((width / 4) * i, 1, width - 1);
@@ -396,7 +396,7 @@ void c_tunerwidget::render_base (cairo_t *cr) {
     cairo_line_to (cr, w, height);
   }
   cairo_stroke (cr);
-
+  
   cairo_set_source_rgba (cr, 0.5, 0.8, 1.0, 1.0);
   cairo_move_to (cr, width / 2, 0);
   cairo_line_to (cr, width / 2, height);
@@ -511,7 +511,7 @@ void c_tunerwidget::on_paint (cairo_t *cr) { //DEBUG_SHOW_RATE ("tuner redraw: "
       cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, 1.0);
     else
       cairo_set_source_rgba (cr, 1.0, 1.0, 0.0, a);
-  
+    
     cairo_move_to (cr, x - side, height);
     cairo_line_to (cr, x, height / 2);
     cairo_line_to (cr, x + side, height);
@@ -555,7 +555,7 @@ void c_tunerwidget::on_paint (cairo_t *cr) { //DEBUG_SHOW_RATE ("tuner redraw: "
     snprintf (buf, 31, "+0");
   cairo_move_to (cr, width - ext.width, height / 10 + ext.height);
   cairo_show_text (cr, buf);
-  
+
 }
 
 void c_tunerwidget::on_resize (int w, int h) {

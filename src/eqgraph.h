@@ -64,7 +64,7 @@ public:
   float spectrum_ceiling_db = 6.0f;
   float spectrum_scale = 1.0f;
   bool spectrum_normalize = false;
-    
+
 private:
   float freq_to_x (float freq) const;
   float x_to_freq (float x) const;
@@ -115,15 +115,15 @@ private:
   std::array<float,  SPECTRUM_BINS> spectrum_hold {};
   std::array<float,  SPECTRUM_BINS> spectrum_input_hold {};
   std::array<float,  SPECTRUM_BINS> spectrum_output_hold {};
-
+  
   size_t spectrum_last_update_ms    = 0;
   float spectrum_hold_seconds       = 0.0f;
   float spectrum_fall_db_per_second = 96.0f;
-
+  
   bool spectrum_valid = false;
   bool spectrum_surface_dirty = true;
   bool m_hold = true;
-
+  
   cairo_surface_t *spectrum_surface = NULL;
   cairo_t *spectrum_cr = NULL;
   int spectrum_surface_w = 0;

@@ -37,13 +37,13 @@ struct s_option {
 
 static bool mkdir_p (const std::string& path) {
     std::error_code ec;
-
+    
     if (std::filesystem::create_directories (path, ec))
         return true;    // created at least one directory
-
+    
     if (!ec)
         return true;    // already existed
-
+    
     return false;       // error
 }
 
@@ -52,12 +52,12 @@ std::string strip_whitespace (const std::string& str) {
     while (start < str.size () &&
            std::isspace (static_cast<unsigned char> (str [start])))
         ++start;
-
+    
     size_t end = str.size();
     while (end > start &&
            std::isspace (static_cast<unsigned char> (str [end - 1])))
         --end;
-
+    
     return str.substr (start, end - start);
 }
 
@@ -69,10 +69,10 @@ static std::vector<std::string> read_lines (const std::string filename) {
   if (f.fail ()) {
     debug ("can't open '%s' for reading", filename.c_str ());
   }
-
+  
   while (std::getline (f, line))
     lines.push_back (line);
-
+  
   return lines;
 }
 
@@ -85,10 +85,10 @@ static bool write_lines (
     debug ("can't open '%s' for writing", filename.c_str ());
     return false;
   }
-
+  
   for (const std::string &line : v)
     f << line << "\n";
-
+  
   return static_cast<bool> (f);
 }
 
@@ -101,14 +101,14 @@ public:
       fd = -1;
     }
   }
-
+  
   ~c_config_write_lock () {
     if (fd >= 0) {
       flock (fd, LOCK_UN);
       close (fd);
     }
   }
-
+  
   bool locked () const { return fd >= 0; }
 
 private:
@@ -125,22 +125,22 @@ bool istrue (std::string value) {
   
   if (value == "true")
     return true;
-    
+  
   if (value == "yes")
     return true;
-
+  
   if (value == "on")
     return true;
-    
+  
   if (value == "TRUE")
     return true;
-    
+  
   if (value == "YES")
     return true;
-
+  
   if (value == "ON")
     return true;
-    
+  
   return false;
 }
 
@@ -210,7 +210,7 @@ std::string c_configfile::get_item (size_t n) {
   if (n >= sizeof (g_options) / sizeof (g_options [0]) ||
       g_options [n].name.empty ())
     return "";
-
+  
   return g_options [n].value;
 }
 
@@ -219,7 +219,7 @@ std::string c_configfile::get_item (std::string str) {
   int n = find_item (str);
   if (n < 0)
     return "";
-
+  
   debug ("returning '%s'", g_options [n].value.c_str ());
   return g_options [n].value;
 }
@@ -248,7 +248,7 @@ int c_configfile::delete_eq_preset (std::string name) {
   
   eq_presets.clear ();
   eq_presets = new_presets;
-
+  
   pending_eq_additions.erase (
     std::remove_if (
       pending_eq_additions.begin (),
@@ -301,11 +301,11 @@ bool same_eq_settings (
     return std::isfinite (x) && std::isfinite (y) &&
            std::fabs (x - y) <= tolerance;
   };
-
+  
   if (a.on != b.on ||
       !same_float (a.master_gain_db, b.master_gain_db, 0.0051f))
     return false;
-
+  
   for (int i = 0; i < EQ_NUM_BANDS; ++i) {
     if (a.enabled [i] != b.enabled [i] ||
         a.mode [i] != b.mode [i] ||
@@ -315,7 +315,7 @@ bool same_eq_settings (
         !same_float (a.q [i], b.q [i], 0.00051f))
       return false;
   }
-
+  
   return true;
 }
 
@@ -337,13 +337,13 @@ static std::vector<c_eq_state> read_user_eq_presets (
     const std::string &path) {
   std::vector<c_eq_state> presets;
   int unnamed_eq_id = 1;
-
+  
   for (const std::string &line : read_lines (path)) {
     std::string token, value;
     split_at_equal (line, token, value);
     if (strip_whitespace (token) != "eq")
       continue;
-
+    
     c_eq_state preset;
     if (preset.from_string ("eq=" + strip_whitespace (value)) !=
         t_parse_result::parsed)
@@ -353,7 +353,7 @@ static std::vector<c_eq_state> read_user_eq_presets (
     preset.builtin = false;
     presets.push_back (preset);
   }
-
+  
   return presets;
 }
 
@@ -362,7 +362,7 @@ static bool same_eq_preset_list (
     const std::vector<c_eq_state> &b) {
   if (a.size () != b.size ())
     return false;
-
+  
   for (size_t i = 0; i < a.size (); ++i) {
     if (a [i].builtin != b [i].builtin ||
         !same_eq_preset (a [i], b [i]))
@@ -409,7 +409,7 @@ bool c_configfile::read_file (std::string path) { CP
             if (eq_state.preset_name.size () == 0) {
               eq_state.preset_name = "Unnamed " + std::to_string (unnamed_eq_id++);
             }
-
+            
             const bool duplicates_builtin = std::any_of (
               eq_presets.begin (),
               eq_presets.end (),
@@ -431,7 +431,7 @@ bool c_configfile::read_file (std::string path) { CP
   }
   //debug ("dump:");
   //this->dump ();
-
+  
   std::error_code ec;
   config_mtime = std::filesystem::last_write_time (path, ec);
   config_mtime_valid = !ec;
@@ -446,10 +446,10 @@ bool c_configfile::refresh_eq_presets_if_changed () {
     std::filesystem::last_write_time (path, ec);
   if (ec || (config_mtime_valid && mtime == config_mtime))
     return false;
-
+  
   const std::vector<c_eq_state> old_presets = eq_presets;
   std::vector<c_eq_state> disk_presets = read_user_eq_presets (path);
-
+  
   reset_eq_presets ();
   for (const c_eq_state &preset : disk_presets) {
     const bool duplicates_builtin = std::any_of (
@@ -461,7 +461,7 @@ bool c_configfile::refresh_eq_presets_if_changed () {
     if (!duplicates_builtin)
       eq_presets.push_back (preset);
   }
-
+  
   for (const std::string &name : pending_eq_deletions) {
     eq_presets.erase (
       std::remove_if (
@@ -476,7 +476,7 @@ bool c_configfile::refresh_eq_presets_if_changed () {
     eq_presets.end (),
     pending_eq_additions.begin (),
     pending_eq_additions.end ());
-
+  
   config_mtime = mtime;
   config_mtime_valid = true;
   return !same_eq_preset_list (old_presets, eq_presets);
@@ -491,15 +491,15 @@ bool c_configfile::write_file (std::string path) { CP
   std::filesystem::path p (path);
   if (p.has_parent_path ())
     mkdir_p (p.parent_path ().string ());
-
+  
   c_config_write_lock lock (path);
   if (!lock.locked ()) {
     debug ("can't lock '%s' for writing", path.c_str ());
     return false;
   }
-
+  
   std::vector<c_eq_state> merged_presets = read_user_eq_presets (path);
-
+  
   for (const std::string &name : pending_eq_deletions) {
     merged_presets.erase (
       std::remove_if (
@@ -514,24 +514,24 @@ bool c_configfile::write_file (std::string path) { CP
     merged_presets.end (),
     pending_eq_additions.begin (),
     pending_eq_additions.end ());
-
+  
   std::vector<std::string> lines;
   for (size_t i = 0; g_options [i].name.size () > 0; i++) {
     lines.push_back (g_options [i].name + "=" + g_options [i].value);
   }
-
+  
   for (c_eq_state &preset : merged_presets) {
     std::string eqstring;
     preset.to_string (eqstring);
     lines.push_back (eqstring);
   }
-
+  
   const std::string tmp_path =
     path + ".tmp." + std::to_string ((long long) getpid ()) + "." +
     std::to_string ((unsigned long long) (uintptr_t) this);
   if (!write_lines (tmp_path, lines))
     return false;
-
+  
   std::error_code ec;
   std::filesystem::rename (tmp_path, path, ec);
   if (ec) {
@@ -539,10 +539,10 @@ bool c_configfile::write_file (std::string path) { CP
     debug ("can't replace '%s': %s", path.c_str (), ec.message ().c_str ());
     return false;
   }
-
+  
   config_mtime = std::filesystem::last_write_time (path, ec);
   config_mtime_valid = !ec;
-
+  
   reset_eq_presets ();
   eq_presets.insert (
     eq_presets.end (), merged_presets.begin (), merged_presets.end ());
@@ -643,7 +643,7 @@ t_parse_result c_eq_state::from_string (std::string s) { CP
   for (i = 0; i < v.size (); i++) {
     debug ("got string '%s'", v [i].c_str ());
     switch (i) {
-      
+    
       case 0:CP
         on = istrue (v [i]);
       break;
@@ -769,18 +769,18 @@ t_parse_result c_neuralblender_lane_state::from_strings (
       std::string *r_s,
       float *r_f,
       bool *r_b) {
-
+    
     for (std::string &line : v) {
       if (line.empty ())
         continue;
-
+      
       std::string token;
       std::string value;
       split_at_equal (line, token, value);
-
+      
       if (token != prefix + name)
         continue;
-
+      
       // Parse and validate value first.
       if (r_s)
         *r_s = value;
@@ -788,7 +788,7 @@ t_parse_result c_neuralblender_lane_state::from_strings (
         *r_f = atof (value.c_str ());
       if (r_b)
         *r_b = istrue (value);
-
+      
       line.clear();
       return true;
     }
@@ -817,7 +817,7 @@ void c_neuralblender_lane_state::to_strings (_lane_bank bank, int lane,
                                              std::vector<std::string> &v) {
   const std::string prefix =
     std::string (bank_name (bank)) + "_" + std::to_string (lane) + "_";
-    
+  
   const auto onoff = [] (bool b) { return b ? "on" : "off"; };
   const auto add_string = [&] (const char *name, const std::string &value) {
     v.push_back (prefix + std::string (name) + "=" + value);
@@ -827,7 +827,7 @@ void c_neuralblender_lane_state::to_strings (_lane_bank bank, int lane,
     snprintf (value_string, sizeof (value_string), "%f", value);
     add_string (name, value_string);
   };
-
+  
   add_string ("filename", filename);
   add_float ("gain_in", gain_in);
   add_float ("gain_out", gain_out);
@@ -841,7 +841,7 @@ void c_neuralblender_lane_state::to_strings (_lane_bank bank, int lane,
 
 void c_neuralblender_state::to_strings (std::vector<std::string> &v) {
   v.clear ();
-
+  
   const auto onoff = [] (bool b) { return b ? "on" : "off"; };
   const auto add_string = [&] (const char *name, const std::string &value) {
     v.push_back (std::string (name) + "=" + value);
@@ -857,7 +857,7 @@ void c_neuralblender_state::to_strings (std::vector<std::string> &v) {
   const auto add_int = [&] (const char *name, int value) {
     add_string (name, std::to_string (value));
   };
-
+  
   //add_string ("current_dir", current_dir);
   add_bool ("bypass", bypass);
   add_bool ("pedal_bypass", pedal_bypass);
@@ -880,29 +880,29 @@ void c_neuralblender_state::to_strings (std::vector<std::string> &v) {
   add_float ("noiserelease", noiserelease);
   add_float ("calib_target_db", calib_target_db);
   add_int ("calib_source", calib_source);
-
+  
   const _lane_bank model_banks [] = {
     BANK_PEDAL,
     BANK_AMP,
     BANK_CAB
   };
-
+  
   for (_lane_bank bank : model_banks) {
     const std::string prefix = bank_name (bank);
     add_int ((prefix + "_exclusive_lane").c_str (),
              banks [bank].exclusive_lane);
     add_bool ((prefix + "_linked_calib").c_str (),
               banks [bank].linked_calib);
-
+    
     for (int lane = 0; lane < NB_NUM_MODELS; ++lane)
       banks [bank].lanes [lane].to_strings (bank, lane, v);
   }
-
+  
   c_eq_state pre = eqpre;
   c_eq_state post = eqpost;
   pre.which = EQ_PRE;
   post.which = EQ_POST;
-
+  
   std::string eq_string;
   pre.to_string (eq_string);
   v.push_back (eq_string);
@@ -914,33 +914,33 @@ bool c_neuralblender_state::from_strings (std::vector<std::string> &v) {
   c_neuralblender_state parsed = *this;
   std::vector<std::string> remaining = v;
   bool valid = true;
-
+  
   auto take_value = [&] (const std::string &name, std::string &value) {
     bool found = false;
-
+    
     for (std::string &line : remaining) {
       if (line.empty ())
         continue;
-
+      
       std::string token;
       std::string candidate;
       split_at_equal (line, token, candidate);
       if (token != name)
         continue;
-
+      
       if (found) {
         valid = false;
         continue;
       }
-
+      
       value = candidate;
       line.clear ();
       found = true;
     }
-
+    
     return found;
   };
-
+  
   const auto read_string = [&] (const char *name, std::string &value) {
     std::string text;
     if (take_value (name, text))
@@ -961,7 +961,7 @@ bool c_neuralblender_state::from_strings (std::vector<std::string> &v) {
     if (take_value (name, text))
       value = (int) tofloat (text);
   };
-
+  
   read_string ("current_dir", parsed.current_dir);
   read_bool ("bypass", parsed.bypass);
   read_bool ("pedal_bypass", parsed.pedal_bypass);
@@ -984,20 +984,20 @@ bool c_neuralblender_state::from_strings (std::vector<std::string> &v) {
   read_float ("noiserelease", parsed.noiserelease);
   read_float ("calib_target_db", parsed.calib_target_db);
   read_int ("calib_source", parsed.calib_source);
-
+  
   const _lane_bank model_banks [] = {
     BANK_PEDAL,
     BANK_AMP,
     BANK_CAB
   };
-
+  
   for (_lane_bank bank : model_banks) {
     const std::string prefix = bank_name (bank);
     read_int ((prefix + "_exclusive_lane").c_str (),
               parsed.banks [bank].exclusive_lane);
     read_bool ((prefix + "_linked_calib").c_str (),
                parsed.banks [bank].linked_calib);
-
+    
     for (int lane = 0; lane < NB_NUM_MODELS; ++lane) {
       const t_parse_result result =
         parsed.banks [bank].lanes [lane].from_strings (
@@ -1006,13 +1006,13 @@ bool c_neuralblender_state::from_strings (std::vector<std::string> &v) {
         valid = false;
     }
   }
-
+  
   bool have_eqpre = false;
   bool have_eqpost = false;
   for (std::string &line : remaining) {
     if (line.empty ())
       continue;
-
+    
     c_eq_state eq;
     const t_parse_result result = eq.from_string (line);
     if (result == t_parse_result::not_mine)
@@ -1021,7 +1021,7 @@ bool c_neuralblender_state::from_strings (std::vector<std::string> &v) {
       valid = false;
       continue;
     }
-
+    
     if (eq.which == EQ_PRE) {
       if (have_eqpre)
         valid = false;
@@ -1037,25 +1037,25 @@ bool c_neuralblender_state::from_strings (std::vector<std::string> &v) {
     } else {
       valid = false;
     }
-
+    
     line.clear ();
   }
-
+  
   for (const std::string &line : remaining) {
     if (!line.empty ()) {
       debug ("unrecognized state entry: '%s'", line.c_str ());
       valid = false;
     }
   }
-
+  
   if (!valid)
     return false;
-
+  
   if (have_eqpre)
     parsed.eqpre_bypass = !parsed.eqpre.on;
   if (have_eqpost)
     parsed.eqpost_bypass = !parsed.eqpost.on;
-
+  
   *this = parsed;
   v = remaining;
   return true;
@@ -1066,18 +1066,18 @@ bool c_neuralblender_state::read_from (const std::string &filename) {
     debug ("can't read state from an empty filename");
     return false;
   }
-
+  
   std::vector<std::string> lines = read_lines (filename);
   if (lines.empty ()) {
     debug ("state file '%s' is empty or unreadable", filename.c_str ());
     return false;
   }
-
+  
   if (!from_strings (lines)) {
     debug ("invalid state file '%s'", filename.c_str ());
     return false;
   }
-
+  
   return true;
 }
 
@@ -1086,14 +1086,14 @@ bool c_neuralblender_state::write_to (const std::string &filename) {
     debug ("can't write state to an empty filename");
     return false;
   }
-
+  
   const std::filesystem::path path (filename);
   if (path.has_parent_path () &&
       !mkdir_p (path.parent_path ().string ())) {
     debug ("can't create parent directory for '%s'", filename.c_str ());
     return false;
   }
-
+  
   std::vector<std::string> lines;
   to_strings (lines);
   return write_lines (filename, lines);

@@ -43,12 +43,12 @@ bool c_lv2_ui::consume_expected_control (
     uint32_t port, float value, float tolerance) {
   if (port >= PORT_COUNT || !expected_control_valid [port])
     return false;
-
+  
   if (nbtk::now_ms () - expected_control_time [port] > 1000) {
     expected_control_valid [port] = false;
     return false;
   }
-
+  
   if (fabsf (expected_control_value [port] - value) <= tolerance)
     expected_control_valid [port] = false;
   return true;
@@ -84,15 +84,15 @@ bool c_lv2_ui::write_model_path (
       !lv2_ui_is_model_bank (bank) ||
       which >= NB_NUM_MODELS)
     return false;
-
+  
   const char *path = filename ? filename : "";
   const LV2_URID property = urid_bank_model [bank] [which];
   if (!property)
     return false;
-
+  
   uint8_t buf [4096];
   LV2_Atom_Forge_Frame frame;
-
+  
   lv2_atom_forge_set_buffer (&forge, buf, sizeof (buf));
   lv2_atom_forge_object (&forge, &frame, 0, urid_patch_Set);
   lv2_atom_forge_key (&forge, urid_patch_property);
@@ -103,7 +103,7 @@ bool c_lv2_ui::write_model_path (
   else
     lv2_atom_forge_string (&forge, "", 1);
   lv2_atom_forge_pop (&forge, &frame);
-
+  
   const LV2_Atom *atom = (const LV2_Atom *) buf;
   write (controller,
          PORT_CONTROL,
@@ -116,10 +116,10 @@ bool c_lv2_ui::write_model_path (
 bool c_lv2_ui::write_float_property (LV2_URID property, float value) {
   if (updating_from_host || !write || !map || !property)
     return false;
-
+  
   uint8_t buf [256];
   LV2_Atom_Forge_Frame frame;
-
+  
   lv2_atom_forge_set_buffer (&forge, buf, sizeof (buf));
   lv2_atom_forge_object (&forge, &frame, 0, urid_patch_Set);
   lv2_atom_forge_key (&forge, urid_patch_property);
@@ -127,7 +127,7 @@ bool c_lv2_ui::write_float_property (LV2_URID property, float value) {
   lv2_atom_forge_key (&forge, urid_patch_value);
   lv2_atom_forge_float (&forge, value);
   lv2_atom_forge_pop (&forge, &frame);
-
+  
   const LV2_Atom *atom = (const LV2_Atom *) buf;
   write (controller,
          PORT_CONTROL,
@@ -140,10 +140,10 @@ bool c_lv2_ui::write_float_property (LV2_URID property, float value) {
 bool c_lv2_ui::write_int_property (LV2_URID property, int32_t value) {
   if (updating_from_host || !write || !map || !property)
     return false;
-
+  
   uint8_t buf [256];
   LV2_Atom_Forge_Frame frame;
-
+  
   lv2_atom_forge_set_buffer (&forge, buf, sizeof (buf));
   lv2_atom_forge_object (&forge, &frame, 0, urid_patch_Set);
   lv2_atom_forge_key (&forge, urid_patch_property);
@@ -151,7 +151,7 @@ bool c_lv2_ui::write_int_property (LV2_URID property, int32_t value) {
   lv2_atom_forge_key (&forge, urid_patch_value);
   lv2_atom_forge_int (&forge, value);
   lv2_atom_forge_pop (&forge, &frame);
-
+  
   const LV2_Atom *atom = (const LV2_Atom *) buf;
   write (controller,
          PORT_CONTROL,
@@ -167,21 +167,21 @@ void c_lv2_ui::select_spectrum_for_visible_page () {
     selection = LV2_SPECTRUM_PRE;
   else if (visible_page == PAGE_EQPOST)
     selection = LV2_SPECTRUM_POST;
-
+  
   write_int_property (urid_spectrum_select, selection);
 }
 
 void c_lv2_ui::request_current_state () {
   if (!write || !map)
     return;
-
+  
   uint8_t buf [256];
   LV2_Atom_Forge_Frame frame;
-
+  
   lv2_atom_forge_set_buffer (&forge, buf, sizeof (buf));
   lv2_atom_forge_object (&forge, &frame, 0, urid_patch_Get);
   lv2_atom_forge_pop (&forge, &frame);
-
+  
   const LV2_Atom *atom = (const LV2_Atom *) buf;
   write (controller,
          PORT_CONTROL,
@@ -203,11 +203,11 @@ void c_lv2_ui::get_dsp_state (c_neuralblender_state &dest) {
 bool c_lv2_ui::set_dsp_state (const c_neuralblender_state &src) {
   if (!write || !map)
     return false;
-
+  
   static constexpr _lane_bank model_banks [] = {
     BANK_PEDAL, BANK_AMP, BANK_CAB
   };
-
+  
   // Queue model changes first so the following controls apply to the new model.
   for (_lane_bank bank : model_banks) {
     for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
@@ -217,7 +217,7 @@ bool c_lv2_ui::set_dsp_state (const c_neuralblender_state &src) {
         src.banks [bank].lanes [lane].filename.c_str ());
     }
   }
-
+  
   write_control (PORT_BYPASS, src.bypass ? 0.0f : 1.0f);
   write_control (PORT_PEDAL_BYPASS, src.pedal_bypass ? 1.0f : 0.0f);
   write_control (PORT_EQPRE_BYPASS, src.eqpre.on ? 0.0f : 1.0f);
@@ -237,7 +237,7 @@ bool c_lv2_ui::set_dsp_state (const c_neuralblender_state &src) {
   write_control (PORT_TUNER_BASE_FREQ, src.tuner_base_freq);
   write_control (PORT_MASTER_GAIN, src.master_gain_db);
   write_control (PORT_PRESENCE, src.presence);
-
+  
   write_control (
     PORT_EXCLUSIVE_LANE_PEDAL,
     (float) src.banks [BANK_PEDAL].exclusive_lane);
@@ -256,7 +256,7 @@ bool c_lv2_ui::set_dsp_state (const c_neuralblender_state &src) {
   write_control (
     PORT_LINKED_CALIB_CAB,
     src.banks [BANK_CAB].linked_calib ? 1.0f : 0.0f);
-
+  
   for (_lane_bank bank : model_banks) {
     for (size_t lane = 0; lane < NB_NUM_MODELS; ++lane) {
       const c_neuralblender_lane_state &lane_state =
@@ -264,7 +264,7 @@ bool c_lv2_ui::set_dsp_state (const c_neuralblender_state &src) {
       const auto port = [bank, lane] (uint32_t param) {
         return nb_lv2_bank_lane_port (bank, lane, param);
       };
-
+      
       write_control (
         port (NB_LV2_LANE_GAIN_IN),
         gain_to_db (lane_state.gain_in));
@@ -288,7 +288,7 @@ bool c_lv2_ui::set_dsp_state (const c_neuralblender_state &src) {
         port (NB_LV2_LANE_CALIBRATE), lane_state.do_calib ? 1.0f : 0.0f);
     }
   }
-
+  
   const auto write_eq = [this] (_lane_bank bank, const c_eq_state &eq) {
     write_control (nb_lv2_eq_master_gain_port (bank), eq.master_gain_db);
     for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
@@ -306,7 +306,7 @@ bool c_lv2_ui::set_dsp_state (const c_neuralblender_state &src) {
         nb_lv2_eq_port (bank, band, NB_LV2_EQ_Q), eq.q [band]);
     }
   };
-
+  
   write_eq (BANK_EQPRE, src.eqpre);
   write_eq (BANK_EQPOST, src.eqpost);
   return true;
@@ -381,18 +381,18 @@ void c_lv2_ui::on_muteall (nbtk::c_widget *w, bool b) {
 void c_lv2_ui::on_excl (nbtk::c_widget *w, int n) {
   const _lane_bank bank =
     w && w->bank < BANK_COUNT ? (_lane_bank) w->bank : visible_bank;
-
+  
   CP
   c_neuralblender_ui::on_excl (w, n);
   switch (bank) {
     case BANK_PEDAL:
       write_control (PORT_EXCLUSIVE_LANE_PEDAL, (float) n);
     break;
-
+    
     case BANK_CAB:
       write_control (PORT_EXCLUSIVE_LANE_CAB, (float) n);
     break;
-
+    
     case BANK_AMP:
     default:
       write_control (PORT_EXCLUSIVE_LANE_AMP, (float) n);
@@ -414,19 +414,19 @@ void c_lv2_ui::on_bank_bypass (nbtk::c_widget *w, _lane_bank bank, bool b) {
     case BANK_PEDAL:
       write_control (PORT_PEDAL_BYPASS, b ? 1.0f : 0.0f);
     break;
-
+    
     case BANK_EQPRE:
       write_control (PORT_EQPRE_BYPASS, b ? 1.0f : 0.0f);
     break;
-
+    
     case BANK_EQPOST:
       write_control (PORT_EQPOST_BYPASS, b ? 1.0f : 0.0f);
     break;
-
+    
     case BANK_CAB:
       write_control (PORT_CAB_BYPASS, b ? 1.0f : 0.0f);
     break;
-
+    
     case BANK_AMP:
     default:
       write_control (PORT_AMP_BYPASS, b ? 1.0f : 0.0f);
@@ -453,11 +453,11 @@ void c_lv2_ui::on_linked_calib (nbtk::c_widget *w, bool b) {
     case BANK_PEDAL:
       write_control (PORT_LINKED_CALIB_PEDAL, b ? 1.0f : 0.0f);
     break;
-
+    
     case BANK_CAB:
       write_control (PORT_LINKED_CALIB_CAB, b ? 1.0f : 0.0f);
     break;
-
+    
     case BANK_AMP:
     default:
       write_control (PORT_LINKED_CALIB_AMP, b ? 1.0f : 0.0f);
@@ -547,47 +547,47 @@ void c_lv2_ui::on_eq_band (
     nbtk::c_widget *w, _lane_bank bank, size_t band) {
   if (!w || band >= EQ_NUM_BANDS)
     return;
-
+  
   const c_eq_state &eq_state = ui_eq_state_for_bank (bank);
-
+  
   if (w->role != ROLE_EQ_ENABLED && eq_state.enabled [band]) {
     write_control (
       widget_eq_port (w, NB_LV2_EQ_ENABLED),
       1.0f);
   }
-
+  
   switch ((_widget_role) w->role) {
     case ROLE_EQ_ENABLED:
       write_control (
         widget_eq_port (w, NB_LV2_EQ_ENABLED),
         eq_state.enabled [band] ? 1.0f : 0.0f);
     break;
-
+    
     case ROLE_EQ_MODE:
       write_control (
         widget_eq_port (w, NB_LV2_EQ_MODE),
         (float) nb_lv2_encode_eq_mode (
           eq_state.mode [band], eq_state.slope [band]));
     break;
-
+    
     case ROLE_EQ_FREQ:
       write_control (
         widget_eq_port (w, NB_LV2_EQ_FREQ),
         eq_state.freq [band]);
     break;
-
+    
     case ROLE_EQ_GAIN:
       write_control (
         widget_eq_port (w, NB_LV2_EQ_GAIN),
         eq_state.gain_db [band]);
     break;
-
+    
     case ROLE_EQ_Q:
       write_control (
         widget_eq_port (w, NB_LV2_EQ_Q),
         eq_state.q [band]);
     break;
-
+    
     case ROLE_EQ_GRAPH:
       write_control (
         widget_eq_port (w, NB_LV2_EQ_FREQ),
@@ -599,7 +599,7 @@ void c_lv2_ui::on_eq_band (
         widget_eq_port (w, NB_LV2_EQ_Q),
         eq_state.q [band]);
     break;
-
+    
     default:
     break;
   }
@@ -610,7 +610,7 @@ void c_lv2_ui::on_eq_master_gain (
   (void) w;
   if (bank != BANK_EQPRE && bank != BANK_EQPOST)
     return;
-
+  
   write_control (nb_lv2_eq_master_gain_port (bank), value);
 }
 
@@ -631,14 +631,14 @@ bool c_lv2_ui::request_window_size (int w, int h) {
       c_neuralblender_ui::request_window_size (w, h);
     return ok;
   }
-
+  
   return c_neuralblender_ui::request_window_size (w, h);
 }
 
 int c_lv2_ui::idle () {
   if (!ui_ready)
     return 0;
-
+  
   t_neuralblender_error error;
   bool have_error = false;
   
@@ -652,26 +652,26 @@ int c_lv2_ui::idle () {
   }
   if (have_error)
     handle_error (error);
-
+  
   if (nbtk_app.backend)
     nbtk_app.backend->run_events (&app);
-
+  
   refresh_config_if_needed ();
-
+  
   eqpage_pre.graph.tick ();
   eqpage_post.graph.tick ();
-
+  
   nbtk_app.tick ();
-
+  
   redraw_meters_now ();
-
+  
   redraw_tuner_if_needed ();
-
+  
   if (nbtk_app.backend) {
     nbtk_app.backend->flush_dirty (&app);
     nbtk_app.backend->flush (mainwindow.native_handle ());
   }
-
+  
   return 0;
 }
 
@@ -679,7 +679,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
   updating_from_host = true;
   const bool old_updating_from_state = updating_from_state;
   updating_from_state = true;
-
+  
   if (port == PORT_BYPASS) {
     state.bypass = value < 0.5f;
     updating_from_state = old_updating_from_state;
@@ -687,7 +687,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_VU_ENABLE) {
     state.do_vu = value >= 0.5f;
     btn_other_vu.set_value (state.do_vu);
@@ -699,7 +699,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_MUTE_ALL) {
     state.mute_all = value >= 0.5f;
     btn_muteall.set_value (state.mute_all);
@@ -707,7 +707,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_EXCLUSIVE_LANE_PEDAL ||
       port == PORT_EXCLUSIVE_LANE_AMP ||
       port == PORT_EXCLUSIVE_LANE_CAB) {
@@ -725,7 +725,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_LINKED_CALIB_PEDAL ||
       port == PORT_LINKED_CALIB_AMP ||
       port == PORT_LINKED_CALIB_CAB) {
@@ -741,7 +741,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_CALIB_SOURCE) {
     int source = (int) lrintf (value);
     if (source < 0)
@@ -752,7 +752,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_CALIB_TARGET_DB) {
     state.calib_target_db = value;
     char buf [64];
@@ -762,7 +762,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_NOISEGATE_ENABLED) {
     state.noisegate_on = value >= 0.5f;
     btn_noisegate.set_value (state.noisegate_on);
@@ -770,7 +770,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_NOISEGATE_THRESHOLD) {
     state.noisethresh = value;
     knob_noisethresh.set_value (value);
@@ -778,7 +778,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_NOISEGATE_ATTACK) {
     state.noiseattack = value;
     knob_noiseattack.set_value (value);
@@ -786,7 +786,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_NOISEGATE_HOLD) {
     state.noisehold = value;
     knob_noisehold.set_value (value);
@@ -794,7 +794,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_NOISEGATE_RELEASE) {
     state.noiserelease = value;
     knob_noiserelease.set_value (value);
@@ -802,14 +802,14 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_NOISEGATE_GAIN) {
     on_threshgain (nullptr, value);
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_TUNER_ON) {
     state.tuner_on = value >= 0.5f;
     sync_tuner_visibility ();
@@ -817,7 +817,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_TUNER_BASE_FREQ) {
     state.tuner_base_freq = value;
     char buf [64];
@@ -827,7 +827,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_MASTER_GAIN) {
     state.master_gain_db = value;
     knob_mastervolume.set_value (value);
@@ -835,7 +835,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_PRESENCE) {
     state.presence = value;
     knob_presence.set_value (value);
@@ -843,7 +843,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_ACTIVE_PAGE) {
     int page = (int) lrintf (value);
     if (page < PAGE_PEDAL)
@@ -856,7 +856,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     select_spectrum_for_visible_page ();
     return;
   }
-
+  
   if (port == PORT_PEDAL_BYPASS ||
       port == PORT_EQPRE_BYPASS ||
       port == PORT_AMP_BYPASS ||
@@ -885,7 +885,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_EQPRE_MASTER_GAIN ||
       port == PORT_EQPOST_MASTER_GAIN) {
     const _lane_bank eq_bank =
@@ -908,7 +908,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_TUNER_NOTE) {
     tuner_note_value = value;
     tuner.set_pitch (tuner_freq_value, tuner_note_value, tuner_cents_value);
@@ -916,7 +916,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_TUNER_CENTS_OFF) {
     tuner_cents_value = value;
     tuner.set_pitch (tuner_freq_value, tuner_note_value, tuner_cents_value);
@@ -924,7 +924,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (port == PORT_TUNER_FREQ) {
     tuner_freq_value = value;
     tuner.set_pitch (tuner_freq_value, tuner_note_value, tuner_cents_value);
@@ -932,7 +932,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   _lane_bank bank = BANK_AMP;
   size_t lane = 0;
   uint32_t param = 0;
@@ -944,7 +944,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     c_eq_state &ui_eq_state = ui_eq_state_for_bank (bank);
     bool changed = false;
     const bool expected = consume_expected_control (port, value, 0.00051f);
-
+    
     switch (eq_param) {
       case NB_LV2_EQ_ENABLED: {
         const bool enabled = value >= 0.5f;
@@ -952,7 +952,7 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
         eq_state.enabled [eq_band] = enabled;
         ui_eq_state.enabled [eq_band] = eq_state.enabled [eq_band];
       } break;
-
+      
       case NB_LV2_EQ_MODE: {
         _eq_band_mode mode;
         int slope;
@@ -967,31 +967,31 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
         ui_eq_state.mode [eq_band] = eq_state.mode [eq_band];
         ui_eq_state.slope [eq_band] = eq_state.slope [eq_band];
       } break;
-
+      
       case NB_LV2_EQ_FREQ:
         changed = fabsf (eq_state.freq [eq_band] - value) > 0.00051f;
         eq_state.freq [eq_band] = value;
         ui_eq_state.freq [eq_band] = value;
       break;
-
+      
       case NB_LV2_EQ_GAIN:
         changed = fabsf (eq_state.gain_db [eq_band] - value) > 0.00051f;
         eq_state.gain_db [eq_band] = value;
         ui_eq_state.gain_db [eq_band] = value;
       break;
-
+      
       case NB_LV2_EQ_Q:
         changed = fabsf (eq_state.q [eq_band] - value) > 0.00051f;
         eq_state.q [eq_band] = value;
         ui_eq_state.q [eq_band] = value;
       break;
     }
-
+    
     if (changed && !expected) {
       eq_state.preset_name.clear ();
       ui_eq_state.preset_name.clear ();
     }
-
+    
     c_eqpage_widgets &eqpage =
       bank == BANK_EQPOST ? eqpage_post : eqpage_pre;
     eqpage.sync_band_from_state (ui_eq_state, eq_band);
@@ -1002,60 +1002,60 @@ void c_lv2_ui::set_port_value (uint32_t port, float value) {
     updating_from_host = false;
     return;
   }
-
+  
   if (nb_lv2_decode_bank_lane_port (port, &bank, &lane, &param)) {
     c_lane_widgets *bank_lanes = lanes_for_bank (bank);
     c_neuralblender_lane_state &lane_state = state.banks [bank].lanes [lane];
-
+    
     switch (param) {
       case NB_LV2_LANE_GAIN_IN:
         lane_state.gain_in = db_to_gain (value);
         bank_lanes [lane].knob_gain_in.set_value (value);
       break;
-
+      
       case NB_LV2_LANE_IR_PITCH:
         lane_state.ir_pitch_semitones = value;
         bank_lanes [lane].knob_ir_pitch.set_value (value);
       break;
-
+      
       case NB_LV2_LANE_GAIN_OUT:
         lane_state.gain_out = db_to_gain (value);
         bank_lanes [lane].knob_gain_out.set_value (value);
       break;
-
+      
       case NB_LV2_LANE_DRY_OUT:
         lane_state.dry_out =
           value <= DB_SILENCE ? 0.0f : db_to_gain (value);
         bank_lanes [lane].knob_dry_out.set_value (value);
       break;
-
+      
       case NB_LV2_LANE_DELAY:
         lane_state.delay_ms = value;
         bank_lanes [lane].knob_delay.set_value (value);
       break;
-
+      
       case NB_LV2_LANE_MUTE:
         lane_state.lane_mute = value >= 0.5f;
         bank_lanes [lane].btn_mute.set_value (lane_state.lane_mute);
         sync_widgets_from_state (state);
       break;
-
+      
       case NB_LV2_LANE_DCFLIP:
         lane_state.dcflip = value >= 0.5f;
         bank_lanes [lane].btn_flip.set_value (lane_state.dcflip);
       break;
-
+      
       case NB_LV2_LANE_CALIBRATE:
         lane_state.do_calib = value >= 0.5f;
         bank_lanes [lane].btn_calib.set_value (lane_state.do_calib);
       break;
     }
-
+    
     updating_from_state = old_updating_from_state;
     updating_from_host = false;
     return;
   }
-
+  
   updating_from_state = old_updating_from_state;
   updating_from_host = false;
 }
@@ -1065,7 +1065,7 @@ void c_lv2_ui::set_model_path (
   if ((bank != BANK_PEDAL && bank != BANK_AMP && bank != BANK_CAB) ||
       which >= NB_NUM_MODELS)
     return;
-
+  
   const char *p = path ? path : "";
   state.banks [bank].lanes [which].filename = p;
   state.banks [bank].lanes [which].loaded = p [0] != '\0';
@@ -1073,12 +1073,12 @@ void c_lv2_ui::set_model_path (
     state.lanes [which].filename = p;
     state.lanes [which].loaded = p [0] != '\0';
   }
-
+  
   if (exclusive_lane_for_bank (bank) > 0) {
     sync_widgets_from_state (state, true);
     return;
   }
-
+  
   sync_widgets_from_state (state, true);
 }
 
@@ -1101,20 +1101,20 @@ void c_lv2_ui::redraw_meters_now () {
 void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
   if (!value || value->type != urid_atom_Vector)
     return;
-
+  
   const LV2_Atom_Vector *vec = (const LV2_Atom_Vector *) value;
   if (vec->body.child_type != urid_atom_Float ||
       vec->body.child_size != sizeof (float) ||
       value->size < sizeof (LV2_Atom_Vector_Body))
     return;
-
+  
   const uint32_t count =
     (value->size - sizeof (LV2_Atom_Vector_Body)) / sizeof (float);
-
+  
   const float *values =
     (const float *) ((const uint8_t *) LV2_ATOM_BODY_CONST (value) +
                      sizeof (LV2_Atom_Vector_Body));
-
+  
   switch (type) {
     case ATOM_METERS: {
       const uint32_t old_need = (1 + NB_NUM_MODELS) * 2;
@@ -1123,21 +1123,21 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
       const uint32_t banked_clip_need = BANK_COUNT * clip_need;
       if (count < old_need)
         return;
-
+      
       if (count >= banked_clip_need) {
         auto read_meter = [&] (c_vudata &meter, size_t &n) {
           meter.set_l_smooth (values [n], values [n + 1], values [n + 2] != 0.0f);
           n += 3;
         };
-
+        
         size_t n = 0;
         for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
           const _lane_bank bank_id = (_lane_bank) bank;
           c_lane_widgets *bank_lanes =
             lv2_ui_is_model_bank (bank_id) ? lanes_for_bank (bank_id) : NULL;
-
+          
           read_meter (vudata_in [bank], n);
-
+          
           for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
             if (bank_lanes)
               read_meter (bank_lanes [lane].vudata_out, n);
@@ -1155,10 +1155,10 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
           const _lane_bank bank_id = (_lane_bank) bank;
           c_lane_widgets *bank_lanes =
             lv2_ui_is_model_bank (bank_id) ? lanes_for_bank (bank_id) : NULL;
-
+          
           vudata_in [bank].set_l_smooth (values [n], values [n + 1]);
           n += 2;
-
+          
           for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
             if (bank_lanes) {
               bank_lanes [lane].vudata_out.set_l_smooth (
@@ -1176,7 +1176,7 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
         size_t n = 0;
         vudata_in [BANK_AMP].set_l_smooth (values [n], values [n + 1]);
         n += 2;
-
+        
         for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
           lanes_models [lane].vudata_out.set_l_smooth (
             values [n], values [n + 1]);
@@ -1185,13 +1185,13 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
       }
       break;
     }
-
+    
     case ATOM_STATS: { CP
       const uint32_t old_need = NB_NUM_MODELS * UI_STATS_PER_LANE;
       const uint32_t banked_need = BANK_COUNT * old_need;
       if (count < old_need)
         return;
-
+      
       if (count >= banked_need) {
         size_t src = 0;
         for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
@@ -1210,16 +1210,16 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
           stats [BANK_AMP] [n + 2] = values [n + 2];
         }
       }
-
+      
       update_stats ();
       break;
     }
-
+    
     case ATOM_SPECTRUM_PRE:
     case ATOM_SPECTRUM_POST: {
       if (count < SPECTRUM_BINS * 2)
         return;
-
+      
       c_eqgraph &graph =
         type == ATOM_SPECTRUM_PRE
           ? eqpage_pre.graph
@@ -1230,7 +1230,7 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
         SPECTRUM_BINS);
       break;
     }
-
+    
     default: CP
       break;
   }
@@ -1239,11 +1239,11 @@ void c_lv2_ui::set_ui_values (const LV2_Atom *value, _ui_feedback_type type) {
 void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
   if (!atom)
     return;
-
+  
   const LV2_Atom_Object *obj = (const LV2_Atom_Object *) atom;
   if (obj->body.otype != urid_patch_Set)
     return;
-
+  
   const LV2_Atom *property = NULL;
   const LV2_Atom *value = NULL;
   lv2_atom_object_get (
@@ -1251,10 +1251,10 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
     urid_patch_property, &property,
     urid_patch_value, &value,
     0);
-
+  
   if (!property || !value || property->type != urid_atom_URID)
     return;
-
+  
   const LV2_URID prop = ((const LV2_Atom_URID *) property)->body;
   if (prop == urid_error &&
       (value->type == urid_atom_Blank || value->type == urid_atom_Object)) {
@@ -1270,7 +1270,7 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
       urid_error_lane, &lane_atom,
       urid_error_filename, &filename_atom,
       0);
-
+    
     if (code_atom && bank_atom && lane_atom && filename_atom &&
         code_atom->type == urid_atom_Int &&
         bank_atom->type == urid_atom_Int &&
@@ -1306,7 +1306,7 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
     set_ui_values (value, ATOM_SPECTRUM_POST);
     return;
   }
-
+  
   if (value->type == urid_atom_Int) {
     for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
       const size_t bank = (size_t) b;
@@ -1314,7 +1314,7 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
         for (uint32_t param = 0; param < NB_LV2_EQ_PORT_COUNT; ++param) {
           if (prop != urid_eq_param [bank] [band] [param])
             continue;
-
+          
           set_port_value (
             nb_lv2_eq_port (b, band, param),
             (float) ((const LV2_Atom_Int *) value)->body);
@@ -1322,29 +1322,29 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
         }
       }
     }
-
+    
     for (size_t bank = BANK_PEDAL; bank < BANK_COUNT; ++bank) {
       if (prop != urid_bank_bypass [bank])
         continue;
-
+      
       const bool bypassed = ((const LV2_Atom_Int *) value)->body != 0;
       switch (bank) {
         case BANK_PEDAL:
           set_port_value (PORT_PEDAL_BYPASS, bypassed ? 1.0f : 0.0f);
         break;
-
+        
         case BANK_EQPRE:
           set_port_value (PORT_EQPRE_BYPASS, bypassed ? 1.0f : 0.0f);
         break;
-
+        
         case BANK_CAB:
           set_port_value (PORT_CAB_BYPASS, bypassed ? 1.0f : 0.0f);
         break;
-
+        
         case BANK_EQPOST:
           set_port_value (PORT_EQPOST_BYPASS, bypassed ? 1.0f : 0.0f);
         break;
-
+        
         case BANK_AMP:
         default:
           set_port_value (PORT_AMP_BYPASS, bypassed ? 1.0f : 0.0f);
@@ -1353,31 +1353,31 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
       return;
     }
   }
-
+  
   if (value->type == urid_atom_Float) {
     if (prop == urid_samplerate) {
       set_samplerate ((int) lrintf (((const LV2_Atom_Float *) value)->body));
       return;
     }
-
+    
     for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
       const size_t bank = (size_t) b;
       if (prop != urid_eq_master_gain [bank])
         continue;
-
+      
       set_port_value (
         nb_lv2_eq_master_gain_port (b),
         ((const LV2_Atom_Float *) value)->body);
       return;
     }
-
+    
     for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
       const size_t bank = (size_t) b;
       for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
         for (uint32_t param = 0; param < NB_LV2_EQ_PORT_COUNT; ++param) {
           if (prop != urid_eq_param [bank] [band] [param])
             continue;
-
+          
           set_port_value (
             nb_lv2_eq_port (b, band, param),
             ((const LV2_Atom_Float *) value)->body);
@@ -1386,11 +1386,11 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
       }
     }
   }
-
+  
   if (value->type != urid_atom_Path &&
       value->type != urid_atom_String)
     return;
-
+  
   const char *path = (const char *) LV2_ATOM_BODY_CONST (value);
   set_model_property (prop, path);
 }
@@ -1398,7 +1398,7 @@ void c_lv2_ui::handle_atom_event (const LV2_Atom *atom) {
 void c_lv2_ui::subscribe_ports () {
   if (!subscribe)
     return;
-
+  
   static const uint32_t scalar_ports [] = {
     PORT_BYPASS,
     PORT_VU_ENABLE,
@@ -1431,7 +1431,7 @@ void c_lv2_ui::subscribe_ports () {
     PORT_EQPOST_BYPASS,
     PORT_CAB_BYPASS,
   };
-
+  
   for (_lane_bank b : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
     const size_t bank = (size_t) b;
     for (size_t lane = 0; lane < NB_NUM_MODELS; lane++) {
@@ -1444,14 +1444,14 @@ void c_lv2_ui::subscribe_ports () {
       }
     }
   }
-
+  
   for (_lane_bank b : { BANK_EQPRE, BANK_EQPOST }) {
     subscribe->subscribe (
       subscribe->handle,
       nb_lv2_eq_master_gain_port (b),
       0,
       NULL);
-
+    
     for (size_t band = 0; band < EQ_NUM_BANDS; ++band) {
       for (uint32_t param = 0; param < NB_LV2_EQ_PORT_COUNT; ++param) {
         subscribe->subscribe (
@@ -1462,7 +1462,7 @@ void c_lv2_ui::subscribe_ports () {
       }
     }
   }
-
+  
   for (uint32_t port : scalar_ports)
     subscribe->subscribe (subscribe->handle, port, 0, NULL);
 }
@@ -1497,21 +1497,21 @@ static LV2UI_Handle instantiate (
       ui->resize = (LV2UI_Resize *) features [i]->data;
     }
   }
-
+  
   if (ui->map && !ui->init (ui->map)) {
     delete ui;
     return NULL;
   }
-
+  
   ui->visible_page = PAGE_NONE;
   if (!ui->create (parent)) {
     delete ui;
     return NULL;
   }
-
+  
   ui->subscribe_ports ();
   ui->request_current_state ();
-
+  
   if (widget)
     *widget = (LV2UI_Widget) (uintptr_t) ui->window;
   
@@ -1521,7 +1521,7 @@ static LV2UI_Handle instantiate (
 static void save_lv2_ui_config (c_lv2_ui *ui) {
   if (!ui || !ui->ui_ready)
     return;
-
+  
   ui->write_prefs_to (ui->prefs);
   ui->write_calib_state_if_consistent ();
   write_prefs_to_config (ui->configfile, ui->prefs);
@@ -1531,7 +1531,7 @@ static void cleanup (LV2UI_Handle handle) { CP
   c_lv2_ui *ui = (c_lv2_ui *) handle;
   if (!ui)
     return;
-
+  
   ui->write_int_property (ui->urid_spectrum_select, LV2_SPECTRUM_OFF);
   CP
   save_lv2_ui_config (ui);
@@ -1549,13 +1549,13 @@ static void port_event (
   c_lv2_ui *ui = (c_lv2_ui *) handle;
   if (!ui || !buffer)
     return;
-
+  
   if (format == 0 && buffer_size == sizeof (float)) {
     const float value = *(const float *) buffer;
     ui->set_port_value (port_index, value);
     return;
   }
-
+  
   if (format == ui->urid_atom_eventTransfer && buffer_size >= sizeof (LV2_Atom_Object)) {
     ui->handle_atom_event ((const LV2_Atom *) buffer);
     return;

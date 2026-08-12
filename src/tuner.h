@@ -34,7 +34,7 @@ public:
   std::atomic<float> detected_note  { 0.0f };
   std::atomic<float> detected_cents { 0.0f };
   std::atomic<bool> needs_redraw { false };
-  
+
 private:
   void publish_snapshot ();
   
@@ -74,19 +74,19 @@ public:
   void create (nbtk::c_widget *parent,
                const char *label,
                int x, int y, int w, int h);
-
+  
   void show ();
   void hide ();
   void move_resize (int x, int y, int w, int h) override;
   void move (int x, int y) override;
   void resize (int w, int h) override;
-
+  
   void set_pitchtracker (c_pitchtracker *p);
   void set_pitch (float freq, float note, float cents);
   bool on_ui_timer ();
   bool needs_redraw ();
   void set_base_freq (float f) { if (pitchtracker) pitchtracker->set_base_freq (f); }
-
+  
   bool created = false;
   int width = 0;
   int height = 0;
@@ -97,10 +97,10 @@ protected:
   void on_paint (cairo_t *cr) override;
   void on_resize (int w, int h) override;
   void on_mouseup_left () override;
-
+  
   std::deque<int> hist_notes;
   std::deque<int> hist_cents;
-
+  
   c_pitchtracker *pitchtracker = NULL;
   float current_freq = 0.0f;
   float current_note = 0.0f;

@@ -45,7 +45,7 @@ typedef struct {
   xevfunc dialog_callback;
   xevfunc dnd_notify_callback;
   xevfunc visibiliy_change_callback;
-
+  
   evfunc button_press_callback;
   evfunc button_release_callback;
   evfunc double_click_callback;
