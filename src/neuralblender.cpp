@@ -1830,18 +1830,18 @@ void c_convolver::process_fft_block (const float *in, float *out) {
 
   if (!in || !out || !m_ready || m_blocksize == 0)
     return;
-
+  
   // FFT input block, zero-padded to fft_size
   std::fill (m_fftw_time_in, m_fftw_time_in + m_fft_size, 0.0f);
   for (uint32_t i = 0; i < m_blocksize; ++i)
     m_fftw_time_in [i] = in [i];
-
+  
   fftwf_execute (m_forward_plan);
   for (uint32_t bin = 0; bin < m_freq_bins; ++bin) {
     m_fft_out [bin].r = m_fftw_freq_out [bin] [0];
     m_fft_out [bin].i = m_fftw_freq_out [bin] [1];
   }
-
+  
   // multiply current input FFT by every IR partition.
   //    add each result into a future accumulation slot.
   for (uint32_t p = 0; p < m_num_partitions; ++p) {
@@ -1852,26 +1852,26 @@ void c_convolver::process_fft_block (const float *in, float *out) {
         m_accum_fft [slot] [bin],
         cpx_mul (m_fft_out [bin], m_ir_fft [p] [bin]));
   }
-
+  
   // inverse FFT the current accumulation slot
   for (uint32_t bin = 0; bin < m_freq_bins; ++bin) {
     m_fftw_freq_in [bin] [0] = m_accum_fft [m_accum_pos] [bin].r;
     m_fftw_freq_in [bin] [1] = m_accum_fft [m_accum_pos] [bin].i;
   }
   fftwf_execute (m_inverse_plan);
-
+  
   // normalize IFFT. FFTW inverse is unnormalized.
   const float scale = 1.0f / (float) m_fft_size;
-
+  
   for (uint32_t i = 0; i < m_blocksize; ++i)
     out [i] = m_fftw_time_out [i] * scale + m_overlap [i];
-
+  
   for (uint32_t i = 0; i < m_blocksize; ++i)
     m_overlap [i] = m_fftw_time_out [i + m_blocksize] * scale;
-
+  
   // clear current accumulation slot for reuse
   clear_cpx_vector (m_accum_fft [m_accum_pos]);
-
+  
   // advance ring
   m_accum_pos = (m_accum_pos + 1) % m_num_partitions;
 }

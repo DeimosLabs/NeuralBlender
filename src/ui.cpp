@@ -550,6 +550,15 @@ void c_aboutwindow::on_action (nbtk::t_action_event &event) {
 ////////////////////////////////////////////////////////////////////////////////
 // c_neuralblender_filepicker
 
+static bool path_exists (std::string path) {
+  struct stat st;
+  if (stat (path.c_str (), &st))
+    return false;
+    
+  return true;
+  
+}
+
 void c_neuralblender_filepicker::create (
     c_neuralblender_ui *ui_,
     nbtk::c_app *nbtk_app,
@@ -571,8 +580,11 @@ void c_neuralblender_filepicker::show () {
       bank < BANK_COUNT ? (_lane_bank) bank : BANK_NONE;
     current_dir = ui->configfile.get_item (cwd_config_key_for_bank_ui (bank_));
   }
-  if (current_dir.empty ())
-    current_dir = CONFIG_DEFAULT_DIR;
+  
+  if (current_dir.empty () || !path_exists (current_dir)) {
+    //current_dir = CONFIG_DEFAULT_DIR;
+    current_dir = std::string (getenv ("HOME"));
+  }
 
   nbtk::c_filepicker::show ();
 }
