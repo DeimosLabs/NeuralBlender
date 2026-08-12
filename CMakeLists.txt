@@ -25,7 +25,7 @@ find_program(XXD_EXECUTABLE xxd REQUIRED)
 
 pkg_check_modules(FFTW3F REQUIRED IMPORTED_TARGET fftw3f)
 pkg_check_modules(SNDFILE REQUIRED IMPORTED_TARGET sndfile)
-pkg_check_modules(SAMPLERATE REQUIRED IMPORTED_TARGET samplerate)
+#pkg_check_modules(SAMPLERATE REQUIRED IMPORTED_TARGET samplerate)
 
 if (GZIP_SUPPORT)
   find_package(ZLIB)
@@ -230,7 +230,7 @@ target_compile_definitions(neuralblender_core PUBLIC
   DSP_SAMPLE_FLOAT
   HAVE_FFTW
   HAVE_SNDFILE
-  HAVE_SAMPLERATE
+#  HAVE_SAMPLERATE
 )
 
 target_compile_definitions(neuralblender_meter_data PRIVATE
@@ -241,7 +241,7 @@ target_link_libraries(neuralblender_core PUBLIC
   Eigen3::Eigen
   PkgConfig::FFTW3F
   PkgConfig::SNDFILE
-  PkgConfig::SAMPLERATE
+#  PkgConfig::SAMPLERATE
   neuralblender_config
 )
 

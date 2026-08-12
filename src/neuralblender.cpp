@@ -35,9 +35,9 @@
 #include <sndfile.h>
 #endif
 
-#ifdef HAVE_SAMPLERATE
+/*#ifdef HAVE_SAMPLERATE
 #include <samplerate.h>
-#endif
+#endif*/
 
 #include "neuralblender.h"
 
@@ -419,7 +419,7 @@ static SF_VIRTUAL_IO g_sndfile_mem_vio {
 static std::mutex g_fftw_planner_mutex;
 
 c_spectrum_analyzer::c_spectrum_analyzer () { CP
-  constexpr float two_pi = 6.28318530717958647692f;
+  constexpr float two_pi = M_PI * 2.0f;
 
   for (size_t i = 0; i < window.size (); ++i) {
     const float phase =
@@ -656,9 +656,8 @@ void c_biquad::set_peak (float samplerate, float freq, float gain_db, float q,
   freq = std::clamp (freq, NB_FREQ_MIN, samplerate * 0.45f);
   q = std::clamp (q, 0.05f, 100.0f);
   
-  const float pi = 3.14159265358979323846f;
   const float a = powf (10.0f, gain_db / 40.0f);
-  const float w0 = 2.0f * pi * freq / samplerate;
+  const float w0 = 2.0f * M_PI * freq / samplerate;
   const float cw = cosf (w0);
   const float sw = sinf (w0);
   const float alpha = sw / (2.0f * q);
@@ -809,8 +808,7 @@ float c_biquad::response_db (float freq, float samplerate) const {
   if (mode == EQ_OFF || samplerate <= 0.0f)
     return 0.0f;
 
-  const float pi = 3.14159265358979323846f;
-  const float w0 = 2.0f * pi * freq / samplerate;
+  const float w0 = 2.0f * M_PI * freq / samplerate;
 
   const float c1 = cosf (w0);
   const float s1 = sinf (w0);
@@ -1361,6 +1359,113 @@ static void convolver_trim_trailing_silence (
   v.resize (n);
 }
 
+/* WINDOWED-SINC / HANN RESAMPLING FUNCTIONS
+
+  Conceptually, for each output sample:
+
+  const double source_pos = output_index * input_rate / output_rate;
+  const int center = floor(source_pos);
+  const double fraction = source_pos - center;
+
+  output[output_index] =
+    sum(input[center + tap] * windowed_sinc(tap - fraction));
+
+  The important downsampling detail is:
+
+  cutoff = std::min(1.0, output_rate / input_rate);
+*/
+
+static double sinc (double x) {
+  if (std::abs (x) < 1.0e-12)
+    return 1.0;
+
+  const double pix = M_PI * x;
+  return std::sin (pix) / pix;
+}
+
+static double hann_window (double x, int half_taps) {
+  const double distance = std::abs (x);
+
+  if (distance > (double) half_taps)
+    return 0.0;
+
+  return 0.5 +
+         0.5 * std::cos (M_PI * distance / (double) half_taps);
+}
+
+static double windowed_sinc (
+    double distance,
+    double cutoff,
+    int half_taps) {
+  return cutoff *
+         sinc (cutoff * distance) *
+         hann_window (distance, half_taps);
+}
+
+static bool resample_audio (
+    const std::vector<float> &in,
+    std::vector<float> &out,
+    double ratio) {
+  CP
+
+  if (in.empty () || !std::isfinite (ratio) || ratio <= 0.0) {
+    out.clear ();
+    return false;
+  }
+
+  if (std::abs (ratio - 1.0) < 1.0e-12) {
+    out = in;
+    return true;
+  }
+
+  const size_t out_count = (size_t) std::llround (
+    (double) in.size () * ratio);
+
+  if (out_count == 0) {
+    out.clear ();
+    return false;
+  }
+
+  constexpr int half_taps = 32;
+
+  const double source_step = 1.0 / ratio;
+
+  // Leave a transition band below the destination Nyquist frequency.
+  const double cutoff =
+    0.95 * std::min (1.0, ratio);
+
+  out.resize (out_count);
+
+  for (size_t i = 0; i < out_count; ++i) {
+    const double source_pos = (double) i * source_step;
+    const int center = (int) std::floor (source_pos);
+    const double fraction = source_pos - (double) center;
+
+    double sum = 0.0;
+    double coefficient_sum = 0.0;
+
+    for (int tap = -half_taps; tap <= half_taps; ++tap) {
+      const int input_index = center + tap;
+      const double distance = (double) tap - fraction;
+      const double coefficient =
+        windowed_sinc (distance, cutoff, half_taps);
+
+      if (input_index >= 0 &&
+          input_index < (int) in.size ()) {
+        sum += (double) in [input_index] * coefficient;
+        coefficient_sum += coefficient;
+      }
+    }
+
+    if (std::abs (coefficient_sum) > 1.0e-12)
+      sum /= coefficient_sum;
+
+    out [i] = (float) sum;
+  }
+
+  return true;
+}
+
 static bool convolver_resample_ir (
     const std::vector<float> &src,
     std::vector<float> &dst,
@@ -1368,34 +1473,23 @@ static bool convolver_resample_ir (
     uint32_t dst_samplerate,
     float semitones) {
 
-  if (src.empty ())
+  if (src.empty () || !src_samplerate || !dst_samplerate) {
+    dst.clear ();
     return false;
-
-  semitones = std::clamp (semitones, -12.0f, 12.0f);
-  const double pitch_ratio = pow (2.0, (double) semitones / 12.0);
-  if (!std::isfinite (pitch_ratio) || pitch_ratio <= 0.0)
-    return false;
-
-  const double sr_ratio =
-    src_samplerate && dst_samplerate
-      ? (double) dst_samplerate / (double) src_samplerate
-      : 1.0;
-  const double resample_ratio = sr_ratio / pitch_ratio;
-  if (!std::isfinite (resample_ratio) || resample_ratio <= 0.0)
-    return false;
-
-  const size_t out_len =
-    std::max (
-      (size_t) 1,
-      (size_t) llround ((double) src.size () * resample_ratio));
-  dst.resize (out_len);
-
-  if (src.size () == 1) {
-    std::fill (dst.begin (), dst.end (), src [0]);
-    return true;
   }
 
-#ifdef HAVE_SAMPLERATE
+  semitones = std::clamp (semitones, -12.0f, 12.0f);
+
+  const double pitch_ratio =
+    std::pow (2.0, (double) semitones / 12.0);
+
+  const double samplerate_ratio =
+    (double) dst_samplerate / (double) src_samplerate;
+
+  const double resample_ratio =
+    samplerate_ratio / pitch_ratio;
+
+/*#ifdef HAVE_SAMPLERATE
   std::vector<float> in = src;
   SRC_DATA data {};
   data.data_in = in.data ();
@@ -1410,25 +1504,20 @@ static bool convolver_resample_ir (
     convolver_trim_trailing_silence (dst);
     return !dst.empty ();
   }
-#endif
+#else*/
 
-  for (size_t i = 0; i < out_len; ++i) {
-    const double pos = (double) i / resample_ratio;
-    size_t i0 = (size_t) floor (pos);
-    if (i0 >= src.size () - 1) {
-      dst [i] = src.back ();
-      continue;
-    }
-    
-    const size_t i1 = i0 + 1;
-    const float frac = (float) (pos - (double) i0);
-    dst [i] = src [i0] + (src [i1] - src [i0]) * frac;
+  if (!std::isfinite (resample_ratio) || resample_ratio <= 0.0) {
+    dst.clear ();
+    return false;
   }
+
+  if (!resample_audio (src, dst, resample_ratio))
+    return false;
 
   convolver_trim_trailing_silence (dst);
   return !dst.empty ();
 }
-
+  
 size_t c_convolver::load_ir (
     const float *ir,
     uint32_t nframes,

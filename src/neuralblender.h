@@ -376,6 +376,8 @@ private:
   void process_fft_block (const float *in, float *out);
   void process_direct_block (const float *in, float *out, uint32_t nframes);
   void update_direct_history (const float *in, uint32_t nframes);
+  static bool resample_audio (const std::vector<float> in,  int in_rate,
+                                    std::vector<float> out, int out_rate);
   
   std::vector<float> m_ir_source;       // cleaned source IR
   std::vector<float> m_ir;              // current pitch-resampled IR

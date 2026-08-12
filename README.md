@@ -82,6 +82,7 @@ Tested on:
   - Void Linux
   - MX Moksha
   - Linux Mint
+  - Fedora
   - FreeBSD
 
 MacOS: Expected to work soon, currently needs to be fixed. The only Mac i have is from 1986.

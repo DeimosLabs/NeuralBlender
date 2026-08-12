@@ -36,6 +36,9 @@ static constexpr size_t NB_MAX_LANES =
 #define EQ_SLOPE_MAX             4
 #define EQ_PARAM_XFADE_MS        2.0f
 #define IR_SILENCE_THRESHOLD     -80.0f
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 enum _nb_error_code {
   NB_ERROR_NONE = 0,

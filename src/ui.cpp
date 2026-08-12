@@ -1834,16 +1834,16 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_other_byp_pedal.create (&frame_other_linkexcl, "Pedal",  x1, y0, 80, 32);
   btn_other_byp_pedal.role = ROLE_BANK_BYPASS;
   btn_other_byp_pedal.bank = BANK_PEDAL;
-  btn_other_byp_eq1.create (&frame_other_linkexcl, "EQ1",  x2, y0, 80, 32);
+  btn_other_byp_eq1.create (&frame_other_linkexcl, "EQ1",      x2, y0, 80, 32);
   btn_other_byp_eq1.role = ROLE_BANK_BYPASS;
   btn_other_byp_eq1.bank = BANK_EQPRE;
   btn_other_byp_amp.create (&frame_other_linkexcl, "Amp",      x3, y0, 80, 32);
   btn_other_byp_amp.role = ROLE_BANK_BYPASS;
   btn_other_byp_amp.bank = BANK_AMP;
-  btn_other_byp_eq2.create (&frame_other_linkexcl, "EQ2",  x4, y0, 80, 32);
+  btn_other_byp_eq2.create (&frame_other_linkexcl, "EQ2",      x4, y0, 80, 32);
   btn_other_byp_eq2.role = ROLE_BANK_BYPASS;
   btn_other_byp_eq2.bank = BANK_EQPOST;
-  btn_other_byp_cab.create (&frame_other_linkexcl, "Cab",   x5, y0, 80, 32);
+  btn_other_byp_cab.create (&frame_other_linkexcl, "Cab",      x5, y0, 80, 32);
   btn_other_byp_cab.role = ROLE_BANK_BYPASS;
   btn_other_byp_cab.bank = BANK_CAB;
   btn_other_link_pedal.create (&frame_other_linkexcl, "Pedal", x1, y1, 80, 32);
@@ -1852,7 +1852,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_other_link_amp.create (&frame_other_linkexcl, "Amp",     x2, y1, 80, 32);
   btn_other_link_amp.role = ROLE_LINKED_CALIB;
   btn_other_link_amp.bank = BANK_AMP;
-  btn_other_link_cab.create (&frame_other_linkexcl, "Cab",  x3, y1, 80, 32);
+  btn_other_link_cab.create (&frame_other_linkexcl, "Cab",     x3, y1, 80, 32);
   btn_other_link_cab.role = ROLE_LINKED_CALIB;
   btn_other_link_cab.bank = BANK_CAB;
   btn_other_excl_pedal.create (&frame_other_linkexcl, "Pedal", x1, y2, 80, 32);
@@ -1861,7 +1861,7 @@ bool c_neuralblender_ui::create (nbtk::t_native_window parent_) { CP
   btn_other_excl_amp.create (&frame_other_linkexcl, "Amp",     x2, y2, 80, 32);
   btn_other_excl_amp.role = ROLE_EXCL_TOGGLE;
   btn_other_excl_amp.bank = BANK_AMP;
-  btn_other_excl_cab.create (&frame_other_linkexcl, "Cab",  x3, y2, 80, 32);
+  btn_other_excl_cab.create (&frame_other_linkexcl, "Cab",     x3, y2, 80, 32);
   btn_other_excl_cab.role = ROLE_EXCL_TOGGLE;
   btn_other_excl_cab.bank = BANK_CAB;
   
