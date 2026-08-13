@@ -1,3 +1,7 @@
+# Thanks to MICROSUCK ABUSING ITS OWNERSHIP OF GITHUB, this project has permanently moved to Sourceforge.
+
+https://sourceforge.net/projects/neuralblender/
+
 # NeuralBlender
 
 A simple, efficient but feature-rich guitar amp modeling plugin based on RTNeural and NeuralAmpModeler (NAM)
