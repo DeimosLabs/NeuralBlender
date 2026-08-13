@@ -1,6 +1,6 @@
 # NeuralBlender
 
-A simple, efficient but feature-rich amp modeling plugin based on RTNeural and NeuralAmpModeler (NAM)
+A simple, efficient but feature-rich guitar amp modeling plugin based on RTNeural and NeuralAmpModeler (NAM)
 
 Features:
   - Supports nam A1, nam A2, aidax, and json model files.
