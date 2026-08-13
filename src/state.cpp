@@ -962,7 +962,7 @@ bool c_neuralblender_state::from_strings (std::vector<std::string> &v) {
       value = (int) tofloat (text);
   };
   
-  read_string ("current_dir", parsed.current_dir);
+  //read_string ("current_dir", parsed.current_dir);
   read_bool ("bypass", parsed.bypass);
   read_bool ("pedal_bypass", parsed.pedal_bypass);
   read_bool ("eqpre_bypass", parsed.eqpre_bypass);
@@ -985,13 +985,7 @@ bool c_neuralblender_state::from_strings (std::vector<std::string> &v) {
   read_float ("calib_target_db", parsed.calib_target_db);
   read_int ("calib_source", parsed.calib_source);
   
-  const _lane_bank model_banks [] = {
-    BANK_PEDAL,
-    BANK_AMP,
-    BANK_CAB
-  };
-  
-  for (_lane_bank bank : model_banks) {
+  for (auto bank : { BANK_PEDAL, BANK_AMP, BANK_CAB }) {
     const std::string prefix = bank_name (bank);
     read_int ((prefix + "_exclusive_lane").c_str (),
               parsed.banks [bank].exclusive_lane);

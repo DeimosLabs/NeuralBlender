@@ -198,7 +198,8 @@ struct c_neuralblender_state {
     if (this == &other)
       return *this;
     
-    current_dir = other.current_dir;
+    //current_dir = other.current_dir;
+    loaded = other.loaded;
     bypass = other.bypass;
     do_excl = other.do_excl;
     do_vu = other.do_vu;
@@ -235,7 +236,9 @@ struct c_neuralblender_state {
   bool read_from (const std::string &filename);
   bool write_to (const std::string &filename);
   
-  std::string current_dir;
+  //std::string current_dir;
+  std::string filename;
+  bool loaded             = false;
   bool bypass             = false;
   bool pedal_bypass       = false;
   bool eqpre_bypass       = true;

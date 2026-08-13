@@ -5101,7 +5101,7 @@ void c_popupwindow::create_native_for_owner (
   native_childlist_add_child (native_owner->childlist, w);
 }
 
-void c_popupwindow::show_at_screen_pos (int x_, int y_) { CP
+void c_popupwindow::show_at_screen_pos (int x_, int y_) {
   move_resize (x_, y_, w, h);
   show ();
 }

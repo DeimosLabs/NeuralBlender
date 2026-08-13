@@ -640,6 +640,73 @@ void do_usage (int argc, char **argv) {
   printf ("NeuralBlender (%s) build timestamp %s\n", c, g_build_timestamp);
 }
 
+enum _arg_type {
+  ARG_NONE,
+  ARG_BOOL,
+  ARG_INT,
+  ARG_FLOAT,
+  ARG_STRING
+};
+
+static struct {
+  const char *longname;
+  const char shortname;
+  _arg_type type;
+  const char *desc;
+  
+} g_argtable [] = {
+  { "help",         'h',  ARG_BOOL,    "show help text" },
+  { "version",      'v',  ARG_BOOL,    "show version" },
+  { "headless",     'H',  ARG_BOOL,    "run without graphic interface" },
+  { "jackname",     'n',  ARG_STRING,  "use client name for JACK" },
+  { "jackserver",   'N',  ARG_STRING,  "connect to JACK server named <str>" },
+  { "preset",       'p',  ARG_STRING,  "load preset file <str>" },
+  { "master",       'M',  ARG_FLOAT,   "master volume in dB" },
+  { "presence",     'R',  ARG_FLOAT,   "presence control, 0.0 to 1.0" },
+  { "tuner",        'T',  ARG_BOOL,    "enable tuner" },
+  { "meters",       'V',  ARG_BOOL,    "enable VU meters" },
+  { "bass",         'B',  ARG_BOOL,    "calibrate for bass guitar" },
+  { "pedal",        'P',  ARG_BOOL,    "enable/disable pedal bank" },
+  { "amp",          'A',  ARG_BOOL,    "enable/disable amp bank" },
+  { "cab",          'C',  ARG_BOOL,    "enable/disable cab bank" },
+  { "eq1",          ' ',  ARG_STRING,  "try to load this pre-EQ preset" },
+  { "eq2",          ' ',  ARG_STRING,  "try to load this post-EQ preset" },
+  { "pedal_link",   ' ',  ARG_BOOL,    "pedal bank linked calibration" },
+  { "amp_link",     ' ',  ARG_BOOL,    "amp bank linked calibration" },
+  { "cab_link",     ' ',  ARG_BOOL,    "cab bank linked calibration" },
+  { "calib",        ' ',  ARG_FLOAT,   "calibration target level in dB" },
+  { "noisegate",    'g',  ARG_BOOL,    "enable noise gate" },
+  { "noisethresh",  't',  ARG_FLOAT,   "set noisegate threshold" },
+  { "noiseattack",  ' ',  ARG_INT,     "set noisegate attack millisec." },
+  { "noisehold",    ' ',  ARG_INT,     "set noisegate hold millisec." },
+  { "noiserelease", ' ',  ARG_INT,     "set noisegate release millisec." },
+  { "excl_pedal",   'X',  ARG_BOOL,    "start pedal bank in exclusive mode" },
+  { "excl_amp",     'Y',  ARG_BOOL,    "start amp bank in exclusive mode" },
+  { "excl_cab",     'Z',  ARG_BOOL,    "start cab bank in exclusive mode" },
+  { "%pedal",       ' ',  ARG_STRING,  "load file <str> in pedal lane %" },
+  { "%amp",         '%',  ARG_STRING,  "load file <str> in amp lane %" },
+  { "%cab",         ' ',  ARG_STRING,  "load file <str> in cab lane %" },
+  { "%pedal_in",    ' ',  ARG_FLOAT,   "input gain for pedal %" },
+  { "%pedal_out",   ' ',  ARG_FLOAT,   "output gain for pedal %" },
+  { "%pedal_dry",   ' ',  ARG_FLOAT,   "dry/passthrough gain for pedal %" },
+  { "%pedal_delay", ' ',  ARG_FLOAT,   "milliseconds delay for pedal %" },
+  { "%pedal_calib", ' ',  ARG_BOOL,    "enable calibration of pedal %" },
+  { "%pedal_flip",  ' ',  ARG_BOOL,    "DC flip (phase invert) pedal %" },
+  { "%amp_in",      ' ',  ARG_FLOAT,   "input gain for amp %" },
+  { "%amp_out",     ' ',  ARG_FLOAT,   "output gain for amp %" },
+  { "%amp_dry",     ' ',  ARG_FLOAT,   "dry/passthrough gain for amp %" },
+  { "%amp_delay",   ' ',  ARG_FLOAT,   "milliseconds delay for amp %" },
+  { "%amp_calib",   ' ',  ARG_BOOL,    "enable calibration of amp %" },
+  { "%amp_flip",    ' ',  ARG_BOOL,    "DC flip (phase invert) amp %" },
+  { "%cab_pitch",   ' ',  ARG_FLOAT,   "pitch shift for cab %" },
+  { "%cab_out",     ' ',  ARG_FLOAT,   "output gain for cab %" },
+  { "%cab_dry",     ' ',  ARG_FLOAT,   "dry/passthrough gain for cab %" },
+  { "%cab_delay",   ' ',  ARG_FLOAT,   "milliseconds delay for cab %" },
+  { "%cab_calib",   ' ',  ARG_BOOL,    "enable calibration of cab %" },
+  { "%cab_flip",    ' ',  ARG_BOOL,    "DC flip (phase invert) cab %" },
+  { NULL, 0, ARG_NONE, NULL }
+};
+
 bool parse_args (int argc, char **argv, c_neuralblender *blender) {
   int i;
   CP
@@ -647,22 +714,6 @@ bool parse_args (int argc, char **argv, c_neuralblender *blender) {
     if (!strcmp (argv [i], "-h") || !strcmp (argv [i], "--help")) {
       do_usage (argc, argv);
       exit (0);
-    } else if (!strcmp (argv [i], "-a")) {
-      if (argv [i + 1]) {
-        blender->banks [BANK_AMP].lanes [0].filename = argv [++i];
-      } else {
-        printf ("-a needs a filename argument\n");
-        return false;
-      }
-    } else if (!strcmp (argv [i], "-b")) {
-      if (argv [i + 1]) {
-        blender->banks [BANK_AMP].lanes [1].filename = argv [++i];
-      } else {
-        printf ("-b needs a filename argument\n");
-        return false;
-      }
-    } else {
-      printf ("don't know what to do with '%s'\n", argv [i]);
       return false;
     }
   }

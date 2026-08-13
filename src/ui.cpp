@@ -629,7 +629,7 @@ void c_neuralblender_filepicker::on_file_select (
   scan_current_dir ();
   if (ui->load_model (bank_, lane, filename.c_str ())) {
     ui->state.banks [bank_].lanes [lane].filename = filename;
-    ui->state.current_dir = current_dir;
+    //ui->state.current_dir = current_dir;
   }
   
   nbtk::c_combobox *cb = &ui->lanes_for_bank (bank_) [lane].cb_list;
