@@ -46,8 +46,7 @@ Demo: https://soundcloud.com/delt01/snakeskin All the guitars and bass in this t
 No pre-built binaries yet. If anyone would like them, please let me know.
 
 Compiles and installs with cmake. Required libs / utilities to build:
-  - eigen3 (for core, required)
-  - fftw-float
+  - fftw-float (for core, required)
   - lv2 (for LV2 plugin)
   - jack (for standalone app)
   - cairo/x11 (for GUI)
