@@ -44,15 +44,6 @@ Demo: https://soundcloud.com/delt01/snakeskin All the guitars and bass in this t
 ![NeuralBlender in Ardour](data/screenshot-ardour.png)
 
 
-Compiles and installs with cmake. Required libs / utilities to build:
-  - fftw-float (for core, required)
-  - lv2 (for LV2 plugin)
-  - jack (for standalone app)
-  - cairo/x11 (for GUI)
-  - libsoundfile (for IR support)
-  - xxd utility, for inline data
-  
-
 ## Supported systems
 
 Should compile and work fine on any POSIX-compliant OS including Linux, MacOS (to be fixed), FreeBSD, etc. For now UI uses X11, but recent rewrite should make it easy to port to other graphic systems.
