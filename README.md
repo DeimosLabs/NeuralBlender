@@ -43,7 +43,6 @@ Demo: https://soundcloud.com/delt01/snakeskin All the guitars and bass in this t
 
 ![NeuralBlender in Ardour](data/screenshot-ardour.png)
 
-No pre-built binaries yet. If anyone would like them, please let me know.
 
 Compiles and installs with cmake. Required libs / utilities to build:
   - fftw-float (for core, required)
@@ -53,29 +52,6 @@ Compiles and installs with cmake. Required libs / utilities to build:
   - libsoundfile (for IR support)
   - xxd utility, for inline data
   
-On debian/ubuntu/mint, just run:
-```bash
-sudo apt install git cmake libeigen3-dev libfftw3-dev lv2-dev libjack-dev libcairo2-dev libsndfile1-dev xxd
-```
-On other distributions, the package names (and package system) are probably different, but still available.
-
-To grab the code, build and install, run something like:
-```
-git clone https://github.com/DeimosLabs/NeuralBlender
-cd NeuralBlender
-mkdir build
-cd build
-cmake ..
-make -j$(nproc) && sudo make install
-```
-
-To uninstall, go back to the same build directory and run:
-
-```
-sudo make uninstall
-```
-
-For the standalone version, see --help text for more info/options
 
 ## Supported systems
 
